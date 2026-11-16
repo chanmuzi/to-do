@@ -34,7 +34,7 @@ let package = Package(
         ),
         .target(
             name: "Editor",
-            dependencies: ["Theme", "Models"],
+            dependencies: ["Theme"],
             swiftSettings: uiSettings
         ),
         .target(
@@ -58,6 +58,13 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
+        // 편집기만 띄워 보는 확인용 실행 파일. 앱에는 들어가지 않는다.
+        .executableTarget(
+            name: "EditorDemo",
+            dependencies: ["Editor", "Theme"],
+            swiftSettings: uiSettings
+        ),
+
         // MARK: Tests
         .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
@@ -72,6 +79,7 @@ let package = Package(
             dependencies: ["FloatingNotes", "NotePanel", "Theme", "Models", "Store", "Routing"],
             swiftSettings: uiSettings
         ),
+        .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
     ],
     swiftLanguageModes: [.v6]
 )
