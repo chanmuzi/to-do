@@ -5,23 +5,14 @@ import Testing
 /// 날짜와 시간 표현 읽기. 달력은 서울 시간이고, "지금"은 경우마다 준다.
 /// 기본 "지금"은 2026년 11월 16일 월요일 10:00이다.
 @Suite nonisolated struct DateTimeParserTests {
-    /// 표의 한 줄: 글, 지금, 알아들은 글자, 시작, 끝.
-    struct Case: Sendable, CustomTestStringConvertible {
-        var text: String
-        var now: Date
-        var match: String
-        var start: Date
-        var end: Date?
-
-        var testDescription: String { text }
-    }
+    typealias Case = ParseCase
 
     private static func at(_ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, year: Int = 2026) -> Date {
-        TestClock.date(month, day, hour, minute, year: year)
+        ParseCase.at(month, day, hour, minute, year: year)
     }
 
     /// 월요일 오전 10시.
-    private static let morning = at(11, 16, 10)
+    private static let morning = ParseCase.morning
     /// 같은 날 밤 10시.
     private static let night = at(11, 16, 22)
     /// 11월의 마지막 날(월요일) 오전 10시.
@@ -32,7 +23,7 @@ import Testing
     private static func one(
         _ text: String, _ match: String, _ start: Date, to end: Date? = nil, now: Date = morning
     ) -> Case {
-        Case(text: text, now: now, match: match, start: start, end: end)
+        ParseCase.one(text, match, start, to: end, now: now)
     }
 
     private func parse(_ text: String, now: Date = DateTimeParserTests.morning) -> DateTimeExpression? {
@@ -40,12 +31,7 @@ import Testing
     }
 
     private func check(_ item: Case) {
-        let found = parse(item.text, now: item.now)
-        #expect(found != nil, "읽지 못했다: \(item.text)")
-        guard let found else { return }
-        #expect((item.text as NSString).substring(with: found.range) == item.match, "\(item.text)")
-        #expect(found.start == item.start, "\(item.text): 시작 \(found.start)")
-        #expect(found.end == item.end, "\(item.text): 끝 \(String(describing: found.end))")
+        item.check()
     }
 
     // MARK: - 시각
@@ -78,21 +64,28 @@ import Testing
         check(item)
     }
 
-    /// 오전·오후를 적지 않은 시각은 지금을 보고 고른다. 지난 시각으로 읽지 않는다.
+    /// 오전·오후를 적지 않은 시각은 흔한 쪽으로 읽는다(1~7시는 오후, 8~11시는 오전, 12시는 정오).
+    /// 그 시각이 오늘 지났으면 같은 시각의 내일이다. 오전과 오후를 바꿔 읽지 않는다.
     @Test(arguments: [
         one("3시 회의", "3시", at(11, 16, 15)),
         one("3시 회의", "3시", at(11, 17, 15), now: night),
-        one("9시 회의", "9시", at(11, 16, 21)),
+        one("9시 회의", "9시", at(11, 17, 9)),
         one("9시 회의", "9시", at(11, 17, 9), now: night),
         one("11시 회의", "11시", at(11, 16, 11)),
-        one("11시 회의", "11시", at(11, 16, 23), now: night),
-        one("7시 회의", "7시", at(11, 16, 7), now: at(11, 16, 6)),
+        one("11시 회의", "11시", at(11, 17, 11), now: night),
+        one("7시 회의", "7시", at(11, 16, 19), now: at(11, 16, 6)),
+        one("7시 회의", "7시", at(11, 17, 19), now: night),
         one("6시 운동", "6시", at(11, 16, 18)),
+        one("6시 운동", "6시", at(11, 17, 18), now: night),
+        one("8시 출근", "8시", at(11, 16, 8), now: at(11, 16, 7)),
         one("12시 점심", "12시", at(11, 16, 12)),
-        one("9:15 회의", "9:15", at(11, 16, 21, 15)),
-        // 뒤따르는 말이 때를 알려 준다.
+        one("9:15 회의", "9:15", at(11, 17, 9, 15)),
+        one("3:30 회의", "3:30", at(11, 16, 15, 30)),
+        // 시각 뒤의 때를 가리키는 말은 `에`가 붙었을 때만 시각의 것이다.
         one("7시 저녁 약속", "7시", at(11, 16, 19)),
         one("9시 아침 회의", "9시", at(11, 17, 9)),
+        one("9시 저녁에 통화", "9시", at(11, 16, 21)),
+        one("11시 밤에 배포", "11시", at(11, 16, 23)),
         // 밤늦게 적은 새벽 시각은 다가오는 그 시각이다.
         one("밤 1시 취침", "밤 1시", at(11, 17, 1), now: night),
     ])
@@ -133,8 +126,8 @@ import Testing
         one("내일 3pm 미팅", "내일 3pm", at(11, 17, 15)),
         one("금요일 3시 데모", "금요일 3시", at(11, 20, 15)),
         one("금요일 데모", "금요일", at(11, 20, 9)),
-        // 오늘이 월요일이다. 날만 적으면 9시가 지났으므로 다음 주, 남은 시각을 적으면 오늘.
-        one("월요일 주간회의", "월요일", at(11, 23, 9)),
+        // 오늘이 월요일이다. 요일만 적어도 오늘이다(9시가 지났어도 다음 주로 넘기지 않는다).
+        one("월요일 주간회의", "월요일", at(11, 16, 9)),
         one("월요일 5시 회고", "월요일 5시", at(11, 16, 17)),
         one("이번 주 금요일 2시", "이번 주 금요일 2시", at(11, 20, 14)),
         one("다음 주 월요일 9시", "다음 주 월요일 9시", at(11, 23, 9)),
@@ -224,8 +217,8 @@ import Testing
         one("3일 마감", "3일", at(1, 3, 9, year: 2027), now: yearEnd),
         // 2월 29일은 다음 윤년.
         one("2월 29일", "2월 29일", at(2, 29, 9, year: 2028)),
-        // 오늘 날짜를 적었는데 시각이 지났으면 내년.
-        one("11월 16일 오전 9시", "11월 16일 오전 9시", at(11, 16, 9, year: 2027)),
+        // 오늘 날짜를 적었으면 시각이 지났어도 오늘이다(내년으로 넘기지 않는다).
+        one("11월 16일 오전 9시", "11월 16일 오전 9시", at(11, 16, 9)),
         one("11월 16일 오후 3시", "11월 16일 오후 3시", at(11, 16, 15)),
     ])
     func rollover(item: Case) {
@@ -297,8 +290,8 @@ import Testing
         #expect(oldDate.start == Self.at(1, 1, 9, year: 2020))
         #expect(oldDate.assumptions.contains(.past))
 
-        // 날을 적지 않았거나 해를 적지 않은 날은 지난 때로 읽지 않는다.
-        for text in ["9시", "오전 9시", "11/15 회의", "15일", "일요일", "정오"] {
+        // 날을 적지 않았거나 해를 적지 않은 지난 날은 지난 때로 읽지 않고 다가오는 것으로 읽는다.
+        for text in ["9시", "오전 9시", "11/5 회의", "15일", "일요일", "정오"] {
             let found = try #require(parse(text, now: Self.at(11, 16, 14)), "\(text)")
             #expect(found.start > Self.at(11, 16, 14), "\(text)")
             #expect(!found.assumptions.contains(.past), "\(text)")
