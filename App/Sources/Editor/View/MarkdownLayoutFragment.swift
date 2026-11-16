@@ -123,16 +123,23 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         }
     }
 
-    private func drawCodeBox(_ decoration: FragmentDecoration, in context: CGContext) {
-        guard let box = decoration.codeBox, let first = contentLines.first, let last = contentLines.last else { return }
-        let style = decoration.style
-        let x0 = decoration.codeBoxX - layoutFragmentFrame.minX
-        let rect = CGRect(
-            x: x0,
+    /// 코드 블록 상자에서 이 문단이 차지하는 부분. 조각 좌표.
+    var codeBoxRect: CGRect? {
+        guard let decoration, decoration.codeBox != nil, let first = contentLines.first else { return nil }
+        // 문서 끝의 빈 코드 줄은 이 조각에 붙은 빈 줄 조각이다. 상자를 거기까지 늘린다.
+        let lines = decoration.codeBoxCoversExtraLine ? textLineFragments : contentLines
+        guard let last = lines.last else { return nil }
+        return CGRect(
+            x: decoration.codeBoxX - layoutFragmentFrame.minX,
             y: first.typographicBounds.minY,
             width: containerWidth - decoration.codeBoxX,
             height: last.typographicBounds.maxY - first.typographicBounds.minY
         )
+    }
+
+    private func drawCodeBox(_ decoration: FragmentDecoration, in context: CGContext) {
+        guard let box = decoration.codeBox, let rect = codeBoxRect else { return }
+        let style = decoration.style
         let radius = style.codeBlockRadius
         context.addPath(BoxPath.fill(rect, radius: radius, top: box.top, bottom: box.bottom))
         context.setFillColor(style.codeBackground.cgColor)

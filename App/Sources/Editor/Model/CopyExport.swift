@@ -9,13 +9,34 @@ nonisolated struct CopyExport: Sendable {
     private let lines: [MarkdownLine]
     private let startsInCode: Bool
 
-    /// - Parameter selection: 선택. 줄 머리의 감춘 기호 바로 뒤에서 시작하면 그 기호까지 넣는다.
+    /// - Parameter selection: 선택.
+    ///   - 첫 줄의 감춘 줄 머리(들여쓰기, 목록 기호)는 선택이 그 줄 끝을 넘어갈 때만 넣는다.
+    ///     한 줄 안의 글자만 골랐으면 기호 없이 그 글자만 나간다.
+    ///   - 마지막 줄에서 고른 것이 줄 머리뿐이면(⇧↓로 아랫줄 글자 시작까지 고른 경우) 그 줄은 뺀다.
     init(_ document: MarkdownDocument, selection: NSRange) {
-        let first = document.lines[document.lineIndex(at: selection.location)]
+        let firstIndex = document.lineIndex(at: selection.location)
+        let first = document.lines[firstIndex]
         var start = selection.location
-        if start <= (first.kind.isCode ? first.caretStart : first.contentStart) { start = first.start }
-        let source = document.string(in: NSRange(location: start, length: NSMaxRange(selection) - start))
+        var end = NSMaxRange(selection)
+        let firstHead = Self.hiddenHeadEnd(of: first)
+        if start <= firstHead {
+            start = end > first.end ? first.start : min(firstHead, end)
+        }
+        let lastIndex = document.lineIndex(at: end)
+        if lastIndex > firstIndex {
+            let last = document.lines[lastIndex]
+            let lastHead = Self.hiddenHeadEnd(of: last)
+            if end > last.start, end <= lastHead, lastHead < last.end {
+                end = document.lines[lastIndex - 1].end
+            }
+        }
+        let source = document.string(in: NSRange(location: start, length: max(0, end - start)))
         self.init(source: source, startsInCode: first.kind == .code || first.kind == .fenceClose)
+    }
+
+    /// 화면에서 글자로 보이지 않는 줄 머리의 끝.
+    private static func hiddenHeadEnd(of line: MarkdownLine) -> Int {
+        line.kind.isCode ? line.caretStart : line.contentStart
     }
 
     /// - Parameter startsInCode: 조각이 코드 블록 안에서 시작하는지. 그러면 첫머리를 코드로 읽는다.
@@ -146,7 +167,12 @@ nonisolated struct CopyExport: Sendable {
                 let color = colors[number].map { " style=\"background-color:\($0)\"" } ?? ""
                 out += "<mark\(color)>\(body)</mark>"
             case .link(let url):
-                out += "<a href=\"\(Self.escape(url))\">\(body)</a>"
+                // 웹 주소와 메일 주소만 링크로 내보낸다. 나머지는 글자만 남긴다.
+                if let target = LinkPolicy.openableURL(url) {
+                    out += "<a href=\"\(Self.escape(target.absoluteString))\">\(body)</a>"
+                } else {
+                    out += body
+                }
             }
             position = NSMaxRange(span.range)
         }

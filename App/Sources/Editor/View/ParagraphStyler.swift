@@ -23,6 +23,19 @@ nonisolated enum ParagraphStyler {
         return out
     }
 
+    /// 닫히지 않은 코드 블록 끝의 빈 줄(문서의 마지막 줄)에 쓰는 문단 모양.
+    /// 그 줄은 글자가 없어 문단이 만들어지지 않으므로 텍스트 뷰의 기본 문단 모양으로 넣는다.
+    static func trailingCodeLineStyle(level: Int, style: EditorStyle) -> NSParagraphStyle {
+        let textStart = CGFloat(level) * style.indent + EditorMetrics.codeBlockPadX
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.firstLineHeadIndent = textStart
+        paragraph.headIndent = textStart
+        paragraph.tailIndent = -EditorMetrics.codeBlockPadX
+        paragraph.minimumLineHeight = style.codeBlock.lineHeight
+        paragraph.maximumLineHeight = style.codeBlock.lineHeight
+        return paragraph
+    }
+
     private struct Builder {
         let out: NSMutableAttributedString
         let line: MarkdownLine
@@ -267,7 +280,8 @@ nonisolated enum ParagraphStyler {
             hide(line.indentRange)
             if isFence, !key.isCodeActive { hide(line.range) }
 
-            decoration.codeBox = (key.isCodeTop, key.isCodeBottom)
+            decoration.codeBox = (key.isCodeTop, key.isCodeBottom || key.hasTrailingCodeLine)
+            decoration.codeBoxCoversExtraLine = key.hasTrailingCodeLine
             decoration.codeBoxX = boxX
             decoration.guideCount = key.level
         }

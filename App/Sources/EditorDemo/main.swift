@@ -80,8 +80,7 @@ final class DemoDelegate: NSObject, NSApplicationDelegate {
         self.window = window
 
         editor.onContentHeightChange = { [weak self] height in self?.resize(to: height) }
-        editor.text = sample
-        editor.foldedLines = options.folded
+        editor.load(text: sample, foldedLines: options.folded)
         editor.forcesActiveAppearance = !options.activates
         resize(to: editor.contentHeight)
 

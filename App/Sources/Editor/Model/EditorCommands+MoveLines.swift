@@ -13,13 +13,9 @@ nonisolated extension EditorCommands {
         direction: MoveDirection
     ) -> TextEdit? {
         let folded = FoldState.sanitized(folded, in: doc)
-        let selected = doc.lineRange(for: selection)
-        var first = selected.lowerBound
-        var last = selected.upperBound
-        if let root = FoldState.foldRoot(of: first, in: doc, folded: folded) { first = root }
-        for index in first...last where folded.contains(index) {
-            last = max(last, doc.lines[index].subtreeEnd - 1)
-        }
+        let block = FoldState.expanded(doc.lineRange(for: selection), in: doc, folded: folded)
+        let first = block.lowerBound
+        let last = block.upperBound
 
         // 자리를 바꿀 이웃 덩어리.
         let neighbor: ClosedRange<Int>
@@ -37,7 +33,6 @@ nonisolated extension EditorCommands {
         func texts(_ lines: ClosedRange<Int>) -> [String] {
             lines.map { doc.string(in: doc.lines[$0].range) }
         }
-        let block = first...last
         let blockTexts = texts(block)
         let neighborTexts = texts(neighbor)
         let regionStart = doc.lines[min(first, neighbor.lowerBound)].start
@@ -59,7 +54,8 @@ nonisolated extension EditorCommands {
             range: NSRange(location: regionStart, length: regionEnd - regionStart),
             replacement: ordered.joined(separator: "\n"),
             selection: NSRange(location: max(0, selection.location + shift), length: selection.length),
-            foldedAfter: foldedAfter
+            foldedAfter: foldedAfter,
+            includesHiddenLines: true
         )
     }
 }

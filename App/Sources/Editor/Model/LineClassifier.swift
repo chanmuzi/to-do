@@ -50,13 +50,11 @@ nonisolated enum LineClassifier {
         return (.paragraph, 0)
     }
 
-    /// `[] `, `[ ] `, `[x] `. 세 글자 꼴은 줄 끝에서 공백이 없어도 받는다.
+    /// `[ ] `, `[x] `. 줄 끝에서는 공백이 없어도 받는다.
+    /// 빈 대괄호 `[] `는 투두로 읽지 않는다. `[]` 뒤에 Space를 칠 때만 `[ ] `로 바꿔 넣는다
+    /// (`] 글자` 앞에 `[`를 쳤다고 투두가 되어 커서가 기호 뒤로 밀리지 않게).
     private static func todo(_ u: [unichar], from i: Int, to end: Int) -> (done: Bool, length: Int)? {
-        guard i + 1 < end, u[i] == 0x5B else { return nil }
-        if u[i + 1] == 0x5D {
-            return i + 2 < end && u[i + 2] == space ? (false, 3) : nil
-        }
-        guard i + 2 < end, u[i + 2] == 0x5D else { return nil }
+        guard i + 2 < end, u[i] == 0x5B, u[i + 2] == 0x5D else { return nil }
         let done: Bool
         switch u[i + 1] {
         case space: done = false

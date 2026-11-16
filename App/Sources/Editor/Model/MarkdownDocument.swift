@@ -2,6 +2,7 @@ import Foundation
 
 /// 원문을 줄 단위로 푼 것. 원문은 바꾸지 않는다(같은 글자를 그대로 들고 있다).
 /// 줄 경계는 TextKit의 문단 경계(`\n`, `\r`, `\r\n`, U+2029)와 같다.
+/// 편집기는 원문을 넣기 전에 줄바꿈을 `\n`으로 맞추므로(`LineEndings`) 편집기 안에서는 `\n`만 나온다.
 nonisolated struct MarkdownDocument: Sendable {
     /// 하위 계층은 이 단계까지만 받는다.
     static let maxLevel = 8

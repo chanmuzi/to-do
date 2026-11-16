@@ -6,7 +6,7 @@ import Theme
 @MainActor
 @Suite struct MarkdownEditorTextTests {
     @Test func textGoesInAndComesOutUnchanged() throws {
-        let source = "# 제목\r\n[ ] ==형광=={3}\n\t> 토글\n```\ncode\n```\n"
+        let source = "# 제목\n[ ] ==형광=={3}\n\t> 토글\n```\ncode\n```\n"
         let h = try EditorHarness(source)
         #expect(h.editor.text == source)
         #expect(h.view.string == source)

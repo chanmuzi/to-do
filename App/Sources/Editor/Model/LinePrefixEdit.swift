@@ -56,6 +56,11 @@ nonisolated enum LinePrefixEdit {
 
         let start = moved(selection.location)
         let end = moved(NSMaxRange(selection))
-        return TextEdit(range: range, replacement: replacement, selection: NSRange(location: start, length: max(0, end - start)))
+        return TextEdit(
+            range: range,
+            replacement: replacement,
+            selection: NSRange(location: start, length: max(0, end - start)),
+            preservesLines: true
+        )
     }
 }

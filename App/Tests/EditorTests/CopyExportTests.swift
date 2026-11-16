@@ -93,6 +93,58 @@ import Testing
             + "<a href=\"https://x.example/?a=1&amp;b=2\">링크</a> <code>&lt;tag&gt;</code></p>")
     }
 
+    @Test func singleLineSelectionLeavesTheHiddenMarkerOut() {
+        let doc = MarkdownDocument("- alpha beta\n- gamma")
+        let word = CopyExport(doc, selection: NSRange(location: 2, length: 5))
+        #expect(word.source == "alpha")
+        #expect(word.markdown == "alpha")
+        #expect(word.html(highlightColors: colors) == "<meta charset=\"utf-8\"><p>alpha</p>")
+        // 줄 맨 앞부터 골라도 그 줄 안에서 끝나면 글자만 나간다.
+        #expect(CopyExport(doc, selection: NSRange(location: 0, length: 7)).markdown == "alpha")
+        // 줄 끝을 넘어가면 기호까지 나간다.
+        #expect(CopyExport(doc, selection: NSRange(location: 2, length: 11)).markdown == "- alpha beta\n")
+        #expect(CopyExport(doc, selection: NSRange(location: 2, length: 16)).markdown == "- alpha beta\n- gam")
+        // 들여 쓴 줄도 같다.
+        let nested = MarkdownDocument("\t[ ] 가나다\n끝")
+        #expect(CopyExport(nested, selection: NSRange(location: 5, length: 3)).markdown == "가나다")
+    }
+
+    @Test func lastLineSelectedOnlyUpToItsMarkerIsDropped() {
+        let doc = MarkdownDocument("- alpha\n- gamma\n- delta")
+        // ⇧↓ : 윗줄 글자 시작에서 아랫줄 글자 시작까지.
+        let export = CopyExport(doc, selection: NSRange(location: 2, length: 8))
+        #expect(export.source == "- alpha")
+        #expect(export.markdown == "- alpha")
+        #expect(export.html(highlightColors: colors) == "<meta charset=\"utf-8\"><ul><li>alpha</li></ul>")
+        // 두 줄을 지나 셋째 줄 글자 시작까지.
+        #expect(CopyExport(doc, selection: NSRange(location: 2, length: 16)).markdown == "- alpha\n- gamma")
+        // 빈 항목은 줄 머리가 전부이므로 고른 그대로 둔다.
+        let empty = MarkdownDocument("- alpha\n- ")
+        #expect(CopyExport(empty, selection: NSRange(location: 0, length: empty.length)).markdown == "- alpha\n- ")
+    }
+
+    @Test func htmlLinksOnlyWebAndMailAddresses() {
+        let html = export("[click](javascript:alert(1)) [파일](file:///etc/passwd) [앱](x-app://open) [상대](../a)")
+            .html(highlightColors: colors)
+        #expect(!html.contains("href"))
+        #expect(!html.contains("javascript"))
+        #expect(html == "<meta charset=\"utf-8\"><p>click) 파일 앱 상대</p>")
+        let allowed = export("[웹](HTTPS://a.example/x) [메일](mailto:a@b.example) [옛](http://a.example)")
+            .html(highlightColors: colors)
+        #expect(allowed == "<meta charset=\"utf-8\"><p><a href=\"HTTPS://a.example/x\">웹</a> "
+            + "<a href=\"mailto:a@b.example\">메일</a> <a href=\"http://a.example\">옛</a></p>")
+        // 글자로는 원문 그대로 나간다.
+        #expect(export("[click](javascript:alert(1))").markdown == "[click](javascript:alert(1))")
+    }
+
+    @Test func linkPolicyAllowsOnlyHTTPAndMail() {
+        #expect(LinkPolicy.openableURL(" https://a.example ")?.absoluteString == "https://a.example")
+        #expect(LinkPolicy.openableURL("mailto:a@b.example") != nil)
+        for address in ["javascript:alert(1)", "JavaScript:alert(1)", "file:///etc/passwd", "x-app://open", "data:text/html,x", "a.example", "/path", ""] {
+            #expect(LinkPolicy.openableURL(address) == nil, "\(address)")
+        }
+    }
+
     @Test func htmlCodeBlock() {
         let html = export("```swift\nlet a = 1 < 2\n```").html(highlightColors: colors)
         #expect(html == "<meta charset=\"utf-8\"><pre><code>let a = 1 &lt; 2</code></pre>")

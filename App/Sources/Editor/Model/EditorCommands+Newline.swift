@@ -42,7 +42,7 @@ nonisolated extension EditorCommands {
 
         case .todo, .bullet, .toggle:
             if isCaret, line.contentRange.length == 0 {
-                if line.indentLength > 0, let edit = outdent(doc, selection: selection) { return edit }
+                if line.indentLength > 0, let edit = outdent(doc, selection: selection, folded: folded) { return edit }
                 return TextEdit(range: line.markerRange, replacement: "", selection: NSRange(location: line.start + line.indentLength, length: 0))
             }
             let marker = doc.string(in: line.markerRange)
@@ -57,7 +57,8 @@ nonisolated extension EditorCommands {
                     return TextEdit(
                         range: NSRange(location: at, length: 0),
                         replacement: text,
-                        selection: NSRange(location: at + text.utf16.count, length: 0)
+                        selection: NSRange(location: at + text.utf16.count, length: 0),
+                        includesHiddenLines: true
                     )
                 }
                 // 펼친 토글은 안쪽 첫 줄을 만든다.
@@ -82,6 +83,22 @@ nonisolated extension EditorCommands {
         default:
             return nil
         }
+    }
+
+    /// ⌦. 줄 끝에서 누르면 줄바꿈과 함께 아랫줄의 감춘 줄 머리(들여쓰기와 목록 기호)를 지운다.
+    /// 그대로 두면 감춰 있던 기호가 글자로 드러난다. 그 밖에는 `nil`(기본 동작).
+    static func deleteForward(_ doc: MarkdownDocument, selection: NSRange) -> TextEdit? {
+        guard selection.length == 0 else { return nil }
+        let index = doc.lineIndex(at: selection.location)
+        let line = doc.lines[index]
+        guard selection.location == line.end, index + 1 < doc.lines.count else { return nil }
+        let next = doc.lines[index + 1]
+        guard next.caretStart > next.start else { return nil }
+        return TextEdit(
+            range: NSRange(location: line.end, length: next.caretStart - line.end),
+            replacement: "",
+            selection: selection
+        )
     }
 
     private static func removingLastIndentUnit(_ doc: MarkdownDocument, line: MarkdownLine) -> TextEdit {

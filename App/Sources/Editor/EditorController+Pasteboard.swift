@@ -23,10 +23,11 @@ extension EditorController {
     }
 
     /// 붙여 넣는다. 이 앱에서 복사한 것이면 원문 조각을, 아니면 글자를 그대로 넣는다.
+    /// 줄바꿈은 `\n`으로 맞춘다.
     func paste(from pasteboard: NSPasteboard) {
         guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string),
               !text.isEmpty else { return }
-        textView.insertText(text, replacementRange: textView.selectedRange())
+        textView.insertText(LineEndings.normalized(text), replacementRange: textView.selectedRange())
     }
 
     /// 다른 앱에 붙였을 때의 형광펜 바탕색. 받는 쪽 바탕을 알 수 없으므로 라이트 값을 쓴다.

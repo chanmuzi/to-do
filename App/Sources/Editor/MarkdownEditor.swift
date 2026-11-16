@@ -17,11 +17,21 @@ public final class MarkdownEditor {
     /// 편집기 뷰(세로 스크롤 뷰). 바탕은 그리지 않는다. 안쪽 여백(`doc-pad`)은 편집기가 둔다.
     public var view: NSView { controller.scrollView }
 
-    /// 원문. 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다.
+    /// 원문. 줄바꿈은 언제나 `\n`이다: 넣을 때 `\r\n`, `\r`, U+2028, U+2029를 `\n`으로 바꾸므로
+    /// 그런 글을 넣으면 읽은 값이 넣은 값과 다르다.
+    /// 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다.
     /// 다른 글을 넣으면 되돌리기 기록을 비우고, 커서는 가능한 한 제자리에 둔다.
+    /// 접힘은 같은 줄 번호가 새 글에서도 토글일 때만 남고, 그래서 달라지면 `onFoldChange`로 알린다.
+    /// 노트를 처음 열 때는 `load(text:foldedLines:)`를 쓴다.
     public var text: String {
         get { controller.text }
         set { controller.text = newValue }
+    }
+
+    /// 노트를 연다. 원문과 접힌 줄을 한 번에 넣는다(순서를 신경 쓸 필요가 없다).
+    /// `onTextChange`, `onFoldChange`를 부르지 않는다. 원문이 달라지면 되돌리기 기록을 비운다.
+    public func load(text: String, foldedLines: Set<Int> = []) {
+        controller.load(text: text, foldedLines: foldedLines)
     }
 
     /// 체크박스 모양 같은 설정. 바꾸면 곧바로 다시 그린다.
@@ -31,6 +41,7 @@ public final class MarkdownEditor {
     }
 
     /// 사용자가 고쳐서 원문이 바뀌었을 때. `text`를 직접 넣을 때는 부르지 않는다.
+    /// 한글을 조합하는 중에도 조합 중인 글자가 들어간 원문으로 부른다.
     public var onTextChange: ((String) -> Void)? {
         get { controller.onTextChange }
         set { controller.onTextChange = newValue }
@@ -45,20 +56,23 @@ public final class MarkdownEditor {
     /// 지금의 내용 높이(안쪽 여백 포함). 뷰에 너비가 정해진 뒤에 맞는 값이 나온다.
     public var contentHeight: CGFloat { controller.contentHeight }
 
-    /// 접힌 토글의 줄 번호(0부터). 원문에 적지 않는 보기 상태다. 토글이 아닌 줄 번호는 버린다.
-    /// 넣을 때는 `onFoldChange`를 부르지 않는다.
+    /// 접힌 토글의 줄 번호(0부터). 원문에 적지 않는 보기 상태다. 지금 원문에서 토글이 아닌 줄 번호는 버린다
+    /// (원문보다 먼저 넣으면 남지 않는다. 함께 넣을 때는 `load(text:foldedLines:)`).
+    /// 넣을 때는 `onFoldChange`를 부르지 않는다. 편집을 되돌리면 접힘도 그 편집 전으로 돌아간다.
     public var foldedLines: Set<Int> {
         get { controller.foldedLines }
         set { controller.foldedLines = newValue }
     }
 
     /// 접힌 토글이 바뀌었을 때(사용자가 접고 폈거나, 원문이 바뀌어 줄 번호가 옮겨졌을 때).
+    /// 값이 실제로 달라졌을 때만 한 번 부른다.
     public var onFoldChange: ((Set<Int>) -> Void)? {
         get { controller.onFoldChange }
         set { controller.onFoldChange = newValue }
     }
 
-    /// 링크를 눌렀을 때. 정하지 않으면 기본 브라우저로 연다.
+    /// 링크를 눌렀을 때. 정하지 않으면 기본 브라우저(메일 주소는 메일 앱)로 연다.
+    /// `http`, `https`, `mailto` 주소만 온다. 다른 주소의 링크는 눌러도 열지 않는다.
     public var onOpenLink: ((URL) -> Void)? {
         get { controller.onOpenLink }
         set { controller.onOpenLink = newValue }

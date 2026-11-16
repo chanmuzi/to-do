@@ -31,6 +31,8 @@ nonisolated final class FragmentDecoration: NSObject {
     /// 코드 블록 상자. 첫 줄이면 위 모서리를, 마지막 줄이면 아래 모서리를 둥글게 닫는다.
     var codeBox: (top: Bool, bottom: Bool)?
     var codeBoxX: CGFloat = 0
+    /// 코드 상자를 문서 끝의 빈 줄 조각까지 늘린다(닫히지 않은 블록이 줄바꿈으로 끝날 때).
+    var codeBoxCoversExtraLine = false
     /// 줄의 기본 글꼴. 줄 높이 안에서 글자를 세로 가운데에 놓을 때 기준으로 삼는다.
     var lineFont: NSFont?
     /// 가운데에서 더 옮길 양(아래가 +). 코드 블록의 ``` 줄이 쓴다.

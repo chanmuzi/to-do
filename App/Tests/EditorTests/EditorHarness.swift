@@ -56,6 +56,33 @@ final class EditorHarness {
         step { view.doCommand(by: selector) }
     }
 
+    func press(_ selector: Selector, times: Int) {
+        for _ in 0..<times { press(selector) }
+    }
+
+    func caret(at location: Int) {
+        editor.selectedRange = NSRange(location: location, length: 0)
+    }
+
+    /// 한글 조합 중인 글자를 넣는다(입력기가 부르는 것과 같은 경로).
+    func mark(_ text: String) {
+        let range = view.hasMarkedText() ? view.markedRange() : view.selectedRange()
+        step { view.setMarkedText(text, selectedRange: NSRange(location: text.utf16.count, length: 0), replacementRange: range) }
+    }
+
+    /// 조합을 확정한다.
+    func commit(_ text: String) {
+        step { view.insertText(text, replacementRange: view.markedRange()) }
+    }
+
+    func undo() {
+        editor.undoManager.undo()
+    }
+
+    func redo() {
+        editor.undoManager.redo()
+    }
+
     func perform(_ action: EditorAction) {
         step { editor.perform(action) }
     }
@@ -91,4 +118,9 @@ extension NSResponder {
     static let backtab = #selector(NSResponder.insertBacktab(_:))
     static let newline = #selector(NSResponder.insertNewline(_:))
     static let backspace = #selector(NSResponder.deleteBackward(_:))
+    static let forwardDelete = #selector(NSResponder.deleteForward(_:))
+    static let shiftRight = #selector(NSResponder.moveRightAndModifySelection(_:))
+    static let shiftLeft = #selector(NSResponder.moveLeftAndModifySelection(_:))
+    static let shiftDown = #selector(NSResponder.moveDownAndModifySelection(_:))
+    static let shiftUp = #selector(NSResponder.moveUpAndModifySelection(_:))
 }

@@ -19,6 +19,7 @@ final class EditorController: NSObject {
     /// 내용 높이(안쪽 여백 포함)가 바뀌었을 때. 노트 창이 이 높이에 맞춘다.
     var onContentHeightChange: ((CGFloat) -> Void)?
     /// 접힌 토글이 바뀌었을 때(사용자가 접고 폈거나, 원문이 바뀌어 줄 번호가 옮겨졌을 때).
+    /// 바깥이 마지막으로 알고 있는 값과 달라졌을 때만 한 번 부른다.
     var onFoldChange: ((Set<Int>) -> Void)?
     /// 링크를 눌렀을 때. 정하지 않으면 기본 브라우저로 연다.
     var onOpenLink: ((URL) -> Void)?
@@ -58,8 +59,26 @@ final class EditorController: NSObject {
     /// 원문이 바뀔 때마다 올린다. 줄별 모양을 다시 계산할지 가리는 데 쓴다.
     var documentVersion = 0
     var keysCache: (stamp: KeyStamp, keys: [LineRenderKey])?
-    /// 원문이 바뀌면서 접힌 줄 번호가 옮겨졌는지(다음 `textDidChange`에서 알린다).
-    var foldChangedByEdit = false
+    /// 바깥이 알고 있는 접힘(바깥에서 넣었거나 마지막으로 알린 값). 이것과 달라지면 `onFoldChange`를 부른다.
+    var reportedFolds: Set<Int> = []
+    /// 원문이 바뀌기 직전의 접힘. 편집이 접힘을 바꿨으면 되돌리기에 함께 적는다.
+    var foldsBeforeEdit: Set<Int>?
+    /// 마지막으로 알린 뒤에 원문에 가해진 편집들(바뀌기 전의 원문, 바뀐 범위, 길이 변화).
+    var editsSinceFlush: [(old: MarkdownDocument, range: NSRange, delta: Int)] = []
+    /// 접힌 줄 번호를 스스로 정한 편집(줄 옮기기, 줄 머리 바꾸기)이 있었다. 되돌릴 때 접힘을 그대로 되살려야 한다.
+    var editSetFoldsExplicitly = false
+    /// 되돌리기, 다시 하기가 진행 중이다.
+    var isReplayingUndo = false
+    /// 되돌리기, 다시 하기가 시작될 때의 접힘과, 끝난 뒤에 되살릴 접힘.
+    var foldsBeforeUndo: Set<Int>?
+    var pendingFoldRestore: Set<Int>?
+    /// 원문이 바뀌었는데 아직 바깥에 알리지 않았다(조합 중인 글자는 `textDidChange`가 오지 않는다).
+    var hasPendingChange = false
+    var isFlushScheduled = false
+    /// 텍스트 뷰에 넣어 둔 문서 끝 빈 줄의 문단 모양(`updateTrailingLineStyle`).
+    var appliedTrailingStyle: NSParagraphStyle?
+    /// 지금 넣는 편집이 접혀서 감춘 줄까지 일부러 고치는 것인지(`TextEdit.includesHiddenLines`).
+    var allowsHiddenEdit = false
     /// 코드 블록 복사 버튼이 쓰는 클립보드.
     var codePasteboard: NSPasteboard = .general
 
@@ -81,14 +100,28 @@ final class EditorController: NSObject {
     /// 편집기 뷰(스크롤 뷰). 바탕은 그리지 않는다.
     var view: NSView { scrollView }
 
-    /// 원문. 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다.
+    /// 원문. 줄바꿈은 언제나 `\n`이다(넣을 때 `\r\n`, `\r`, U+2028, U+2029를 `\n`으로 바꾼다).
+    /// 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다.
     /// 다른 글을 넣으면 되돌리기 기록을 비우고, 커서는 가능한 한 제자리에 둔다.
+    /// 새 글에서 토글이 아니게 된 줄의 접힘은 버리고 `onFoldChange`로 알린다.
     var text: String {
         get { document.text }
-        set { setText(newValue) }
+        set {
+            let normalized = LineEndings.normalized(newValue)
+            guard normalized != document.text else { return }
+            replaceText(normalized)
+            notifyFoldChangeIfNeeded()
+        }
     }
 
-    /// 접힌 토글의 줄 번호(0부터). 원문에는 적지 않는 보기 상태다. 토글이 아닌 줄 번호는 버린다.
+    /// 노트를 연다. 원문과 접힘을 한 번에 넣고 아무것도 알리지 않는다.
+    func load(text newText: String, foldedLines: Set<Int>) {
+        let normalized = LineEndings.normalized(newText)
+        if normalized != document.text { replaceText(normalized) }
+        setFolded(foldedLines, notify: false)
+    }
+
+    /// 접힌 토글의 줄 번호(0부터). 원문에는 적지 않는 보기 상태다. 지금 원문에서 토글이 아닌 줄 번호는 버린다.
     var foldedLines: Set<Int> {
         get { folded }
         set { setFolded(newValue, notify: false) }
@@ -187,6 +220,7 @@ final class EditorController: NSObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadStyle() }
         })
+        observeUndo()
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
                 let windowID = (note.object as AnyObject?).map(ObjectIdentifier.init)
@@ -212,6 +246,8 @@ final class EditorController: NSObject {
     func reloadStyle() {
         style = EditorStyle(theme: theme, configuration: configuration, increaseContrast: Self.increaseContrast)
         applyStyleToViews()
+        appliedTrailingStyle = nil
+        textView.defaultParagraphStyle = nil
         if let storage = textView.textStorage, storage.length > 0 {
             isRestyling = true
             storage.addAttributes(baseAttributes, range: NSRange(location: 0, length: storage.length))
@@ -228,13 +264,18 @@ final class EditorController: NSObject {
 
     // MARK: 원문 넣기
 
-    private func setText(_ newText: String) {
-        guard newText != document.text, let storage = textView.textStorage else { return }
+    private func replaceText(_ newText: String) {
+        guard let storage = textView.textStorage else { return }
         let selection = textView.selectedRange()
         isSettingText = true
         if textView.hasMarkedText() { textView.unmarkText() }
         storage.setAttributedString(NSAttributedString(string: newText, attributes: baseAttributes))
         editorUndoManager.removeAllActions()
+        hasPendingChange = false
+        foldsBeforeEdit = nil
+        editsSinceFlush = []
+        editSetFoldsExplicitly = false
+        pendingFoldRestore = nil
         isSettingText = false
         textView.setSelectedRange(clamped(selection))
         hoveredLink = nil
@@ -243,12 +284,25 @@ final class EditorController: NSObject {
         reportContentHeight()
     }
 
+    /// - Parameter notify: 사용자가 접고 편 것이면 `true`. 바깥에서 넣은 값이면 `false`(알리지 않는다).
     func setFolded(_ newValue: Set<Int>, notify: Bool) {
+        applyFolds(newValue)
+        if notify { notifyFoldChangeIfNeeded() } else { reportedFolds = folded }
+    }
+
+    /// 접힘을 바꾸고 화면에 입힌다. 알리지는 않는다.
+    func applyFolds(_ newValue: Set<Int>) {
         let sanitized = FoldState.sanitized(newValue, in: document)
         guard sanitized != folded else { return }
         folded = sanitized
         refreshStyling()
         reportContentHeight()
-        if notify { onFoldChange?(folded) }
+    }
+
+    /// 접힘이 바깥이 알고 있는 값과 달라졌으면 알린다. 되돌리는 중에는 끝난 뒤에 한 번만 알린다.
+    func notifyFoldChangeIfNeeded() {
+        guard !isReplayingUndo, folded != reportedFolds else { return }
+        reportedFolds = folded
+        onFoldChange?(folded)
     }
 }

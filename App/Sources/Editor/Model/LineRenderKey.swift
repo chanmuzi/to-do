@@ -18,6 +18,9 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     /// 코드 블록의 첫 줄, 마지막 줄(상자의 둥근 모서리를 그린다).
     var isCodeTop = false
     var isCodeBottom = false
+    /// 닫히지 않은 코드 블록이 줄바꿈으로 끝나서, 이 줄 바로 뒤에 문서 끝의 빈 코드 줄이 있다.
+    /// 그 빈 줄은 문단이 따로 없고 이 줄의 조각에 붙어 그려지므로, 코드 상자를 그 줄까지 늘려 닫는다.
+    var hasTrailingCodeLine = false
     /// 마우스가 올라간 링크의 줄 안 위치.
     var hoveredLink: Int?
 }
@@ -32,6 +35,7 @@ nonisolated enum LinePresentation {
     ) -> [LineRenderKey] {
         let folded = FoldState.sanitized(folded, in: doc)
         let hidden = FoldState.hiddenLines(doc, folded: folded)
+        let trailingCode = trailingCodeLine(in: doc) != nil
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
             var key = LineRenderKey(kind: line.kind, level: line.level)
@@ -46,8 +50,15 @@ nonisolated enum LinePresentation {
                 key.isCodeBottom = index == block.upperBound
             }
             if let hoveredLink, hoveredLink.line == index { key.hoveredLink = hoveredLink.offset }
+            key.hasTrailingCodeLine = trailingCode && index == doc.lines.count - 2 && !key.isCollapsed
             return key
         }
+    }
+
+    /// 문서 끝의 빈 줄이 닫히지 않은 코드 블록 안이면 그 줄.
+    static func trailingCodeLine(in doc: MarkdownDocument) -> MarkdownLine? {
+        guard doc.lines.count >= 2, let last = doc.lines.last, last.range.length == 0, last.kind == .code else { return nil }
+        return last
     }
 
     /// 달라진 줄의 범위(새 문서의 줄 번호). 앞뒤로 같은 부분을 빼고 남은 가운데다.

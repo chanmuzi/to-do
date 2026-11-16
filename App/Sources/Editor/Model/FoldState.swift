@@ -16,12 +16,52 @@ nonisolated enum FoldState {
         return hidden
     }
 
+    /// 그 줄들 가운데 접혀서 보이지 않는 줄이 있는지.
+    static func hidesAny(of lines: ClosedRange<Int>, in doc: MarkdownDocument, folded: Set<Int>) -> Bool {
+        !hiddenLines(doc, folded: folded).isDisjoint(with: lines)
+    }
+
     /// 그 줄을 감추고 있는 가장 바깥의 접힌 토글.
     static func foldRoot(of line: Int, in doc: MarkdownDocument, folded: Set<Int>) -> Int? {
         sanitized(folded, in: doc).filter { $0 < line && doc.lines[$0].subtreeEnd > line }.min()
     }
 
-    /// 원문이 바뀐 뒤의 접힌 줄 번호. 바뀐 곳 앞은 그대로, 뒤는 늘거나 준 줄 수만큼 옮긴다.
+    /// 선택한 줄을 접힌 덩어리 단위로 넓힌다. 접힌 토글이 걸쳐 있으면 감춘 줄까지 넣는다.
+    static func expanded(_ lines: ClosedRange<Int>, in doc: MarkdownDocument, folded: Set<Int>) -> ClosedRange<Int> {
+        let folded = sanitized(folded, in: doc)
+        var first = lines.lowerBound
+        var last = lines.upperBound
+        if let root = foldRoot(of: first, in: doc, folded: folded) { first = root }
+        for index in first...last where folded.contains(index) {
+            last = max(last, doc.lines[index].subtreeEnd - 1)
+        }
+        return first...last
+    }
+
+    /// 그 범위를 바꿔 쓰면 감춘 줄이 보이지 않는 채로 고쳐지는 접힌 토글들.
+    ///
+    /// 감춘 줄의 글자나 그 앞뒤 줄바꿈(제목 줄과 감춘 줄, 감춘 줄과 다음 줄을 잇는 것)에 닿으면 해당한다.
+    /// 접힌 덩어리를 통째로 덮는 범위도 마찬가지다(보이지 않는 줄이 함께 지워지므로).
+    static func brokenRoots(by range: NSRange, in doc: MarkdownDocument, folded: Set<Int>) -> Set<Int> {
+        let lower = range.location
+        let upper = NSMaxRange(range)
+        return sanitized(folded, in: doc).filter { root in
+            let title = doc.lines[root]
+            guard title.subtreeEnd > root + 1 else { return false }
+            let last = doc.lines[title.subtreeEnd - 1]
+            return range.length == 0
+                ? lower > title.end && lower <= last.end
+                : lower < NSMaxRange(last.fullRange) && upper > title.end
+        }
+    }
+
+    /// 원문이 바뀐 뒤의 접힌 줄 번호. 접힌 토글은 자기 줄의 첫 글자를 따라간다.
+    ///
+    /// - 줄이 바뀐 범위의 끝이나 그 뒤에서 시작하면, 그 첫 글자가 옮겨 간 줄이 된다
+    ///   (위의 줄을 지우거나 더해도, 줄 맨 앞에 글자를 끼워도 따라간다).
+    /// - 줄이 바뀐 범위의 시작이나 그 앞에서 시작하면 줄 번호가 그대로다.
+    /// - 줄의 첫 글자가 바뀐 범위 한가운데에 있었으면 어디로 갔는지 알 수 없으므로 버린다.
+    ///
     /// - Parameters:
     ///   - editedRange: 바뀐 범위(바뀐 뒤의 원문 기준).
     ///   - delta: 길이 변화.
@@ -33,20 +73,15 @@ nonisolated enum FoldState {
         delta: Int
     ) -> Set<Int> {
         guard !folded.isEmpty else { return folded }
-        let oldEnd = min(old.length, editedRange.location + editedRange.length - delta)
-        let firstLine = old.lineIndex(at: min(editedRange.location, old.length))
-        let lastLine = old.lineIndex(at: max(oldEnd, 0))
-        let lineDelta = new.lines.count - old.lines.count
+        let editStart = min(editedRange.location, old.length)
+        let oldEnd = max(editStart, min(old.length, NSMaxRange(editedRange) - delta))
         var result = Set<Int>()
-        for index in folded {
-            if index < firstLine {
+        for index in folded where old.lines.indices.contains(index) {
+            let start = old.lines[index].start
+            if start >= oldEnd {
+                result.insert(new.lineIndex(at: start + delta))
+            } else if start <= editStart {
                 result.insert(index)
-            } else if index > lastLine {
-                result.insert(index + lineDelta)
-            } else if index == firstLine {
-                // 토글 제목 줄 안에서 고친 경우. 줄 맨 앞에 끼워 넣은 것이면 토글이 아래로 밀린다.
-                let insertedAtLineStart = oldEnd == editedRange.location && editedRange.location == old.lines[index].start
-                result.insert(insertedAtLineStart ? index + lineDelta : index)
             }
         }
         return sanitized(result, in: new)

@@ -4,9 +4,9 @@ import Foundation
 nonisolated enum CaretSnapping {
     /// - Parameters:
     ///   - old: 옮기기 전의 선택.
-    ///   - new: 옮기려는 선택. 길이가 있으면 그대로 둔다.
+    ///   - new: 옮기려는 선택. 길이가 있으면 양 끝을 따로 옮긴다.
     static func snap(old: NSRange, new: NSRange, in doc: MarkdownDocument, folded: Set<Int>) -> NSRange {
-        guard new.length == 0 else { return snapSelection(old: old, new: new, in: doc) }
+        guard new.length == 0 else { return snapSelection(old: old, new: new, in: doc, folded: folded) }
         let index = doc.lineIndex(at: new.location)
         let forward = new.location > old.location
 
@@ -29,11 +29,19 @@ nonisolated enum CaretSnapping {
         return NSRange(location: line.caretStart, length: 0)
     }
 
-    /// 선택의 끝이 감춘 줄 머리 한가운데에 걸리지 않게 한다. 줄 머리는 통째로 들어가거나 통째로 빠진다
-    /// (기호의 일부만 지워져 깨진 문법이 남지 않게).
-    private static func snapSelection(old: NSRange, new: NSRange, in doc: MarkdownDocument) -> NSRange {
+    /// 선택의 끝이 감춘 줄 머리 한가운데나 접힌 줄 안에 걸리지 않게 한다.
+    /// 줄 머리는 통째로 들어가거나 통째로 빠진다(기호의 일부만 지워져 깨진 문법이 남지 않게).
+    /// 접힌 줄 안의 끝은 접힌 덩어리의 경계(토글 제목 끝, 또는 덩어리 다음 줄의 맨 앞)로 옮긴다.
+    /// 그래서 접힌 덩어리는 선택에 통째로 들어가거나 통째로 빠진다.
+    private static func snapSelection(old: NSRange, new: NSRange, in doc: MarkdownDocument, folded: Set<Int>) -> NSRange {
         func snapped(_ position: Int, movedBack: Bool) -> Int {
-            let line = doc.lines[doc.lineIndex(at: position)]
+            let index = doc.lineIndex(at: position)
+            if let root = FoldState.foldRoot(of: index, in: doc, folded: folded) {
+                let title = doc.lines[root]
+                if !movedBack, title.subtreeEnd < doc.lines.count { return doc.lines[title.subtreeEnd].start }
+                return title.end
+            }
+            let line = doc.lines[index]
             guard position > line.start, position < line.caretStart else { return position }
             return movedBack ? line.start : line.caretStart
         }

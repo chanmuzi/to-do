@@ -5,7 +5,8 @@ extension EditorController {
     enum Hit: Equatable {
         case checkbox(line: Int)
         case chevron(line: Int)
-        case link(line: Int, offset: Int, url: String)
+        /// 열 수 있는 주소(`LinkPolicy`)의 링크.
+        case link(line: Int, offset: Int, url: URL)
     }
 
     /// 그 점(텍스트 뷰 좌표)의 문단 조각과 줄 번호.
@@ -31,12 +32,13 @@ extension EditorController {
             default: return nil
             }
         }
-        if let link = found.fragment.link(at: found.local) {
+        // 웹 주소와 메일 주소만 누를 수 있다. 다른 주소의 링크는 보통 글자처럼 다룬다.
+        if let link = found.fragment.link(at: found.local), let url = LinkPolicy.openableURL(link.url) {
             // 링크 구간의 시작(기호 포함)을 줄 안 위치로 적어 둔다.
             let span = line.spans.first { span in
                 if case .link = span.kind { span.contentRange.location - line.start == link.location } else { false }
             }
-            return .link(line: found.line, offset: (span?.range.location ?? line.start + link.location) - line.start, url: link.url)
+            return .link(line: found.line, offset: (span?.range.location ?? line.start + link.location) - line.start, url: url)
         }
         return nil
     }
@@ -83,8 +85,7 @@ extension EditorController {
         case .chevron(let line):
             toggleFold(line: line)
         case .link(_, _, let url):
-            guard let target = URL(string: url.trimmingCharacters(in: .whitespaces)) else { return true }
-            if let onOpenLink { onOpenLink(target) } else { NSWorkspace.shared.open(target) }
+            if let onOpenLink { onOpenLink(url) } else { NSWorkspace.shared.open(url) }
         }
         return true
     }

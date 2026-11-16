@@ -251,7 +251,8 @@ private struct Scenario {
     @Test func doneToggles() {
         #expect(run("[ ] 할| 일") { EditorCommands.toggleDone($0, selection: $1) } == "[x] 할| 일")
         #expect(run("[x] 할 일|") { EditorCommands.toggleDone($0, selection: $1) } == "[ ] 할 일|")
-        #expect(run("[] 할 일|") { EditorCommands.toggleDone($0, selection: $1) } == "[x] 할 일|")
+        // 빈 대괄호는 투두가 아니다(Space를 칠 때만 `[ ] `가 된다).
+        #expect(run("[] 할 일|") { EditorCommands.toggleDone($0, selection: $1) } == nil)
         #expect(run("- [ ] 표준|") { EditorCommands.toggleDone($0, selection: $1) } == "- [x] 표준|")
         #expect(run("본문|") { EditorCommands.toggleDone($0, selection: $1) } == nil)
         // 하나라도 미완료면 모두 완료로.

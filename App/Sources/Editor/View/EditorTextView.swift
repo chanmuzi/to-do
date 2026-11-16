@@ -68,6 +68,20 @@ final class EditorTextView: NSTextView {
         return result
     }
 
+    // MARK: 한글 조합
+
+    // 조합 중인 글자는 원문에 들어가지만 `textDidChange`가 오지 않는다. 그 글자까지 저장되고
+    // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
+    override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        editor?.flushPendingChange()
+    }
+
+    override func unmarkText() {
+        super.unmarkText()
+        editor?.flushPendingChange()
+    }
+
     // MARK: 마우스
 
     override func mouseDown(with event: NSEvent) {

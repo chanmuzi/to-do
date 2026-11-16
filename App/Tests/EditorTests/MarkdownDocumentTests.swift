@@ -48,11 +48,12 @@ import Testing
         """)
         #expect(doc.lines.map(\.kind) == [
             .heading(1), .heading(2), .heading(3), .paragraph, .paragraph, .paragraph,
-            .todo(done: false), .todo(done: true), .todo(done: false),
+            .todo(done: false), .todo(done: true), .paragraph,
             .todo(done: false), .todo(done: true),
             .bullet, .bullet, .toggle, .paragraph,
         ])
-        #expect(doc.lines.map(\.markerLength) == [2, 3, 4, 0, 0, 0, 4, 4, 3, 6, 6, 2, 2, 2, 0])
+        // 빈 대괄호 `[] `는 투두로 읽지 않는다(Space를 칠 때만 `[ ] `로 바꿔 넣는다).
+        #expect(doc.lines.map(\.markerLength) == [2, 3, 4, 0, 0, 0, 4, 4, 0, 6, 6, 2, 2, 2, 0])
     }
 
     @Test func todoWithoutTrailingSpaceAtLineEnd() {
