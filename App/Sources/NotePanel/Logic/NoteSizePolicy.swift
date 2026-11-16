@@ -1,0 +1,44 @@
+import CoreGraphics
+
+/// 노트 창 크기 규칙(spec 5.6, 19). 너비는 사용자가 정하고 높이는 내용을 따른다.
+struct NoteSizePolicy: Hashable {
+    /// 화면 높이에서 노트가 차지할 수 있는 몫. 임시 값(spec 20의 2번).
+    static let provisionalMaxScreenFraction: CGFloat = 0.7
+
+    var defaultWidth: CGFloat
+    var minWidth: CGFloat
+    var maxWidth: CGFloat
+    /// 상단 줄과 그 아래 선의 높이.
+    var chromeHeight: CGFloat
+    /// 본문 한 줄과 위아래 여백. 빈 노트의 본문 높이다.
+    var minBodyHeight: CGFloat
+    var maxScreenFraction: CGFloat = NoteSizePolicy.provisionalMaxScreenFraction
+
+    var minHeight: CGFloat { chromeHeight + minBodyHeight }
+
+    func clampedWidth(_ width: CGFloat) -> CGFloat {
+        min(max(width, minWidth), maxWidth)
+    }
+
+    /// 내용 높이에 맞춘 창 높이. 한도를 넘으면 거기서 멈추고 본문이 스크롤된다.
+    /// 한도는 화면 높이의 몫과, 위쪽 가장자리에서 화면 아래 끝까지 남은 높이 가운데 작은 쪽이다
+    /// (아래로 늘어난 창이 화면 밖으로 나가지 않게).
+    func windowHeight(
+        contentHeight: CGFloat, screenHeight: CGFloat, roomBelowTop: CGFloat = .greatestFiniteMagnitude
+    ) -> CGFloat {
+        let wanted = chromeHeight + max(contentHeight, minBodyHeight)
+        let limit = max(minHeight, min(screenHeight * maxScreenFraction, roomBelowTop).rounded(.down))
+        return min(wanted, limit).rounded(.up)
+    }
+
+    /// 위쪽 가장자리를 `top`에 고정하고 아래로 늘리거나 줄인 틀(AppKit 좌표).
+    func frame(
+        current: CGRect, top: CGFloat, contentHeight: CGFloat, screenHeight: CGFloat,
+        roomBelowTop: CGFloat = .greatestFiniteMagnitude
+    ) -> CGRect {
+        let height = windowHeight(
+            contentHeight: contentHeight, screenHeight: screenHeight, roomBelowTop: roomBelowTop
+        )
+        return CGRect(x: current.minX, y: top - height, width: clampedWidth(current.width), height: height)
+    }
+}

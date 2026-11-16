@@ -1,0 +1,83 @@
+import AppKit
+import Theme
+
+/// 메뉴 한 줄(spec 5.4): 높이 `row-h`, 왼쪽에 14pt 아이콘, 고르는 중이면 `hover` 바탕. 단축키는 적지 않는다(규칙 4).
+final class MenuRowView: NSView {
+    private let style: PanelStyle
+    private let highlightView = NSView()
+    private let iconView = NSImageView()
+    private let label = NSTextField(labelWithString: "")
+    private let stateView = NSImageView()
+    private var isShowingHighlight = false
+
+    /// - Parameters:
+    ///   - isOn: 켜진 항목이면 오른쪽 끝에 체크를 보인다.
+    ///   - isDimmed: 누를 수 없는 설명 줄.
+    init(style: PanelStyle, title: String, symbolName: String?, isOn: Bool = false, isDimmed: Bool = false) {
+        self.style = style
+        let theme = style.theme
+        super.init(frame: NSRect(
+            x: 0, y: 0, width: theme.component(.menuWidth), height: theme.component(.rowHeight)
+        ))
+        wantsLayer = true
+        autoresizingMask = [.width]
+        highlightView.wantsLayer = true
+        iconView.image = symbolName.flatMap { style.symbol($0, size: .iconLarge) }
+        iconView.contentTintColor = style.color(isDimmed ? .text3 : .text2)
+        iconView.imageScaling = .scaleProportionallyDown
+        label.stringValue = title
+        label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
+        label.textColor = style.color(isDimmed ? .text3 : .text)
+        label.lineBreakMode = .byTruncatingTail
+        stateView.image = isOn ? style.symbol("checkmark", size: .iconSmall) : nil
+        stateView.contentTintColor = style.color(.text3)
+        stateView.imageScaling = .scaleProportionallyDown
+        [highlightView, iconView, label, stateView].forEach(addSubview)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("코드로만 만든다")
+    }
+
+    override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+
+    override func layout() {
+        super.layout()
+        let theme = style.theme
+        let edge = theme.space(.sp1)
+        let icon = theme.component(.iconLarge)
+        let state = theme.component(.iconSmall)
+        func centered(x: CGFloat, width: CGFloat, height: CGFloat) -> NSRect {
+            NSRect(x: x, y: ((bounds.height - height) / 2).rounded(), width: width, height: height)
+        }
+        highlightView.frame = bounds.insetBy(dx: edge, dy: 0)
+        let contentX = edge + theme.space(.sp2)
+        iconView.frame = centered(x: contentX, width: icon, height: icon)
+        let stateX = bounds.width - contentX - state
+        stateView.frame = centered(x: stateX, width: state, height: state)
+        let labelX = contentX + icon + theme.space(.sp2)
+        label.frame = centered(
+            x: labelX, width: max(0, stateX - theme.space(.sp2) - labelX),
+            height: label.intrinsicContentSize.height.rounded(.up)
+        )
+    }
+
+    /// 메뉴가 고른 줄을 바꾸면 다시 그리라는 요청이 온다. 그때 바탕을 `dur` 동안 바꾼다.
+    override func updateLayer() {
+        highlightView.layer?.cornerRadius = style.theme.shape(.chipRadius)
+        let highlighted = enclosingMenuItem?.isHighlighted == true && enclosingMenuItem?.isEnabled == true
+        guard highlighted != isShowingHighlight else { return }
+        isShowingHighlight = highlighted
+        style.animate {
+            highlightView.layer?.backgroundColor = highlighted ? style.cgColor(.hover, in: self) : CGColor.clear
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu else { return }
+        menu.cancelTracking()
+        menu.performActionForItem(at: menu.index(of: item))
+    }
+}

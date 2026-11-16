@@ -63,6 +63,10 @@ let package = Package(
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
         .testTarget(name: "StoreTests", dependencies: ["Store", "Models"]),
         .testTarget(name: "RoutingTests", dependencies: ["Routing", "Models"]),
+        .testTarget(
+            name: "NotePanelTests",
+            dependencies: ["NotePanel", "Theme", "Models", "Store", "Routing"]
+        ),
     ],
     swiftLanguageModes: [.v6]
 )
