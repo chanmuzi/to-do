@@ -18,7 +18,8 @@ extension Route {
 
 /// 기능 모듈이 보낸 요청을 받아 그 일을 하는 모듈을 부르는 곳.
 /// 노트 창 요청은 `NotePanelCoordinator`로, 빠른 캡처와 노트 찾기는 `QuickPanels`로 넘긴다.
-/// 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 한다.
+/// 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 하고 `.unconnected`로 답한다.
+/// 보낸 쪽은 답(`RouteResult`)을 보고 닫을지, 적던 글을 둘지, 포커스를 돌려줄지 정한다.
 ///
 /// 노트 찾기와 캡처 바가 보낸 요청도 여기로 돌아온다: 고른 노트는 `.openNote`(창을 앞으로 가져오고 키 창으로
 /// 만든다. 사용자가 고른 것이므로 D-025의 "앱이 시킨다"에 든다), "새 노트 만들기"와 캡처의 ⌘↵는 `.newNote`.
@@ -32,11 +33,14 @@ final class AppRouter: Routing {
     /// 아직 연결되지 않아 기록만 한 요청.
     private(set) var unhandled: [Route] = []
 
-    func route(_ route: Route) {
-        guard route.isConnected, let notePanels else {
-            logUnhandled(route)
-            return
-        }
+    func isConnected(_ route: Route) -> Bool {
+        route.isConnected
+    }
+
+    /// 하지 못했으면 알림 창으로 까닭을 보여 준 뒤(창이 닫힌 뒤)에 `.failed`로 돌아온다.
+    @discardableResult
+    func route(_ route: Route) -> RouteResult {
+        guard route.isConnected, let notePanels else { return logUnhandled(route) }
         do {
             switch route {
             case .openNote(let id): try notePanels.open(id)
@@ -50,12 +54,14 @@ final class AppRouter: Routing {
                 guard let quickPanels else { return logUnhandled(route) }
                 quickPanels.toggleBrowse(anchor: anchor)
             case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker:
-                logUnhandled(route)
+                return logUnhandled(route)
             }
+            return .handled
         } catch {
             AppLog.warning("요청을 처리하지 못했습니다(\(route)): \(error)")
             // 눌렀는데 아무 일도 일어나지 않은 것처럼 보이지 않게 까닭을 보여 준다(디스크가 가득 참 등).
             if let title = Self.failureTitle(for: route) { presentFailure(title, error) }
+            return .failed
         }
     }
 
@@ -67,8 +73,9 @@ final class AppRouter: Routing {
         }
     }
 
-    private func logUnhandled(_ route: Route) {
+    private func logUnhandled(_ route: Route) -> RouteResult {
         unhandled.append(route)
         AppLog.warning("아직 연결되지 않은 요청입니다: \(route)")
+        return .unconnected
     }
 }
