@@ -10,24 +10,23 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden: true
-        // INTEGRATION(Capture): `.openCapture`를 위로 옮긴다.
-        // INTEGRATION(Browse): `.openBrowse`를 위로 옮긴다.
-        case .openCapture, .openBrowse, .openLibrary, .openAIPanel, .openSettings, .openShortcuts,
-             .openReminderEditor, .openSpacePicker: false
+        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse: true
+        case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker: false
         }
     }
 }
 
 /// 기능 모듈이 보낸 요청을 받아 그 일을 하는 모듈을 부르는 곳.
-/// 노트 창 요청은 `NotePanelCoordinator`로 넘긴다. 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 한다.
+/// 노트 창 요청은 `NotePanelCoordinator`로, 빠른 캡처와 노트 찾기는 `QuickPanels`로 넘긴다.
+/// 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 한다.
 ///
-/// 빠른 캡처와 노트 찾기는 `Route.isConnected`와 아래 `INTEGRATION` 표시 두 곳에서 잇는다. 그때 쓸 것:
-/// - `notePanels.window(for:)`: 그 노트의 `NSWindow`(노트 찾기를 상단 줄 아래에 붙일 때).
-/// - `notePanels.frontmostNoteID`: 맨 앞 노트(키 창인 노트, 없으면 보이는 것 가운데 가장 앞). `keyNoteID`는 키 창인 노트만.
+/// 노트 찾기와 캡처 바가 보낸 요청도 여기로 돌아온다: 고른 노트는 `.openNote`(창을 앞으로 가져오고 키 창으로
+/// 만든다. 사용자가 고른 것이므로 D-025의 "앱이 시킨다"에 든다), "새 노트 만들기"와 캡처의 ⌘↵는 `.newNote`.
 final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
+    /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
+    weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
     /// 아직 연결되지 않아 기록만 한 요청.
@@ -45,12 +44,11 @@ final class AppRouter: Routing {
             case .closeNoteWindow(let id): notePanels.closeWindow(id)
             case .toggleAllNotesHidden: notePanels.toggleAllHidden()
             case .openCapture:
-                // INTEGRATION(Capture): 빠른 캡처 바를 여기서 띄운다(화면 가운데 위쪽, spec 4.1).
-                logUnhandled(route)
-            case .openBrowse:
-                // INTEGRATION(Browse): 노트 찾기를 여기서 띄운다. `anchor`가 있으면
-                // `notePanels.window(for: anchor)`의 상단 줄 아래에, 없으면 캡처 바 자리에(spec 4.1).
-                logUnhandled(route)
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleCapture()
+            case .openBrowse(let anchor):
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleBrowse(anchor: anchor)
             case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker:
                 logUnhandled(route)
             }

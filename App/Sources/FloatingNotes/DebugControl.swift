@@ -44,6 +44,9 @@ extension NotePanelCoordinator {
 /// - `backdrop light|dark|stripes <파일 이름>`: 떠 있는 노트 창 뒤에 불투명한 단색 창을 깔고, 그 안쪽을 찍을 영역
 ///   (`screencapture -R`의 `x,y,w,h`)을 파일에 쓴다. `backdrop off`: 치운다.
 /// - `move <id> <x>,<y>`: 창을 그 자리(왼쪽 아래 기준)로 옮긴다. `appearance light|dark`: 앱의 모양을 바꾼다.
+/// - `capture`: 빠른 캡처를 요청한다(`Route.openCapture`). `browse [<붙일 노트 id>]`: 노트 찾기를 요청한다.
+/// - `panel …`: 떠 있는 캡처 바나 노트 찾기에 글자와 키를 넣는다(`DebugQuickPanels`의 주석).
+/// - `panel-snapshot capture|browse <파일 이름>`: 그 화면의 내용을 앱 안에서 그려 PNG로 쓴다(`snapshot`과 같다).
 /// - `quit`
 ///
 /// 파일 이름은 출력 폴더 바로 아래의 이름이어야 한다. 경로를 주면 쓰지 않는다.
@@ -53,6 +56,7 @@ final class DebugControl {
     private let session: DebugControlSession
     private let router: any Routing
     private let notePanels: NotePanelCoordinator
+    private let quickPanels: DebugQuickPanels
     private let editors: NoteEditorFactory
     private let commands: AppCommandDispatcher
     private let currentStatusItem: () -> StatusItemController?
@@ -69,7 +73,7 @@ final class DebugControl {
 
     init(
         session: DebugControlSession, router: any Routing, notePanels: NotePanelCoordinator,
-        editors: NoteEditorFactory, commands: AppCommandDispatcher, hotKeys: GlobalHotKeys?, isPassive: Bool,
+        quickPanels: DebugQuickPanels, editors: NoteEditorFactory, commands: AppCommandDispatcher, hotKeys: GlobalHotKeys?, isPassive: Bool,
         statusItem: @escaping () -> StatusItemController?, dockMenu: @escaping () -> NSMenu?,
         setMenuBarIconShown: @escaping (Bool) -> Void
     ) {
@@ -79,6 +83,7 @@ final class DebugControl {
         self.session = session
         self.router = router
         self.notePanels = notePanels
+        self.quickPanels = quickPanels
         self.editors = editors
         self.commands = commands
         currentStatusItem = statusItem
@@ -183,6 +188,13 @@ final class DebugControl {
                 named: words.dropFirst().first == "dark" ? .darkAqua : .aqua
             )
         case ("quit", _, _): NSApplication.shared.terminate(nil)
+        case ("capture", _, _): router.route(.openCapture)
+        case ("browse", _, _): router.route(.openBrowse(anchor: id))
+        case ("panel-snapshot", let target?, let name?):
+            guard let url = output(named: name) else { return }
+            write(quickPanels.window(named: target.rawValue), to: url)
+        case ("panel", _, _):
+            if !quickPanels.run(Array(words.dropFirst())) { AppLog.warning("모르는 확인용 명령입니다: \(command)") }
         default: AppLog.warning("모르는 확인용 명령입니다: \(command)")
         }
     }
@@ -489,6 +501,7 @@ final class DebugControl {
             "mainMenuVisibleKeyEquivalents": visibleMainMenuKeyEquivalents,
             "lastKeyHandled": lastKeyHandled.map { $0 ? "yes" : "no" } ?? "",
             "unavailableCommands": commands.unavailable.map(\.rawValue),
+            "quickPanels": quickPanels.dump(),
         ]
         write(json: document, to: url)
     }

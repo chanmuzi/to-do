@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var environment: AppEnvironment?
     private var router: AppRouter?
     private var notePanels: NotePanelCoordinator?
+    private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
     private var commands: AppCommandDispatcher?
     private var menuBarIcon: MenuBarIconSwitch<StatusItemController>?
@@ -46,8 +47,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if options.debugIsPassive { notePanels.refuseKeyWindowsForVerification() }
             #endif
             router.notePanels = notePanels
+            // 빠른 캡처와 노트 찾기. 노트 창과 같은 창 상태를 넘겨 "떠 있는 노트"와 핀이 보이게 한다.
+            let quickPanels = QuickPanels(
+                theme: environment.theme, notes: environment.notes, spaces: environment.spaces,
+                windowStates: environment.windowStates, router: router, notePanels: notePanels,
+                log: AppLog.warning
+            )
+            #if DEBUG
+            if options.debugIsPassive { quickPanels.refuseKeyWindowsForVerification() }
+            #endif
+            router.quickPanels = quickPanels
             self.router = router
             self.notePanels = notePanels
+            self.quickPanels = quickPanels
             self.editors = editors
 
             let commands = AppCommandDispatcher(router: router, notePanels: notePanels)
@@ -89,7 +101,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             AppLog.warning("노트 폴더를 다시 읽지 못했습니다: \(error)")
         }
-        if activationFocus.shouldFocusNote(activatedAt: ProcessInfo.processInfo.systemUptime) {
+        // 알림 창이나 캡처 바, 노트 찾기가 키 입력을 받는 중이면 노트가 그것을 가져가지 않는다.
+        let isKeyHeldElsewhere = NSApplication.shared.modalWindow != nil || quickPanels?.isAnyVisible == true
+        if activationFocus.shouldFocusNote(
+            activatedAt: ProcessInfo.processInfo.systemUptime, isKeyHeldElsewhere: isKeyHeldElsewhere
+        ) {
             notePanels?.focusFrontmostNote()
         }
     }
@@ -176,9 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startDebugging(router: AppRouter, notePanels: NotePanelCoordinator) throws {
         options.debugHover.forEach { notePanels.setHoverOverride(true, for: $0) }
         guard let directory = options.debugControlDirectory else { return }
-        guard let editors, let commands else { return }
+        guard let editors, let commands, let quickPanels else { return }
         let control = DebugControl(
             session: try DebugControlSession.start(in: directory), router: router, notePanels: notePanels,
+            quickPanels: DebugQuickPanels(panels: quickPanels),
             editors: editors, commands: commands, hotKeys: hotKeys, isPassive: options.debugIsPassive,
             statusItem: { [unowned self] in menuBarIcon?.item },
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },

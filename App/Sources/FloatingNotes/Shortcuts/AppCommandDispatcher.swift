@@ -59,7 +59,7 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         switch action {
         case .newNote: perform(.newNote)
         case .quickCapture: perform(.quickCapture)
-        // 메뉴 막대에서 연 노트 찾기는 노트에 붙지 않고 캡처 바 자리에 뜬다(spec 4.1).
+        // 메뉴 막대에서 연 노트 찾기는 노트에 붙지 않고 화면 가운데 위쪽에 뜬다(spec 4.1, D-030).
         case .findNote: router.route(.openBrowse(anchor: nil))
         case .library: perform(.library)
         case .aiPanel: perform(.aiPanel)

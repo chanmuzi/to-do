@@ -85,7 +85,9 @@ let package = Package(
         ),
         .testTarget(
             name: "FloatingNotesTests",
-            dependencies: ["FloatingNotes", "NotePanel", "Editor", "Theme", "Models", "Store", "Routing"],
+            dependencies: [
+                "FloatingNotes", "NotePanel", "Editor", "Capture", "Browse", "Theme", "Models", "Store", "Routing",
+            ],
             swiftSettings: uiSettings
         ),
         .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
