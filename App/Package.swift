@@ -34,7 +34,7 @@ let package = Package(
         ),
         .target(
             name: "Editor",
-            dependencies: ["Theme", "Models"],
+            dependencies: ["Theme"],
             swiftSettings: uiSettings
         ),
         .target(
