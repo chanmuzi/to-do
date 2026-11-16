@@ -47,6 +47,16 @@ final class SpyBodyEditor: NoteBodyEditing {
         if !hadUnnotified { notified = shown }
     }
 
+    /// 밖에서 바뀐 본문을 통째로 받은 것(받은 차례대로). 실제 편집기는 달라진 곳만 바꾼다.
+    private(set) var applied: [String] = []
+
+    /// 실제 편집기처럼 받은 글로 맞추고, 미뤄 둔 알림은 버린다. `text`에 넣은 것으로 세지 않는다.
+    func applyOutsideChange(to newText: String) {
+        applied.append(newText)
+        shown = normalizesLineEndings ? newText.replacingOccurrences(of: "\r\n", with: "\n") : newText
+        notified = shown
+    }
+
     /// 화면에만 있고 아직 알리지 않은 글(조합 중이거나 한 차례 늦게 알리려던 것)을 알린다.
     func flushPendingChange() {
         guard shown != notified else { return }

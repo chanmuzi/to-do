@@ -132,6 +132,40 @@ import Testing
         #expect(ids.allSatisfy { requests($0, in: coordinator) == 0 })
     }
 
+    // MARK: - 키 창을 잠깐 가져갔던 화면이 닫혔을 때
+
+    /// 빠른 캡처나 노트 찾기가 닫히면 그 전에 키 창이던 노트가 다시 키 창이 된다. 다른 노트로 옮겨 간 것이
+    /// 아니므로 방금 휴지통으로 보낸 노트는 여전히 ⌘Z로 되살릴 수 있다.
+    @Test func returningKeyAsksThatNoteAndKeepsTheTrashUndo() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        coordinator.activateApp = {}
+        let ids = try openNotes(["쓰던 노트", "다른 노트", "버릴 노트"], in: coordinator)
+        coordinator.moveToTrash(ids[2])
+        #expect(coordinator.canUndoTrash)
+
+        #expect(coordinator.returnKey(to: ids[0]))
+
+        #expect(requests(ids[0], in: coordinator) == 1)
+        #expect(requests(ids[1], in: coordinator) == 0)
+        #expect(coordinator.canUndoTrash)
+    }
+
+    @Test func returningKeyToAClosedOrHiddenNoteDoesNothing() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let ids = try openNotes(["하나", "둘"], in: coordinator)
+
+        coordinator.closeWindow(ids[1])
+        #expect(!coordinator.returnKey(to: ids[1]))
+        #expect(!coordinator.returnKey(to: NoteID(rawValue: "없는 노트")))
+        coordinator.toggleAllHidden()
+        #expect(!coordinator.returnKey(to: ids[0]))
+        #expect(requests(ids[0], in: coordinator) == 0)
+        // 숨김을 풀지도 않는다.
+        #expect(coordinator.areNotesHidden)
+    }
+
     // MARK: - 사용자가 앱을 앞으로 가져왔을 때
 
     @Test func activatingTheAppMakesTheFrontmostNoteKey() throws {

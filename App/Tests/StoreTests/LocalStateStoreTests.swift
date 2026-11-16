@@ -43,6 +43,64 @@ import Store
         #expect(reloaded.space(for: SpaceID(rawValue: "home"))?.name == "개인")
     }
 
+    /// 창 상태가 바뀌면 알린다. 값이 그대로면 알리지 않고, 표를 놓으면 알림이 멈춘다.
+    @Test func windowStateChangesAreAnnounced() throws {
+        defer { temporary.cleanUp() }
+        let id = NoteID(rawValue: "n1")
+        let store = try WindowStateStore(location: temporary.location)
+        var seen: [NoteWindowState?] = []
+        var observation: StoreObservation? = store.observe { seen.append(store.state(for: id)) }
+
+        try store.set(NoteWindowState(isOpen: true), for: id)
+        // 알림을 받을 때는 이미 새 값이 읽힌다.
+        #expect(seen == [NoteWindowState(isOpen: true)])
+        try store.set(NoteWindowState(isOpen: true), for: id)
+        #expect(seen.count == 1)
+        try store.set(NoteWindowState(isPinned: false, isOpen: true), for: id)
+        try store.remove(id)
+        #expect(seen.count == 3)
+        #expect(seen.last == .some(nil))
+        try store.remove(id)
+        #expect(seen.count == 3)
+
+        observation?.cancel()
+        observation = nil
+        try store.set(NoteWindowState(), for: id)
+        #expect(seen.count == 3)
+    }
+
+    /// 마지막으로 연 때는 창 상태와 함께 남고, 그것 없이 적힌 예전 파일도 읽힌다.
+    @Test func lastOpenedTimePersistsAndOldFilesStillLoad() throws {
+        defer { temporary.cleanUp() }
+        let id = NoteID(rawValue: "n1")
+        let opened = Date(timeIntervalSince1970: 1_800_000_000)
+        let store = try WindowStateStore(location: temporary.location)
+        try store.set(NoteWindowState(isOpen: true, lastOpened: opened), for: id)
+        #expect(try WindowStateStore(location: temporary.location).state(for: id)?.lastOpened == opened)
+
+        let file = temporary.location.stateDirectory.appendingPathComponent("windows.json")
+        try Data(#"{"old":{"isOpen":true,"isPinned":false}}"#.utf8).write(to: file)
+        let reloaded = try WindowStateStore(location: temporary.location)
+        #expect(reloaded.loadWarning == nil)
+        #expect(reloaded.state(for: NoteID(rawValue: "old")) == NoteWindowState(isPinned: false, isOpen: true))
+    }
+
+    @Test func spaceListChangesAreAnnounced() throws {
+        defer { temporary.cleanUp() }
+        let work = Space(id: SpaceID(rawValue: "work"), name: "회사", icon: .emoji("💼"))
+        let store = try SpaceStore(location: temporary.location)
+        var counts: [Int] = []
+        let observation = store.observe { counts.append(store.spaces.count) }
+
+        try store.replace(with: [work])
+        try store.replace(with: [work])
+        try store.replace(with: [])
+        #expect(counts == [1, 0])
+        observation.cancel()
+        try store.replace(with: [work])
+        #expect(counts == [1, 0])
+    }
+
     /// 잘린 상태 파일은 앱을 막지 않는다. 빈 상태로 시작하고 원래 파일은 옆에 남긴다.
     @Test func corruptStateFilesAreSetAsideInsteadOfBlocking() throws {
         defer { temporary.cleanUp() }

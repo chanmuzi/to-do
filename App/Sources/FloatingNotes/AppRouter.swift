@@ -10,34 +10,37 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden: true
-        // INTEGRATION(Capture): `.openCapture`를 위로 옮긴다.
-        // INTEGRATION(Browse): `.openBrowse`를 위로 옮긴다.
-        case .openCapture, .openBrowse, .openLibrary, .openAIPanel, .openSettings, .openShortcuts,
-             .openReminderEditor, .openSpacePicker: false
+        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse: true
+        case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker: false
         }
     }
 }
 
 /// 기능 모듈이 보낸 요청을 받아 그 일을 하는 모듈을 부르는 곳.
-/// 노트 창 요청은 `NotePanelCoordinator`로 넘긴다. 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 한다.
+/// 노트 창 요청은 `NotePanelCoordinator`로, 빠른 캡처와 노트 찾기는 `QuickPanels`로 넘긴다.
+/// 아직 화면이 없는 요청(`Route.isConnected`가 거짓)은 기록만 하고 `.unconnected`로 답한다.
+/// 보낸 쪽은 답(`RouteResult`)을 보고 닫을지, 적던 글을 둘지, 포커스를 돌려줄지 정한다.
 ///
-/// 빠른 캡처와 노트 찾기는 `Route.isConnected`와 아래 `INTEGRATION` 표시 두 곳에서 잇는다. 그때 쓸 것:
-/// - `notePanels.window(for:)`: 그 노트의 `NSWindow`(노트 찾기를 상단 줄 아래에 붙일 때).
-/// - `notePanels.frontmostNoteID`: 맨 앞 노트(키 창인 노트, 없으면 보이는 것 가운데 가장 앞). `keyNoteID`는 키 창인 노트만.
+/// 노트 찾기와 캡처 바가 보낸 요청도 여기로 돌아온다: 고른 노트는 `.openNote`(창을 앞으로 가져오고 키 창으로
+/// 만든다. 사용자가 고른 것이므로 D-025의 "앱이 시킨다"에 든다), "새 노트 만들기"와 캡처의 ⌘↵는 `.newNote`.
 final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
+    /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
+    weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
     /// 아직 연결되지 않아 기록만 한 요청.
     private(set) var unhandled: [Route] = []
 
-    func route(_ route: Route) {
-        guard route.isConnected, let notePanels else {
-            logUnhandled(route)
-            return
-        }
+    func isConnected(_ route: Route) -> Bool {
+        route.isConnected
+    }
+
+    /// 하지 못했으면 알림 창으로 까닭을 보여 준 뒤(창이 닫힌 뒤)에 `.failed`로 돌아온다.
+    @discardableResult
+    func route(_ route: Route) -> RouteResult {
+        guard route.isConnected, let notePanels else { return logUnhandled(route) }
         do {
             switch route {
             case .openNote(let id): try notePanels.open(id)
@@ -45,19 +48,20 @@ final class AppRouter: Routing {
             case .closeNoteWindow(let id): notePanels.closeWindow(id)
             case .toggleAllNotesHidden: notePanels.toggleAllHidden()
             case .openCapture:
-                // INTEGRATION(Capture): 빠른 캡처 바를 여기서 띄운다(화면 가운데 위쪽, spec 4.1).
-                logUnhandled(route)
-            case .openBrowse:
-                // INTEGRATION(Browse): 노트 찾기를 여기서 띄운다. `anchor`가 있으면
-                // `notePanels.window(for: anchor)`의 상단 줄 아래에, 없으면 캡처 바 자리에(spec 4.1).
-                logUnhandled(route)
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleCapture()
+            case .openBrowse(let anchor):
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleBrowse(anchor: anchor)
             case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker:
-                logUnhandled(route)
+                return logUnhandled(route)
             }
+            return .handled
         } catch {
             AppLog.warning("요청을 처리하지 못했습니다(\(route)): \(error)")
             // 눌렀는데 아무 일도 일어나지 않은 것처럼 보이지 않게 까닭을 보여 준다(디스크가 가득 참 등).
             if let title = Self.failureTitle(for: route) { presentFailure(title, error) }
+            return .failed
         }
     }
 
@@ -69,8 +73,9 @@ final class AppRouter: Routing {
         }
     }
 
-    private func logUnhandled(_ route: Route) {
+    private func logUnhandled(_ route: Route) -> RouteResult {
         unhandled.append(route)
         AppLog.warning("아직 연결되지 않은 요청입니다: \(route)")
+        return .unconnected
     }
 }

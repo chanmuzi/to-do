@@ -34,6 +34,10 @@ final class CaptureFixture {
     let spaces: SpaceStore
     private(set) var routes: [Route] = []
     private(set) var logs: [String] = []
+    /// 요청마다 받는 쪽이 돌려줄 답. 기본은 해냄.
+    var routeResult: (Route) -> RouteResult = { _ in .handled }
+    /// 이어져 있지 않은 것으로 칠 요청.
+    var unconnectedRoutes: Set<Route> = []
 
     static let work = Space(id: SpaceID(rawValue: "work"), name: "회사", icon: .symbol(name: "briefcase", colorID: nil))
     static let home = Space(id: SpaceID(rawValue: "home"), name: "개인", icon: .symbol(name: "house", colorID: nil))
@@ -53,7 +57,13 @@ final class CaptureFixture {
     func makeCoordinator(notes store: (any NoteStoring)? = nil) -> CaptureCoordinator {
         let coordinator = CaptureCoordinator(
             theme: theme, notes: store ?? notes, spaces: spaces,
-            router: RouteDispatcher { [unowned self] in routes.append($0) },
+            router: RouteDispatcher(
+                isConnected: { [unowned self] in !unconnectedRoutes.contains($0) },
+                answering: { [unowned self] in
+                    routes.append($0)
+                    return routeResult($0)
+                }
+            ),
             log: { [unowned self] in logs.append($0) }
         )
         coordinator.takesKeyOnShow = false

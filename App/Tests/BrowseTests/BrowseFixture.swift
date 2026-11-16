@@ -81,6 +81,10 @@ final class BrowseFixture {
     let windowStates: WindowStateStore
     private(set) var routes: [Route] = []
     private(set) var logs: [String] = []
+    /// 요청마다 받는 쪽이 돌려줄 답. 기본은 해냄.
+    var routeResult: (Route) -> RouteResult = { _ in .handled }
+    /// 이어져 있지 않은 것으로 칠 요청.
+    var unconnectedRoutes: Set<Route> = []
 
     init() throws {
         _ = NSApplication.shared
@@ -119,7 +123,13 @@ final class BrowseFixture {
     func makeCoordinator(notes store: (any NoteStoring)? = nil) -> BrowseCoordinator {
         let coordinator = BrowseCoordinator(
             theme: theme, notes: store ?? notes, spaces: spaces,
-            router: RouteDispatcher { [unowned self] in routes.append($0) },
+            router: RouteDispatcher(
+                isConnected: { [unowned self] in !unconnectedRoutes.contains($0) },
+                answering: { [unowned self] in
+                    routes.append($0)
+                    return routeResult($0)
+                }
+            ),
             windowStates: windowStates,
             log: { [unowned self] in logs.append($0) }
         )

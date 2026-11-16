@@ -6,7 +6,9 @@ import Testing
 @testable import FloatingNotes
 
 /// 메뉴 막대 아이콘을 보일지의 설정과, 아이콘 없이도 같은 기능에 닿는 길(Dock 메뉴, 앱 메뉴).
-@Suite struct AppSettingsTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 메뉴 항목을 고르는 시험은 메인 액터를 오래 잡는다. 한꺼번에 시작하면
+/// 전환 시간을 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct AppSettingsTests {
     private let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("app-settings-tests-\(UUID().uuidString)", isDirectory: true)
 
@@ -78,8 +80,10 @@ import Testing
         for index in menu.items.indices where !menu.items[index].isSeparatorItem {
             menu.performActionForItem(at: index)
         }
-        #expect(chosen == [
-            .newNote, .quickCapture, .findNote, .library, .aiPanel, .toggleNotesHidden, .settings, .shortcuts,
+        // 여는 화면이 아직 이어지지 않은 항목(라이브러리, AI 패널, 설정, 단축키)은 자리에 그대로 있되 고를 수 없다.
+        #expect(chosen == [.newNote, .quickCapture, .findNote, .toggleNotesHidden])
+        #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
+            "라이브러리", "AI 패널", "설정", "단축키",
         ])
     }
 

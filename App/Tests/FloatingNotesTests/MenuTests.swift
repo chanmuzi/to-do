@@ -6,7 +6,9 @@ import Theme
 @testable import FloatingNotes
 
 /// 메뉴 막대 메뉴(spec 4.3)와 앱 메뉴: 단축키를 보이지 않으면서(규칙 4) 키는 듣는지.
-@Suite struct MenuTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 메뉴 항목을 고르는 시험은 메인 액터를 오래 잡는다. 한꺼번에 시작하면
+/// 전환 시간을 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct MenuTests {
     private let fixture: AppFixture
 
     init() throws {
@@ -80,6 +82,48 @@ import Theme
         menu.performActionForItem(at: 0)
         menu.performActionForItem(at: 12)
         #expect(chosen == [.newNote, .quit])
+    }
+
+    /// 여는 화면이 아직 이어지지 않은 항목은 메뉴에 자리와 이름 그대로 있되(spec 4.3) 고를 수 없다:
+    /// 눌러도 아무 일이 없는 항목을 내놓지 않는다(D-034). 메뉴 막대 메뉴, 앱 메뉴 모두 같다.
+    @Test func entriesForUnconnectedScreensAreDisabledNotRemoved() throws {
+        defer { fixture.cleanUp() }
+        let unconnected: Set<StatusMenuAction> = [.library, .aiPanel, .settings, .shortcuts]
+        let connected: [StatusMenuAction] = [.newNote, .quickCapture, .findNote, .toggleNotesHidden, .quit]
+        #expect(connected.filter(\.isConnected) == connected)
+        #expect(unconnected.filter(\.isConnected).isEmpty)
+
+        let menu = NSMenu()
+        var chosen: [StatusMenuAction] = []
+        StatusMenuBuilder(theme: fixture.theme).fill(
+            menu, with: StatusMenuModel.entries(areNotesHidden: false)
+        ) { chosen.append($0) }
+        let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
+        #expect(disabled == ["라이브러리", "AI 패널", "설정", "단축키"])
+        // 고를 수 없는 항목은 눌러도 동작이 가지 않는다(고를 수 있는 항목은 위의 시험이 본다).
+        let library = try #require(menu.items.firstIndex { $0.title == "라이브러리" })
+        menu.performActionForItem(at: library)
+        #expect(chosen.isEmpty)
+        #expect(menu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title) == [
+            "새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "종료",
+        ])
+
+        // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
+        let main = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let items = main.items.compactMap(\.submenu).flatMap(\.items)
+        func validity(_ title: String) throws -> Bool {
+            fixture.commands.validateMenuItem(try #require(items.first { $0.title == title && !$0.isHidden }))
+        }
+        for title in ["라이브러리", "AI 패널", "설정", "단축키"] {
+            let isValid = try validity(title)
+            #expect(!isValid, "\(title)")
+        }
+        for title in ["새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "창 닫기"] {
+            let isValid = try validity(title)
+            #expect(isValid, "\(title)")
+        }
+        let hidden = items.filter(\.isHidden)
+        #expect(hidden.filter { fixture.commands.validateMenuItem($0) }.count == hidden.count)
     }
 
     @Test func menuBarIconIsAnEighteenPointTemplateImage() throws {

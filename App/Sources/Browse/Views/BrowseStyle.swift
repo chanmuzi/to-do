@@ -32,21 +32,26 @@ struct BrowseStyle {
     /// 전환 시간. "동작 줄이기"가 켜져 있으면 바로 바꾼다.
     var transitionDuration: TimeInterval { reducesMotion ? 0 : theme.motion.duration }
 
-    /// 알파, 창 틀을 `dur`, `ease`로 바꾼다(규칙 8). `completion`은 움직임이 끝난 뒤에 불린다.
-    func animate(_ changes: () -> Void, completion: (@MainActor () -> Void)? = nil) {
-        guard transitionDuration > 0 else {
+    /// 알파, 창 틀을 `dur`, `ease`로 바꾼다(규칙 8). "동작 줄이기"면 시간이 0이라 바로 바뀐다.
+    ///
+    /// 움직임이 끝났을 때를 알려 주지 않는다. 끝난 뒤에 할 일(창 내리기, 끝의 틀에 놓기)은 `afterTransition`으로
+    /// 잡는다: 화면이 꺼져 있으면 창의 움직임은 나아가지 않고 끝났다는 알림도 오지 않는다.
+    func animate(_ changes: () -> Void) {
+        let duration = transitionDuration
+        NSAnimationContext.runAnimationGroup { context in
+            // 시간이 0이어도 묶는다: `animator()`로 바꾼 값이 시스템 기본 시간으로 움직이지 않게.
+            context.duration = duration
+            if duration > 0 {
+                context.timingFunction = theme.motion.timingFunction
+                context.allowsImplicitAnimation = true
+            }
             changes()
-            completion?()
-            return
         }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = transitionDuration
-            context.timingFunction = theme.motion.timingFunction
-            context.allowsImplicitAnimation = true
-            changes()
-        }, completionHandler: completion.map { completion in
-            { @Sendable in MainActor.assumeIsolated { completion() } }
-        })
+    }
+
+    /// 전환 시간이 지난 뒤에 `work`를 한다("동작 줄이기"면 그 자리에서). 돌려받은 것을 취소하면 하지 않는다.
+    func afterTransition(_ work: @escaping @MainActor () -> Void) -> Task<Void, Never>? {
+        TransitionTimer.after(transitionDuration, work)
     }
 
     /// SF Symbols 아이콘(spec 18.2). 굵기는 regular, 크기는 토큰.

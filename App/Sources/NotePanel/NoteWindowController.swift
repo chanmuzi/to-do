@@ -90,13 +90,14 @@ final class NoteWindowController: NSObject {
     // MARK: - 띄우고 내리기
 
     /// 창을 맨 앞에 띄운다. 앱을 앞으로 가져오지 않는다.
-    func show(focus: Bool) {
+    /// - Parameter recordsOpening: 사용자가 이 노트를 연 것이다(마지막으로 연 때를 적는다). 켤 때 되살리는 창은 아니다.
+    func show(focus: Bool, recordsOpening: Bool = true) {
         orderFront()
         if !isShown {
             isShown = true
             environment.recorder.recordOpened(noteID, frame: panel.frame, isPinned: isPinned)
         }
-        environment.recorder.recordFronted(noteID)
+        environment.recorder.recordFronted(noteID, openedAt: recordsOpening ? environment.now() : nil)
         if focus { focusBody() }
     }
 
@@ -253,7 +254,15 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         let menu = NoteMenuBuilder(style: environment.style).moreMenu(
-            isPinned: isPinned, selectedPaletteID: note.colorID?.rawValue
+            isPinned: isPinned, selectedPaletteID: note.colorID?.rawValue,
+            isAvailable: { action in
+                switch action {
+                case .setReminder: router.isConnected(.openReminderEditor(id))
+                case .moveToSpace: router.isConnected(.openSpacePicker(id))
+                case .openAIPanel: router.isConnected(.openAIPanel(context: id))
+                case .togglePin, .setColor, .closeWindow, .moveToTrash: true
+                }
+            }
         ) { [weak self] action in
             switch action {
             case .setReminder: router.route(.openReminderEditor(id))

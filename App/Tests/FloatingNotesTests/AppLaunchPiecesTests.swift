@@ -143,6 +143,26 @@ import Testing
         #expect(userActivation)
     }
 
+    /// 알림 창이나 캡처 바, 노트 찾기가 키 입력을 받는 중에 앱이 앞으로 오면(실패를 알리는 알림 창은 스스로
+    /// 앱을 앞으로 가져온다) 노트가 키 창을 가져가지 않는다. 그 활성화도 본 것으로 친다.
+    @Test func activationWhileAnotherScreenHoldsKeyDoesNotFocusANote() {
+        var policy = ActivationFocusPolicy()
+        policy.launchFinished(at: 10)
+
+        let duringAlert = policy.shouldFocusNote(activatedAt: 500, isKeyHeldElsewhere: true)
+        let afterwards = policy.shouldFocusNote(activatedAt: 501, isKeyHeldElsewhere: false)
+        #expect(!duringAlert)
+        #expect(afterwards)
+
+        // 다 켠 직후에 알림 창과 함께 온 활성화 다음의 활성화는 사용자의 것이다.
+        var early = ActivationFocusPolicy()
+        early.launchFinished(at: 10)
+        let first = early.shouldFocusNote(activatedAt: 10.1, isKeyHeldElsewhere: true)
+        let second = early.shouldFocusNote(activatedAt: 10.3)
+        #expect(!first)
+        #expect(second)
+    }
+
     /// 뒤에서 켠 실행(로그인 항목, `open -g`)에는 켜면서 오는 활성화가 없다. 첫 활성화가 사용자의 것이다.
     @Test func firstActivationLongAfterABackgroundLaunchFocusesTheNote() {
         var policy = ActivationFocusPolicy()

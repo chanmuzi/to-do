@@ -12,7 +12,7 @@ final class MenuRowView: NSView {
 
     /// - Parameters:
     ///   - isOn: 켜진 항목이면 오른쪽 끝에 체크를 보인다.
-    ///   - isDimmed: 누를 수 없는 설명 줄.
+    ///   - isDimmed: 누를 수 없는 줄(설명 줄, 아직 이어지지 않은 화면을 여는 항목).
     init(style: PanelStyle, title: String, symbolName: String?, isOn: Bool = false, isDimmed: Bool = false) {
         self.style = style
         let theme = style.theme

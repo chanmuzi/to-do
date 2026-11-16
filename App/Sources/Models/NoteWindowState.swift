@@ -41,10 +41,13 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     /// 어긋났는지 다시 열 때 이것으로 알아보고, 같은 글의 줄을 찾아 옮기거나 버린다(D-023).
     /// 이것 없이 적힌 예전 상태에서는 `nil`이다.
     public var foldedLineTexts: [String]?
+    /// 이 노트의 창을 마지막으로 띄웠거나 키 창으로 만든 때. 노트 찾기의 "최근에 연 노트" 차례를 정한다(D-033).
+    /// 적은 적이 없으면 `nil`이고, 그때는 고친 시각으로 대신한다.
+    public var lastOpened: Date?
 
     public init(
         frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false, stackOrder: Int? = nil,
-        foldedLines: [Int]? = nil, foldedLineTexts: [String]? = nil
+        foldedLines: [Int]? = nil, foldedLineTexts: [String]? = nil, lastOpened: Date? = nil
     ) {
         self.frame = frame
         self.isPinned = isPinned
@@ -52,5 +55,6 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
         self.stackOrder = stackOrder
         self.foldedLines = foldedLines
         self.foldedLineTexts = foldedLineTexts
+        self.lastOpened = lastOpened
     }
 }

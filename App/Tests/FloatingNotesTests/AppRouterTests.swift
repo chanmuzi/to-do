@@ -39,7 +39,8 @@ import Theme
             try? FileManager.default.removeItem(at: root)
         }
 
-        router.route(.newNote(NewNoteRequest()))
+        // 보낸 쪽이 하지 못했다는 것을 답으로 받는다.
+        #expect(router.route(.newNote(NewNoteRequest())) == .failed)
 
         #expect(shown.count == 1)
         #expect(shown.first?.title == "새 노트를 만들지 못했습니다")
@@ -53,13 +54,16 @@ import Theme
         var shown: [String] = []
         router.presentFailure = { title, _ in shown.append(title) }
 
-        router.route(.openNote(NoteID(rawValue: "missing")))
+        #expect(router.route(.openNote(NoteID(rawValue: "missing"))) == .failed)
         #expect(shown == ["노트를 열지 못했습니다"])
 
         let note = try notes.create(NoteDraft(title: "있는 노트"))
-        router.route(.openNote(note.id))
-        router.route(.closeNoteWindow(note.id))
-        router.route(.openSettings)
+        #expect(router.route(.openNote(note.id)) == .handled)
+        #expect(router.route(.closeNoteWindow(note.id)) == .handled)
+        // 아직 화면이 없는 요청은 이어지지 않았다고 답하고, 물어봐도 그렇게 답한다.
+        #expect(router.route(.openSettings) == .unconnected)
+        #expect(!router.isConnected(.openSettings))
+        #expect(router.isConnected(.openNote(note.id)))
         #expect(shown.count == 1)
         #expect(coordinator.openNoteIDs.isEmpty)
         #expect(router.unhandled == [.openSettings])

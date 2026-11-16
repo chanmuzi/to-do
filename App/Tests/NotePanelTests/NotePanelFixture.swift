@@ -29,9 +29,12 @@ final class NotePanelFixture {
     /// 앱을 다시 켠 것처럼 상태 파일을 새로 읽는 노트 창 묶음.
     /// - Parameter makeBodyEditor: 주지 않으면 기본 편집기를 쓴다.
     /// 시험 중에 뜨는 창이 키 창이 되어 사용자가 다른 앱에 치던 글자를 받지 않게 한다.
-    func makeCoordinator(makeBodyEditor: NoteBodyEditorFactory? = nil) throws -> NotePanelCoordinator {
+    /// - Parameter windowStates: 주지 않으면 바꿀 때마다 곧바로 쓰는 창 상태 저장소를 새로 만든다.
+    func makeCoordinator(
+        makeBodyEditor: NoteBodyEditorFactory? = nil, windowStates: WindowStateStore? = nil
+    ) throws -> NotePanelCoordinator {
         let coordinator = NotePanelCoordinator(
-            theme: theme, notes: notes, windowStates: try WindowStateStore(location: location),
+            theme: theme, notes: notes, windowStates: try windowStates ?? WindowStateStore(location: location),
             spaces: try SpaceStore(location: location),
             router: RouteDispatcher { [unowned self] in routes.append($0) },
             makeBodyEditor: makeBodyEditor ?? { PlainTextBodyEditor(theme: $0.theme) },

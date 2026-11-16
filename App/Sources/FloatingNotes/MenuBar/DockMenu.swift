@@ -17,6 +17,8 @@ enum DockMenu {
                 item.target = target
                 // 항목은 target을 붙잡지 않는다. 메뉴가 살아 있는 동안 함께 살도록 여기 맡긴다.
                 item.representedObject = target
+                // 아직 이어지지 않은 화면의 항목은 고를 수 없다.
+                item.isEnabled = action.isConnected
                 return item
             }
         }

@@ -11,6 +11,24 @@ nonisolated enum StatusMenuAction: Hashable, Sendable {
     case quit
 }
 
+extension StatusMenuAction {
+    /// 고르면 일어나는 일이 있는지. 여는 화면이 아직 이어지지 않은 항목(`AppCommand.isConnected`)은 메뉴에
+    /// 자리와 이름을 그대로 두되(spec 4.3의 항목과 차례) 고를 수 없게 흐려 둔다(D-034).
+    var isConnected: Bool {
+        switch self {
+        case .newNote: AppCommand.newNote.isConnected
+        case .quickCapture: AppCommand.quickCapture.isConnected
+        case .findNote: AppCommand.findNote.isConnected
+        case .library: AppCommand.library.isConnected
+        case .aiPanel: AppCommand.aiPanel.isConnected
+        case .toggleNotesHidden: AppCommand.toggleNotesHidden.isConnected
+        case .settings: AppCommand.settings.isConnected
+        case .shortcuts: AppCommand.shortcuts.isConnected
+        case .quit: true
+        }
+    }
+}
+
 /// 메뉴 막대 메뉴의 한 칸.
 nonisolated enum StatusMenuEntry: Hashable, Sendable {
     /// - Parameter symbol: 왼쪽 14pt 아이콘의 SF Symbols 이름(spec 18.2). 종료에는 없다.
