@@ -5,7 +5,8 @@ public struct StoreChange: Hashable, Sendable {
     public enum Kind: Hashable, Sendable {
         case created
         case updated
-        /// 휴지통으로 갔거나 파일이 없어졌다.
+        /// 휴지통으로 갔거나 파일이 없어졌다. 다른 프로그램이 지운 경우(`.external`) 쓰지 않은 변경은
+        /// 저장소에 남아 있다(`hasPendingChanges`). 새 노트로 옮기거나 `discardPendingChanges`로 버린다.
         case removed
         /// 미뤄 둔 저장(`scheduleUpdate`)이 실패했다. 고친 내용은 저장소에 남아 있고 디스크에는 없다.
         case saveFailed(message: String)
