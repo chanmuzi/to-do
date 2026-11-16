@@ -48,7 +48,7 @@ App/
 ├─ Package.swift      모듈을 SwiftPM 타깃으로 정의해 의존 방향을 컴파일러가 강제하게 한다
 ├─ Sources/<모듈명>/   앱 실행 타깃은 Sources/FloatingNotes/
 ├─ Tests/<모듈명>Tests/
-└─ Resources/         tokens.json, Fonts/, AppIcon.appiconset, Info.plist
+└─ Resources/         tokens.json, Fonts/, AppIcon.appiconset, menubar-icon.pdf, Info.plist
 scripts/
 ├─ build-app.sh       빌드해서 build/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
 ├─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
@@ -56,10 +56,12 @@ scripts/
 ```
 
 - Xcode 프로젝트 파일은 없다(D-011). `cd App && swift build`, `swift test`.
-- `Sources/Theme/Resources/`의 `tokens.json`, `Fonts`는 `App/Resources/`를 가리키는 심볼릭 링크다. 정본은 `App/Resources/` 하나다.
-- 실행 인자(확인용): `--notes-dir <경로>`(그 폴더만 읽고 씀), `--appearance light|dark`. 환경 변수 `FLOATING_NOTES_DIR`도 같은 일을 한다.
+- `Sources/Theme/Resources/`의 `tokens.json`, `Fonts`와 `Sources/FloatingNotes/Resources/`의 `menubar-icon.pdf`는 `App/Resources/`를 가리키는 심볼릭 링크다. 정본은 `App/Resources/` 하나다. `.app` 묶음에서는 `Contents/Resources/`에서, `swift run`과 `swift test`에서는 SwiftPM 리소스 번들에서 찾는다.
+- 실행 인자(확인용): `--notes-dir <경로>`(그 폴더만 읽고 씀), `--appearance light|dark`, `--menu-bar-icon on|off`(저장된 설정과 상관없이 이번 실행에서 메뉴 막대 아이콘을 보이거나 감춤). 환경 변수 `FLOATING_NOTES_DIR`도 같은 일을 한다.
 - 확인용 실행 인자(디버그 빌드에만 있다. `#if DEBUG`로 묶여 릴리스 빌드에는 인자 해석도, 명령을 받는 코드도 들어가지 않는다): `--debug-hover <노트 id>`(그 노트를 마우스가 올라간 모습으로 띄움), `--debug-control <출력 폴더>`(다른 프로세스가 분산 알림 `local.floating-notes.debug`로 보내는 명령을 받음. 명령 목록은 `DebugControl.swift`의 주석). 마우스와 키보드를 건드리지 않고 창 상태를 바꾸고 읽을 때 쓴다.
   - 분산 알림은 이 Mac의 어느 프로세스나 보낼 수 있으므로 두 가지로 막는다. 명령마다 이번 실행의 표가 있어야 한다(켤 때 새로 만들어 `<출력 폴더>/control-token`에 소유자만 읽게 적는다. 알림의 `object`는 `<표> <명령>`). 명령이 쓰는 파일(`snapshot`, `menu`, `dump`)은 출력 폴더 바로 아래의 파일 이름으로만 받는다(경로, `..`, 폴더 밖을 가리키는 링크는 거부).
+  - 자동 확인 실행에는 `--debug-passive`(노트 창이 어떤 경우에도 키 창이 되지 않음. 새 노트처럼 커서를 두는 동작도 키 창을 만들지 않는다), `--debug-no-hotkeys`(전역 단축키를 등록하지 않음), `--menu-bar-icon off`(메뉴 막대 아이콘이 켜고 끌 때마다 나타났다 사라지지 않게)를 함께 준다. 앱은 `open -g -n build/FloatingNotes.app --args …`로 켠다(앞으로 가져오지 않음). 키 창을 봐야 할 때만 `click <id>`(이 앱의 이벤트 줄에만 넣는 누름)나 `focus <id>`로 키 창을 만들고 곧바로 `unfocus`로 물린다. 그 사이에는 사용자가 치는 글자가 그 노트로 들어간다. 테스트의 조립(`NotePanelFixture`, `AppFixture`)도 `allowsKeyWindows`를 끈다.
+  - 창 밖에 그려지는 것(그림자, 모서리)은 `backdrop light|dark|stripes <파일>`로 노트 뒤에 불투명한 창을 깔고 그 안쪽만 `screencapture -R`로 찍어 본다. 확인용 노트는 화면 구석(있으면 보조 화면)에 두고, 깐 창은 찍는 동안만 둔다.
   - 보내기: `scripts/build-app.sh debug`로 만든 묶음을 `--notes-dir <폴더> --debug-control <출력 폴더>`로 켜고 `scripts/debug-send.sh <출력 폴더> dump state.json`처럼 보낸다.
 
 ## 빌드 설정
@@ -95,7 +97,7 @@ scripts/
 
 - `Note`: `id: NoteID`, `title`, `body`(Markdown 원문), `spaceID: SpaceID?`, `colorID: PaletteID?`, `reminder: Date?`, `created`, `modified`. 핀은 없다(아래).
 - `NoteDraft`: 새 노트 내용(`title`, `body`, `spaceID`, `colorID`, `reminder`).
-- `NoteWindowState`: `frame: WindowFrame?`, `isPinned`(기본 켜짐), `isOpen`, `stackOrder: Int?`(창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값, 클수록 앞). 노트 파일이 아니라 로컬 상태다(D-003).
+- `NoteWindowState`: `frame: WindowFrame?`, `isPinned`(기본 켜짐), `isOpen`, `stackOrder: Int?`(창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값, 클수록 앞), `foldedLines: [Int]?`(접어 둔 토글의 줄 번호, 오름차순. 없으면 `nil`. App의 편집기 어댑터가 적는다, D-023). 노트 파일이 아니라 로컬 상태다(D-003). 항목마다 주인이 다르므로 고칠 때는 지금 값을 읽어 제 항목만 바꿔 넣는다(`WindowStateRecorder`, `NoteFoldStore`가 그렇게 한다).
 - `Space`(`id`, `name`, `icon: SpaceIcon`), `SpaceIcon`(`.symbol(name:colorID:)`, `.emoji`, `.image`).
 - `NoteID`, `SpaceID`, `PaletteID`: 문자열을 감싼 식별자. `PaletteID.rawValue`를 `Theme`의 `paletteID:`에 넘긴다.
 
@@ -153,7 +155,11 @@ scripts/
   - `init(theme:notes:windowStates:spaces:router:makeBodyEditor:log:)`. `makeBodyEditor`를 주지 않으면 기본 편집기(`PlainTextBodyEditor`)를 쓴다.
   - `restoreOpenNotes() -> [NoteID]`(지난번에 떠 있던 창을 제자리에, 겹친 앞뒤도 그대로. 뒤에 있던 것부터 띄우고 그 차례로 돌려준다), `open(_:nextTo:focus:) throws`, `createNote(_: NewNoteRequest) throws -> NoteID`(지금 노트 옆에 핀이 켜진 채), `closeWindow(_:)`(창만 내림), `moveToTrash(_:)`, `toggleAllHidden()`, `areNotesHidden`.
   - 숨김은 전부 아니면 전무다. 숨긴 중에 `open`, `createNote`, `focusBody(of:)`, `popUpMoreMenu(for:)`를 부르면 숨김이 모두 풀린다(뒤에 있던 창부터 띄워 앞뒤를 지키고, 마우스가 올라가 있는지도 다시 잰다). `areNotesHidden`이 참이면 보이는 노트 창이 없다.
-  - 창마다: `openNoteIDs`, `keyNoteID`, `snapshot(of:) -> NoteWindowSnapshot?`(틀, 핀, 창 단계, 보임, 호버), `setPinned(_:for:)`, `setColor(_:for:)`, `focusBody(of:)`, `popUpMoreMenu(for:)`, `setHoverOverride(_:for:)`(확인용).
+  - 창마다: `openNoteIDs`, `keyNoteID`(키 창인 노트), `frontmostNoteID`(키 창인 노트, 없으면 보이는 것 가운데 가장 앞에 겹친 노트), `window(for:) -> NSWindow?`(다른 화면을 그 노트에 붙일 때), `snapshot(of:) -> NoteWindowSnapshot?`(틀, 핀, 창 단계, 보임, 호버), `setPinned(_:for:)`, `setColor(_:for:)`, `focusBody(of:)`, `focusNextNote()`(띄운 순서로 다음 노트, 끝에서 처음으로), `beginTitleEditing(for:)`, `popUpMoreMenu(for:)`, `setHoverOverride(_:for:)`(확인용), `allowsKeyWindows`(확인용. 끄면 노트 창이 키 창이 되지 않는다), `releaseKeyWindow()`(확인용. 키 창인 노트 창을 물린다).
+  - 키 창이 되는 때: 노트 창은 앱이 앞에 있지 않아도 키 창이 되어 키 입력을 받는다(`.nonactivatingPanel`). 그래서 사용자가 그 창을 눌렀을 때와 앱이 일부러 시켰을 때(`focusBody`, `beginTitleEditing`, `focusNextNote`, 새 노트)만 키 창이 된다(`NotePanelWindow.canBecomeKey`). 켤 때 되살린 창, 앞으로 가져오기만 한 창, 앱이 앞으로 올 때는 키 창이 되지 않는다(D-025).
+  - 그림자: 투명한 창의 그림자는 내용 모양에서 만들어 두고 다시 쓰이므로 창 크기가 바뀔 때마다(`windowDidResize`) `invalidateShadow()`를 부른다.
+  - 휴지통 되돌리기(spec 5.3): `moveToTrash(_:)` 바로 뒤에 `canUndoTrash`가 참이 되고 `undoTrash() throws -> NoteID?`가 노트를 되살려 창 상태(틀, 핀, 접힘)째 다시 띄운다. 그 뒤에 사용자가 노트를 고치거나(본문, 제목, 색) 새 노트를 만들면 거짓이 된다(D-024).
+  - `flushPendingEdits()`: 떠 있는 모든 창에서 고치던 제목을 마무리하고 편집기가 아직 알리지 않은 본문을 받는다. App이 끝내기 전에 `flushPendingSaves()`보다 먼저 부른다. 창 하나를 닫거나 휴지통으로 보낼 때는 노트 창이 스스로 한다.
   - `displayOptions: NotePanelDisplayOptions`: 스페이스 표시(아이콘, 아이콘+이름, 이름), 리마인더 표시(시간, 남은 시간, 아이콘), 시간 형식, 임박 기준. 설정 화면이 생기면 여기에 넣는다.
 - 노트 창이 하는 일과 하지 않는 일:
   - 제목, 노트 색은 `update`/`scheduleUpdate`로 그 항목만 고친다. 핀과 창 틀, 열림 상태는 `WindowStateStore`에 둔다.
@@ -176,6 +182,7 @@ scripts/
     var onTextChange: ((String) -> Void)? { get set }
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
     func focus()
+    func flushPendingChange()
 }
 public struct NoteBodyEditorContext { public let theme: Theme; public let noteID: NoteID }
 public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> any NoteBodyEditing
@@ -184,7 +191,8 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - `view`는 노트 창이 가진 스크롤 뷰의 문서 뷰가 된다. 노트 창은 너비만 맞추고, 높이는 `view`가 내용에 맞춘다. 뒤집힌 좌표(`isFlipped`)여야 한다.
 - 안쪽 여백(`Theme.docPadding`)은 편집기가 넣는다.
 - `onContentHeightChange`에는 여백을 포함한 내용 높이를 넘긴다(글이나 너비가 바뀔 때마다, 처음 배치된 뒤 한 번). 노트 창이 이 값으로 창 높이를 맞춘다(위쪽 고정, 아래로, `dur` 동안).
-- `PlainTextBodyEditor(theme:)`: 서식 없는 기본 구현(TextKit 1). 제 실행 취소 기록을 따로 갖는다. Editor 모듈을 끼울 때는 이 프로토콜에 맞춘 어댑터를 App 타깃에 두고 `makeBodyEditor`로 넘긴다.
+- 배치 도중에 알게 된 내용 높이로 창 높이를 바꾸면(창을 처음 띄울 때가 그렇다) 그 배치가 끝나며 "다시 배치" 요청이 지워진다. `NoteRootView.layout()`은 `onLayout` 뒤에 크기가 달라졌으면 한 번 더 놓는다. 이것이 없으면 본문 영역이 옛 창 높이에 머물러 아래가 잘린다.
+- `PlainTextBodyEditor(theme:)`: 서식 없는 기본 구현(TextKit 1). 제 실행 취소 기록을 따로 갖는다. `makeBodyEditor`를 주지 않았을 때의 기본값이고 노트 창 테스트가 쓴다. 앱에서는 App 타깃의 어댑터 `MarkdownBodyEditor`가 Editor 모듈을 끼운다.
 
 글을 주고받는 약속(정본은 `NoteBodyEditing`의 문서 주석). 편집 중인 글의 주인은 편집기다. 편집기는 받은 글을 제 표기로 고쳐 보일 수 있고(CRLF를 LF로 등), 밖에서 다른 글을 넣으면 실행 취소 기록을 비우고 조합(한글 입력)을 끊어도 된다. 그래서 노트 창은 꼭 필요할 때만 `text`에 넣는다.
 
@@ -201,6 +209,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - 지금 글과 같은 글을 넣으면 아무것도 하지 않는다(실행 취소 기록과 조합을 그대로 둔다).
 - 다른 글을 넣으면 그 글로 바꾸고 실행 취소 기록을 비운다(옛 기록은 새 글에 없는 범위를 가리킨다).
 - 받은 글을 제 표기로 고쳐 보이는 것만으로는 `onTextChange`를 부르지 않는다(사용자가 고친 것이 아니다).
+- `flushPendingChange()`가 불리면 아직 알리지 않은 변경(늦게 알리려고 미뤄 둔 것)을 그 자리에서 `onTextChange`로 알린다. 알릴 것이 없으면 아무것도 하지 않는다. 노트 창은 창을 내리기 전(`closeWindow`), 휴지통으로 보내기 전(`moveToTrash`), 그리고 App이 끝내기 전에 부르는 `flushPendingEdits()`에서 부른다. 이것이 없으면 알림이 한 차례 늦는 편집과 같은 차례에 닫힌 창의 마지막 글이 사라진다.
 
 ## Editor (`Sources/Editor/`)
 
@@ -210,6 +219,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 - `MarkdownEditor` (`@MainActor`): `init(theme: Theme, configuration: MarkdownEditorConfiguration = .init())`
   - `view: NSView`: 세로 스크롤 뷰. 바탕은 그리지 않고 안쪽 여백(`doc-pad`)은 편집기가 둔다. 아무 뷰에나 넣는다.
+  - `documentView: NSView`: 스크롤 뷰 없이 본문만 든 뷰(뒤집힌 좌표, 안쪽 여백 포함). 바깥이 스크롤 뷰를 가질 때(노트 창) 그 문서 뷰로 넣는다. 바깥은 너비만 맞추고 높이는 이 뷰가 내용에 맞춘다. 이것을 가져가면 `view`는 비므로 둘 중 하나만 쓴다.
   - `text: String`: 원문(Markdown 글자 그대로). 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다(커서, 되돌리기 기록 유지). 다른 글을 넣으면 되돌리기 기록을 비운다.
     - 편집기의 글은 언제나 `\n`으로 끝나는 줄이다. 넣을 때 `\r\n`, `\r`, U+2028, U+2029를 `\n`으로 바꾸므로, 그런 글을 넣으면 읽은 값이 넣은 값과 다르다(이때도 `onTextChange`는 부르지 않는다. 파일의 줄바꿈은 사용자가 고친 뒤 저장될 때 `\n`이 된다). 붙여넣기와 끌어다 놓기도 같게 바꾸고, Return 계열 키(⌃Return, ⌥Return 포함)는 모두 `\n` 하나를 넣는다.
   - `load(text:foldedLines:)`: 노트를 열 때 원문과 접힌 줄을 한 번에 넣는다. 아무것도 알리지 않는다. 같은 글이면 접힘만 바꾼다.
@@ -220,6 +230,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
     - `onFoldChange`는 값이 바깥이 아는 것과 실제로 달라졌을 때만 한 번 부른다. `text`를 넣어 접힘이 없어진 경우도 그 자리에서 알린다.
     - 편집을 되돌리면 접힘도 그 편집 전으로 돌아간다(D-020).
   - `configuration: MarkdownEditorConfiguration`(`checkboxStyle: .box | .bracket`), `selectedRange: NSRange`, `undoManager: UndoManager`(편집기마다 따로), `onOpenLink: ((URL) -> Void)?`(없으면 기본 브라우저). 링크는 `http`, `https`, `mailto` 주소만 열고 `onOpenLink`에도 그것만 넘긴다. 복사한 HTML의 `href`도 같다(D-020).
+  - `flushPendingChange()`: 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다(창을 닫기 직전에 바깥이 부른다).
   - `focus()`, `perform(_ action: EditorAction)`: `EditorAction`은 spec 13 "편집" 표의 동작(`.indent .outdent .toggleTodo .toggleDone .moveLineUp .moveLineDown .fold .unfold .heading(1...3) .bold .strikethrough .highlight .inlineCode .codeBlock .link`). 단축키는 편집기가 직접 받고, 더 보기 메뉴 같은 곳에서는 이것을 부른다.
   - `@_spi(Verification)`: `forcesActiveAppearance`, `textView`, `gutterPoint(forLine:)`, `textPoint(forLine:)`. `EditorDemo`만 쓴다.
 
@@ -239,6 +250,9 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - 원문이 바뀌는 길목은 `shouldChangeTextIn` 하나다(글자 입력, 지우기, 붙여넣기, 끌어다 놓기, 조합, 편집 명령이 모두 지난다). 여기서 접혀서 감춘 줄에 닿는 편집을 막고 그 토글을 편다(D-020). 감춘 줄까지 일부러 고치는 명령(줄 옮기기, 들여쓰기, 접힌 토글 뒤에 새 토글)만 `TextEdit.includesHiddenLines`로 지나간다. 다른 줄바꿈 글자가 든 글도 여기서 `\n`으로 바꿔 넣는다.
 - 바깥에 알리는 일(`onTextChange`, 높이, 접힘)은 `didProcessEditing`에서 표시해 두고 `flushPendingChange`에서 한다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는 `setMarkedText` 바로 뒤에(이때는 `textDidChange`가 오지 않는다), 그 밖에는 다음 메인 큐 차례에 불린다.
 - 접힘의 되돌리기: 편집을 되돌렸을 때 줄 번호를 따라 옮기는 것만으로 접힘이 편집 전으로 돌아가지 않으면(토글이 사라짐, 줄 옮기기, 접힌 덩어리를 통째로 고침) 편집 전 접힘을 같은 되돌리기 묶음에 적어 두고, 되돌리기가 끝난 뒤(`NSUndoManagerDidUndoChange`)에 넣는다. 글자를 치는 편집에는 적지 않는다(연달아 친 글자가 한 번에 되돌려지는 것을 깨지 않으려고).
+- 입력 커서는 시스템의 것을 그대로 쓰고 색만 `insertionPointColor`(`accent`)로 맞춘다. 지금 macOS의 입력 커서는 텍스트 뷰가 그리지 않고 따로 놓이는 표시 뷰여서, `drawInsertionPoint`를 덮어써 너비를 `caret-w`로 줄이면 커서가 하나 더 그려지고 지워지지 않는 자국이 남는다. 기본 편집기(`PlainBodyTextView`)도 같다(D-025).
+- 줄의 모양만 바뀌어도 높이가 달라진다(커서가 들어간 줄은 링크의 주소 같은 감춘 기호가 보여 줄이 넘어가고, 커서가 나가거나 창이 키 창에서 물러나면 줄어든다). `refreshStyling()`이 줄을 다시 입히면 다음 메인 큐 차례에 높이를 다시 재어 알린다(`scheduleHeightReport`).
+- 텍스트 뷰는 마우스가 움직일 때마다 I자 커서를 넣는다(추적 영역이 보이는 영역 전체다). 그 자리에서 마우스를 받는 뷰가 텍스트 뷰(와 그 안의 뷰)가 아니면, 곧 위에 겹쳐 뜬 다른 뷰(노트 창의 휴지통, 닫기)면 I자 커서를 넣지 않고 화살표로 둔다(`EditorTextView.isHitView(for:)`, 규칙 9).
 - 문서 끝의 빈 줄은 문단이 만들어지지 않고 앞 문단 조각에 붙은 빈 줄 조각으로 놓인다. 커서가 그 줄에 있으면 그 줄의 들여쓰기와 높이는 텍스트 뷰의 입력 속성(기본 문단 모양)을 따른다. 닫히지 않은 코드 블록이 줄바꿈으로 끝나면 `defaultParagraphStyle`에 코드 줄 모양을 넣고, 앞 문단 조각이 코드 상자를 그 줄까지 늘려 닫는다. 서식 없는 텍스트 뷰는 기본 문단 모양을 저장소의 글자에도 붙이므로 `willProcessEditing`에서 떼어 낸다(저장소에는 글꼴과 글자색만 남는다).
 
 ### 확인용 실행 파일 `EditorDemo` (`Sources/EditorDemo/`)
@@ -250,9 +264,38 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ## App 타깃 (`Sources/FloatingNotes/`)
 
-- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. `AppRouter`는 `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로 넘기고, 나머지는 아직 기록만 한다. 새 노트를 만들거나 노트를 열다가 실패하면(디스크가 가득 참 등) 기록과 함께 알림 창으로 까닭을 보여 준다(`RouteFailureAlert`).
-- 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일도 같은 방식으로 남기고 건너뛴다.
-- `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다(노트 창이 키 창이 될 때는 `NotePanelCoordinator`가 부른다). 끝낼 때(`applicationShouldTerminate`) `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
+- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`, `AppSettingsStore`(`stateDirectory/app-settings.json`. 지금은 `showsMenuBarIcon` 하나)를 한 번 만들고, `AppDelegate`가 아래를 조립한다. 기능 모듈끼리는 서로를 모르고 여기서만 이어진다.
+- 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일과 등록하지 못한 전역 단축키도 같은 방식으로 남긴다. 번들에 든 리소스(토큰, 메뉴 막대 아이콘)가 없으면 시작하지 않는다.
+- `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다(노트 창이 키 창이 될 때는 `NotePanelCoordinator`가 부른다). 끝낼 때(`applicationShouldTerminate`) `notePanels.flushPendingEdits()`로 편집기가 아직 알리지 않은 글을 받은 뒤 `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
 - 켤 때 `NotePanelCoordinator.restoreOpenNotes()`로 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 가장 최근에 고친 노트를, 노트가 하나도 없으면 빈 노트를 새로 만들어 띄운다(D-021). Dock 아이콘을 눌렀을 때도 같다.
-- 앱 메뉴(`MainMenu`)에는 글을 쓰는 데 필요한 것만 있다: 편집(실행 취소, 오려두기, 복사, 붙여넣기, 모두 선택), 새 노트, 창 닫기, 종료. 메뉴 막대 아이콘과 단축키 표는 4단계에서 만든다.
-- Features 타깃 `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`에만 의존하고 아직 노트 창에 끼우지 않았다(노트 창은 `PlainTextBodyEditor`를 쓴다). `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
+
+### 요청 전달 (`AppRouter`)
+
+- `Routing` 구현. `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로 넘기고, 나머지는 아직 기록만 한다(`unhandled`). 새 노트를 만들거나 노트를 열다가 실패하면 기록과 함께 알림 창으로 까닭을 보여 준다(`RouteFailureAlert`).
+- 빠른 캡처와 노트 찾기는 `AppRouter.route(_:)`의 `INTEGRATION(Capture)`, `INTEGRATION(Browse)` 표시 두 곳에서 잇는다. 그때 쓸 것: `notePanels.window(for:)`(노트 찾기를 그 노트의 상단 줄 아래에 붙일 창), `notePanels.frontmostNoteID`, `notePanels.keyNoteID`.
+
+### 본문 편집기 (`Editor/`)
+
+- `NoteEditorFactory`: `NotePanelCoordinator`의 `makeBodyEditor`로 넘기는 곳. 노트 창마다 `MarkdownEditor`를 만들어 `MarkdownBodyEditor`로 감싼다. `options: NoteEditorOptions`(체크박스 모양, 기본 상자. `tokens.json`의 `display.defaults`와 같고 설정 화면이 생기면 여기에 넣는다)를 바꾸면 떠 있는 편집기에 바로 반영된다. `editor(for:)`로 그 노트의 편집기를 찾는다.
+- `MarkdownBodyEditor`: `NoteBodyEditing` 어댑터. 편집기의 `documentView`를 본문 자리에 넘기고, 글과 높이 알림을 그대로 잇는다. 처음 넣는 글은 `load(text:foldedLines:)`로 지난번의 접힘과 함께 넣고, 그 뒤에 들어오는 글(다른 프로그램이 고친 본문)은 접힌 줄 번호를 새 본문에 맞춰 옮긴 뒤 넣는다.
+- 접힘 저장(D-018, D-023): `NoteFoldStore`가 `WindowStateStore`의 창 상태에 `foldedLines`만 고쳐 적는다(`stateDirectory/windows.json`). 창 상태와 함께 살고 함께 지워진다. `FoldPersistence`는 저장 표기(오름차순, 비면 항목 없음)와 줄 번호 옮기기(`remapped`: 앞뒤에서 그대로인 줄을 찾아 바뀐 곳 위의 접힘은 그대로, 아래의 접힘은 늘고 준 줄 수만큼 옮기고, 바뀐 줄에 걸친 접힘은 버린다. 옮긴 줄이 토글인지는 편집기가 다시 거른다)를 맡는다.
+
+### 단축키 (`Shortcuts/`)
+
+- `ShortcutTable.standard`(`ShortcutTable.swift`)가 단축키 표(spec 13)의 정본이다. 줄마다 구획(`ShortcutGroup`), 동작 이름, 키(`KeyChord`: `ShortcutKey`와 `ShortcutModifiers`. 키는 가상 키 코드로 적는다), App이 받는 동작(`AppCommand`, 없으면 그 화면이 스스로 받는 줄)을 든다. `tokens.json`의 `shortcuts`와 구획, 동작 이름, 키 표기가 줄마다 같은지 테스트가 견준다. `replacing(_:with:)`가 키를 바꾼 표를 내므로, 설정 화면은 그 표로 `MainMenu.make`와 `GlobalHotKeys.register`를 다시 부르면 된다.
+- `AppCommandDispatcher`: `AppCommand`를 실제 일로 바꾼다. 다른 화면을 여는 일은 `Routing`으로, 지금 노트(키 창인 노트)에 하는 일은 `NotePanelCoordinator`로 보낸다. "노트 안에서 찾기"(⌘F)와 "전체 검색"(⇧⌘F)은 화면이 없어 기록만 한다(`unavailable`). `undoOrRestoreTrash(_:)`는 ⌘Z를 받아, 방금 휴지통으로 보낸 노트가 있으면 되살리고 없으면 첫 응답자의 `undo:`로 넘긴다.
+- 전역 단축키: `GlobalHotKeys`가 표의 "어디서나" 줄을 `HotKeyRegistering`으로 등록한다. 실제 구현 `CarbonHotKeyRegistrar`는 `RegisterEventHotKey`를 독점(`kEventHotKeyExclusive`)으로 부른다. 보통 등록은 다른 앱이 같은 키를 쓰고 있어도 성공하므로 겹친 것을 알 수 없고, 독점 등록만 `eventHotKeyExistsErr`로 실패한다. 등록하지 못한 키는 `failures`에 남고 켤 때 경고로 기록된다(설정 화면이 생기면 이것으로 그 자리에서 알린다).
+- 앱 안의 단축키: `MainMenu`가 표의 "노트 창" 줄마다 숨긴 메뉴 항목(`isHidden`, `allowsKeyEquivalentWhenHidden`)을 넣어 키만 듣게 한다. 보이는 항목에는 `keyEquivalent`가 없다(규칙 4). 표에 없는 표준 편집 키(⌘Z, ⇧⌘Z, ⌘X, ⌘C, ⌘V, ⌘A, ⌘Q)도 같은 방식이다. 편집기의 단축키("편집" 줄)는 편집기가 `performKeyEquivalent`에서 먼저 받는다(뷰가 메뉴보다 앞선다). 캡처 바와 노트 찾기의 키도 그 화면이 스스로 받는다.
+- `MenuShortcutConcealer`: 시스템이 "편집" 메뉴에 끼워 넣는 항목(이모지 및 기호 등)의 단축키도 보이지 않게, 메뉴가 열리기 직전에 단축키 없는 같은 항목을 앞에 두고 원래 항목을 숨긴다(키는 계속 듣는다).
+
+### 메뉴 막대 (`MenuBar/`)
+
+- 메뉴 막대 아이콘은 꺼 둘 수 있다(`AppSettings.showsMenuBarIcon`, 기본 보임. `AppDelegate.setMenuBarIconShown(_:)`이 적고 곧바로 반영한다. 실행 인자 `--menu-bar-icon on|off`가 그 실행에서만 덮어쓴다). 꺼도 모든 기능에 닿는다: 전역 단축키, 앱 안의 단축키, 앱 메뉴(메뉴 막대 메뉴의 항목이 모두 보이는 항목으로 있다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다), Dock 메뉴(`DockMenu`: 메뉴 막대 메뉴에서 종료만 뺀 같은 항목), Dock 아이콘 누르기(숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄운다).
+- `StatusItemController`: `NSStatusItem`에 `MenuBarIcon.load()`의 18pt 템플릿 이미지(`App/Resources/menubar-icon.pdf`)를 넣고, 메뉴가 열릴 때마다 `StatusMenuModel.entries(areNotesHidden:)`로 다시 채운다. 노트를 숨긴 중이면 "노트 모두 숨기기" 자리에 "노트 모두 보이기"가 온다.
+- `StatusMenuModel`: 항목의 순서, 이름, 아이콘(SF Symbols, spec 18.2), 동작(`StatusMenuAction`). 이름과 순서는 `tokens.json`의 `navigation.menuBar`와 같은지 테스트가 견준다. `StatusMenuBuilder`가 `NSMenu`로 만들고 줄은 `MenuBarRowView`(노트의 더 보기 메뉴와 같은 모양: `row-h`, 14pt 아이콘, `hover` 바탕)가 그린다. `keyEquivalent`는 넣지 않는다.
+- 고른 항목은 `AppCommandDispatcher.performStatusMenu(_:)`가 받는다. 메뉴 막대에서 연 노트 찾기는 `.openBrowse(anchor: nil)`이다(spec 4.1).
+
+### 그 밖
+
+- Features 타깃 `Capture`, `Browse`는 다른 작업에서 만든다. `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
+- 창 그림자와 뒤 배경 흐림은 시스템의 것을 쓴다(`shadow-window`, `blur` 토큰 값은 쓰지 않는다. 까닭은 D-025).
