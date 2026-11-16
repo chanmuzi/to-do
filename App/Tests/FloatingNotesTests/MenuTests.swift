@@ -6,7 +6,9 @@ import Theme
 @testable import FloatingNotes
 
 /// 메뉴 막대 메뉴(spec 4.3)와 앱 메뉴: 단축키를 보이지 않으면서(규칙 4) 키는 듣는지.
-@Suite struct MenuTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 메뉴 항목을 고르는 시험은 메인 액터를 오래 잡는다. 한꺼번에 시작하면
+/// 전환 시간을 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct MenuTests {
     private let fixture: AppFixture
 
     init() throws {
@@ -98,10 +100,13 @@ import Theme
         ) { chosen.append($0) }
         let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
         #expect(disabled == ["라이브러리", "AI 패널", "설정", "단축키"])
-        for index in menu.items.indices where !menu.items[index].isSeparatorItem {
-            menu.performActionForItem(at: index)
-        }
-        #expect(chosen == [.newNote, .quickCapture, .findNote, .toggleNotesHidden, .quit])
+        // 고를 수 없는 항목은 눌러도 동작이 가지 않는다(고를 수 있는 항목은 위의 시험이 본다).
+        let library = try #require(menu.items.firstIndex { $0.title == "라이브러리" })
+        menu.performActionForItem(at: library)
+        #expect(chosen.isEmpty)
+        #expect(menu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title) == [
+            "새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "종료",
+        ])
 
         // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
         let main = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
