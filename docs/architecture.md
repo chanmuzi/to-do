@@ -76,10 +76,13 @@ scripts/
   - 글꼴: `font(_: TextStyle, size:weight:) -> Font`, `nsFont(_:size:weight:) -> NSFont`, `lineHeight(_:)`, `tracking(_:)`. `TextStyle`은 spec 3.1 표의 줄(`.title .h1 .h2 .h3 .body .strong .paneTitle .row .rowSub .ui .micro .code .capture`)
   - 치수: `space(_: SpaceToken)`, `shape(_: ShapeToken)`, `component(_: ComponentToken)`, `docPadding`, `material`(opacity, blur, tintMix, tintMixRow), `motion`(duration, curve, `.animation`, `.timingFunction`), `palette`, `accentPresets`
   - 형광펜: `HighlightColor`(`.yellow=1 .gray .rose .blue`, 번호는 D-008의 `{n}`) → `.background`, `.foreground`가 `ColorToken`
-  - 상태: `appearance`, `tokens`, `overrides`, `setOverrides(_:) throws`, `followAppearance(of: NSApplication)`. AppKit 쪽은 `Theme.didChangeNotification`을 받아 다시 그린다.
-- `ThemeTokens` (`Sendable` 값): `tokens.json`을 푼 것. `Theme` 없이 쓸 수 있다. `color(_:_:)`, `textStyle(_:)`, `noteBackground(paletteID:_:)`, `rowTint(paletteID:)`, `applying(_: ThemeOverrides)`.
+  - 상태: `appearance`, `tokens`, `overrides`, `setOverrides(_:) throws`(잘못된 키·값이면 던지고 아무것도 바꾸지 않음), `followAppearance(of: NSApplication)`, `loadWarnings: [String]`. AppKit 쪽은 `Theme.didChangeNotification`을 받아 다시 그린다.
+  - 저장된 덮어쓰기를 읽을 때는 던지지 않는다. 없어진 키나 잘못된 값은 버리고, 깨진 파일은 `theme-overrides.json.corrupt`로 옮긴 뒤 기본 테마로 시작하며, 버린 것을 `loadWarnings`에 적는다.
+- `ThemeTokens` (`Sendable` 값): `tokens.json`을 푼 것. `Theme` 없이 쓸 수 있다. `color(_:_:)`, `textStyle(_:)`, `noteBackground(paletteID:_:)`, `rowTint(paletteID:)`, `applying(_: ThemeOverrides) throws`(엄격), `applyingValid(_:) -> (tokens, accepted, rejected: [ThemeError])`(쓸 수 있는 것만 얹음).
+- 토큰 값 검증: 수는 십진 표기만 받는다(`nan`, `inf`, `0x10`, `1e3` 거부). 글자 크기·줄 높이는 0보다 커야 하고, 간격·모서리·치수·여백·흐림은 0 이상, 굵기는 1~1000, 불투명도는 0~1, 섞는 비율은 0~100%여야 한다. `tokens.json`과 덮어쓰기에 똑같이 적용된다.
 - `ThemeOverrides`: `[구역.키: 값]` 사전. 키 예 `color.light.accent`, `type.fs-body`, `palette.tint-1`. 값 표기는 `tokens.json`과 같다. `ThemeOverrideStore(url:)`가 JSON 파일로 읽고 쓴다(`stateDirectory/theme-overrides.json`).
-- `FontRegistrar.registerBundledFonts()`: App이 켤 때 부른다. 기능 모듈은 부르지 않는다.
+- `FontRegistrar.registerBundledFonts() -> FontRegistration`(`registered: [URL]`, `problems: [String]`): App이 켤 때 부른다. 던지지 않는다. 등록하지 못한 글꼴은 `problems`에 적히고 글꼴 고르기는 시스템 글꼴로 넘어간다. 기능 모듈은 부르지 않는다.
+- 글꼴 고르기: 가족 이름은 `<이름> Variable`(번들의 가변 글꼴)을 먼저 찾고 그다음 `<이름>`을 찾는다. 가변 글꼴은 굵기 축에 토큰 값을 그대로 넣고, 굵기별 파일로 된 가족은 CSS 굵기가 가장 가까운 파일을 고른다.
 - 새 토큰을 쓰려면 `tokens.json`에 값을 넣고 `TokenKeys.swift`의 enum에 case를 더한다. 테스트가 파일과 enum이 어긋나면 실패한다.
 
 ### Models
@@ -92,13 +95,37 @@ scripts/
 
 ### Store
 
-- `NoteStoring` (`@MainActor` 프로토콜, 구현은 `FileNoteStore`): `list()`, `load(_:)`, `create(_: NoteDraft)`, `save(_:)`(곧바로), `scheduleSave(_:)`(자동 저장, 기본 0.5초 뒤), `flushPendingSaves()`, `moveToTrash(_:)`, `listTrash()`, `restoreFromTrash(_:)`, `observe(_:) -> StoreObservation`. 모두 동기 호출이고 실패하면 던진다.
-- `StoreChange`: `id`, `kind`(`.created .updated .removed .saveFailed(message:)`), `origin`(`.local` 이 앱, `.external` 다른 프로그램). 편집기는 `.external` `.updated`일 때만 다시 읽으면 된다.
-- `FileNoteStore.refresh()`: 폴더를 다시 훑는다. 폴더 감시는 파일이 생기고 없어지고 바꿔치기되는 것만 잡고, 제자리 수정은 이 호출이 잡는다.
+- `NoteStoring` (`@MainActor` 프로토콜, 구현은 `FileNoteStore`). 모두 동기 호출이고 실패하면 `StoreError`를 던진다.
+  - `list() throws -> NoteListing`, `listTrash() throws -> NoteListing`: `NoteListing`은 `notes: [Note]`(최근에 고친 것이 앞)와 `failures: [NoteReadFailure]`(`id`, `url`, `error`). 읽지 못하는 `.md`(UTF-8 아님, `.md`로 끝나는 폴더)가 있어도 나머지를 돌려준다. 폴더 자체를 못 읽을 때만 던진다.
+  - `load(_ id: NoteID) throws -> Note`: 노트의 지금 값(아직 쓰지 않은 변경 포함).
+  - `create(_ draft: NoteDraft) throws -> Note`: 파일을 새로 만드는 호출은 이것뿐이다.
+  - `update(_ id: NoteID, _ mutate: (inout Note) -> Void) throws -> Note`: 지금 값에 적용하고 곧바로 쓴다(`@discardableResult`).
+  - `scheduleUpdate(_ id: NoteID, _ mutate: (inout Note) -> Void) throws -> Note`: 지금 값에 적용하고 잠시 뒤에 쓴다(자동 저장). 마지막 변경 뒤 0.5초, 계속 고치는 중이어도 첫 변경 뒤 3초 안에 쓴다. 돌려주는 값은 적용한 뒤의 지금 값.
+  - `flushPendingSaves() throws`: 미뤄 둔 변경을 모두 쓴다. 하나가 실패해도 나머지를 쓰고, 실패한 것은 남겨 둔 채 `StoreError.pendingSavesFailed([SaveFailure])`(`id`, `title`, `error`)를 던진다.
+  - `resolveConflict(_ id: NoteID, keeping: ConflictSide) throws -> Note`: `.mine`(이 앱에서 고친 내용을 쓴다) 또는 `.disk`(디스크 내용을 받아들이고 쓰지 않은 변경을 버린다).
+  - `moveToTrash(_ id: NoteID) throws`, `restoreFromTrash(_ id: NoteID) throws -> Note`.
+  - `refresh() throws`: 폴더를 다시 훑는다. 폴더 감시는 파일이 생기고 없어지고 바꿔치기되는 것만 잡고, 제자리 수정은 이 호출이 잡는다. App이 앞으로 올 때 부른다.
+  - `observe(_ handler: (StoreChange) -> Void) -> StoreObservation`: 돌려받은 값을 들고 있는 동안만 알림이 온다.
+- 노트를 고치는 규칙(기능 모듈이 지켜야 하는 것):
+  - 노트의 지금 값은 저장소가 들고 있다. 노트를 통째로 넘겨 덮어쓰는 호출은 없다. 자기가 맡은 항목만 클로저에서 고친다. 예: 편집기 쪽 `scheduleUpdate(id) { $0.body = text }`, 노트 창 `update(id) { $0.colorID = color }`. 클로저는 다른 쪽이 미뤄 둔 변경까지 들어 있는 값을 받으므로 서로의 변경을 지우지 않는다.
+  - 클로저에서 `id`, `created`, `modified`는 바꿀 수 없다(`modified`는 바꿔도 무시한다). 바뀐 것이 없으면 쓰지 않고 알리지도 않는다.
+  - 노트 폴더에 파일이 없는 노트(휴지통으로 갔거나 지워짐)를 고치면 `noteNotFound`이고 파일을 만들지 않는다. 휴지통으로 보낸 뒤 늦게 도착한 저장이 노트를 되살리지 않는다.
+  - `moveToTrash`는 미뤄 둔 변경을 먼저 쓰고 옮긴다. 그 쓰기가 실패하면(충돌 포함) 옮기지 않고 던진다. 휴지통에 같은 이름의 파일이 있으면 그 옛 파일을 `<id>-2.md`, `<id>-3.md`…로 옮겨 둘 다 남긴다(방금 버린 것이 원래 이름을 갖는다).
+- 다른 프로그램이 고친 파일(충돌) 정책:
+  - 저장소는 노트마다 "마지막으로 내준 글"을 기억한다. `load`, `create`, `restoreFromTrash`, 쓰기 성공, `resolveConflict`가 이것을 갱신한다. `list`, `refresh`는 갱신하지 않는다.
+  - 쓰기 직전에 디스크의 글이 이것과 다르면 쓰지 않는다. `update`는 `StoreError.conflict(id)`를 던지고, 자동 저장은 `StoreChange.Kind.conflict`를 알린다. 고친 내용은 저장소에 남고(`load`가 돌려준다) `resolveConflict`로 풀 때까지 그 노트는 디스크에 쓰지 않는다. 글 전체를 견주므로 수정 시각만 바뀐 파일은 충돌이 아니다.
+  - 쓰지 않은 변경이 없는 노트를 다른 프로그램이 고치면 `.updated`/`.external`이 온다. 그 노트를 보여 주는 쪽은 `load`로 다시 읽는다(다시 읽으면 충돌 기준도 갱신된다). 다시 읽지 않고 고치면 `conflict`다.
+  - 노트를 편집용으로 열 때는 `list()`의 값을 그대로 쓰지 말고 `load(id)`를 한 번 부른다.
+- `StoreChange`: `id`, `kind`(`.created .updated .removed .saveFailed(message:) .conflict`), `origin`(`.local` 이 앱, `.external` 다른 프로그램). `.saveFailed`와 `.conflict`는 미뤄 둔 저장에서만 오고, 고친 내용은 저장소에 남아 있다.
+- `StoreError`: `.noteNotFound(id)`, `.noteAlreadyExists(id)`, `.unreadableFile(url)`, `.conflict(id)`, `.writeFailed(id, message:)`, `.pendingSavesFailed([SaveFailure])`.
 - `StoreLocation`: `notesDirectory`, `trashDirectory`(`notes/.trash/`), `stateDirectory`. `.standard()`는 `~/Library/Application Support/FloatingNotes/{notes,state}`, `.isolated(notesDirectory:)`는 그 폴더 안만 쓴다.
-- `WindowStateStore`: `state(for:)`, `set(_:for:)`, `remove(_:)`, `all` → `stateDirectory/windows.json`.
-- `SpaceStore`: `spaces`, `space(for:)`, `replace(with:)` → `stateDirectory/spaces.json`.
-- 노트 파일은 `<id>.md`. 머리는 `title`(따옴표 문자열), `space`, `color`, `reminder`, `created`(ISO 8601, UTC, 초 단위)이고 닫는 `---` 다음 글자부터 끝까지가 본문 그대로다. 모르는 머리 줄은 저장해도 남는다. 머리 없는 `.md`도 읽는다.
+- `WindowStateStore`: `state(for:)`, `set(_:for:)`, `remove(_:)`, `all`, `loadWarning: String?` → `stateDirectory/windows.json`.
+- `SpaceStore`: `spaces`, `space(for:)`, `replace(with:)`, `loadWarning: String?` → `stateDirectory/spaces.json`.
+- 두 상태 파일이 깨져 있으면(잘림, 모양 다름) 지우지 않고 `<이름>.corrupt`(이미 있으면 `.corrupt-2`…)로 옮긴 뒤 빈 상태로 시작하고 `loadWarning`에 적는다.
+- 노트 파일은 `<id>.md`. 머리는 `title`(따옴표 문자열), `space`, `color`, `reminder`, `created`(ISO 8601, UTC, 초 단위)이고 닫는 `---` 다음 글자부터 끝까지가 본문 그대로다. 머리 없는 `.md`도 읽는다.
+  - 아는 항목은 들여쓰기 없이 줄 맨 앞에서 시작하는 다섯 키뿐이다. 들여쓴 줄과 모르는 줄은 저장해도 그대로 남는다.
+  - 이미 있는 파일을 고쳐 쓸 때는 값이 바뀐 항목의 줄만 새로 적는다. 값이 그대로인 줄(손으로 적은 표기, 초 아래 자리가 있는 날짜, 읽지 못한 날짜)과 줄 순서, 줄바꿈 종류, 맨 앞의 BOM은 그대로 둔다. `created` 줄은 있으면 언제나 그대로 둔다.
+  - 날짜는 ISO 8601로 읽는다. 초 아래 자리(`…00.123Z`)와 날짜만 있는 값(`2026-11-17`, UTC 자정)도 받는다. 읽지 못한 `reminder`는 리마인더 없음으로 읽히고, 리마인더를 새로 정할 때만 그 줄이 바뀐다.
 
 ### Routing
 
@@ -109,5 +136,7 @@ scripts/
 ## App 타깃 (`Sources/FloatingNotes/`)
 
 - `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. 지금 `AppRouter`는 요청을 기록만 한다.
+- 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일도 같은 방식으로 남기고 건너뛴다.
+- `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다. 끝낼 때(`applicationShouldTerminate`) `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
 - 지금은 `PlaceholderWindowController`가 테마 확인용 창 하나를 띄운다. 2단계에서 `AppDelegate.showInitialWindows()`를 노트 창을 되살리는 코드로 바꾸고 `Placeholder*` 두 파일을 지운다.
 - Features 타깃 `NotePanel`, `Editor`, `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`, `Models`에만 의존한다. `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
