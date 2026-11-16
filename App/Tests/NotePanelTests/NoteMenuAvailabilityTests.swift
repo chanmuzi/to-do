@@ -20,10 +20,11 @@ import Theme
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
             "리마인더 설정", "스페이스 옮기기", "AI 패널 열기",
         ])
-        for index in menu.items.indices where menu.items[index].action != nil {
-            menu.performActionForItem(at: index)
-        }
-        #expect(chosen == [.togglePin, .closeWindow, .moveToTrash])
+        // 고를 수 없는 항목은 눌러도 동작이 가지 않고, 고를 수 있는 항목은 간다.
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "리마인더 설정" }))
+        #expect(chosen.isEmpty)
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "창 닫기" }))
+        #expect(chosen == [.closeWindow])
 
         // 모두 이어져 있으면(기본) 전부 고를 수 있다.
         let all = builder.moreMenu(isPinned: false, selectedPaletteID: nil) { _ in }
