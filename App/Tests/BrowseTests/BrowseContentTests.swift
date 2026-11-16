@@ -239,4 +239,26 @@ import Testing
     func previewFlattensTheBody(body: String, expected: String) {
         #expect(BrowsePreview.flatten(body) == expected)
     }
+
+    /// "라이브러리 열기"를 두지 않을 때는 그 위의 구분선도 없다. 줄이 하나도 없으면 목록이 빈다.
+    @Test func libraryRowAndItsSeparatorCanBeLeftOut() {
+        let listed = BrowseContent(
+            notes: Sample.notes, floating: Sample.floating, query: BrowseQuery(""), excluding: nil,
+            showsLibrary: false
+        ).entries
+        #expect(listed.last?.label == "api")
+        #expect(!listed.contains(.library))
+        #expect(!listed.contains(.separator))
+
+        let searching = BrowseContent(
+            notes: Sample.notes, floating: Sample.floating, query: BrowseQuery("없는 말"), excluding: nil,
+            showsLibrary: false
+        ).entries
+        #expect(searching.map(\.label) == ["+ 없는 말"])
+
+        let empty = BrowseContent(
+            notes: [], floating: [], query: BrowseQuery(""), excluding: nil, showsLibrary: false
+        ).entries
+        #expect(empty.isEmpty)
+    }
 }

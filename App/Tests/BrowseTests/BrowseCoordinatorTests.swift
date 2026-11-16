@@ -6,8 +6,10 @@ import Testing
 @_spi(Verification) @testable import Browse
 
 /// 노트 찾기를 실제로 띄우고 입력 경로(`insertText`, `setMarkedText`, `doCommand(by:)`)로 움직여 본다.
+/// 한 번에 하나씩 돈다(`.serialized`): 창을 띄우는 시험이 한꺼번에 시작하면 메인 액터가 밀려, 전환 시간을
+/// 기다리는 다른 시험이 제때 차례를 받지 못한다.
 @MainActor
-@Suite struct BrowseCoordinatorTests {
+@Suite(.serialized) struct BrowseCoordinatorTests {
     private let fixture: BrowseFixture
     private let browse: BrowseCoordinator
     private let ids: [String: NoteID]
@@ -499,8 +501,8 @@ import Testing
 
     // MARK: - 닫힘과 실패를 알리기
 
-    /// 닫힐 때 포커스를 열기 전의 자리로 돌려줄지 알린다: esc와 `hide()`는 돌려주고, 줄을 골랐을 때는
-    /// 요청을 받은 쪽이 포커스를 정하므로 돌려주지 않는다. 알림은 요청보다 먼저 온다.
+    /// 닫힐 때 포커스를 열기 전의 자리로 돌려줄지 알린다: esc와 `hide()`는 돌려주고, 줄을 골라 요청이
+    /// 이루어졌을 때는 받은 쪽이 포커스를 정했으므로 돌려주지 않는다. 그때의 알림은 요청 뒤에 온다.
     @Test func dismissalTellsWhetherFocusShouldGoBack() throws {
         defer { fixture.cleanUp() }
         var events: [String] = []
@@ -515,7 +517,7 @@ import Testing
         browse.show(anchoredTo: nil, excluding: nil)
         try press(returnKey)
 
-        #expect(events == ["dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 0"])
+        #expect(events == ["dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 1"])
         #expect(fixture.routes == [.openNote(try id("today"))])
     }
 
@@ -565,5 +567,165 @@ import Testing
         browse.show(anchoredTo: nil, excluding: nil)
         try input().type("배포\n체크")
         #expect(try input().string == "배포 체크")
+    }
+
+    // MARK: - 닫히는 중에는 명령을 받지 않는다
+
+    /// 검토에서 나온 문제: 검색어를 치고 esc를 누른 바로 뒤의 ↵(사라지는 `dur` 안)가 고른 줄을 열었다.
+    @Test func returnRightAfterEscapeOpensNothing() throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try input().type("배포")
+        try press(escapeKey)
+        #expect(!browse.isVisible)
+        #expect(try !input().isEditable)
+        let selected = selectedRow
+
+        try press(returnKey)
+        try press(downKey)
+        #expect(fixture.routes.isEmpty)
+        #expect(selectedRow == selected)
+
+        // 다시 띄우면 전처럼 받는다.
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(try input().isEditable)
+        try press(returnKey)
+        #expect(fixture.routes == [.openNote(try id("today"))])
+    }
+
+    /// 창을 내리고 높이를 맞추는 일은 움직임이 끝났다는 알림이 아니라 전환 시간에 걸려 있다: 화면이 꺼져
+    /// 움직임이 나아가지 않아도 `dur` 뒤에는 마지막으로 정한 틀에 놓여 있고, 닫은 창은 내려가 있다.
+    @Test func frameAndClosingSettleAfterTheTransitionTimeWhateverTheAnimationDid() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let window = try #require(browse.window)
+        try input().type("xyz")
+        var deadline = Date().addingTimeInterval(3)
+        while window.frame != browse.settledFrame, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(window.frame == browse.settledFrame)
+
+        try press(escapeKey)
+        deadline = Date().addingTimeInterval(3)
+        while window.isVisible, Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(!window.isVisible)
+        #expect(window.alphaValue == 0)
+    }
+
+    // MARK: - 고른 줄의 답
+
+    /// 검토에서 나온 문제: 고른 노트를 열지 못하면(파일이 없어짐) 알림은 뜨는데 포커스가 돌아오지 않았다.
+    /// 이루어지지 못한 요청 뒤에는 포커스를 열기 전의 자리로 돌려줄 때라고 알린다.
+    @Test func failedRouteClosesAndAsksToReturnFocus() throws {
+        defer { fixture.cleanUp(expectingLogs: true) }
+        var dismissals: [Bool] = []
+        browse.onDismiss = { dismissals.append($0) }
+        fixture.routeResult = { _ in .failed }
+
+        browse.show(anchoredTo: nil, excluding: nil)
+        try press(returnKey)
+        #expect(fixture.routes == [.openNote(try id("today"))])
+        #expect(!browse.isVisible)
+        #expect(dismissals == [true])
+
+        fixture.routeResult = { _ in .unconnected }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try press(returnKey)
+        #expect(dismissals == [true, true])
+        #expect(fixture.logs.count == 1)
+        #expect(fixture.logs.first?.contains("아직 이어지지 않은 요청") == true)
+    }
+
+    /// 요청이 돌아오기 전에 키 창에서 물러나도(고른 노트가 키 창이 됨, 실패 알림 창) 그 때문에 닫히지 않는다:
+    /// 닫힘은 한 번만, 요청의 답에 맞는 포커스로 알린다.
+    @Test func resigningKeyWhileARouteIsOutDoesNotDismissEarly() throws {
+        defer { fixture.cleanUp() }
+        let center = NotificationCenter()
+        let browse = fixture.makeCoordinator()
+        browse.notificationCenter = center
+        var dismissals: [Bool] = []
+        browse.onDismiss = { dismissals.append($0) }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let window = try #require(browse.window)
+        fixture.routeResult = { _ in
+            center.post(name: NSWindow.didResignKeyNotification, object: window)
+            return .failed
+        }
+
+        try #require(browse.inputView).doCommand(by: returnKey)
+        #expect(dismissals == [true])
+    }
+
+    /// 이어지지 않은 요청을 보내는 줄은 내놓지 않는다: "라이브러리 열기"는 그 화면이 이어져 있을 때만 보인다.
+    @Test func libraryRowIsHiddenWhileItsRouteIsNotConnected() throws {
+        defer { fixture.cleanUp() }
+        fixture.unconnectedRoutes = [.openLibrary]
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(rows.count == 7)
+        #expect(!rows.contains { $0.contains("library") })
+        #expect(rows.last?.hasPrefix(" note api") == true)
+        for _ in 0..<10 { try press(downKey) }
+        #expect(selectedRow?.hasPrefix("*note api") == true)
+        try input().type("새 계획")
+        #expect(rows == ["*create “새 계획” 새 노트 만들기"])
+
+        // 이어지면 다시 보인다.
+        fixture.unconnectedRoutes = []
+        try press(escapeKey)
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(rows.last == " library 라이브러리 열기")
+    }
+
+    // MARK: - 목록을 읽지 못했을 때의 알림
+
+    /// 검토에서 나온 문제: 띄울 때 목록을 읽지 못해 알림 창이 뜨면, 그 창이 키 창을 가져가는 바람에
+    /// 노트 찾기가 스스로 닫혀 남은 줄("새 노트 만들기", "라이브러리 열기")을 볼 수 없었다.
+    @Test func failureAlertTakingKeyDoesNotCloseTheList() throws {
+        defer { fixture.cleanUp(expectingLogs: true) }
+        let center = NotificationCenter()
+        let store = UnreadableListNoteStore(base: fixture.notes)
+        store.failsListing = true
+        let browse = fixture.makeCoordinator(notes: store)
+        browse.notificationCenter = center
+        var dismissals: [Bool] = []
+        var failures = 0
+        browse.onDismiss = { dismissals.append($0) }
+        browse.onFailure = { [weak browse] _ in
+            failures += 1
+            // 알림 창이 키 창이 되면 노트 찾기는 키 창에서 물러난다.
+            center.post(name: NSWindow.didResignKeyNotification, object: browse?.window)
+        }
+
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(failures == 1)
+        #expect(browse.isVisible)
+        #expect(dismissals.isEmpty)
+        #expect(browse.rowDescriptions == ["*library 라이브러리 열기"])
+
+        // 알림이 끝난 뒤의 바깥 클릭은 전처럼 닫는다.
+        center.post(name: NSWindow.didResignKeyNotification, object: browse.window)
+        #expect(!browse.isVisible)
+        #expect(dismissals == [false])
+    }
+
+    // MARK: - ⌘W
+
+    /// ⌘W는 esc처럼 노트 찾기를 닫는다(테두리 없는 창은 `performClose`를 받지 못해 경고음만 났다).
+    @Test func commandWClosesTheListLikeEscape() throws {
+        defer { fixture.cleanUp() }
+        var dismissals: [Bool] = []
+        browse.onDismiss = { dismissals.append($0) }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: .command,
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: browse.window?.windowNumber ?? 0, context: nil, characters: "ㅈ",
+            charactersIgnoringModifiers: "ㅈ", isARepeat: false, keyCode: 13
+        ))
+        #expect(try input().performKeyEquivalent(with: event))
+        #expect(!browse.isVisible)
+        #expect(dismissals == [true])
+        #expect(fixture.routes.isEmpty)
     }
 }

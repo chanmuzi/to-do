@@ -8,7 +8,8 @@ import Theme
 ///
 /// - 줄을 고르면 `Route.openNote`를 보내고 닫는다. 떠 있는 노트로 포커스를 옮기거나 새 창으로 띄우는 일은 App이 한다.
 /// - "“검색어” 새 노트 만들기"는 `Route.newNote`, "라이브러리 열기"는 `Route.openLibrary`를 보낸다.
-/// - esc, 바깥 클릭으로 닫힌다. esc로 닫으면 포커스를 열기 전의 자리로 돌려줄 때라고 알린다(`onDismiss`).
+///   "라이브러리 열기"는 그 요청이 이어져 있을 때만 보인다(`Routing.isConnected`).
+/// - esc, ⌘W, 바깥 클릭으로 닫힌다. esc로 닫으면 포커스를 열기 전의 자리로 돌려줄 때라고 알린다(`onDismiss`).
 @MainActor
 public final class BrowseCoordinator {
     private let theme: Theme
@@ -27,8 +28,15 @@ public final class BrowseCoordinator {
     private var stateObservations: [StoreObservation] = []
     /// 다음 차례에 목록을 다시 읽기로 해 두었다. 그사이의 변경은 한 번에 읽는다.
     private var isReloadScheduled = false
-    /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 친다.
+    /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 치고 명령도 받지 않는다.
     private var isClosing = false
+    /// 사라지는 전환이 끝날 때 창을 내리는 일. 움직임이 끝났는지에 기대지 않고 `dur` 뒤에 한다. 다시 띄우면 취소한다.
+    private var closingSettle: Task<Void, Never>?
+    /// 높이가 바뀌는 전환이 끝날 때 마지막으로 정한 틀에 놓고 그림자를 다시 만드는 일. 다음 변경이 오면 취소한다.
+    private var frameSettle: Task<Void, Never>?
+    /// 목록을 읽지 못한 것을 알리는 중이거나 고른 줄의 요청이 돌아오기를 기다리는 중이다. 이때는 키 창에서
+    /// 물러나도(알림 창, 고른 노트의 창) 닫지 않는다. 닫을지와 포커스는 그 일이 끝난 뒤에 정한다.
+    private var staysOpenWithoutKey = false
 
     private var indexedNotes: [BrowseIndexedNote] = []
     private var floating: [NoteID] = []
@@ -42,10 +50,12 @@ public final class BrowseCoordinator {
     private var targetFrame: CGRect = .null
 
     /// 닫히기 시작할 때 불린다. 인자가 참이면 열기 전에 키 입력을 받던 곳으로 포커스를 돌려줄 때다
-    /// (esc, `hide()`). 거짓이면 포커스가 갈 곳이 따로 있다(바깥을 누름, 줄을 골라 요청을 보냄).
+    /// (esc, ⌘W, `hide()`, 고른 줄의 요청이 이루어지지 못함). 거짓이면 포커스가 갈 곳이 따로 있다
+    /// (바깥을 누름, 고른 줄의 요청이 이루어짐).
     /// 키 창을 누구에게 돌려줄지는 App이 정한다. 이 모듈은 노트 창을 직접 키 창으로 만들지 않는다.
     public var onDismiss: (@MainActor (_ returnsFocus: Bool) -> Void)?
-    /// 띄울 때 노트 목록을 읽지 못했으면 불린다(`log`에도 남는다). App이 사용자에게 알린다.
+    /// 띄울 때 노트 목록을 읽지 못했으면 불린다(`log`에도 남는다). App이 사용자에게 알린다. 알리는 동안
+    /// 키 창에서 물러나도(알림 창) 닫히지 않고, 돌아오면 다시 입력을 받는다.
     /// 열려 있는 동안 다시 읽다가 난 실패는 기록만 하고 보이던 목록을 그대로 둔다.
     public var onFailure: (@MainActor (Error) -> Void)?
 
@@ -92,7 +102,10 @@ public final class BrowseCoordinator {
     public func show(anchoredTo window: NSWindow?, excluding current: NoteID?) {
         let panel = preparedPanel()
         guard let rootView else { return }
+        closingSettle?.cancel()
+        closingSettle = nil
         isClosing = false
+        rootView.searchField.textView.isEditable = true
         self.current = current
         anchorWindow = window
         let failure = reloadNotes()
@@ -119,7 +132,19 @@ public final class BrowseCoordinator {
         panel.makeFirstResponder(textView)
         panel.ignoresMouseEvents = !isShownOpaque
         if isShownOpaque { style.animate { panel.animator().alphaValue = 1 } }
-        if let failure { onFailure?(failure) }
+        if let failure { reportFailure(failure) }
+    }
+
+    /// 목록을 읽지 못한 것을 App에 알린다. 알림 창이 떠 있는 동안 목록은 그대로 있고("새 노트 만들기" 같은
+    /// 남은 줄이 보인다), 닫히면 다시 입력을 받는다.
+    private func reportFailure(_ error: Error) {
+        guard let onFailure else { return }
+        staysOpenWithoutKey = true
+        onFailure(error)
+        staysOpenWithoutKey = false
+        guard let panel, let rootView, panel.isVisible, !isClosing, takesKeyOnShow else { return }
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(rootView.searchField.textView)
     }
 
     /// `dur` 동안 흐려진 뒤 내려간다. 포커스를 열기 전의 자리로 돌려줄 때라고 `onDismiss`로 알린다(spec 17).
@@ -182,7 +207,7 @@ public final class BrowseCoordinator {
         observers = [
             // 바깥을 누르면 키 창에서 물러난다. 그때 닫는다(포커스는 누른 곳에 둔다).
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.close(returningFocus: false) }
+                MainActor.assumeIsolated { self?.resignedKey() }
             },
             center.addObserver(forName: Theme.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.themeDidChange() }
@@ -193,18 +218,37 @@ public final class BrowseCoordinator {
         return panel
     }
 
+    /// 바깥을 눌렀다. 포커스는 누른 곳에 둔다. 실패를 알리는 중이거나(알림 창이 키 창이 됨) 고른 줄의 답을
+    /// 기다리는 중이면 닫지 않는다.
+    private func resignedKey() {
+        guard !staysOpenWithoutKey else { return }
+        close(returningFocus: false)
+    }
+
     private func close(returningFocus: Bool) {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
         storeObservation = nil
         stateObservations = []
         anchorWindow = nil
-        style.animate({ panel.animator().alphaValue = 0 }, completion: { [weak self] in
-            guard let self, self.isClosing else { return }
-            self.isClosing = false
-            panel.orderOut(nil)
-        })
+        // 사라지는 동안에는 글도 명령도 받지 않는다(보이지 않게 된 목록이 키 입력을 먹지 않게).
+        rootView?.searchField.textView.isEditable = false
+        style.animate { panel.animator().alphaValue = 0 }
+        // 창을 내리는 일은 움직임이 끝났다는 알림이 아니라 `dur` 뒤의 시계가 한다("동작 줄이기"면 바로).
+        closingSettle = style.afterTransition { [weak self] in self?.finishClosing() }
         onDismiss?(returningFocus)
+    }
+
+    private func finishClosing() {
+        closingSettle = nil
+        guard let panel, isClosing else { return }
+        isClosing = false
+        panel.orderOut(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            panel.animator().alphaValue = 0
+        }
+        panel.alphaValue = 0
     }
 
     private func themeDidChange() {
@@ -286,7 +330,9 @@ public final class BrowseCoordinator {
         let textView = rootView.searchField.textView
         let query = BrowseQuery(textView.string, isComposing: textView.hasMarkedText())
         let content = BrowseContent(
-            notes: indexedNotes, floating: floating, lastOpened: lastOpened, query: query, excluding: current
+            notes: indexedNotes, floating: floating, lastOpened: lastOpened, query: query, excluding: current,
+            // 눌러도 아무 일이 없는 줄은 내놓지 않는다.
+            showsLibrary: router.isConnected(.openLibrary)
         )
         let views = content.entries.map(makeView(for:))
         let selection = BrowseSelection.index(keeping: selected, in: content.entries)
@@ -300,21 +346,30 @@ public final class BrowseCoordinator {
         // 움직이는 중의 `panel.frame`은 가는 길의 값이다. 마지막으로 정한 틀과 견준다.
         guard frame != targetFrame else { return }
         targetFrame = frame
+        frameSettle?.cancel()
+        frameSettle = nil
         if animated, panel.isVisible {
-            // 높이는 위쪽을 고정한 채 `dur` 동안 내용을 따라간다.
-            // 투명한 테두리 없는 창의 그림자는 모양이 바뀐 뒤에 다시 만들어야 옛 모양이 남지 않는다.
-            style.animate({ panel.animator().setFrame(frame, display: true) }, completion: { [weak panel] in
-                panel?.invalidateShadow()
-            })
+            // 높이는 위쪽을 고정한 채 `dur` 동안 내용을 따라간다. 움직임은 꾸밈이고, 끝의 틀에 놓는 일은
+            // `dur` 뒤에 따로 한다(화면이 꺼져 있으면 움직임이 나아가지 않는다).
+            style.animate { panel.animator().setFrame(frame, display: true) }
+            frameSettle = style.afterTransition { [weak self] in self?.landOnTargetFrame() }
         } else {
-            // 가던 움직임이 있으면 멈추고 바로 놓는다.
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0
-                panel.animator().setFrame(frame, display: true)
-            }
-            panel.setFrame(frame, display: true)
-            panel.invalidateShadow()
+            landOnTargetFrame()
         }
+    }
+
+    /// 가던 움직임이 있으면 멈추고 마지막으로 정한 틀에 놓는다.
+    /// 투명한 테두리 없는 창의 그림자는 모양이 바뀐 뒤에 다시 만들어야 옛 모양이 남지 않는다.
+    private func landOnTargetFrame() {
+        frameSettle = nil
+        guard let panel, !targetFrame.isNull else { return }
+        let frame = targetFrame
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            panel.animator().setFrame(frame, display: true)
+        }
+        panel.setFrame(frame, display: true)
+        panel.invalidateShadow()
     }
 
     private func makeView(for entry: BrowseEntry) -> BrowseEntryView {
@@ -352,7 +407,8 @@ public final class BrowseCoordinator {
     // MARK: - 동작
 
     private func perform(_ command: BrowseCommand) {
-        guard let listView = rootView?.listView else { return }
+        // 닫히는 중의 키 입력은 버린다: esc 바로 뒤의 ↵가 줄을 열지 않는다.
+        guard !isClosing, let listView = rootView?.listView else { return }
         switch command {
         case .moveUp, .moveDown:
             let step = command == .moveUp ? -1 : 1
@@ -366,12 +422,16 @@ public final class BrowseCoordinator {
         }
     }
 
-    /// 줄을 연다: 먼저 닫고 요청을 보낸다. 포커스는 요청을 받은 쪽이 정한다.
+    /// 줄을 연다: 요청을 보내고 닫는다. 요청이 이루어졌으면 포커스는 받은 쪽이 정했고(고른 노트가 키 창이 된다),
+    /// 이루어지지 못했으면(받은 쪽이 사용자에게 알렸다) 열기 전의 자리로 포커스를 돌려줄 때라고 알린다.
     private func activate(_ index: Int) {
-        guard let listView = rootView?.listView, listView.entries.indices.contains(index),
+        guard !isClosing, let listView = rootView?.listView, listView.entries.indices.contains(index),
               let route = BrowseSelection.route(for: listView.entries[index], current: current)
         else { return }
-        close(returningFocus: false)
-        router.route(route)
+        staysOpenWithoutKey = true
+        let result = router.route(route)
+        staysOpenWithoutKey = false
+        if result == .unconnected { log("노트 찾기: 아직 이어지지 않은 요청입니다: \(route)") }
+        close(returningFocus: result != .handled)
     }
 }
