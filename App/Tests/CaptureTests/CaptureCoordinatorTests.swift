@@ -431,6 +431,66 @@ import Testing
         #expect(fixture.routes.isEmpty)
     }
 
+    // MARK: - 닫힘과 실패를 알리기
+
+    /// 닫힐 때 포커스를 열기 전의 자리로 돌려줄지 알린다: esc, ↵로 넣음, `hide()`는 돌려주고,
+    /// ⌘↵는 새 노트가 키 창이 되므로 돌려주지 않는다. 알림은 새 노트 요청보다 먼저 온다.
+    @Test func dismissalTellsWhetherFocusShouldGoBack() throws {
+        defer { fixture.cleanUp() }
+        var events: [String] = []
+        capture.onDismiss = { [fixture] in events.append("dismiss \($0) routes \(fixture.routes.count)") }
+
+        capture.show()
+        try press(escapeKey)
+        capture.show()
+        try input().type("우유 사기")
+        capture.performSubmit()
+        capture.show()
+        capture.hide()
+        // 이미 닫히는 중이면 다시 알리지 않는다.
+        capture.hide()
+        capture.show()
+        try input().type("새 노트로")
+        capture.performSubmitAsNewNote()
+
+        #expect(events == [
+            "dismiss true routes 0", "dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 0",
+        ])
+        #expect(fixture.routes.count == 1)
+    }
+
+    /// 넣지 못하면 기록만 하지 않고 App에 알린다. 바는 적은 글을 그대로 둔 채 열려 있고, 닫혔다고 알리지 않는다.
+    @Test func failedSubmitIsReportedAndTheBarStaysOpenWithItsText() throws {
+        defer { fixture.cleanUp() }
+        let note = try fixture.notes.create(NoteDraft(title: "오늘", spaceID: work))
+        let store = FaultyNoteStore(base: fixture.notes)
+        store.faults = [note.id: .writeFailed(note.id, message: "쓸 수 없음")]
+        let capture = fixture.makeCoordinator(notes: store)
+        var failures: [Error] = []
+        var dismissals = 0
+        capture.onFailure = { failures.append($0) }
+        capture.onDismiss = { _ in dismissals += 1 }
+
+        capture.show()
+        let input = try #require(capture.inputView)
+        input.type("우유 사기")
+        capture.performSubmit()
+
+        #expect(failures.count == 1)
+        #expect(failures.first as? StoreError == .writeFailed(note.id, message: "쓸 수 없음"))
+        #expect(fixture.logs.contains { $0.contains("넣지 못했습니다") })
+        #expect(capture.isVisible)
+        #expect(input.string == "우유 사기")
+        #expect(dismissals == 0)
+
+        // 문제가 풀린 뒤 다시 ↵를 누르면 들어가고 닫힌다.
+        store.faults = [:]
+        capture.performSubmit()
+        #expect(failures.count == 1)
+        #expect(!capture.isVisible)
+        #expect(try fixture.fileText(note.id).hasSuffix("[ ] 우유 사기\n"))
+    }
+
     @Test func toggleShowsAndHides() async throws {
         defer { fixture.cleanUp() }
         capture.toggle()

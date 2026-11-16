@@ -34,6 +34,16 @@ public final class CaptureCoordinator {
     /// 이번에 연 뒤로 ⇥를 눌렀는지. 빈 바에는 스페이스를 보이지 않지만(화면 3), 바꾸는 중에는 보여야 한다.
     private var hasCycledSpace = false
 
+    /// 닫히기 시작할 때 불린다. 인자가 참이면 열기 전에 키 입력을 받던 곳으로 포커스를 돌려줄 때다
+    /// (esc, ↵로 넣음, `hide()`). 거짓이면 포커스가 갈 곳이 따로 있다(바깥을 누름, ⌘↵로 새 노트를 띄움).
+    /// 키 창을 누구에게 돌려줄지는 App이 정한다.
+    public var onDismiss: (@MainActor (_ returnsFocus: Bool) -> Void)?
+    /// ↵로 넣지 못했을 때 불린다(`log`에도 남는다). App이 사용자에게 알린다. 알리는 동안 바가 키 창에서
+    /// 물러나도(알림 창) 닫히지 않고, 돌아오면 적은 글을 그대로 둔 채 다시 입력을 받는다.
+    public var onFailure: (@MainActor (Error) -> Void)?
+    /// 넣지 못한 것을 알리는 중이다. 이때는 키 창에서 물러나도 닫지 않는다.
+    private var isReportingFailure = false
+
     /// 확인용: 지금 시각과 달력을 바꿔 끼운다.
     @_spi(Verification) public var now: @MainActor () -> Date = { Date() }
     @_spi(Verification) public var calendar: Calendar = .current
@@ -106,7 +116,12 @@ public final class CaptureCoordinator {
     }
 
     /// `dur` 동안 조금 내려가며 흐려진 뒤 내려간다(나타날 때의 반대).
+    /// 포커스를 열기 전의 자리로 돌려줄 때라고 `onDismiss`로 알린다.
     public func hide() {
+        dismiss(returningFocus: true)
+    }
+
+    private func dismiss(returningFocus: Bool) {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
         let offstage = offstageFrame
@@ -118,6 +133,7 @@ public final class CaptureCoordinator {
             self.isClosing = false
             panel.orderOut(nil)
         })
+        onDismiss?(returningFocus)
     }
 
     private var offstageFrame: NSRect {
@@ -164,7 +180,7 @@ public final class CaptureCoordinator {
         observers = [
             // 바깥을 누르면 키 창에서 물러난다. 그때 닫는다.
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.hide() }
+                MainActor.assumeIsolated { self?.resignedKey() }
             },
             center.addObserver(forName: Theme.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.themeDidChange() }
@@ -173,6 +189,12 @@ public final class CaptureCoordinator {
         self.panel = panel
         self.barView = barView
         return panel
+    }
+
+    /// 바깥을 눌렀다. 포커스는 누른 곳에 둔다. 넣지 못한 것을 알리는 중이면(알림 창이 키 창이 됨) 닫지 않는다.
+    private func resignedKey() {
+        guard !isReportingFailure else { return }
+        dismiss(returningFocus: false)
     }
 
     private func themeDidChange() {
@@ -262,7 +284,7 @@ public final class CaptureCoordinator {
         case .cycleReminder:
             manualReminder = CaptureReminderPresets.next(after: manualReminder, now: now(), calendar: calendar)
             refresh(animated: true)
-        case .cancel: hide()
+        case .cancel: dismiss(returningFocus: true)
         }
     }
 
@@ -292,7 +314,19 @@ public final class CaptureCoordinator {
             hide()
         } catch {
             log("캡처: 넣지 못했습니다: \(error)")
+            reportFailure(error)
         }
+    }
+
+    /// 넣지 못한 것을 App에 알린다. 알림 창이 떠 있는 동안 바는 그대로 있고, 닫히면 다시 입력을 받는다.
+    private func reportFailure(_ error: Error) {
+        guard let onFailure else { return }
+        isReportingFailure = true
+        onFailure(error)
+        isReportingFailure = false
+        guard let panel, let barView, panel.isVisible, !isClosing, takesKeyOnShow else { return }
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(barView.textView)
     }
 
     /// ⌘↵: 적은 글을 제목으로 한 새 노트를 띄운다(임시, D-026). 만들고 띄우는 일은 App이 한다.
@@ -300,7 +334,8 @@ public final class CaptureCoordinator {
         let entry = interpretation()
         guard !entry.isEmpty else { return }
         rememberSpace(entry.spaceID)
-        hide()
+        // 새 노트가 키 창이 된다. 열기 전의 자리로 포커스를 돌려주지 않는다.
+        dismiss(returningFocus: false)
         router.route(.newNote(NewNoteRequest(
             draft: NoteDraft(title: entry.text, spaceID: entry.spaceID, reminder: entry.reminder)
         )))
