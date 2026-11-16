@@ -29,5 +29,15 @@ import Testing
             try LaunchOptions(arguments: ["app", "--debug-control"])
         }
     }
+
+    /// 자동 확인 실행이 사용자의 키와 입력을 가져오지 않게 하는 인자. 주지 않으면 꺼져 있다.
+    @Test func verificationRunsCanSkipHotKeysAndKeyWindows() throws {
+        let plain = try LaunchOptions(arguments: ["app"])
+        #expect(!plain.debugSkipsHotKeys)
+        #expect(!plain.debugIsPassive)
+        let quiet = try LaunchOptions(arguments: ["app", "--debug-no-hotkeys", "--debug-passive"])
+        #expect(quiet.debugSkipsHotKeys)
+        #expect(quiet.debugIsPassive)
+    }
     #endif
 }

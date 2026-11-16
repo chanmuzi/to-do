@@ -102,4 +102,39 @@ import Testing
         recorder.recordClosed(NoteID(rawValue: "b"))
         #expect(recorder.openNoteIDs.map(\.rawValue) == ["a", "c"])
     }
+
+    /// 다른 쪽이 창 상태에 적어 둔 항목(접힌 줄)은 틀, 핀, 차례, 닫힘을 적어도 남는다.
+    @Test func recordingKeepsFieldsOwnedByOthers() throws {
+        defer { cleanUp() }
+        let store = try WindowStateStore(location: location)
+        let recorder = WindowStateRecorder(store: store, log: { _ in })
+        try store.set(NoteWindowState(foldedLines: [2, 5]), for: id)
+
+        recorder.recordOpened(id, frame: frame, isPinned: false)
+        recorder.recordFronted(id)
+        recorder.recordFrame(id, frame: frame.offsetBy(dx: 5, dy: 5))
+        recorder.recordPinned(id, isPinned: true)
+        recorder.recordClosed(id)
+
+        let state = try #require(try WindowStateStore(location: location).state(for: id))
+        #expect(state.foldedLines == [2, 5])
+        #expect(state.frame == WindowFrame(frame.offsetBy(dx: 5, dy: 5)))
+        #expect(state.isPinned)
+        #expect(!state.isOpen)
+        #expect(state.stackOrder == 1)
+    }
+
+    @Test func savedStateCanBePutBackAfterForgetting() throws {
+        defer { cleanUp() }
+        let recorder = try recorder()
+        #expect(recorder.savedState(for: id) == nil)
+        recorder.recordOpened(id, frame: frame, isPinned: false)
+        let saved = try #require(recorder.savedState(for: id))
+
+        recorder.forget(id)
+        #expect(recorder.savedState(for: id) == nil)
+        recorder.restore(saved, for: id)
+
+        #expect(try WindowStateStore(location: location).state(for: id) == saved)
+    }
 }

@@ -12,6 +12,11 @@ final class SpyBodyEditor: NoteBodyEditing {
     /// 밖에서 `text`에 넣은 값(넣은 차례대로).
     private(set) var assignments: [String] = []
     private var shown = ""
+    /// 마지막으로 주고받은 글.
+    private var notified = ""
+    /// 밖에서 끝에 덧붙인 글(붙인 차례대로).
+    private(set) var appended: [String] = []
+    private(set) var flushCount = 0
     private let normalizesLineEndings: Bool
 
     /// - Parameter normalizesLineEndings: 받은 글의 CRLF를 LF로 고쳐 보인다(실제 편집기처럼).
@@ -24,14 +29,36 @@ final class SpyBodyEditor: NoteBodyEditing {
         set {
             assignments.append(newValue)
             shown = normalizesLineEndings ? newValue.replacingOccurrences(of: "\r\n", with: "\n") : newValue
+            notified = shown
         }
     }
 
-    func focus() {}
+    private(set) var focusCount = 0
+
+    func focus() {
+        focusCount += 1
+    }
+
+    /// 실제 편집기처럼 지금 보이는 글(조합 중인 글자 포함) 끝에 붙이고, 조합과 알리지 않은 변경은 그대로 둔다.
+    func appendFromOutside(_ suffix: String) {
+        appended.append(suffix)
+        let hadUnnotified = shown != notified
+        shown += suffix
+        if !hadUnnotified { notified = shown }
+    }
+
+    /// 화면에만 있고 아직 알리지 않은 글(조합 중이거나 한 차례 늦게 알리려던 것)을 알린다.
+    func flushPendingChange() {
+        guard shown != notified else { return }
+        notified = shown
+        flushCount += 1
+        onTextChange?(shown)
+    }
 
     /// 사용자가 글을 쳐서 편집기가 알린다.
     func type(_ text: String) {
         shown = text
+        notified = text
         onTextChange?(text)
     }
 

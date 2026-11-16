@@ -55,6 +55,8 @@ let package = Package(
                 "Theme", "Models", "Store", "Routing",
                 "NotePanel", "Editor", "Capture", "Browse",
             ],
+            // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
+            resources: [.copy("Resources/menubar-icon.pdf")],
             swiftSettings: uiSettings
         ),
 
@@ -83,7 +85,7 @@ let package = Package(
         ),
         .testTarget(
             name: "FloatingNotesTests",
-            dependencies: ["FloatingNotes", "NotePanel", "Theme", "Models", "Store", "Routing"],
+            dependencies: ["FloatingNotes", "NotePanel", "Editor", "Theme", "Models", "Store", "Routing"],
             swiftSettings: uiSettings
         ),
         .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),

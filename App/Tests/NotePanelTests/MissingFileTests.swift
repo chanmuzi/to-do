@@ -165,4 +165,48 @@ import Testing
         #expect(controller.editor.text == "처음 그리고 쓰지 못한 글")
         #expect(try String(contentsOf: fixture.noteFile(id), encoding: .utf8) == "다른 프로그램이 새로 만든 내용")
     }
+
+    /// 새 노트로 저장하기 전에 편집기가 아직 알리지 않은 글(조합 중인 글자)을 받고, 접힘 같은 보기 상태를
+    /// 새 노트로 옮긴다. 검토에서 나온 문제: 마지막에 친 글과 접힘이 새 노트에 오지 않았다.
+    @Test func saveAsNewTakesTextNotYetReportedAndCarriesTheFolds() throws {
+        var editors: [SpyBodyEditor] = []
+        let coordinator = try fixture.makeCoordinator(makeBodyEditor: { _ in
+            editors.append(SpyBodyEditor())
+            return editors[editors.count - 1]
+        })
+        defer { fixture.cleanUp(coordinator) }
+        let note = try fixture.notes.create(NoteDraft(title: "지워질 노트", body: "> 토글\n\t안"))
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        editors[0].type("> 토글\n\t안쪽 글")
+        try FileManager.default.removeItem(at: fixture.noteFile(note.id))
+        try fixture.notes.refresh()
+        #expect(controller.problem == .fileMissing)
+        // 편집기 어댑터가 창 상태에 적어 둔 접힘.
+        let recorder = controller.environment.recorder
+        var state = try #require(recorder.savedState(for: note.id))
+        state.foldedLines = [0]
+        state.foldedLineTexts = ["> 토글"]
+        recorder.restore(state, for: note.id)
+        let frame = controller.panel.frame
+        // 화면에만 있고 아직 알리지 않은 글.
+        editors[0].compose("> 토글\n\t안쪽 글 그리고 마지막에 친 글")
+
+        controller.resolveProblem(.saveAsNewNote)
+
+        #expect(editors[0].flushCount == 1)
+        let newID = try #require(coordinator.openNoteIDs.first)
+        #expect(coordinator.openNoteIDs.count == 1)
+        #expect(newID != note.id)
+        #expect(try fixture.notes.load(newID).body == "> 토글\n\t안쪽 글 그리고 마지막에 친 글")
+        #expect(editors.count == 2)
+        #expect(editors[1].assignments == ["> 토글\n\t안쪽 글 그리고 마지막에 친 글"])
+        let carried = try #require(try fixture.windowState(for: newID))
+        #expect(carried.foldedLines == [0])
+        #expect(carried.foldedLineTexts == ["> 토글"])
+        #expect(carried.isOpen)
+        #expect(carried.frame?.cgRect.minX == frame.minX)
+        #expect(carried.frame?.cgRect.maxY == frame.maxY)
+        #expect(try fixture.windowState(for: note.id) == nil)
+    }
 }

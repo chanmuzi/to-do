@@ -27,25 +27,34 @@ nonisolated enum EditorShortcuts {
         static let down: UInt16 = 125
     }
 
-    /// Tab, ⇧Tab은 여기 없다(글자 입력 경로에서 처리한다).
+    /// 키 하나와 그 동작.
+    struct Binding: Hashable, Sendable {
+        let modifiers: Modifiers
+        let keyCode: UInt16
+        let action: EditorAction
+    }
+
+    /// 편집기가 `performKeyEquivalent`에서 받는 키 전부. Tab, ⇧Tab은 여기 없다(글자 입력 경로에서 처리한다).
+    /// 단축키 표(App의 `ShortcutTable`의 "편집" 줄)와 같아야 하고, App의 테스트가 둘을 견준다.
+    static let bindings: [Binding] = [
+        Binding(modifiers: [.command, .shift], keyCode: Key.nine, action: .toggleTodo),
+        Binding(modifiers: [.command], keyCode: Key.returnKey, action: .toggleDone),
+        Binding(modifiers: [.command, .control], keyCode: Key.up, action: .moveLineUp),
+        Binding(modifiers: [.command, .control], keyCode: Key.down, action: .moveLineDown),
+        Binding(modifiers: [.command, .option], keyCode: Key.leftBracket, action: .fold),
+        Binding(modifiers: [.command, .option], keyCode: Key.rightBracket, action: .unfold),
+        Binding(modifiers: [.command, .option], keyCode: Key.one, action: .heading(1)),
+        Binding(modifiers: [.command, .option], keyCode: Key.two, action: .heading(2)),
+        Binding(modifiers: [.command, .option], keyCode: Key.three, action: .heading(3)),
+        Binding(modifiers: [.command], keyCode: Key.b, action: .bold),
+        Binding(modifiers: [.command, .shift], keyCode: Key.x, action: .strikethrough),
+        Binding(modifiers: [.command, .shift], keyCode: Key.h, action: .highlight),
+        Binding(modifiers: [.command], keyCode: Key.e, action: .inlineCode),
+        Binding(modifiers: [.command, .option], keyCode: Key.c, action: .codeBlock),
+        Binding(modifiers: [.command], keyCode: Key.l, action: .link),
+    ]
+
     static func action(keyCode: UInt16, modifiers: Modifiers) -> EditorAction? {
-        switch (modifiers, keyCode) {
-        case ([.command, .shift], Key.nine): .toggleTodo
-        case ([.command], Key.returnKey): .toggleDone
-        case ([.command, .control], Key.up): .moveLineUp
-        case ([.command, .control], Key.down): .moveLineDown
-        case ([.command, .option], Key.leftBracket): .fold
-        case ([.command, .option], Key.rightBracket): .unfold
-        case ([.command, .option], Key.one): .heading(1)
-        case ([.command, .option], Key.two): .heading(2)
-        case ([.command, .option], Key.three): .heading(3)
-        case ([.command], Key.b): .bold
-        case ([.command, .shift], Key.x): .strikethrough
-        case ([.command, .shift], Key.h): .highlight
-        case ([.command], Key.e): .inlineCode
-        case ([.command, .option], Key.c): .codeBlock
-        case ([.command], Key.l): .link
-        default: nil
-        }
+        bindings.first { $0.keyCode == keyCode && $0.modifiers == modifiers }?.action
     }
 }

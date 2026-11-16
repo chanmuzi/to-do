@@ -79,4 +79,14 @@ import Testing
         #expect(TokenValueParser.fontFamilies("\"Pretendard\",-apple-system,sans-serif")
             == ["Pretendard", "-apple-system", "sans-serif"])
     }
+
+    /// 줄 수 같은 개수는 단위 없는 1 이상의 정수만 받는다.
+    @Test func parsesCounts() throws {
+        #expect(TokenValueParser.count("4") == 4)
+        #expect(TokenValueParser.count(" 12 ") == 12)
+        for text in ["0", "-1", "4px", "2.5", "", "네", "99999"] {
+            #expect(TokenValueParser.count(text) == nil, "\(text)")
+        }
+        #expect(try ThemeTokens.bundled().count(.noteBodyLinesMin) == 4)
+    }
 }

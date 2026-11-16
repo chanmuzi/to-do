@@ -54,4 +54,22 @@ import Testing
         #expect(!h.view.performKeyEquivalent(with: try keyEvent(h, code: EditorShortcuts.Key.b, characters: "b", modifiers: .command)))
         #expect(h.editor.text == "글자")
     }
+
+    /// 창이 키 창이 아니면 본문에 포커스가 있어도 편집 단축키를 받지 않는다. 키 창이 아닌 창의 뷰에도
+    /// `performKeyEquivalent`가 올 수 있고, 그때 받으면 사용자가 보고 있지 않은 노트의 글이 바뀐다.
+    @Test func shortcutsAreIgnoredWhenTheWindowIsNotKey() throws {
+        let h = try EditorHarness("글자")
+        h.editor.selectedRange = NSRange(location: 0, length: 2)
+        // 하네스는 키 창을 만들지 않고 "편집 중인 것으로 보기"를 켜 둔다. 끄면 키 창이 아닌 창 그대로다.
+        h.editor.controller.forcesActiveAppearance = false
+        #expect(h.window.firstResponder === h.view)
+        #expect(!h.window.isKeyWindow)
+
+        #expect(!h.view.performKeyEquivalent(with: try keyEvent(h, code: EditorShortcuts.Key.b, characters: "b", modifiers: .command)))
+        #expect(h.editor.text == "글자")
+
+        h.editor.controller.forcesActiveAppearance = true
+        h.step { #expect(h.view.performKeyEquivalent(with: try! keyEvent(h, code: EditorShortcuts.Key.b, characters: "b", modifiers: .command))) }
+        #expect(h.editor.text == "**글자**")
+    }
 }

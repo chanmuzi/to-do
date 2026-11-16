@@ -92,6 +92,12 @@ extension NoteWindowController: NSWindowDelegate {
         recordFrameIfSettled()
     }
 
+    /// 투명한 창의 그림자는 내용의 모양에서 만들어 두고 다시 쓰인다. 크기가 바뀔 때마다(높이가 움직이는
+    /// 동안의 매 단계, 가장자리를 끄는 동안) 다시 재게 해, 줄어든 창 밖에 옛 그림자가 남지 않게 한다.
+    func windowDidResize(_ notification: Notification) {
+        panel.invalidateShadow()
+    }
+
     func windowDidMove(_ notification: Notification) {
         recordFrameIfSettled()
     }

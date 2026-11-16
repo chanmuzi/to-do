@@ -7,7 +7,8 @@ struct NoteSizePolicy: Hashable {
     var maxWidth: CGFloat
     /// 상단 줄과 그 아래 선의 높이.
     var chromeHeight: CGFloat
-    /// 본문 한 줄과 위아래 여백. 빈 노트의 본문 높이다.
+    /// 본문 영역의 가장 낮은 높이: 본문 줄 `note-body-lines-min`개와 위아래 여백(D-031).
+    /// 글이 그보다 적어도(빈 노트 포함) 본문 영역은 이만큼이다.
     var minBodyHeight: CGFloat
     /// 화면 높이에서 노트가 차지할 수 있는 몫(`note-h-max-screen`, spec 20의 2번 임시 값).
     var maxScreenFraction: CGFloat

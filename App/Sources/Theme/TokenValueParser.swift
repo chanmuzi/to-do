@@ -46,6 +46,15 @@ enum TokenValueParser {
         number(raw).flatMap { (1...1000).contains($0) ? $0 : nil }
     }
 
+    /// `4` → 4. 단위 없는 1 이상의 정수만 받는다(줄 수 같은 개수).
+    static func count(_ raw: String) -> Int? {
+        let text = raw.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty, text.count <= 4, text.allSatisfy({ ("0"..."9").contains($0) }),
+              let value = Int(text), value >= 1
+        else { return nil }
+        return value
+    }
+
     /// `26%` → 0.26. 0~100%만 받는다.
     static func fraction(_ raw: String) -> Double? {
         let text = raw.trimmingCharacters(in: .whitespaces)

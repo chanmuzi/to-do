@@ -23,7 +23,8 @@ struct NotePanelEnvironment {
             minWidth: theme.component(.noteWidthMin),
             maxWidth: theme.component(.noteWidthMax),
             chromeHeight: theme.shape(.chromeHeight) + theme.shape(.borderWidth),
-            minBodyHeight: theme.lineHeight(.body) + padding.top + padding.bottom,
+            minBodyHeight: theme.lineHeight(.body) * CGFloat(theme.count(.noteBodyLinesMin))
+                + padding.top + padding.bottom,
             maxScreenFraction: theme.ratio(.noteMaxScreenHeight)
         )
     }

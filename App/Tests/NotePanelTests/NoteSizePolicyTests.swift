@@ -18,7 +18,7 @@ import Testing
         #expect(policy.windowHeight(contentHeight: 148, screenHeight: 1000) == 177)
     }
 
-    @Test func emptyNoteKeepsRoomForOneLine() {
+    @Test func contentShorterThanTheMinimumBodyKeepsTheMinimum() {
         #expect(policy.windowHeight(contentHeight: 0, screenHeight: 1000) == 77)
         #expect(policy.minHeight == 77)
     }
