@@ -435,6 +435,113 @@ import Testing
         #expect(fixture.logs.count == 1)
     }
 
+    // MARK: - 창 상태와 스페이스의 변경
+
+    private func waitForRows(_ condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+    }
+
+    /// 열려 있는 동안 노트 창이 뜨고 내려가면 "떠 있는 노트"와 핀이 따라간다(노트 파일은 바뀌지 않아도).
+    @Test func openListFollowsWindowStateChanges() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(rows[1].hasPrefix("*note today"))
+        #expect(rows.contains(" note api | API Notes | Rate limit and Retry policy | - | -"))
+
+        // api 노트의 창이 맨 앞에 떴고 home의 창은 내려갔다.
+        try fixture.windowStates.set(NoteWindowState(isOpen: true, stackOrder: 99), for: try id("api"))
+        try fixture.windowStates.set(NoteWindowState(isOpen: false, stackOrder: 4), for: try id("home"))
+        try await waitForRows { rows.contains { $0.contains("note api") && $0.hasSuffix("| pin") } }
+
+        #expect(rows == [
+            " header 떠 있는 노트",
+            " note api | API Notes | Rate limit and Retry policy | - | pin",
+            "*note today | 오늘 할 일 | PR #482 리뷰, 배포 체크리스트 확인 | 2:12 PM | pin",
+            " header 최근에 연 노트",
+            " note home | 개인 | 치과 예약 전화 | - | -",
+            " note release | 릴리즈 노트 초안 | 2.3 변경 사항 정리, 배포 순서 확인 | 내일 10:00 AM | -",
+            " note untitled | 제목 없음 | 주말 장보기 목록 | - | -",
+            " separator",
+            " library 라이브러리 열기",
+        ])
+        // 잇달아 온 변경은 한 번에 다시 읽는다. 고른 줄은 같은 노트다.
+        #expect(browse.listReadCount == 2)
+    }
+
+    /// "최근에 연 노트"는 창 상태에 적힌 마지막으로 연 때를 따른다. 적힌 것이 없는 노트는 고친 시각이다.
+    @Test func recentSectionUsesTheRecordedOpenTimes() async throws {
+        defer { fixture.cleanUp() }
+        // api는 가장 오래전에 고친 노트지만 방금 열었다 닫았다.
+        try fixture.windowStates.set(NoteWindowState(isOpen: false, lastOpened: TestClock.now), for: try id("api"))
+        browse.show(anchoredTo: nil, excluding: nil)
+        let recent = rows.drop { $0 != " header 최근에 연 노트" }.dropFirst().prefix(3)
+        #expect(recent.map { $0.components(separatedBy: " | ")[0] } == [
+            " note api", " note release", " note untitled",
+        ])
+    }
+
+    /// 스페이스 목록이 바뀌어도 열려 있는 목록을 다시 만든다. 닫힌 뒤에는 듣지 않는다.
+    @Test func openListFollowsSpaceChangesUntilItCloses() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let reads = browse.listReadCount
+        try fixture.spaces.replace(with: [Space(id: Sample.work, name: "일", icon: .emoji("💼"))])
+        try await waitForRows { browse.listReadCount > reads }
+        #expect(browse.listReadCount == reads + 1)
+
+        try press(escapeKey)
+        try fixture.spaces.replace(with: [])
+        try fixture.windowStates.set(NoteWindowState(isOpen: true), for: try id("api"))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(browse.listReadCount == reads + 1)
+    }
+
+    // MARK: - 닫힘과 실패를 알리기
+
+    /// 닫힐 때 포커스를 열기 전의 자리로 돌려줄지 알린다: esc와 `hide()`는 돌려주고, 줄을 골랐을 때는
+    /// 요청을 받은 쪽이 포커스를 정하므로 돌려주지 않는다. 알림은 요청보다 먼저 온다.
+    @Test func dismissalTellsWhetherFocusShouldGoBack() throws {
+        defer { fixture.cleanUp() }
+        var events: [String] = []
+        browse.onDismiss = { [fixture] in events.append("dismiss \($0) routes \(fixture.routes.count)") }
+
+        browse.show(anchoredTo: nil, excluding: nil)
+        try press(escapeKey)
+        browse.show(anchoredTo: nil, excluding: nil)
+        browse.hide()
+        // 이미 닫히는 중이면 다시 알리지 않는다.
+        browse.hide()
+        browse.show(anchoredTo: nil, excluding: nil)
+        try press(returnKey)
+
+        #expect(events == ["dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 0"])
+        #expect(fixture.routes == [.openNote(try id("today"))])
+    }
+
+    /// 띄울 때 목록을 읽지 못하면 기록과 함께 App에 알린다. 열려 있는 동안의 실패는 기록만 한다.
+    @Test func failedOpenIsReportedOnce() async throws {
+        defer { fixture.cleanUp(expectingLogs: true) }
+        let store = UnreadableListNoteStore(base: fixture.notes)
+        let browse = fixture.makeCoordinator(notes: store)
+        var failures: [Error] = []
+        browse.onFailure = { failures.append($0) }
+
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(failures.isEmpty)
+        store.failsListing = true
+        try fixture.notes.update(try id("api")) { $0.title = "API 메모" }
+        let deadline = Date().addingTimeInterval(3)
+        while fixture.logs.isEmpty, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(failures.isEmpty)
+        browse.hide()
+
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(failures.count == 1)
+        #expect(failures.first as? StoreError == .unreadableFile(URL(fileURLWithPath: "/notes")))
+        #expect(browse.isVisible)
+    }
+
     /// 걸어 둔 알림은 노트 찾기가 없어질 때 모두 푼다.
     @Test func observersAreRemovedWhenTheCoordinatorGoesAway() throws {
         defer { fixture.cleanUp() }

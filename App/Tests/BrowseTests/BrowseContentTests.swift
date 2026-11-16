@@ -46,6 +46,61 @@ import Testing
         #expect(content(floating: stale).entries.prefix(3).map(\.label) == ["# 떠 있는 노트", "today", "# 최근에 연 노트"])
     }
 
+    /// "최근에 연 노트"는 마지막으로 연 때가 가까운 것이 앞이다(D-033). 연 때를 적은 적이 없는 노트는
+    /// 고친 시각으로 견주고, 때가 같으면 받은 차례를 지킨다.
+    @Test func recentNotesAreOrderedByWhenTheyWereLastOpened() {
+        func note(_ id: String, modifiedMinutesAgo minutes: Double) -> BrowseIndexedNote {
+            BrowseIndexedNote(Note(
+                id: NoteID(rawValue: id), title: id, body: "", created: TestClock.now,
+                modified: TestClock.now.addingTimeInterval(-minutes * 60)
+            ))
+        }
+        // 받은 차례는 최근에 고친 것이 앞이다.
+        let notes = [
+            note("edited-now", modifiedMinutesAgo: 0), note("edited-10m", modifiedMinutesAgo: 10),
+            note("edited-1h", modifiedMinutesAgo: 60), note("edited-1d", modifiedMinutesAgo: 1440),
+        ]
+        func labels(_ opened: [String: Double]) -> [String] {
+            let times = Dictionary(uniqueKeysWithValues: opened.map {
+                (NoteID(rawValue: $0.key), TestClock.now.addingTimeInterval(-$0.value * 60))
+            })
+            return BrowseContent(
+                notes: notes, floating: [], lastOpened: times, query: BrowseQuery("", isComposing: false),
+                excluding: nil
+            ).entries.compactMap { entry in
+                if case .note(let row) = entry { row.id.rawValue } else { nil }
+            }
+        }
+
+        // 적힌 것이 없으면 고친 차례 그대로다.
+        #expect(labels([:]) == ["edited-now", "edited-10m", "edited-1h", "edited-1d"])
+        // 오래전에 고쳤어도 방금 연 노트가 맨 앞이고, 방금 고쳤어도 연 지 오래된 노트는 뒤로 간다.
+        #expect(labels(["edited-1d": 1, "edited-now": 120]) == ["edited-1d", "edited-10m", "edited-1h", "edited-now"])
+        // 연 적이 없는 노트는 고친 시각으로 그 사이에 낀다.
+        #expect(labels(["edited-1h": 5, "edited-1d": 30]) == ["edited-now", "edited-1h", "edited-10m", "edited-1d"])
+    }
+
+    /// 떠 있는 노트의 차례와 검색 결과의 차례는 연 때를 따르지 않는다.
+    @Test func lastOpenedTimesOnlyOrderTheRecentSection() {
+        let later = TestClock.now.addingTimeInterval(60)
+        let times = [NoteID(rawValue: "api"): later, NoteID(rawValue: "scratch"): later]
+        let sections = BrowseContent(
+            notes: Sample.notes, floating: Sample.floating, lastOpened: times,
+            query: BrowseQuery("", isComposing: false), excluding: nil
+        )
+        #expect(sections.entries.map(\.label) == [
+            "# 떠 있는 노트", "today", "home", "scratch",
+            "# 최근에 연 노트", "api", "release", "untitled", "meeting",
+            "---", "library",
+        ])
+        let unordered = content("배포").entries.map(\.label)
+        let ordered = BrowseContent(
+            notes: Sample.notes, floating: Sample.floating, lastOpened: times,
+            query: BrowseQuery("배포", isComposing: false), excluding: nil
+        ).entries.map(\.label)
+        #expect(ordered == unordered)
+    }
+
     @Test func emptySectionsHaveNoHeader() {
         #expect(content(floating: []).entries.map(\.label) == [
             "# 최근에 연 노트", "today", "home", "scratch", "release", "untitled", "meeting", "api",

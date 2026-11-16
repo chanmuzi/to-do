@@ -8,7 +8,7 @@ import Theme
 ///
 /// - 줄을 고르면 `Route.openNote`를 보내고 닫는다. 떠 있는 노트로 포커스를 옮기거나 새 창으로 띄우는 일은 App이 한다.
 /// - "“검색어” 새 노트 만들기"는 `Route.newNote`, "라이브러리 열기"는 `Route.openLibrary`를 보낸다.
-/// - esc, 바깥 클릭으로 닫힌다. esc로 닫으면 열었던 노트 창으로 포커스가 돌아간다.
+/// - esc, 바깥 클릭으로 닫힌다. esc로 닫으면 포커스를 열기 전의 자리로 돌려줄 때라고 알린다(`onDismiss`).
 @MainActor
 public final class BrowseCoordinator {
     private let theme: Theme
@@ -23,6 +23,8 @@ public final class BrowseCoordinator {
     private var rootView: BrowseRootView?
     private var observers: [NSObjectProtocol] = []
     private var storeObservation: StoreObservation?
+    /// 창 상태(떠 있는 노트, 핀, 연 때)와 스페이스 목록의 변경 알림. 열려 있는 동안만 건다.
+    private var stateObservations: [StoreObservation] = []
     /// 다음 차례에 목록을 다시 읽기로 해 두었다. 그사이의 변경은 한 번에 읽는다.
     private var isReloadScheduled = false
     /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 친다.
@@ -30,6 +32,7 @@ public final class BrowseCoordinator {
 
     private var indexedNotes: [BrowseIndexedNote] = []
     private var floating: [NoteID] = []
+    private var lastOpened: [NoteID: Date] = [:]
     private var current: NoteID?
     private weak var anchorWindow: NSWindow?
     /// 목록의 위쪽 가장자리와 왼쪽 자리. 높이가 바뀌어도 여기는 그대로다.
@@ -37,6 +40,14 @@ public final class BrowseCoordinator {
     private var maxHeight: CGFloat = 0
     /// 마지막으로 정한 창 틀(움직이는 중이면 가려는 곳).
     private var targetFrame: CGRect = .null
+
+    /// 닫히기 시작할 때 불린다. 인자가 참이면 열기 전에 키 입력을 받던 곳으로 포커스를 돌려줄 때다
+    /// (esc, `hide()`). 거짓이면 포커스가 갈 곳이 따로 있다(바깥을 누름, 줄을 골라 요청을 보냄).
+    /// 키 창을 누구에게 돌려줄지는 App이 정한다. 이 모듈은 노트 창을 직접 키 창으로 만들지 않는다.
+    public var onDismiss: (@MainActor (_ returnsFocus: Bool) -> Void)?
+    /// 띄울 때 노트 목록을 읽지 못했으면 불린다(`log`에도 남는다). App이 사용자에게 알린다.
+    /// 열려 있는 동안 다시 읽다가 난 실패는 기록만 하고 보이던 목록을 그대로 둔다.
+    public var onFailure: (@MainActor (Error) -> Void)?
 
     /// 확인용: 지금 시각과 달력을 바꿔 끼운다.
     @_spi(Verification) public var now: @MainActor () -> Date = { Date() }
@@ -84,8 +95,13 @@ public final class BrowseCoordinator {
         isClosing = false
         self.current = current
         anchorWindow = window
-        reloadNotes()
-        storeObservation = notes.observe { [weak self] _ in self?.notesDidChange() }
+        let failure = reloadNotes()
+        storeObservation = notes.observe { [weak self] _ in self?.contentDidChange() }
+        // 떠 있는 노트, 핀, 스페이스 이름이 바뀌어도 열려 있는 목록이 따라간다.
+        stateObservations = [
+            windowStates?.observe { [weak self] in self?.contentDidChange() },
+            spaces.observe { [weak self] in self?.contentDidChange() },
+        ].compactMap { $0 }
 
         let textView = rootView.searchField.textView
         textView.string = ""
@@ -102,11 +118,11 @@ public final class BrowseCoordinator {
         }
         panel.makeFirstResponder(textView)
         panel.ignoresMouseEvents = !isShownOpaque
-        guard isShownOpaque else { return }
-        style.animate { panel.animator().alphaValue = 1 }
+        if isShownOpaque { style.animate { panel.animator().alphaValue = 1 } }
+        if let failure { onFailure?(failure) }
     }
 
-    /// `dur` 동안 흐려진 뒤 내려가고, 열었던 노트 창으로 포커스가 돌아간다(spec 17).
+    /// `dur` 동안 흐려진 뒤 내려간다. 포커스를 열기 전의 자리로 돌려줄 때라고 `onDismiss`로 알린다(spec 17).
     public func hide() {
         close(returningFocus: true)
     }
@@ -181,14 +197,14 @@ public final class BrowseCoordinator {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
         storeObservation = nil
-        let anchor = returningFocus && takesKeyOnShow ? anchorWindow : nil
+        stateObservations = []
         anchorWindow = nil
         style.animate({ panel.animator().alphaValue = 0 }, completion: { [weak self] in
             guard let self, self.isClosing else { return }
             self.isClosing = false
             panel.orderOut(nil)
         })
-        if let anchor, anchor.isVisible { anchor.makeKey() }
+        onDismiss?(returningFocus)
     }
 
     private func themeDidChange() {
@@ -229,22 +245,28 @@ public final class BrowseCoordinator {
     ///
     /// 목록을 읽지 못하면 까닭을 `log`로 알리고, 앞서 읽은 목록이 있으면 그대로 둔다(열려 있던 목록이 비지 않게).
     /// 처음부터 읽지 못했으면 노트 줄 없이 "새 노트 만들기"(글자를 치면)와 "라이브러리 열기"만 보인다.
-    private func reloadNotes() {
+    /// - Returns: 목록을 읽지 못했으면 그 까닭.
+    @discardableResult
+    private func reloadNotes() -> Error? {
         listReadCount += 1
+        var failure: Error?
         do {
             let listing = try notes.list()
             listing.failures.forEach { log("노트 찾기: 읽지 못한 노트 \($0.id): \($0.error)") }
             indexedNotes = listing.notes.map(BrowseIndexedNote.init)
         } catch {
             log("노트 찾기: 노트 목록을 읽지 못했습니다: \(error)")
+            failure = error
         }
-        // 창 상태와 스페이스 저장소는 바뀐 것을 알려 주지 않는다. 목록을 다시 읽을 때마다 함께 다시 본다.
-        floating = windowStates.map { BrowseFloating.ids(from: $0.all) } ?? []
+        let states = windowStates?.all ?? [:]
+        floating = BrowseFloating.ids(from: states)
+        lastOpened = BrowseRecency.openedTimes(from: states)
+        return failure
     }
 
-    /// 열려 있는 동안 노트가 바뀌면 목록을 다시 만든다. 변경이 잇달아 와도(여러 노트를 한꺼번에 저장, 폴더 다시 훑기)
-    /// 노트 파일은 다음 차례에 한 번만 다시 읽는다.
-    private func notesDidChange() {
+    /// 열려 있는 동안 노트나 창 상태, 스페이스 목록이 바뀌면 목록을 다시 만든다. 변경이 잇달아 와도
+    /// (여러 노트를 한꺼번에 저장, 폴더 다시 훑기, 창 상태를 잇달아 적음) 다음 차례에 한 번만 다시 읽는다.
+    private func contentDidChange() {
         guard isVisible, !isReloadScheduled else { return }
         isReloadScheduled = true
         DispatchQueue.main.async { [weak self] in self?.reloadAfterChanges() }
@@ -263,7 +285,9 @@ public final class BrowseCoordinator {
         guard let panel, let rootView else { return }
         let textView = rootView.searchField.textView
         let query = BrowseQuery(textView.string, isComposing: textView.hasMarkedText())
-        let content = BrowseContent(notes: indexedNotes, floating: floating, query: query, excluding: current)
+        let content = BrowseContent(
+            notes: indexedNotes, floating: floating, lastOpened: lastOpened, query: query, excluding: current
+        )
         let views = content.entries.map(makeView(for:))
         let selection = BrowseSelection.index(keeping: selected, in: content.entries)
         rootView.searchField.updatePlaceholder(animated: animated)
