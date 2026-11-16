@@ -10,7 +10,7 @@ public enum Route: Hashable, Sendable {
     case closeNoteWindow(NoteID)
     /// 빠른 캡처 바.
     case openCapture
-    /// 노트 찾기. `anchor`가 있으면 그 노트 상단 줄 아래에, 없으면 캡처 바 자리에 뜬다(spec 4.1).
+    /// 노트 찾기. `anchor`가 있으면 그 노트 상단 줄 아래에, 없으면 화면 가운데 위쪽에 뜬다(spec 4.1, D-030).
     case openBrowse(anchor: NoteID?)
     /// 떠 있는 노트를 모두 숨기거나 되돌린다.
     case toggleAllNotesHidden
