@@ -57,7 +57,9 @@ final class DemoDelegate: NSObject, NSApplicationDelegate {
         } catch {
             fail("테마를 읽지 못했습니다: \(error)")
         }
-        let editor = MarkdownEditor(theme: theme, configuration: MarkdownEditorConfiguration(checkboxStyle: options.checkboxStyle))
+        let editor = MarkdownEditor(theme: theme, configuration: MarkdownEditorConfiguration(
+            checkboxStyle: options.checkboxStyle, inlineCodeStyle: options.inlineCodeStyle
+        ))
         self.theme = theme
         self.editor = editor
 
@@ -84,9 +86,10 @@ final class DemoDelegate: NSObject, NSApplicationDelegate {
         editor.forcesActiveAppearance = !options.activates
         resize(to: editor.contentHeight)
 
+        // 캡처만 할 때는 창을 화면에 올리지 않는다(창 내용은 화면 밖에서도 그려진다).
         if options.activates {
             window.makeKeyAndOrderFront(nil)
-        } else {
+        } else if options.snapshotPath == nil {
             window.orderFrontRegardless()
         }
         if options.caretLine != nil || !options.script.isEmpty {

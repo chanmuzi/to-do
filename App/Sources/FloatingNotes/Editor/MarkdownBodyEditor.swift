@@ -60,6 +60,17 @@ final class MarkdownBodyEditor: NoteBodyEditing {
         saveFolds()
     }
 
+    /// 이 앱의 다른 곳이 본문을 바꿨다(끝에 붙인 것이 아닌 변경 포함). 달라진 부분만 바꿔 넣어
+    /// 되돌리기 기록, 접힘, 커서, 조합 중인 글자를 지킨다.
+    func applyOutsideChange(to newText: String) {
+        guard hasLoaded else {
+            text = newText
+            return
+        }
+        editor.applyOutsideChange(to: newText)
+        saveFolds()
+    }
+
     func focus() {
         editor.focus()
     }

@@ -61,11 +61,18 @@ extension EditorController: NSTextStorageDelegate {
             folded = FoldState.sanitized(folded, in: document)
             return
         }
-        if isAppendingFromOutside {
-            // 바깥이 끝에 덧붙인 글: 접힘은 줄 번호를 따라 옮기기만 한다. 사용자의 편집이 아니므로
-            // 알리지 않고 되돌리기에도 적지 않는다.
+        if isApplyingOutsideChange {
+            // 바깥이 바꾼 글: 접힘은 줄 번호를 따라 옮기고, 바뀐 줄에 걸친 접힘은 편다. 사용자의 편집이
+            // 아니므로 알리지 않는다.
             folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
+            folded.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
             return
+        }
+        // 미뤄 둔 바깥의 변경이 가리키는 자리를 이 편집만큼 옮긴다.
+        // 조합 중인 글자보다 앞에 있는 변경은 조합이 바꾸는 글에 밀리지 않는다(같은 자리에 넣는 글자도 그 뒤다).
+        if let deferred = deferredOutsideEdit,
+           !(deferredEditPrecedesComposition && editedRange.location >= NSMaxRange(deferred.range) && NSMaxRange(editedRange) - delta >= NSMaxRange(deferred.range)) {
+            deferredOutsideEdit?.shift(editedRange: editedRange, delta: delta)
         }
         if foldsBeforeEdit == nil { foldsBeforeEdit = folded }
         folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
@@ -75,36 +82,30 @@ extension EditorController: NSTextStorageDelegate {
             folded.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
         } else {
             editsSinceFlush.append((old, editedRange, delta))
+            recordForUndo(old: old, editedRange: editedRange, delta: delta)
         }
         markTextChanged()
     }
 }
 
 extension EditorController {
-    /// 편집 중인 것으로 보는지. 본문에 포커스가 있고 창이 키 창일 때다. 커서 줄의 기호를 보일지와
-    /// 편집 단축키를 받을지를 이것으로 정한다.
+    /// 편집 중인 것으로 보는지. 본문에 포커스가 있고 창이 키 창일 때다. 편집 단축키를 받을지를 이것으로 정한다.
     var isActive: Bool {
         guard let window = textView.window, window.firstResponder === textView else { return false }
         return window.isKeyWindow || forcesActiveAppearance
     }
 
-    /// 지금 상태(원문, 선택, 접힘, 마우스)에서의 줄별 모양.
+    /// 지금 상태(원문, 접힘, 마우스)에서의 줄별 모양. 커서가 어디에 있든 같다(기호는 늘 감춘다).
     func currentKeys() -> [LineRenderKey] {
-        var active: ClosedRange<Int>?
-        if isActive {
-            let selection = clamped(textView.selectedRange())
-            active = document.lineIndex(at: selection.location)...document.lineIndex(at: NSMaxRange(selection))
-        }
         // 문단을 만들 때마다 불리므로 같은 상태에서는 다시 계산하지 않는다.
         let stamp = KeyStamp(
             documentVersion: documentVersion,
-            active: active,
             folded: folded,
             hoveredLine: hoveredLink?.line,
             hoveredOffset: hoveredLink?.offset
         )
         if let cache = keysCache, cache.stamp == stamp { return cache.keys }
-        let keys = LinePresentation.keys(for: document, active: active, folded: folded, hoveredLink: hoveredLink)
+        let keys = LinePresentation.keys(for: document, folded: folded, hoveredLink: hoveredLink)
         keysCache = (stamp, keys)
         return keys
     }
@@ -117,20 +118,6 @@ extension EditorController {
         defer { appliedKeys = keys }
         guard let changed = LinePresentation.changedLines(old: appliedKeys, new: keys) else { return }
         invalidate(lines: changed)
-        scheduleHeightReport()
-    }
-
-    /// 줄의 모양만 바뀌어도 높이가 달라질 수 있다: 커서가 들어간 줄은 감췄던 기호(링크의 주소 등)가 보여
-    /// 줄이 넘어가고, 커서가 나가거나 창이 키 창에서 물러나면 다시 줄어든다. 글이 바뀐 것이 아니어서
-    /// 따로 알려야 창 높이가 따라온다. 선택이 바뀌는 도중일 수 있으므로 다음 메인 큐 차례에 잰다.
-    func scheduleHeightReport() {
-        guard !isHeightReportScheduled else { return }
-        isHeightReportScheduled = true
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.isHeightReportScheduled = false
-            self.reportContentHeight()
-        }
     }
 
     func restyleAll() {
@@ -185,7 +172,9 @@ extension EditorController {
             used = fragment.layoutFragmentFrame.maxY
             return false
         }
-        return ceil(max(used, style.body.lineHeight)) + padding.top + padding.bottom
+        let text = ceil(max(used, style.body.lineHeight)) + padding.top + padding.bottom
+        // 링크 주소 칸이 떠 있으면 그 아래 끝까지 보이게 한다.
+        return linkSession == nil ? text : max(text, ceil(linkField.frame.maxY + EditorMetrics.linkFieldGap))
     }
 
     func reportContentHeight() {
@@ -199,7 +188,8 @@ extension EditorController {
     // MARK: 뷰에서 오는 알림
 
     func focusDidChange() {
-        refreshStyling()
+        // 포커스가 바뀌면 정해 둔 서식은 버린다.
+        typingMarks = nil
     }
 
     func windowDidChange() {
@@ -210,5 +200,6 @@ extension EditorController {
     func widthDidChange() {
         reportContentHeight()
         layoutCopyButton()
+        layoutLinkField()
     }
 }

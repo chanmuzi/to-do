@@ -57,11 +57,12 @@ nonisolated struct MarkdownLine: Hashable, Sendable {
     var prefixRange: NSRange { NSRange(location: start, length: prefixLength) }
 
     /// 항상 감춰 두는 줄 머리의 끝. 커서는 이보다 앞에 놓이지 않는다.
-    /// 목록 기호는 왼쪽 칸의 그림으로 대신하므로 감추고, 제목의 `#`은 편집 중에 보이므로 들여쓰기만 감춘다.
+    /// 들여쓰기, 목록 기호, 제목의 `#`은 보이지 않는다(목록은 왼쪽 칸의 그림이 대신한다).
+    /// 코드 줄은 들여쓰기만 줄 머리다.
     var caretStart: Int {
         switch kind {
-        case .heading, .fenceOpen, .fenceClose, .code: start + indentLength
-        case .paragraph, .todo, .bullet, .toggle: contentStart
+        case .fenceOpen, .fenceClose, .code: start + indentLength
+        case .paragraph, .heading, .todo, .bullet, .toggle: contentStart
         }
     }
 }

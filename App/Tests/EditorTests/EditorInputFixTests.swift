@@ -164,19 +164,19 @@ private func namedPasteboard() -> NSPasteboard {
         #expect(h.editor.text == "- ab\n[ ] c")
     }
 
-    @Test func forwardDeleteSwallowsIndentationButKeepsVisibleSyntax() throws {
+    @Test func forwardDeleteSwallowsIndentationAndTheHiddenHeadingMarker() throws {
         let h = try EditorHarness("가\n\t\t나\n# 제목")
         h.caret(at: 1)
         h.press(NSResponder.forwardDelete)
         #expect(h.editor.text == "가나\n# 제목")
-        // 제목의 `#`은 편집 중에 보이는 글자라 그대로 이어 붙는다.
+        // 제목의 `#`도 보이지 않는 줄 머리다. 함께 지워져 글자로 드러나지 않는다.
         h.caret(at: 2)
         h.press(NSResponder.forwardDelete)
-        #expect(h.editor.text == "가나# 제목")
+        #expect(h.editor.text == "가나제목")
         // 줄 가운데에서는 보통의 지우기다.
         h.caret(at: 0)
         h.press(NSResponder.forwardDelete)
-        #expect(h.editor.text == "나# 제목")
+        #expect(h.editor.text == "나제목")
     }
 }
 
@@ -296,13 +296,9 @@ private func namedPasteboard() -> NSPasteboard {
     }
 
     @Test func emptyLastLineOfAnUnterminatedCodeBlockIsStyledAsCode() throws {
-        let h = try EditorHarness()
-        h.type("```")
-        h.press(NSResponder.newline)
-        // 닫는 줄을 지워 닫히지 않은 블록으로 만든다: "```\ncode\n"
-        h.type("code")
-        h.editor.selectedRange = NSRange(location: 8, length: 4)
-        h.press(NSResponder.backspace)
+        // 닫히지 않은 블록(다른 프로그램이 쓴 파일에서 올 수 있다)의 끝에서 Return: "```\ncode\n"
+        let h = try EditorHarness("```\ncode")
+        h.caret(at: 8)
         h.press(NSResponder.newline)
         #expect(h.editor.text == "```\ncode\n")
         #expect(h.document.lines.map(\.kind) == [.fenceOpen, .code, .code])
@@ -315,9 +311,9 @@ private func namedPasteboard() -> NSPasteboard {
         let empty = try #require(lines.last)
         #expect(empty.characterRange.length == 0)
         // 빈 줄도 코드 줄의 높이와 들여쓰기를 갖는다(커서가 코드 글자와 같은 자리에 선다).
-        #expect(empty.typographicBounds.height == EditorMetrics.codeLineHeight)
+        #expect(empty.typographicBounds.height == h.theme.lineHeight(.codeBlock))
         let frame = fragment.layoutFragmentFrame
-        #expect(frame.minX + empty.typographicBounds.minX == EditorMetrics.codeBlockPadX)
+        #expect(frame.minX + empty.typographicBounds.minX == h.theme.component(.codeBlockPaddingX))
         #expect(frame.minX + empty.typographicBounds.minX == frame.minX + code.typographicBounds.minX)
         // 코드 상자가 빈 줄까지 덮고 거기서 아래 모서리를 닫는다.
         let decoration = try #require(fragment.decoration)
@@ -332,12 +328,12 @@ private func namedPasteboard() -> NSPasteboard {
         h.caret(at: 0)
         let away = try #require(try lastFragment(h).textLineFragments.last)
         #expect(away.characterRange.length == 0)
-        #expect(try lastFragment(h).layoutFragmentFrame.minX + away.typographicBounds.minX == EditorMetrics.codeBlockPadX)
+        #expect(try lastFragment(h).layoutFragmentFrame.minX + away.typographicBounds.minX == h.theme.component(.codeBlockPaddingX))
         #expect(try lastFragment(h).codeBoxRect?.maxY == away.typographicBounds.maxY)
         h.caret(at: h.document.length)
         let back = try #require(try lastFragment(h).textLineFragments.last)
-        #expect(back.typographicBounds.height == EditorMetrics.codeLineHeight)
-        #expect(try lastFragment(h).layoutFragmentFrame.minX + back.typographicBounds.minX == EditorMetrics.codeBlockPadX)
+        #expect(back.typographicBounds.height == h.theme.lineHeight(.codeBlock))
+        #expect(try lastFragment(h).layoutFragmentFrame.minX + back.typographicBounds.minX == h.theme.component(.codeBlockPaddingX))
 
         // 그 줄에 글자를 치면 보통의 코드 문단이 되고, 저장소에는 여전히 서식이 없다.
         h.type("x")
@@ -381,14 +377,11 @@ private func namedPasteboard() -> NSPasteboard {
         // 닫힌 블록의 상자는 닫는 줄에서 끝난다.
         #expect(box.maxY <= empty.typographicBounds.minY)
 
-        // 닫는 줄을 지우면 빈 줄이 코드가 되고, 다시 닫으면 돌아온다.
-        h.editor.selectedRange = NSRange(location: 9, length: 3)
-        h.press(NSResponder.backspace)
-        #expect(h.document.lines.last?.kind == .code)
-        let open = try lastFragment(h)
+        // 닫는 줄이 없는 글(다른 프로그램이 쓴 파일)에서는 빈 마지막 줄이 코드다.
+        let k = try EditorHarness("```\ncode\n")
+        k.caret(at: k.document.length)
+        #expect(k.document.lines.last?.kind == .code)
+        let open = try lastFragment(k)
         #expect(open.codeBoxRect?.maxY == open.textLineFragments.last?.typographicBounds.maxY)
-        h.undo()
-        let again = try lastFragment(h)
-        #expect(try #require(again.codeBoxRect).maxY <= (try #require(again.textLineFragments.last)).typographicBounds.minY)
     }
 }

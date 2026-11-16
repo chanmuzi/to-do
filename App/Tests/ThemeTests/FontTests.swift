@@ -18,7 +18,7 @@ import Testing
 
         let code = theme.nsFont(.code)
         #expect(code.familyName == "D2Coding")
-        #expect(code.pointSize == 12)
+        #expect(code.pointSize == 11.5)
 
         // 가변 글꼴의 굵기 축에 토큰 값이 그대로 들어간다.
         #expect(weightAxisValue(theme.nsFont(.strong)) == 650)

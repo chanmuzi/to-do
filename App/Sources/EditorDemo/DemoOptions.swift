@@ -6,7 +6,8 @@ import Theme
 ///
 /// - `--appearance light|dark`
 /// - `--checkbox box|bracket`
-/// - `--sample note|elements|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
+/// - `--code-style accent|plain`: 인라인 코드의 글자색(기본 `accent`)
+/// - `--sample note|elements|code|literal|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
 /// - `--caret-line <n>`: 커서를 둘 줄(0부터). 그 줄 끝에 놓는다
 /// - `--fold <n,n>`: 접어 둘 토글의 줄 번호
 /// - `--width <pt>`: 창 너비(기본 340)
@@ -18,6 +19,7 @@ import Theme
 struct DemoOptions {
     var appearance: ThemeAppearance = .light
     var checkboxStyle: CheckboxStyle = .box
+    var inlineCodeStyle: InlineCodeStyle = .accent
     var sample = "note"
     var caretLine: Int?
     var folded: Set<Int> = []
@@ -56,6 +58,10 @@ struct DemoOptions {
                 let raw = try value(flag)
                 guard let parsed = CheckboxStyle(rawValue: raw) else { throw ParseError.invalidValue(flag, raw) }
                 checkboxStyle = parsed
+            case "--code-style":
+                let raw = try value(flag)
+                guard let parsed = InlineCodeStyle(rawValue: raw) else { throw ParseError.invalidValue(flag, raw) }
+                inlineCodeStyle = parsed
             case "--sample":
                 sample = try value(flag)
             case "--caret-line":

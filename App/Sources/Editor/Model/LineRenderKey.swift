@@ -4,8 +4,6 @@ import Foundation
 nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
     var level: Int
-    /// 커서(선택)가 있는 줄. 마크다운 기호를 보인다.
-    var isActive = false
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
     /// 접힌 토글 자신.
@@ -13,23 +11,22 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var childCount = 0
     /// 문서의 첫 줄(위 여백을 두지 않는다).
     var isFirst = false
-    /// 코드 블록에 커서가 있어 ``` 줄을 보인다.
-    var isCodeActive = false
     /// 코드 블록의 첫 줄, 마지막 줄(상자의 둥근 모서리를 그린다).
     var isCodeTop = false
     var isCodeBottom = false
     /// 닫히지 않은 코드 블록이 줄바꿈으로 끝나서, 이 줄 바로 뒤에 문서 끝의 빈 코드 줄이 있다.
     /// 그 빈 줄은 문단이 따로 없고 이 줄의 조각에 붙어 그려지므로, 코드 상자를 그 줄까지 늘려 닫는다.
     var hasTrailingCodeLine = false
+    /// 코드 줄이 없는 블록의 ``` 줄 가운데 커서가 놓이는 줄(`EditorCommands.emptyBlockCaret`).
+    /// 빈 코드 줄 하나의 높이로 그려, 블록에 들어가 쓸 수 있게 한다.
+    var isEmptyBlockSpot = false
     /// 마우스가 올라간 링크의 줄 안 위치.
     var hoveredLink: Int?
 }
 
 nonisolated enum LinePresentation {
-    /// - Parameter active: 선택이 걸친 줄. 편집기에 포커스가 없으면 `nil`.
     static func keys(
         for doc: MarkdownDocument,
-        active: ClosedRange<Int>?,
         folded: Set<Int>,
         hoveredLink: (line: Int, offset: Int)? = nil
     ) -> [LineRenderKey] {
@@ -40,14 +37,14 @@ nonisolated enum LinePresentation {
             let line = doc.lines[index]
             var key = LineRenderKey(kind: line.kind, level: line.level)
             key.isCollapsed = hidden.contains(index)
-            key.isActive = !key.isCollapsed && (active?.contains(index) ?? false)
             key.isFolded = folded.contains(index)
             key.childCount = line.kind == .toggle ? line.childCount : 0
             key.isFirst = index == 0
             if let block = line.codeBlock {
-                key.isCodeActive = active.map { $0.overlaps(block) } ?? false
                 key.isCodeTop = index == block.lowerBound
                 key.isCodeBottom = index == block.upperBound
+                key.isEmptyBlockSpot = index == block.upperBound && line.kind != .code
+                    && EditorCommands.emptyBlock(doc, at: index) != nil
             }
             if let hoveredLink, hoveredLink.line == index { key.hoveredLink = hoveredLink.offset }
             key.hasTrailingCodeLine = trailingCode && index == doc.lines.count - 2 && !key.isCollapsed

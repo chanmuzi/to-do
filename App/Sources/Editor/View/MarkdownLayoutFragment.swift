@@ -102,7 +102,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     private func textShift(_ decoration: FragmentDecoration) -> CGFloat {
         guard let font = decoration.lineFont, let line = contentLines.first else { return 0 }
         let bounds = line.typographicBounds
-        let centered = bounds.height / 2 + (font.ascender + font.descender) / 2 + decoration.centerOffset
+        let centered = bounds.height / 2 + (font.ascender + font.descender) / 2
         return line.glyphOrigin.y - centered
     }
 
@@ -110,7 +110,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     private func baseline(of line: NSTextLineFragment, _ decoration: FragmentDecoration) -> CGFloat {
         let bounds = line.typographicBounds
         let font = decoration.lineFont ?? decoration.style.body.font
-        return bounds.midY + (font.ascender + font.descender) / 2 + decoration.centerOffset
+        return bounds.midY + (font.ascender + font.descender) / 2
     }
 
     private func drawGuides(_ decoration: FragmentDecoration, in context: CGContext) {
@@ -140,43 +140,39 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     private func drawCodeBox(_ decoration: FragmentDecoration, in context: CGContext) {
         guard let box = decoration.codeBox, let rect = codeBoxRect else { return }
         let style = decoration.style
-        let radius = style.codeBlockRadius
-        context.addPath(BoxPath.fill(rect, radius: radius, top: box.top, bottom: box.bottom))
-        context.setFillColor(style.codeBackground.cgColor)
+        context.addPath(BoxPath.fill(rect, radius: style.codeBlockRadius, top: box.top, bottom: box.bottom))
+        context.setFillColor(style.codeBlockBackground.cgColor)
         context.fillPath()
-        context.addPath(BoxPath.border(rect, radius: radius, width: style.borderWidth, top: box.top, bottom: box.bottom))
-        context.setStrokeColor(style.codeLine.cgColor)
-        context.setLineWidth(style.borderWidth)
-        context.strokePath()
     }
 
+    /// 형광펜을 먼저, 인라인 코드를 그 위에 그린다(형광펜 안의 코드도 제 상자를 갖는다).
     private func drawInlineBackgrounds(_ decoration: FragmentDecoration, in context: CGContext) {
         guard let string = paragraphString else { return }
         let style = decoration.style
-        string.enumerateAttribute(.markdownInlineBackground, in: NSRange(location: 0, length: string.length)) { value, range, _ in
-            guard let background = value as? InlineBackground else { return }
-            for rect in rects(for: range) {
-                let box = CGRect(
-                    x: rect.minX - background.padX,
-                    y: rect.midY - background.height / 2,
-                    width: rect.width + background.padX * 2,
-                    height: background.height
-                )
-                switch background.kind {
-                case .highlight(let number):
-                    context.addPath(CGPath(roundedRect: box, cornerWidth: style.highlightRadius, cornerHeight: style.highlightRadius, transform: nil))
-                    context.setFillColor(style.highlightBackground(number).cgColor)
+        let full = NSRange(location: 0, length: string.length)
+        for key in [NSAttributedString.Key.markdownHighlight, .markdownCodeBox] {
+            string.enumerateAttribute(key, in: full) { value, range, _ in
+                guard let background = value as? InlineBackground else { return }
+                for (index, rect) in rects(for: range).enumerated() {
+                    let lead = index == 0 ? background.leadShift : 0
+                    let box = CGRect(
+                        x: rect.minX + lead - background.padX,
+                        y: rect.midY - background.height / 2 + background.drop,
+                        width: rect.width - lead + background.padX * 2,
+                        height: background.height
+                    )
+                    let radius: CGFloat
+                    switch background.kind {
+                    case .highlight(let number):
+                        radius = style.highlightRadius
+                        context.setFillColor(style.highlightBackground(number).cgColor)
+                    case .code:
+                        radius = style.codeRadius
+                        context.setFillColor(style.codeBackground.cgColor)
+                    }
+                    let corner = min(radius, box.height / 2, box.width / 2)
+                    context.addPath(CGPath(roundedRect: box, cornerWidth: corner, cornerHeight: corner, transform: nil))
                     context.fillPath()
-                case .code:
-                    context.addPath(CGPath(roundedRect: box, cornerWidth: style.codeRadius, cornerHeight: style.codeRadius, transform: nil))
-                    context.setFillColor(style.codeBackground.cgColor)
-                    context.fillPath()
-                    let inset = box.insetBy(dx: style.borderWidth / 2, dy: style.borderWidth / 2)
-                    let radius = max(0, style.codeRadius - style.borderWidth / 2)
-                    context.addPath(CGPath(roundedRect: inset, cornerWidth: radius, cornerHeight: radius, transform: nil))
-                    context.setStrokeColor(style.codeLine.cgColor)
-                    context.setLineWidth(style.borderWidth)
-                    context.strokePath()
                 }
             }
         }

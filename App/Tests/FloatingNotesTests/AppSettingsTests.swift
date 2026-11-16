@@ -33,6 +33,44 @@ import Testing
         #expect(try AppSettingsStore(stateDirectory: directory).settings.showsMenuBarIcon)
     }
 
+    /// 본문 편집기의 표시 방식(인라인 코드 글자색, 체크박스 모양)은 설정 파일에 남고, 바꾸면 떠 있는 편집기에
+    /// 곧바로 반영된다.
+    @MainActor
+    @Test func editorDisplayOptionsPersistAndReachOpenEditors() throws {
+        defer { cleanUp() }
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: directory)
+        // 기본값: 강조색, 상자.
+        #expect(NoteEditorOptions(settings: store.settings) == NoteEditorOptions(checkbox: .box, inlineCode: .accent))
+        fixture.editors.follow(store)
+        let id = try fixture.notes.create(NoteDraft(title: "설정", body: "`코드` [ ] 할 일")).id
+        try fixture.notePanels.open(id, focus: false)
+        let adapter = try #require(fixture.editors.editor(for: id))
+        #expect(adapter.editor.configuration.inlineCodeStyle == .accent)
+
+        try store.update { NoteEditorOptions(checkbox: .bracket, inlineCode: .plain).write(to: &$0) }
+
+        // 떠 있는 편집기에 바로 반영되고, 다시 켜도 남아 있다.
+        #expect(adapter.editor.configuration.inlineCodeStyle == .plain)
+        #expect(adapter.editor.configuration.checkboxStyle == .bracket)
+        let reloaded = try AppSettingsStore(stateDirectory: directory)
+        #expect(reloaded.settings.inlineCode == "plain")
+        #expect(reloaded.settings.checkbox == "bracket")
+        #expect(NoteEditorOptions(settings: reloaded.settings) == NoteEditorOptions(checkbox: .bracket, inlineCode: .plain))
+        // 다른 설정을 바꿔도 편집기의 값은 그대로다.
+        try store.update { $0.showsMenuBarIcon = false }
+        #expect(adapter.editor.configuration.inlineCodeStyle == .plain)
+        #expect(try AppSettingsStore(stateDirectory: directory).settings.inlineCode == "plain")
+        // 모르는 이름은 기본값으로 읽는다. 항목이 없는 예전 파일도 같다.
+        #expect(NoteEditorOptions(settings: AppSettings(inlineCode: "rainbow", checkbox: "circle")) == NoteEditorOptions())
+        try Data(#"{"showsMenuBarIcon":false}"#.utf8).write(to: directory.appendingPathComponent("app-settings.json"))
+        let older = try AppSettingsStore(stateDirectory: directory)
+        #expect(older.settings.inlineCode == "accent")
+        #expect(older.settings.checkbox == "box")
+        #expect(!older.settings.showsMenuBarIcon)
+    }
+
     @Test func olderOrBrokenSettingsFilesFallBackToDefaultsWithoutLosingTheFile() throws {
         defer { cleanUp() }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

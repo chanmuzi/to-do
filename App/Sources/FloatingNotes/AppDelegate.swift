@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let router = AppRouter()
             // 본문은 Markdown 편집기(Editor 모듈)다. 노트 창은 편집기를 모르고, 여기서 어댑터로 잇는다.
             let editors = NoteEditorFactory(windowStates: environment.windowStates, log: AppLog.warning)
+            // 체크박스 모양과 인라인 코드 글자색은 저장된 설정을 따른다(바뀌면 떠 있는 편집기에 바로 반영).
+            editors.follow(environment.settings)
             let notePanels = NotePanelCoordinator(
                 theme: environment.theme, notes: environment.notes, windowStates: environment.windowStates,
                 spaces: environment.spaces, router: router, makeBodyEditor: editors.makeEditor,
@@ -152,6 +154,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 메뉴 막대 아이콘을 보이거나 감추고 설정에 적는다(설정 화면이 부른다). 감춰도 같은 항목이 Dock 메뉴와
     /// 앱 메뉴에 있고, 전역 단축키도 그대로다.
+    /// 본문 편집기의 표시 방식(체크박스 모양, 인라인 코드 글자색)을 적는다. 떠 있는 편집기에 곧바로 반영된다.
+    func setEditorOptions(_ options: NoteEditorOptions) {
+        do {
+            try environment?.settings.update { options.write(to: &$0) }
+        } catch {
+            AppLog.warning("편집기 표시 설정을 저장하지 못했습니다: \(error)")
+        }
+    }
+
     func setMenuBarIconShown(_ shown: Bool) {
         do {
             try environment?.settings.update { $0.showsMenuBarIcon = shown }

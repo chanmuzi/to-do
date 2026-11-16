@@ -30,8 +30,42 @@ nonisolated struct CopyExport: Sendable {
                 end = document.lines[lastIndex - 1].end
             }
         }
-        let source = document.string(in: NSRange(location: start, length: max(0, end - start)))
-        self.init(source: source, startsInCode: first.kind == .code || first.kind == .fenceClose)
+        let fragment = Self.balanced(document, start: start, end: max(start, end))
+        self.init(source: fragment, startsInCode: first.kind == .code || first.kind == .fenceClose)
+    }
+
+    /// 고른 범위의 원문에, 잘려 나간 인라인 기호를 채운 것. 기호는 화면에 보이지 않아 고를 수 없으므로,
+    /// 서식 구간의 글자만 골라도 그 서식이 함께 나가게 한다: 구간의 글자 맨 앞이나 맨 끝에 닿은 쪽은
+    /// 기호까지 넣고, 구간 한가운데에서 잘린 쪽은 기호를 덧붙인다.
+    private static func balanced(_ document: MarkdownDocument, start: Int, end: Int) -> String {
+        guard end > start else { return "" }
+        var lower = start
+        var upper = end
+        var opens = ""
+        var closes = ""
+        let first = document.line(at: start)
+        if !first.kind.isCode {
+            let spans = first.hiddenSpans.sorted { $0.range.length < $1.range.length }
+            // 글자 맨 앞에 닿은 구간은 여는 기호까지 넣는다. 안쪽 구간부터.
+            for span in spans where lower == span.contentRange.location && end > lower {
+                lower = span.range.location
+            }
+            // 한가운데에서 잘린 구간은 여는 기호를 덧붙인다. 바깥 구간부터.
+            for span in spans.reversed() where span.contentRange.location < start && start < NSMaxRange(span.contentRange) {
+                opens += document.string(in: span.openMarker)
+            }
+        }
+        let last = document.line(at: end)
+        if !last.kind.isCode {
+            let spans = last.hiddenSpans.sorted { $0.range.length < $1.range.length }
+            for span in spans where upper == NSMaxRange(span.contentRange) && start < upper {
+                upper = NSMaxRange(span.range)
+            }
+            for span in spans where span.contentRange.location < end && end < NSMaxRange(span.contentRange) {
+                closes += document.string(in: span.closeMarker)
+            }
+        }
+        return opens + document.string(in: NSRange(location: lower, length: upper - lower)) + closes
     }
 
     /// 화면에서 글자로 보이지 않는 줄 머리의 끝.
@@ -173,6 +207,9 @@ nonisolated struct CopyExport: Sendable {
                 } else {
                     out += body
                 }
+            case .escape:
+                // 백슬래시는 내보내지 않는다. 막은 글자만 남는다.
+                out += body
             }
             position = NSMaxRange(span.range)
         }

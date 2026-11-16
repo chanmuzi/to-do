@@ -1,12 +1,24 @@
 import Foundation
 
-/// 한 줄의 글자 구간에서 굵게, 취소선, 형광펜, 인라인 코드, 링크를 찾는다.
+/// 한 줄의 글자 구간에서 굵게, 취소선, 형광펜, 인라인 코드, 링크, 백슬래시로 막은 글자를 찾는다.
 /// 바깥 구간이 안쪽 구간보다 먼저 나온다. 인라인 코드 안은 더 풀지 않는다.
+///
+/// 기호로 읽는 조건(D-036의 13번). 맞지 않는 기호는 글자 그대로 보인다.
+/// - 여는 기호 바로 뒤와 닫는 기호 바로 앞은 공백이 아니어야 한다(`a == b`, `2 ** 3`, `` ` `` 뒤의 공백).
+/// - `**`, `~~`, `==`: 영문자나 숫자(ASCII) 바로 뒤의 여는 기호는 글자일 수 있다(`a==b`, `2**3`). 그런 기호가
+///   구간을 여는 것은 닫는 기호 뒤가 영문자나 숫자가 아니고, 사이의 글이 글자와 숫자만으로 된 한 낱말일
+///   때뿐이다(`un**believ**`, `3**개**`). 아니면 그 여는 기호만 글자로 두고 뒤는 다시 읽는다
+///   (`a==b 인지 ==확인==`은 `a==b 인지 ` 뒤에 형광펜 `확인`, `x==1&y==2`와 `2**3**4`는 글자).
+///   여는 기호 앞이 영문자나 숫자가 아니면 닫는 기호 뒤에는 무엇이 와도 된다(`**bold**er`).
+///   한글은 여기의 영문자나 숫자가 아니다(`한글**굵은 글**`, `**중요**하다`는 굵게다).
+/// - `\` 뒤의 `*`, `=`, `~`, `` ` ``, `[`, `]`, `\`는 그 글자 그대로다. 백슬래시는 보이지 않고 원문에 남는다.
+///   인라인 코드 안에서는 백슬래시도 글자다.
 nonisolated enum InlineParser {
     private static let backtick: unichar = 0x60
     private static let star: unichar = 0x2A
     private static let tilde: unichar = 0x7E
     private static let equals: unichar = 0x3D
+    private static let backslash: unichar = 0x5C
     private static let leftBracket: unichar = 0x5B
     private static let rightBracket: unichar = 0x5D
     private static let leftParen: unichar = 0x28
@@ -15,18 +27,67 @@ nonisolated enum InlineParser {
     private static let rightBrace: unichar = 0x7D
     private static let httpPrefixes: [[unichar]] = [Array("https://".utf16), Array("http://".utf16)]
     private static let trailingPunctuation = Set(".,;:!?)\"'".utf16)
+    /// 백슬래시로 막을 수 있는 글자.
+    static let escapable: Set<unichar> = [star, equals, tilde, backtick, leftBracket, rightBracket, backslash]
+    static let escapableCharacters: Set<Character> = ["*", "=", "~", "`", "[", "]", "\\"]
 
     static func parse(_ units: [unichar], in range: NSRange) -> [InlineSpan] {
         var spans: [InlineSpan] = []
-        scan(units, from: range.location, to: NSMaxRange(range), into: &spans)
+        scan(units, from: range.location, to: NSMaxRange(range), lineStart: range.location, into: &spans)
         return spans
     }
 
-    private static func scan(_ u: [unichar], from start: Int, to end: Int, into spans: inout [InlineSpan]) {
+    static func isWhitespace(_ c: unichar) -> Bool {
+        c == 0x20 || c == 0x09 || c == 0xA0 || c == 0x3000
+    }
+
+    private static func isEscape(_ u: [unichar], at i: Int, to end: Int) -> Bool {
+        u[i] == backslash && i + 1 < end && escapable.contains(u[i + 1])
+    }
+
+    /// `i`에서 시작하는 인라인 코드의 닫는 백틱. 여는 백틱 뒤와 닫는 백틱 앞은 공백이 아니어야 한다.
+    private static func codeClose(_ u: [unichar], from i: Int, to end: Int) -> Int? {
+        guard i + 2 < end, !isWhitespace(u[i + 1]), u[i + 1] != backtick else { return nil }
+        var j = i + 2
+        while j < end {
+            if u[j] == backtick, !isWhitespace(u[j - 1]) { return j }
+            j += 1
+        }
+        return nil
+    }
+
+    /// `i`에서 시작하는 `cc`의 닫는 `cc`. 사이의 백슬래시로 막은 글자와 인라인 코드는 건너뛴다.
+    private static func pairClose(_ c: unichar, in u: [unichar], from i: Int, to end: Int) -> Int? {
+        guard i + 2 < end, !isWhitespace(u[i + 2]) else { return nil }
+        var j = i + 2
+        while j + 1 < end {
+            if isEscape(u, at: j, to: end) {
+                j += 2
+            } else if u[j] == backtick, let close = codeClose(u, from: j, to: end) {
+                j = close + 1
+            } else if u[j] == c, u[j + 1] == c, j > i + 2, !isWhitespace(u[j - 1]) {
+                return j
+            } else {
+                j += 1
+            }
+        }
+        return nil
+    }
+
+    private static func scan(_ u: [unichar], from start: Int, to end: Int, lineStart: Int, into spans: inout [InlineSpan]) {
         var i = start
         while i < end {
             let c = u[i]
-            if c == backtick, let close = index(of: backtick, in: u, from: i + 1, to: end), close > i + 1 {
+            if isEscape(u, at: i, to: end) {
+                spans.append(InlineSpan(
+                    kind: .escape,
+                    range: NSRange(location: i, length: 2),
+                    contentRange: NSRange(location: i + 1, length: 1)
+                ))
+                i += 2
+                continue
+            }
+            if c == backtick, let close = codeClose(u, from: i, to: end) {
                 spans.append(InlineSpan(
                     kind: .code,
                     range: NSRange(location: i, length: close + 1 - i),
@@ -36,7 +97,7 @@ nonisolated enum InlineParser {
                 continue
             }
             if c == star || c == tilde || c == equals, i + 1 < end, u[i + 1] == c,
-               let close = indexOfPair(c, in: u, from: i + 2, to: end), close > i + 2 {
+               let close = pairClose(c, in: u, from: i, to: end) {
                 var spanEnd = close + 2
                 let kind: InlineSpan.Kind
                 switch c {
@@ -50,18 +111,34 @@ nonisolated enum InlineParser {
                         kind = .highlight(1)
                     }
                 }
+                // 영문자나 숫자 바로 뒤의 여는 기호는 글자일 수 있다(`a==b`, `2**3`). 구간으로 읽는 것은 닫는 기호
+                // 뒤가 영문자나 숫자가 아니고 사이의 글이 한 낱말일 때뿐이다(`un**believ**`). 아니면 여는 기호를
+                // 글자로 두고 그 뒤부터 다시 읽는다(`a==b 인지 ==확인==`의 `==확인==`은 형광펜이다).
+                if i > lineStart, isWordCharacter(u[i - 1]) {
+                    if spanEnd < end, isWordCharacter(u[spanEnd]) {
+                        // 양쪽 모두 붙었다. 두 기호 모두 글자다.
+                        scan(u, from: i + 2, to: close, lineStart: lineStart, into: &spans)
+                        i = close + 2
+                        continue
+                    }
+                    if !isSingleWord(u, from: i + 2, to: close) {
+                        i += 2
+                        continue
+                    }
+                }
                 spans.append(InlineSpan(
                     kind: kind,
                     range: NSRange(location: i, length: spanEnd - i),
                     contentRange: NSRange(location: i + 2, length: close - i - 2)
                 ))
-                scan(u, from: i + 2, to: close, into: &spans)
+                scan(u, from: i + 2, to: close, lineStart: lineStart, into: &spans)
                 i = spanEnd
                 continue
             }
             if c == leftBracket,
-               let textEnd = index(of: rightBracket, in: u, from: i + 1, to: end),
-               textEnd + 1 < end, u[textEnd + 1] == leftParen,
+               let textEnd = linkTextEnd(u, from: i + 1, to: end),
+               // 글자가 없는 링크는 화면에 아무것도 남지 않으므로 링크로 읽지 않는다.
+               textEnd > i + 1, textEnd + 1 < end, u[textEnd + 1] == leftParen,
                let urlEnd = index(of: rightParen, in: u, from: textEnd + 2, to: end) {
                 let url = String(utf16CodeUnits: Array(u[(textEnd + 2)..<urlEnd]), count: urlEnd - textEnd - 2)
                 spans.append(InlineSpan(
@@ -69,11 +146,11 @@ nonisolated enum InlineParser {
                     range: NSRange(location: i, length: urlEnd + 1 - i),
                     contentRange: NSRange(location: i + 1, length: textEnd - i - 1)
                 ))
-                scan(u, from: i + 1, to: textEnd, into: &spans)
+                scan(u, from: i + 1, to: textEnd, lineStart: lineStart, into: &spans)
                 i = urlEnd + 1
                 continue
             }
-            if c == 0x68, i == start || !isWordCharacter(u[i - 1]), let urlEnd = bareURLEnd(u, at: i, to: end) {
+            if c == 0x68, i == lineStart || !isWordCharacter(u[i - 1]), let urlEnd = bareURLEnd(u, at: i, to: end) {
                 let range = NSRange(location: i, length: urlEnd - i)
                 let url = String(utf16CodeUnits: Array(u[i..<urlEnd]), count: urlEnd - i)
                 spans.append(InlineSpan(kind: .link(url), range: range, contentRange: range))
@@ -84,19 +161,25 @@ nonisolated enum InlineParser {
         }
     }
 
-    private static func index(of c: unichar, in u: [unichar], from: Int, to end: Int) -> Int? {
+    /// 링크 글자를 닫는 `]`. 백슬래시로 막은 글자는 건너뛴다.
+    private static func linkTextEnd(_ u: [unichar], from: Int, to end: Int) -> Int? {
         var i = from
         while i < end {
-            if u[i] == c { return i }
-            i += 1
+            if isEscape(u, at: i, to: end) {
+                i += 2
+            } else if u[i] == rightBracket {
+                return i
+            } else {
+                i += 1
+            }
         }
         return nil
     }
 
-    private static func indexOfPair(_ c: unichar, in u: [unichar], from: Int, to end: Int) -> Int? {
+    private static func index(of c: unichar, in u: [unichar], from: Int, to end: Int) -> Int? {
         var i = from
-        while i + 1 < end {
-            if u[i] == c, u[i + 1] == c { return i }
+        while i < end {
+            if u[i] == c { return i }
             i += 1
         }
         return nil
@@ -109,7 +192,18 @@ nonisolated enum InlineParser {
         return (1...4).contains(digit) ? digit : nil
     }
 
-    private static func isWordCharacter(_ c: unichar) -> Bool {
+    /// 글자와 숫자만으로 된 글인지(한글 등 다른 문자의 글자도 글자다). 공백, 문장 부호, 연산 기호가 없다.
+    /// 안에 겹친 서식의 기호(`*`, `~`, `=`, 백틱, 백슬래시)는 있어도 된다(`a==**굵게**==`).
+    private static func isSingleWord(_ u: [unichar], from start: Int, to end: Int) -> Bool {
+        start < end && !(start..<end).contains { index in
+            if u[index] == star || u[index] == tilde || u[index] == equals || u[index] == backtick || u[index] == backslash { return false }
+            guard let scalar = UnicodeScalar(u[index]) else { return true }
+            return !CharacterSet.alphanumerics.contains(scalar)
+        }
+    }
+
+    /// 영문자나 숫자(ASCII)인지.
+    static func isWordCharacter(_ c: unichar) -> Bool {
         (0x30...0x39).contains(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c)
     }
 

@@ -43,8 +43,31 @@ public final class MarkdownEditor {
     /// 바깥(이 편집기가 아닌 쪽)이 원문 끝에 글을 덧붙였을 때 그 글만 넘긴다(빠른 캡처가 떠 있는 노트에
     /// 한 줄을 덧붙임). 커서와 선택, 접힘, 되돌리기 기록, 조합 중인 글자를 그대로 둔다. 되돌리기에 적히지
     /// 않으므로 ⌘Z는 붙인 글을 지우지 않는다. `onTextChange`를 부르지 않는다.
+    /// 줄바꿈 없이 끝나는 글이 붙으면 문서 끝의 커서는 그 뒤로 가고, 이어 치는 글은 새 줄에서 시작한다.
+    /// 이 약속은 잇달아 붙는 글에도 이어진다(두 번째로 붙는 글이 줄바꿈으로 시작해도 커서가 따라간다).
     public func appendFromOutside(_ suffix: String) {
         controller.appendFromOutside(suffix)
+    }
+
+    /// 바깥(이 편집기가 아닌 쪽)이 원문을 `newText`로 바꿨을 때 부른다. 지금 원문과 견주어 앞뒤의 같은
+    /// 부분은 그대로 두고 달라진 가운데만 바꿔 넣는다. 통째로 넣는 것(`text`)과 달리 되돌리기 기록,
+    /// 접힘, 조합 중인 글자를 지키고, 커서는 바뀐 부분 밖이면 제자리에 둔다. `onTextChange`를 부르지 않는다.
+    ///
+    /// - 바깥의 변경은 되돌리기에 적히지 않는다: ⌘Z는 바깥이 쓴 글을 지우지도 되살리지도 않는다. 사용자의
+    ///   되돌리기 기록은 그대로 남고, 기록이 가리키는 위치는 이 변경만큼 따라 옮겨진다(되돌리면 사용자가 고친
+    ///   자리만 돌아간다). 바깥의 변경이 사용자가 고친 자리(넣은 글, 지운 자리)에 겹치면 그 단계는 옮길 수
+    ///   없으므로, 그 단계와 그보다 오래된 단계를 버린다(다시 하기 쪽은 그 단계와 그 뒤의 단계). 통째로 다른
+    ///   글이 오면 기록이 모두 사라진다.
+    /// - 커서가 문서 끝에 있었고 바깥의 글이 그 줄에 이어 붙었으면(문서 끝에 닿는 변경이고 줄바꿈으로
+    ///   시작하지 않는다. 예: 빈 마지막 줄에 `[ ] 우유\n`) 커서는 그 글 뒤로 간다. 그 글이 줄바꿈으로
+    ///   끝나면 커서는 새 빈 마지막 줄에 놓이고, 아니면 사용자가 이어 치는 글이 새 줄에서 시작한다
+    ///   (바깥이 붙인 줄에 붙지 않는다). 바깥의 글이 줄바꿈으로 시작하면 커서의 줄은 그대로이므로 제자리다.
+    ///   커서나 선택의 끝이 바뀐 부분 안에 있었으면 바뀐 부분 뒤로 간다. 그 밖에는 제자리다.
+    /// - 한글을 조합하는 중이면 화면에 넣는 일을 조합이 끝날 때까지 미룬다. 미룬 동안에도 `text`와
+    ///   `onTextChange`로 나가는 원문에는 바깥의 변경이 들어 있다. 바뀐 부분이 조합 중인 글자에 겹치면
+    ///   미루지 않고 조합을 끝낸 뒤 넣는다.
+    public func applyOutsideChange(to newText: String) {
+        controller.applyOutsideChange(to: newText)
     }
 
     /// 체크박스 모양 같은 설정. 바꾸면 곧바로 다시 그린다.
@@ -97,7 +120,10 @@ public final class MarkdownEditor {
         set { controller.selectedRange = newValue }
     }
 
-    /// 되돌리기 기록. 편집기마다 따로 있다.
+    /// 되돌리기 기록. 편집기마다 따로 있다. 기록은 편집기가 직접 들고(바깥의 변경을 건너 위치를 옮길 수
+    /// 있게), 이것은 메뉴와 단축키가 쓰는 창구다: `undo()`, `redo()`, `canUndo`, `canRedo`, `removeAllActions()`,
+    /// `beginUndoGrouping()`과 `endUndoGrouping()`(그 사이의 편집이 한 단계)만 뜻이 있다. `registerUndo`는
+    /// 받지 않는다. 묶음을 열지 않으면 런 루프 한 차례의 편집이 한 단계이고 이어 친 글자는 합쳐진다.
     public var undoManager: UndoManager { controller.editorUndoManager }
 
     /// 본문에 포커스를 준다.
@@ -117,7 +143,13 @@ public final class MarkdownEditor {
         controller.perform(action)
     }
 
-    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(커서 줄의 기호를 보이고 편집 단축키를 받는다).
+    /// 떠 있는 링크 주소 칸에 주소를 적고 Return을 누른 것과 같다(`perform(.link)` 뒤에 부른다).
+    @_spi(Verification)
+    public func commitLink(_ address: String) {
+        controller.commitLink(address)
+    }
+
+    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(편집 단축키를 받는다).
     /// 화면을 캡처해 확인할 때만 쓴다(다른 앱의 포커스를 빼앗지 않기 위해).
     @_spi(Verification)
     public var forcesActiveAppearance: Bool {

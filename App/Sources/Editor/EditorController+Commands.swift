@@ -15,12 +15,17 @@ extension EditorController {
         case .heading(let level):
             guard (1...3).contains(level) else { return }
             apply(EditorCommands.toggleHeading(document, selection: selection, level: level))
-        case .bold: apply(EditorCommands.toggleWrap(document, selection: selection, .bold))
-        case .strikethrough: apply(EditorCommands.toggleWrap(document, selection: selection, .strike))
-        case .inlineCode: apply(EditorCommands.toggleWrap(document, selection: selection, .code))
-        case .highlight: apply(EditorCommands.cycleHighlight(document, selection: selection))
+        case .bold: toggle(.bold, selection: selection)
+        case .strikethrough: toggle(.strike, selection: selection)
+        case .inlineCode: toggle(.code, selection: selection)
+        case .highlight:
+            if selection.length > 0 {
+                apply(EditorCommands.cycleHighlight(document, selection: selection))
+            } else {
+                perform(EditorCommands.cycleTypingHighlight(document, caret: selection.location, marks: currentTypingMarks() ?? TypingMarks()))
+            }
         case .codeBlock: apply(EditorCommands.toggleCodeBlock(document, selection: selection))
-        case .link: apply(EditorCommands.link(document, selection: selection))
+        case .link: beginLinkEditing()
         case .fold:
             guard let result = FoldState.fold(document, selection: selection, folded: folded) else { return }
             setSelection(result.selection)
@@ -31,12 +36,64 @@ extension EditorController {
         }
     }
 
+    /// 굵게, 취소선, 인라인 코드. 선택이 있으면 그 글자에, 없으면 다음에 칠 글자에 건다.
+    private func toggle(_ wrap: EditorCommands.Wrap, selection: NSRange) {
+        if selection.length > 0 {
+            apply(EditorCommands.toggleWrap(document, selection: selection, wrap))
+        } else {
+            perform(EditorCommands.toggleTyping(document, caret: selection.location, wrap, marks: currentTypingMarks() ?? TypingMarks()))
+        }
+    }
+
+    private func perform(_ toggle: TypingToggle) {
+        switch toggle {
+        case .move(let location):
+            typingMarks = nil
+            setSelection(NSRange(location: location, length: 0))
+        case .marks(let marks):
+            let location = clamped(textView.selectedRange()).location
+            typingMarks = marks.isEmpty ? nil : (location, documentVersion, marks)
+        case .unavailable:
+            break
+        }
+    }
+
+    /// 정해 둔 "다음에 칠 글자의 서식". 커서가 그 자리에 그대로 있고 원문이 그대로일 때만 살아 있다.
+    func currentTypingMarks() -> TypingMarks? {
+        guard let typingMarks else { return nil }
+        let selection = textView.selectedRange()
+        guard selection.length == 0, selection.location == typingMarks.location,
+              typingMarks.version == documentVersion else {
+            self.typingMarks = nil
+            return nil
+        }
+        return typingMarks.marks
+    }
+
     /// 원문을 바꿔 쓴다. 텍스트 뷰의 편집 경로를 거치므로 되돌리기 한 단계로 기록된다.
     /// 접혀서 감춘 줄에 닿는 편집은 `includesHiddenLines`가 없으면 막힌다(`shouldChangeTextIn`).
-    func apply(_ edit: TextEdit?) {
-        guard let edit, let storage = textView.textStorage, textView.isEditable else { return }
+    /// - Parameter isIntermediate: 곧 이어지는 편집이나 조합이 마무리하는 중간 편집(두 단계로 넣는 서식의 둘째
+    ///   단계, 조합할 자리를 만드는 편집). 그 사이에 잠깐 드러나는 기호는 가리지 않는다.
+    func apply(_ edit: TextEdit?, isIntermediate: Bool = false) {
+        guard var edit, let storage = textView.textStorage, textView.isEditable else { return }
+        // ``` 줄이 짝을 잃는 편집은 그대로 넣지 않는다(어느 길로 들어온 편집이든). 새로 생기는 ``` 를 글자로
+        // 막아 넣을 수 있으면 그렇게 하고, 아니면 넣지 않고 알린다.
+        if !EditorCommands.keepsFencesBalanced(document, edit) {
+            guard let repaired = EditorCommands.escapingNewFences(document, edit) else {
+                onRejectedEdit()
+                return
+            }
+            edit = repaired
+        }
+        // 감춰 둔 기호가 글자로 드러나는 편집도 넣지 않는다(있던 서식을 원문에 적을 수 없게 된다).
+        guard isIntermediate || !EditorCommands.exposesHiddenMarkers(document, edit) else {
+            onRejectedEdit()
+            return
+        }
         let wasApplying = isApplyingEdit
         let allowedHidden = allowsHiddenEdit
+        isPlainTyping = false
+        if history.open == nil { selectionBeforeEdit = textView.selectedRange() }
         isApplyingEdit = true
         allowsHiddenEdit = edit.includesHiddenLines
         defer {
@@ -52,9 +109,27 @@ extension EditorController {
             editSetFoldsExplicitly = true
         }
         if edit.includesHiddenLines { editSetFoldsExplicitly = true }
-        textView.setSelectedRange(clamped(edit.selection))
+        // 명령이 정한 커서가 감춘 곳(줄 머리, 기호 한가운데, ``` 줄)에 걸리면 보이는 자리로 옮긴다.
+        let target = clamped(edit.selection)
+        textView.setSelectedRange(CaretSnapping.snap(old: target, new: target, in: document, folded: folded, textChanged: true))
         textView.didChangeText()
+        selectionVersion = documentVersion
         textView.scrollRangeToVisible(textView.selectedRange())
+    }
+
+    private func apply(_ outcome: KeyOutcome) -> Bool {
+        switch outcome {
+        case .edit(let edit):
+            apply(edit)
+            return true
+        case .select(let range):
+            setSelection(range)
+            return true
+        case .ignore:
+            return true
+        case .passThrough:
+            return false
+        }
     }
 
     /// 감춘 곳으로 옮기지 않고 선택을 그대로 넣는다.
@@ -79,8 +154,12 @@ extension EditorController {
     /// 원문이 바뀐 것을 바깥에 알린다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는
     /// `setMarkedText` 바로 뒤에 부르고, 그 밖의 경로는 다음 메인 큐 차례에 부른다.
     func flushPendingChange() {
-        insertDeferredAppendIfPossible()
-        guard hasPendingChange, !isSettingText else { return }
+        // 쌓아 두는 중이거나 텍스트 뷰가 조합을 끝내는 중이면 끝난 뒤에 한 번만 알린다.
+        guard !holdsChangeNotification, !isEndingComposition else { return }
+        applyDeferredOutsideEditIfPossible()
+        selectionVersion = documentVersion
+        // 바깥의 변경을 넣는 중에는 알리지 않는다. 알리지 않은 사용자의 변경은 다음 차례에 나간다.
+        guard hasPendingChange, !isSettingText, !isApplyingOutsideChange else { return }
         hasPendingChange = false
         refreshStyling()
         recordFoldChangeForUndo()
@@ -121,6 +200,11 @@ extension EditorController: NSTextViewDelegate {
         // 조합 중인 글자가 있으면 입력기가 먼저 처리하게 둔다.
         guard !textView.hasMarkedText() else { return false }
         let selection = clamped(textView.selectedRange())
+        let swallows = swallowsCodeTriggerKey
+        swallowsCodeTriggerKey = false
+        let tag = codeTag
+        codeTag = nil
+        absorbRun = nil
         switch selector {
         case #selector(NSResponder.insertTab(_:)):
             apply(EditorCommands.indent(document, selection: selection, folded: folded))
@@ -132,26 +216,54 @@ extension EditorController: NSTextViewDelegate {
              #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
              #selector(NSResponder.insertLineBreak(_:)),
              #selector(NSResponder.insertParagraphSeparator(_:)):
+            // 세 번째 백틱으로 코드 블록이 이미 만들어졌다. 이어 누른 Return은 넣지 않는다.
+            if swallows { return true }
+            // 블록을 만든 바로 뒤에 친 낱말 하나는 언어 이름이다(` ```swift ` + Return).
+            if let tag, let edit = EditorCommands.languageTag(document, selection: selection, openLine: tag.openLine, typed: tag.typed) {
+                apply(edit)
+                return true
+            }
             // ⌃Return(U+2028), 문단 구분(U+2029)도 원문에는 `\n` 하나로 넣는다.
             apply(EditorCommands.newline(document, selection: selection, folded: folded))
             return true
         case #selector(NSResponder.deleteBackward(_:)):
-            if let edit = EditorCommands.deleteBackward(document, selection: selection) {
-                apply(edit)
-                return true
-            }
             unfoldBeforeDeleting(selection, backward: true)
-            return false
+            return apply(finalized(EditorCommands.deleteBackward(document, selection: selection)))
         case #selector(NSResponder.deleteForward(_:)):
             unfoldBeforeDeleting(selection, backward: false)
-            if let edit = EditorCommands.deleteForward(document, selection: selection) {
-                apply(edit)
-                return true
-            }
-            return false
+            return apply(finalized(EditorCommands.deleteForward(document, selection: selection)))
+        case #selector(NSResponder.transpose(_:)):
+            return apply(finalized(EditorCommands.transpose(document, selection: selection)))
+        case #selector(NSResponder.moveDown(_:)):
+            // 문서 끝의 코드 블록에서 아래로 나가면 빈 문단을 만든다.
+            guard isOnEdgeVisualLine(selection.location, last: true),
+                  let edit = EditorCommands.leaveCodeBlockDownward(document, selection: selection) else { return false }
+            apply(edit)
+            return true
+        case #selector(NSResponder.moveUp(_:)):
+            guard isOnEdgeVisualLine(selection.location, last: false),
+                  let edit = EditorCommands.leaveCodeBlockUpward(document, selection: selection) else { return false }
+            apply(edit)
+            return true
         default:
             return false
         }
+    }
+
+    private func finalized(_ outcome: KeyOutcome) -> KeyOutcome {
+        guard case .edit(let edit) = outcome else { return outcome }
+        guard let finalized = finalized(edit) else { return .ignore }
+        return .edit(finalized)
+    }
+
+    /// 사용자의 편집을 다듬는다(`EditorCommands.finalized`). 있던 서식 구간을 읽히지 않게 만드는 편집
+    /// (구간 바로 앞에 영문자나 숫자가 붙는다)은 넣지 않고 알린 뒤 `nil`을 돌려준다. 서식을 말없이 풀지 않는다.
+    private func finalized(_ edit: TextEdit) -> TextEdit? {
+        guard !EditorCommands.breaksExistingRun(document, edit) else {
+            onRejectedEdit()
+            return nil
+        }
+        return EditorCommands.finalized(document, edit)
     }
 
     /// 지우려는 줄바꿈 너머가 접힌 줄이면 먼저 편다. 보이지 않는 줄과 합쳐지지 않게 한다.
@@ -161,17 +273,33 @@ extension EditorController: NSTextViewDelegate {
         guard selection.length == 0 else { return }
         let index = document.lineIndex(at: selection.location)
         let line = document.lines[index]
-        if backward, selection.location == line.start, index > 0,
+        if backward, line.prefixLength == 0, line.isVisualStart(selection.location), index > 0,
            let root = FoldState.foldRoot(of: index - 1, in: document, folded: folded) {
             setFolded(folded.subtracting([root]), notify: true)
-        } else if !backward, selection.location == line.end, folded.contains(index) {
+        } else if !backward, !line.kind.isCode, line.isVisualEnd(selection.location), folded.contains(index) {
             setFolded(folded.subtracting([index]), notify: true)
         }
+    }
+
+    /// 그 위치가 문단의 마지막(또는 첫) 화면 줄에 있는지. 줄이 넘어간 문단에서 ↑↓가 문단 안을 움직일 때를 가린다.
+    private func isOnEdgeVisualLine(_ location: Int, last: Bool) -> Bool {
+        let line = document.line(at: location)
+        guard let start = contentStorage.location(contentStorage.documentRange.location, offsetBy: line.start),
+              let fragment = layoutManager.textLayoutFragment(for: start) else { return true }
+        layoutManager.ensureLayout(for: fragment.rangeInElement)
+        let lines = fragment.textLineFragments.filter { $0.characterRange.length > 0 }
+        guard let edge = last ? lines.last : lines.first else { return true }
+        let offset = location - line.start
+        return last ? offset >= edge.characterRange.location : offset <= NSMaxRange(edge.characterRange)
     }
 
     func textView(_ textView: NSTextView, shouldChangeTextIn range: NSRange, replacementString: String?) -> Bool {
         // 속성만 바뀌는 경우.
         guard let replacementString else { return true }
+        // 바깥이 바꾼 글은 그대로 받는다(감춘 줄에 닿으면 넣은 뒤에 그 토글을 편다).
+        if isApplyingOutsideChange { return true }
+        isPlainTyping = false
+        if history.open == nil, !isReplayingUndo, !isApplyingEdit { selectionBeforeEdit = textView.selectedRange() }
         // 원문이 바뀌는 모든 길목이다. 접혀서 보이지 않는 줄에 닿는 편집은 넣지 않고 그 토글을 편다.
         // 무엇이 바뀌는지 본 뒤에 다시 하게 한다. 되돌리기는 막지 않는다(접힘이 함께 돌아온다).
         if !allowsHiddenEdit, !isReplayingUndo {
@@ -181,16 +309,150 @@ extension EditorController: NSTextViewDelegate {
                 return false
             }
         }
-        guard !isApplyingEdit, !isReplayingUndo, !textView.hasMarkedText() else { return true }
-        // 붙여넣기, 끌어다 놓기로 들어오는 다른 줄바꿈 글자는 `\n`으로 바꿔 넣는다.
-        if LineEndings.needsNormalizing(replacementString) {
-            apply(.insert(LineEndings.normalized(replacementString), replacing: clamped(range)))
+        guard !isApplyingEdit, !isReplayingUndo else { return true }
+        // 조합 중에는 원문을 따로 고치지 않는다. 보이지 않는 ``` 줄의 한쪽만 지워지는 편집만 막는다.
+        if textView.hasMarkedText() {
+            guard EditorCommands.breaksCodeFence(document, clamped(range)) else { return true }
+            onRejectedEdit()
             return false
         }
-        guard replacementString == " ", let edit = EditorCommands.spaceTrigger(document, selection: range) else { return true }
-        // `[]` 뒤의 Space: 넣으려던 공백 대신 투두 기호로 바꿔 쓴다.
-        apply(edit)
-        return false
+        let original = clamped(range)
+        let text = LineEndings.normalized(replacementString)
+        let swallows = swallowsCodeTriggerKey
+        swallowsCodeTriggerKey = false
+        let tag = codeTag
+        codeTag = nil
+        let absorb = absorbRun
+        absorbRun = nil
+        // 편집의 경계를 감춘 글자(줄 머리, 백슬래시) 밖으로 옮긴다.
+        let range = EditorCommands.normalized(document, original, replacement: text)
+        // 보이지 않는 ``` 줄의 한쪽만 지워지는 편집은 넣지 않는다(편집 명령은 스스로 맞춰 쓴다).
+        if EditorCommands.breaksCodeFence(document, range) {
+            onRejectedEdit()
+            return false
+        }
+
+        if range.length == 0, !text.isEmpty {
+            // 바깥이 줄바꿈 없이 붙인 줄의 끝에 커서가 있다. 이어 치는 글은 새 줄에서 시작한다.
+            if !text.hasPrefix("\n"), takePendingLineBreak(at: range.location) {
+                apply(.insert("\n" + text, replacing: range))
+                return false
+            }
+            // 세 번째 백틱으로 코드 블록이 이미 만들어졌다. 이어 누른 Space는 넣지 않는다.
+            if swallows, text == " " { return false }
+            // 줄이 없는 코드 블록의 커서 자리: 친 글이 코드 줄이 된다.
+            if let block = EditorCommands.emptyBlock(document, caretAt: range.location) {
+                apply(EditorCommands.insertingIntoEmptyBlock(document, block, text))
+                return false
+            }
+            // 정해 둔 서식이 있으면 기호 쌍과 함께 넣는다(한 번의 편집). 여러 줄이면 줄마다 감싼다.
+            if let marks = currentTypingMarks() {
+                typingMarks = nil
+                if !text.contains("\n"), text.allSatisfy(\.isWhitespace) {
+                    // 공백은 서식 없이 넣고, 서식은 그다음 글자까지 살려 둔다(기호 바로 뒤는 공백일 수 없다).
+                    apply(finalized(.insert(text, replacing: range)))
+                    typingMarks = (textView.selectedRange().location, documentVersion, marks)
+                    return false
+                }
+                if let edit = EditorCommands.typing(document, text, caret: range.location, marks: marks) {
+                    apply(finalized(edit))
+                    return false
+                }
+            }
+            // 구간 끝에서 친 공백 뒤에 글자를 이어 친다: 공백과 함께 구간 안으로 들인다.
+            if let absorb, absorb.location == range.location, absorb.version == documentVersion,
+               !text.contains("\n"), !text.allSatisfy(\.isWhitespace),
+               let edit = EditorCommands.absorbingIntoRun(document, closeStart: absorb.closeStart, caret: range.location, text: text) {
+                apply(edit)
+                return false
+            }
+            // 줄 맨 앞의 기호 뒤 Space, 세 번째 백틱: 줄의 종류를 바꾼다.
+            if text == " ", let edit = EditorCommands.spaceTrigger(document, selection: range) {
+                apply(edit)
+                return false
+            }
+            if text == "`", let edit = EditorCommands.codeBlockTrigger(document, selection: range) {
+                let index = document.lineIndex(at: range.location)
+                let created = !document.lines[index].kind.isCode
+                apply(edit)
+                if created {
+                    swallowsCodeTriggerKey = true
+                    codeTag = (index, documentVersion, "")
+                }
+                return false
+            }
+            // 링크 글자 안의 `]`는 백슬래시로 막아 넣는다.
+            if text == "]", EditorCommands.isInsideLinkText(document, at: range.location) {
+                apply(.insert("\\]", replacing: range))
+                return false
+            }
+            // 닫는 기호를 쳐서 그 자리에서 서식이 된다. 되돌리면 친 기호가 글자로 남도록 두 단계로 넣는다.
+            if let conversion = EditorCommands.conversion(document, typing: text, at: range.location) {
+                // 바깥에는 서식이 된 마지막 원문만 한 번 알린다.
+                guard let formatted = conversion.formatted else {
+                    // 영문자나 숫자 바로 뒤에서 연 기호는 글자로 친 것으로 본다. 서식으로 바꾸지 않는다.
+                    apply(conversion.literal)
+                    return false
+                }
+                holdsChangeNotification = true
+                apply(conversion.literal)
+                splitUndoRecord()
+                holdsChangeNotification = false
+                apply(formatted, isIntermediate: true)
+                return false
+            }
+        }
+        // 감춘 기호가 짝을 잃지 않게 고쳐 쓴다(선택을 지우거나 덮어쓸 때, 구간 안에 여러 줄을 넣을 때).
+        let wasAtRunEnd = range.length == 0 && document.line(at: range.location).marker(startingAt: range.location)?.isOpen == false
+        guard var edit = finalized(EditorCommands.replacing(document, range, with: text) ?? .insert(text, replacing: range)) else {
+            return false
+        }
+        // 새로 생기는 ``` 줄은 글자로 막아 넣는다. 막을 수 없으면 넣지 않고 알린다.
+        if !EditorCommands.keepsFencesBalanced(document, edit) {
+            guard let repaired = EditorCommands.escapingNewFences(document, edit) else {
+                onRejectedEdit()
+                return false
+            }
+            edit = repaired
+        }
+        guard !EditorCommands.exposesHiddenMarkers(document, edit) else {
+            onRejectedEdit()
+            return false
+        }
+        let isSpace = range.length == 0 && !text.isEmpty && text.allSatisfy { $0 == " " || $0 == "\t" }
+        let plain = TextEdit.insert(replacementString, replacing: original)
+        guard edit.range == plain.range, edit.replacement == plain.replacement, edit.selection == plain.selection else {
+            apply(edit)
+            // 구간 끝에서 친 공백이 기호 밖으로 나갔다. 이어 치는 글자는 구간에 붙는다.
+            if isSpace, wasAtRunEnd { armAbsorb() }
+            return false
+        }
+        // 그대로 넣는다. 이어지는 상태를 넘겨 둔다.
+        if isSpace, let absorb, absorb.location == range.location, absorb.version == documentVersion {
+            absorbRun = (absorb.closeStart, range.location + text.utf16.count, documentVersion + 1)
+        }
+        if let tag, range.length == 0, EditorCommands.isLanguageTag(text), tag.openLine + 1 < document.lines.count {
+            // 블록을 만든 바로 뒤에 그 첫 줄에 이어 치는 낱말은 언어 이름일 수 있다(Return을 누를 때 정한다).
+            let first = document.lines[tag.openLine + 1]
+            let typed = document.string(in: NSRange(location: first.start + first.indentLength, length: first.end - first.start - first.indentLength))
+            if first.kind == .code, range.location == first.end, typed == tag.typed {
+                codeTag = (tag.openLine, documentVersion + 1, tag.typed + text)
+            }
+        }
+        isPlainTyping = true
+        return true
+    }
+
+    /// 커서 앞이 [닫는 기호들][공백]이면, 이어 치는 글자를 그 구간에 붙이도록 적어 둔다.
+    private func armAbsorb() {
+        let caret = textView.selectedRange()
+        guard caret.length == 0 else { return }
+        let line = document.line(at: caret.location)
+        var spaceStart = caret.location
+        while spaceStart > line.contentStart, InlineParser.isWhitespace(document.units[spaceStart - 1]) { spaceStart -= 1 }
+        let closeStart = line.visualStart(from: spaceStart)
+        guard spaceStart < caret.location, closeStart < spaceStart, line.marker(endingAt: spaceStart)?.isOpen == false else { return }
+        absorbRun = (closeStart, caret.location, documentVersion)
     }
 
     func textView(
@@ -199,12 +461,26 @@ extension EditorController: NSTextViewDelegate {
         toCharacterRange newRange: NSRange
     ) -> NSRange {
         guard !isApplyingEdit, !isSettingText, !textView.hasMarkedText() else { return newRange }
-        return CaretSnapping.snap(old: oldRange, new: clamped(newRange), in: document, folded: folded)
+        return CaretSnapping.snap(
+            old: clamped(oldRange),
+            new: clamped(newRange),
+            in: document,
+            folded: folded,
+            textChanged: selectionVersion != documentVersion || isReplayingUndo
+        )
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
         guard !isSettingText else { return }
-        if !isApplyingEdit { unfoldAroundSelection() }
+        if !isApplyingEdit {
+            unfoldAroundSelection()
+            swallowsCodeTriggerKey = false
+            // 커서를 옮기면 정해 둔 "다음에 칠 글자의 서식"은 사라진다(제자리로 돌아와도).
+            typingMarks = nil
+            if let absorb = absorbRun, absorb.location != textView.selectedRange().location { absorbRun = nil }
+            if !isApplyingOutsideChange { pendingLineBreak = nil }
+        }
+        selectionVersion = documentVersion
         refreshStyling()
     }
 

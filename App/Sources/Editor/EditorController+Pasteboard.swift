@@ -27,7 +27,15 @@ extension EditorController {
     func paste(from pasteboard: NSPasteboard) {
         guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string),
               !text.isEmpty else { return }
-        textView.insertText(LineEndings.normalized(text), replacementRange: textView.selectedRange())
+        guard !textView.hasMarkedText() else {
+            textView.insertText(LineEndings.normalized(text), replacementRange: textView.selectedRange())
+            return
+        }
+        let selection = clamped(textView.selectedRange())
+        let runEnd = absorbRun.flatMap { $0.location == selection.location && $0.version == documentVersion ? $0.closeStart : nil }
+        let prepared = EditorCommands.preparedForPaste(document, LineEndings.normalized(text), replacing: selection, runEnd: runEnd)
+        guard !prepared.isEmpty else { return }
+        textView.insertText(prepared, replacementRange: selection)
     }
 
     /// 다른 앱에 붙였을 때의 형광펜 바탕색. 받는 쪽 바탕을 알 수 없으므로 라이트 값을 쓴다.

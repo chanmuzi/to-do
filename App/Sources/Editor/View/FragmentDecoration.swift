@@ -3,8 +3,10 @@ import AppKit
 nonisolated extension NSAttributedString.Key {
     /// 문단 첫 글자에 붙는 `FragmentDecoration`. 글자 뒤와 왼쪽 칸에 그릴 것을 담는다.
     static let markdownDecoration = NSAttributedString.Key("FloatingNotes.Editor.decoration")
-    /// 형광펜과 인라인 코드의 둥근 바탕(`InlineBackground`).
-    static let markdownInlineBackground = NSAttributedString.Key("FloatingNotes.Editor.inlineBackground")
+    /// 형광펜의 둥근 바탕(`InlineBackground`).
+    static let markdownHighlight = NSAttributedString.Key("FloatingNotes.Editor.highlight")
+    /// 인라인 코드의 둥근 바탕(`InlineBackground`). 형광펜 안에 놓일 수 있어 따로 둔다.
+    static let markdownCodeBox = NSAttributedString.Key("FloatingNotes.Editor.codeBox")
     /// 링크 글자에 붙는 주소 문자열.
     static let markdownLink = NSAttributedString.Key("FloatingNotes.Editor.link")
 }
@@ -35,8 +37,6 @@ nonisolated final class FragmentDecoration: NSObject {
     var codeBoxCoversExtraLine = false
     /// 줄의 기본 글꼴. 줄 높이 안에서 글자를 세로 가운데에 놓을 때 기준으로 삼는다.
     var lineFont: NSFont?
-    /// 가운데에서 더 옮길 양(아래가 +). 코드 블록의 ``` 줄이 쓴다.
-    var centerOffset: CGFloat = 0
     /// 접힌 토글 안의 줄. 아무것도 그리지 않는다.
     var isCollapsed = false
 
@@ -57,10 +57,17 @@ nonisolated final class InlineBackground: NSObject {
     let padX: CGFloat
     /// 상자 높이. 줄 높이 안에서 세로 가운데에 놓는다.
     let height: CGFloat
+    /// 가운데에서 아래로 내리는 양.
+    let drop: CGFloat
+    /// 첫 조각의 왼쪽을 오른쪽으로 미는 양. 감춘 여는 기호 뒤에 준 자간은 글자 위치
+    /// (`locationForCharacter(at:)`)에 절반만 잡혀서, 그대로 두면 왼쪽 여백이 그만큼 넓어진다.
+    let leadShift: CGFloat
 
-    init(kind: Kind, padX: CGFloat, height: CGFloat) {
+    init(kind: Kind, padX: CGFloat, height: CGFloat, drop: CGFloat = 0, leadShift: CGFloat = 0) {
         self.kind = kind
         self.padX = padX
         self.height = height
+        self.drop = drop
+        self.leadShift = leadShift
     }
 }

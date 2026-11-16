@@ -133,51 +133,45 @@ import Testing
         #expect(backward.location == title.end)
     }
 
-    @Test func headingMarkerIsReachable() {
-        let heading = MarkdownDocument("\t# 제목")
-        let moved = CaretSnapping.snap(old: NSRange(location: 5, length: 0), new: NSRange(location: 1, length: 0), in: heading, folded: [])
-        #expect(moved.location == 1)
-        let hidden = CaretSnapping.snap(old: NSRange(location: 5, length: 0), new: NSRange(location: 0, length: 0), in: heading, folded: [])
-        #expect(hidden.location == 1)
+    @Test func headingMarkerIsNeverReachable() {
+        // 제목의 `#`도 목록 기호처럼 늘 감춘다. 커서는 글자 시작보다 앞에 놓이지 않는다.
+        let heading = MarkdownDocument("앞\n\t# 제목")
+        let line = heading.lines[1]
+        #expect(line.caretStart == line.contentStart)
+        func snap(from old: Int, to new: Int) -> Int {
+            CaretSnapping.snap(old: NSRange(location: old, length: 0), new: NSRange(location: new, length: 0), in: heading, folded: []).location
+        }
+        #expect(snap(from: line.end, to: line.start + 1) == line.contentStart)
+        #expect(snap(from: line.end, to: line.start) == line.contentStart)
+        #expect(snap(from: line.contentStart, to: line.contentStart - 1) == heading.lines[0].end)
     }
 }
 
 @Suite struct LinePresentationTests {
     let doc = MarkdownDocument(DemoNote.text)
 
-    @Test func onlyTheCaretLineIsActive() {
-        let keys = LinePresentation.keys(for: doc, active: 4...4, folded: [])
-        #expect(keys.indices.filter { keys[$0].isActive } == [4])
-        #expect(LinePresentation.keys(for: doc, active: nil, folded: []).allSatisfy { !$0.isActive })
-    }
-
-    @Test func foldedSubtreeIsCollapsedAndNeverActive() {
-        let keys = LinePresentation.keys(for: doc, active: 6...6, folded: [5])
+    @Test func foldedSubtreeIsCollapsed() {
+        let keys = LinePresentation.keys(for: doc, folded: [5])
         #expect(keys[5].isFolded)
         #expect(keys.indices.filter { keys[$0].isCollapsed } == [6, 7, 8, 9])
-        #expect(!keys[6].isActive)
         #expect(keys[5].childCount == 3)
     }
 
-    @Test func fenceLinesShowOnlyWhileTheCaretIsInTheBlock() {
+    @Test func codeBlockKnowsItsTopAndBottom() {
         let code = MarkdownDocument("앞\n```\ncode\n```\n뒤")
-        let outside = LinePresentation.keys(for: code, active: 0...0, folded: [])
-        #expect(outside[1...3].allSatisfy { !$0.isCodeActive })
-        let inside = LinePresentation.keys(for: code, active: 2...2, folded: [])
-        #expect(inside[1...3].allSatisfy { $0.isCodeActive })
-        #expect(inside[1].isCodeTop && inside[3].isCodeBottom && !inside[2].isCodeTop)
-        #expect(!inside[0].isCodeActive)
+        let keys = LinePresentation.keys(for: code, folded: [])
+        #expect(keys[1].isCodeTop && keys[3].isCodeBottom && !keys[2].isCodeTop && !keys[2].isCodeBottom)
+        #expect(!keys[0].isCodeTop && !keys[4].isCodeBottom)
     }
 
     @Test func changedLinesIsTheMiddleDifference() {
-        let before = LinePresentation.keys(for: doc, active: 1...1, folded: [])
-        let after = LinePresentation.keys(for: doc, active: 4...4, folded: [])
-        #expect(LinePresentation.changedLines(old: before, new: after) == 1..<5)
+        let before = LinePresentation.keys(for: doc, folded: [])
+        let after = LinePresentation.keys(for: doc, folded: [], hoveredLink: (line: 3, offset: 0))
+        #expect(LinePresentation.changedLines(old: before, new: after) == 3..<4)
         #expect(LinePresentation.changedLines(old: before, new: before) == nil)
         // 줄 수가 달라도 앞뒤의 같은 부분은 뺀다.
         let longer = MarkdownDocument("새 줄\n" + DemoNote.text)
-        let shifted = LinePresentation.keys(for: longer, active: nil, folded: [])
-        let plain = LinePresentation.keys(for: doc, active: nil, folded: [])
-        #expect(LinePresentation.changedLines(old: plain, new: shifted) == 0..<2)
+        let shifted = LinePresentation.keys(for: longer, folded: [])
+        #expect(LinePresentation.changedLines(old: before, new: shifted) == 0..<2)
     }
 }

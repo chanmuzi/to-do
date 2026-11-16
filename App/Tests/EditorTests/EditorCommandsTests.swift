@@ -2,29 +2,6 @@ import Foundation
 import Testing
 @testable import Editor
 
-/// 명령을 원문에 적용한 결과를 `|`(커서) 표기로 견준다. `|`가 둘이면 그 사이가 선택이다.
-private struct Scenario {
-    var text: String
-    var selection: NSRange
-
-    init(_ marked: String) {
-        let parts = marked.components(separatedBy: "|")
-        text = parts.joined()
-        let start = parts[0].utf16.count
-        selection = NSRange(location: start, length: parts.count > 2 ? parts[1].utf16.count : 0)
-    }
-
-    var doc: MarkdownDocument { MarkdownDocument(text) }
-
-    func applying(_ edit: TextEdit?) -> String? {
-        guard let edit else { return nil }
-        let result = edit.applied(to: text) as NSString
-        let end = result.replacingCharacters(in: NSRange(location: NSMaxRange(edit.selection), length: 0), with: "|") as NSString
-        guard edit.selection.length > 0 else { return end as String }
-        return end.replacingCharacters(in: NSRange(location: edit.selection.location, length: 0), with: "|")
-    }
-}
-
 @Suite struct IndentationTests {
     private func indent(_ marked: String) -> String? {
         let s = Scenario(marked)
@@ -108,11 +85,30 @@ private struct Scenario {
         #expect(newline("> 토글|\n\t- 안\n밖", folded: [0]) == "> 토글\n\t- 안\n> |\n밖")
     }
 
-    @Test func fenceTriggerClosesTheBlock() {
-        #expect(newline("```|") == "```\n|\n```")
-        #expect(newline("```swift|") == "```swift\n|\n```")
-        // 이미 닫힌 블록에서는 줄만 나눈다.
-        #expect(newline("```|\ncode\n```") == "```\n|\ncode\n```")
+    @Test func returnInsideAFormattedRunSplitsTheRun() {
+        // 구간은 줄을 넘지 못한다. 줄바꿈 앞에서 닫고 다음 줄에서 다시 연다.
+        #expect(newline("**굵|게**") == "**굵**\n**|게**")
+        #expect(newline("- ==형|광=={3}") == "- ==형=={3}\n- ==|광=={3}")
+        #expect(newline("[글|자](https://a.example)") == "[글](https://a.example)\n[|자](https://a.example)")
+        #expect(newline("**~~가|나~~**") == "**~~가~~**\n**~~|나~~**")
+        // 구간의 끝이나 앞에서는 나눌 것이 없다. 빈 구간을 남기지 않는다.
+        #expect(newline("**굵게|**") == "**굵게**\n|")
+        #expect(newline("**|굵게**") == "\n**|굵게**")
+        // 커서 뒤의 공백은 줄바꿈과 함께 지운다(새 줄의 맨 앞에서 감춘 들여쓰기가 되지 않게).
+        #expect(newline("가 **굵게**| 나") == "가 **굵게**\n|나")
+    }
+
+    @Test func returnOnTheEmptyLastLineLeavesTheCodeBlock() {
+        // 빈 마지막 줄을 지우고 블록 아래에 새 문단을 연다.
+        #expect(newline("```\ncode\n|\n```") == "```\ncode\n```\n|")
+        #expect(newline("```swift\ncode\n|\n```\n뒤") == "```swift\ncode\n```\n|\n뒤")
+        #expect(newline("\t```\n\tcode\n\t|\n\t```") == "\t```\n\tcode\n\t```\n\t|")
+        // 닫히지 않은 블록(문서 끝까지 이어진다)은 닫는 줄을 넣는다.
+        #expect(newline("```\ncode\n|") == "```\ncode\n```\n|")
+        // 줄이 하나뿐인 블록, 빈 줄이 마지막이 아닌 경우, 글이 있는 줄에서는 줄만 나눈다.
+        #expect(newline("```\n|\n```") == "```\n\n|\n```")
+        #expect(newline("```\n|\ncode\n```") == "```\n\n|\ncode\n```")
+        #expect(newline("```\ncode|\n```") == "```\ncode\n|\n```")
     }
 
     @Test func codeKeepsItsIndentation() {
@@ -126,9 +122,14 @@ private struct Scenario {
         return s.applying(EditorCommands.spaceTrigger(s.doc, selection: s.selection))
     }
 
+    private func backtick(_ marked: String) -> String? {
+        let s = Scenario(marked)
+        return s.applying(EditorCommands.codeBlockTrigger(s.doc, selection: s.selection))
+    }
+
     private func backspace(_ marked: String) -> String? {
         let s = Scenario(marked)
-        return s.applying(EditorCommands.deleteBackward(s.doc, selection: s.selection))
+        return s.applying(EditorCommands.deleteBackward(s.doc, selection: s.selection).edit)
     }
 
     @Test func bracketsThenSpaceBecomeATodo() {
@@ -139,12 +140,14 @@ private struct Scenario {
         #expect(MarkdownDocument("[ ] ").lines[0].kind == .todo(done: false))
     }
 
-    @Test func otherTriggersNeedNoRewrite() {
-        // `#`, `-`, `>` 뒤의 Space는 그대로 넣으면 그 문법이 된다.
-        #expect(space("#|") == nil)
-        #expect(space("-|") == nil)
-        #expect(space(">|") == nil)
-        #expect(space("글 []|") == nil)
+    @Test func everyTriggerOnAnEmptyLine() {
+        #expect(space("#|") == "# |")
+        #expect(space("##|") == "## |")
+        #expect(space("###|") == "### |")
+        #expect(space("-|") == "- |")
+        #expect(space("*|") == "- |")
+        #expect(space(">|") == "> |")
+        #expect(space("[]|") == "[ ] |")
         #expect(MarkdownDocument("# ").lines[0].kind == .heading(1))
         #expect(MarkdownDocument("## ").lines[0].kind == .heading(2))
         #expect(MarkdownDocument("### ").lines[0].kind == .heading(3))
@@ -152,17 +155,91 @@ private struct Scenario {
         #expect(MarkdownDocument("> ").lines[0].kind == .toggle)
     }
 
+    @Test func triggersOnALineThatAlreadyHasText() {
+        #expect(space("#|글") == "# |글")
+        #expect(space("##|글 더") == "## |글 더")
+        #expect(space("-|글") == "- |글")
+        #expect(space(">|글") == "> |글")
+        #expect(space("[]|글") == "[ ] |글")
+    }
+
+    @Test func triggersConvertBetweenBlockTypes() {
+        // 줄 머리 기호는 보이지 않으므로 기호는 글자가 보이기 시작하는 자리에 친다.
+        #expect(space("# -|제목") == "- |제목")
+        #expect(space("- ##|항목") == "## |항목")
+        #expect(space("### #|제목") == "# |제목")
+        #expect(space("[x] >|끝낸 일") == "> |끝낸 일")
+        #expect(space("> []|토글") == "[ ] |토글")
+        #expect(space("- [ ] -|표준 투두") == "- |표준 투두")
+        #expect(space("> ###|토글") == "### |토글")
+        // 들여쓰기는 그대로다.
+        #expect(space("\t- #|항목") == "\t# |항목")
+        #expect(space("\t\t[ ] -|할 일") == "\t\t- |할 일")
+    }
+
+    @Test func triggerAfterAHiddenInlineMarkerStillCounts() {
+        // 줄이 서식 구간으로 시작하면 커서는 여는 기호 뒤에 있다. 친 기호는 구간 안에 들어가 있다.
+        #expect(space("**-|굵게** 뒤") == "- **|굵게** 뒤")
+        #expect(space("# ==##|형광==") == "## ==|형광==")
+    }
+
+    @Test func noTriggerAwayFromTheVisualStartOrForTheSameType() {
+        #expect(space("글 []|") == nil)
+        #expect(space("글 #|") == nil)
+        #expect(space("####|") == nil)
+        #expect(space("--|") == nil)
+        // 이미 그 종류인 줄에서는 공백을 그대로 넣는다.
+        #expect(space("- -|항목") == nil)
+        #expect(space("# #|제목") == nil)
+        #expect(space("[ ] []|할 일") == nil)
+        #expect(space("```\n#|\n```") == nil)
+    }
+
+    @Test func thirdBacktickMakesACodeBlock() {
+        #expect(backtick("``|") == "```\n|\n```")
+        #expect(backtick("``|let x = 1") == "```\n|let x = 1\n```")
+        #expect(backtick("앞\n``|\n뒤") == "앞\n```\n|\n```\n뒤")
+        // 다른 종류의 줄에서는 줄 머리를 떼고, 들여쓰기는 그대로 둔다.
+        #expect(backtick("- ``|항목") == "```\n|항목\n```")
+        #expect(backtick("\t# ``|제목") == "\t```\n\t|제목\n\t```")
+        // 줄 맨 앞이 아니면 바꾸지 않는다.
+        #expect(backtick("글 ``|") == nil)
+        #expect(backtick("`|") == nil)
+    }
+
+    /// 코드 블록 안에서 빈 줄에 친 백틱 셋은 블록에서 나가게 한다(새 ``` 줄이 생기지 않는다).
+    @Test func thirdBacktickInsideACodeBlockLeavesTheBlock() {
+        // 마지막 줄: Return과 같다.
+        #expect(backtick("```\ncode\n``|\n```\nafter **b**") == "```\ncode\n```\n|\nafter **b**")
+        // 첫 줄: 블록 위에 문단을 연다. 가운데 줄: 블록을 둘로 나눈다.
+        #expect(backtick("```\n``|\ncode\n```") == "|\n```\ncode\n```")
+        #expect(backtick("```\na\n``|\nb\n```") == "```\na\n```\n|\n```\nb\n```")
+        // 줄이 하나뿐인 블록은 블록을 없앤다.
+        #expect(backtick("```\n``|\n```") == "|")
+        // 닫히지 않은 블록은 닫는다.
+        #expect(backtick("```\ncode\n``|") == "```\ncode\n```\n|")
+        // 글이 있는 줄, 줄 가운데에서는 백틱이 글자로 들어간다.
+        #expect(backtick("```\nx``|\n```") == nil)
+        #expect(backtick("```\n``|x\n```") == nil)
+    }
+
     @Test func backspaceAtContentStartRemovesTheMarker() {
         #expect(backspace("[ ] |할 일") == "|할 일")
         #expect(backspace("\t- |항목") == "\t|항목")
         #expect(backspace("> |토글") == "|토글")
         #expect(backspace("\t|들여 쓴 본문") == "|들여 쓴 본문")
+        // 제목도 본문으로 돌아간다(`#`이 보이지 않으므로 글자로 지울 수 없다).
+        #expect(backspace("# |제목") == "|제목")
+        #expect(backspace("\t### |제목") == "\t|제목")
+        // 줄이 서식 구간으로 시작해 커서가 감춘 여는 기호 뒤에 있어도 같다.
+        #expect(backspace("- **|굵게**") == "**|굵게**")
     }
 
     @Test func backspaceElsewhereIsTheDefault() {
-        #expect(backspace("[ ] 할| 일") == nil)
-        #expect(backspace("|본문") == nil)
-        #expect(backspace("# |제목") == nil)
+        #expect(EditorCommands.deleteBackward(MarkdownDocument("[ ] 할 일"), selection: NSRange(location: 5, length: 0)) == .passThrough)
+        #expect(EditorCommands.deleteBackward(MarkdownDocument("본문"), selection: NSRange(location: 0, length: 0)) == .passThrough)
+        #expect(EditorCommands.deleteBackward(MarkdownDocument("앞\n본문"), selection: NSRange(location: 2, length: 0)) == .passThrough)
+        #expect(EditorCommands.deleteBackward(MarkdownDocument("본문"), selection: NSRange(location: 0, length: 1)) == .passThrough)
     }
 }
 
@@ -177,21 +254,49 @@ private struct Scenario {
         return s.applying(EditorCommands.cycleHighlight(s.doc, selection: s.selection))
     }
 
-    private func link(_ marked: String) -> String? {
-        let s = Scenario(marked)
-        return s.applying(EditorCommands.link(s.doc, selection: s.selection))
-    }
-
     @Test func wrapsAndUnwrapsTheSelection() {
         #expect(wrap("가 |굵게| 나", .bold) == "가 **|굵게|** 나")
         #expect(wrap("가 **|굵게|** 나", .bold) == "가 |굵게| 나")
         #expect(wrap("|취소|", .strike) == "~~|취소|~~")
         #expect(wrap("|코드|", .code) == "`|코드|`")
-        #expect(wrap("`코|드`", .code) == "코|드")
+        #expect(wrap("`|코드|`", .code) == "|코드|")
+        // 기호까지 고른 선택도 보이는 글자로 맞춰 본다.
+        #expect(wrap("가 |**굵게**| 나", .bold) == "가 |굵게| 나")
     }
 
-    @Test func emptySelectionInsertsAPair() {
-        #expect(wrap("가|", .bold) == "가**|**")
+    @Test func aCaretIsNotAnEditOfTheSource() {
+        // 선택이 없으면 원문을 고치지 않는다(다음에 칠 글자의 서식만 정한다. `TypingMarksTests`).
+        #expect(wrap("가|", .bold) == nil)
+        #expect(highlight("==형|광==") == nil)
+    }
+
+    @Test func unwrappingPartOfARunKeepsTheRestFormatted() {
+        #expect(wrap("**가|나|다**", .bold) == "**가**|나|**다**")
+        #expect(wrap("**|가|나다**", .bold) == "|가|**나다**")
+        #expect(wrap("**가나|다|**", .bold) == "**가나**|다|")
+        #expect(wrap("`가|나|다`", .code) == "`가`|나|`다`")
+        // 안쪽의 다른 구간과 엇갈리면 그 구간까지 넣는다.
+        // 남는 조각의 끝 공백은 기호 밖에 둔다(닫는 기호 바로 앞은 공백일 수 없다).
+        #expect(wrap("**가 ~~나|다~~ 라|**", .bold) == "**가** |~~나다~~ 라|")
+    }
+
+    @Test func wrappingMergesRunsOfTheSameKind() {
+        #expect(wrap("가|나**다|라**", .bold) == "가**|나다라|**")
+        #expect(wrap("|**가** 나 **다**|", .bold) == "**|가 나 다|**")
+        // 다른 서식에 걸친 선택은 그 구간을 통째로 감싼다(기호가 엇갈리지 않게).
+        #expect(wrap("가|나~~다|라~~", .bold) == "가**|나~~다라~~|**")
+        // 다른 서식 구간 안에서는 그 안에 겹쳐 넣는다.
+        #expect(wrap("~~|가나|~~", .bold) == "~~**|가나|**~~")
+        #expect(wrap("~~가|나|다~~", .bold) == "~~가**|나|**다~~")
+    }
+
+    @Test func codeSpansTakeNoOtherFormatInside() {
+        #expect(wrap("`가|나|다`", .bold) == nil)
+        // 코드의 글자를 모두 골랐으면 코드 구간 바깥에서 감싼다.
+        #expect(wrap("앞 `|코드|` 뒤", .bold) == "앞 **|`코드`|** 뒤")
+        // 코드로 감싸면 안의 기호가 글자로 드러나므로 벗긴다. 링크는 감싸지 않는다.
+        #expect(wrap("|가 **나** 다|", .code) == "`|가 나 다|`")
+        #expect(wrap("|가 [나](https://a.example)|", .code) == nil)
     }
 
     @Test func doesNotWrapAcrossLinesOrInCode() {
@@ -215,16 +320,10 @@ private struct Scenario {
         ])
     }
 
-    @Test func highlightCyclesWithTheCaretInside() {
-        #expect(highlight("==형|광==") == "==형|광=={2}")
-        #expect(highlight("==형광=={4}|") == "형광|")
-    }
-
-    @Test func linkPutsTheSelectionWhereItBelongs() {
-        #expect(link("|문서|") == "[문서](|)")
-        #expect(link("|https://a.example|") == "[|](https://a.example)")
-        #expect(link("가|") == "가[|]()")
-        #expect(link("[문|서](https://a.example)") == "문|서")
+    @Test func highlightChangesOnlyTheSelectedPart() {
+        #expect(highlight("==가|나|다==") == "==가====|나|=={2}==다==")
+        #expect(highlight("==가|나|다=={4}") == "==가=={4}|나|==다=={4}")
+        #expect(highlight("가|나==다|라=={3}") == "가==|나다라|==")
     }
 }
 

@@ -10,6 +10,8 @@ nonisolated struct InlineSpan: Hashable, Sendable {
         case code
         /// 링크. 주소만 적은 링크는 기호 구간이 비어 있다.
         case link(String)
+        /// 백슬래시로 막은 글자 하나(`\*`). 여는 기호가 백슬래시이고 닫는 기호는 없다. 서식이 아니다.
+        case escape
     }
 
     var kind: Kind

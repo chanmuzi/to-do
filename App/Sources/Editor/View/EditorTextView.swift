@@ -12,6 +12,27 @@ final class EditorTextView: NSTextView {
     // 텍스트 뷰가 그리는 것이 아니라 따로 놓이는 표시 뷰여서, 옛 그리기 경로(`drawInsertionPoint`)를
     // 덮어써 너비를 줄이면 두 번째 커서가 그려지고 지워지지 않는 자국이 남는다(D-025).
 
+    // MARK: 되돌리기
+
+    /// 되돌리기 기록은 편집기가 직접 든다. 편집 메뉴와 ⌘Z가 창의 기록이 아니라 이것을 쓰게 한다.
+    override var undoManager: UndoManager? { editor?.editorUndoManager ?? super.undoManager }
+
+    @objc func undo(_ sender: Any?) {
+        editor?.editorUndoManager.undo()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        editor?.editorUndoManager.redo()
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(undo(_:)): editor?.editorUndoManager.canUndo ?? false
+        case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
+        default: super.validateUserInterfaceItem(item)
+        }
+    }
+
     // MARK: 포커스
 
     override func becomeFirstResponder() -> Bool {
@@ -21,9 +42,28 @@ final class EditorTextView: NSTextView {
     }
 
     override func resignFirstResponder() -> Bool {
-        let accepted = super.resignFirstResponder()
+        // 조합 중에 포커스를 잃으면 텍스트 뷰가 조합을 끝낸다. `unmarkText`와 같게 다룬다.
+        let wasComposing = hasMarkedText()
+        let accepted = endingComposition { super.resignFirstResponder() }
+        if accepted, hasMarkedText() {
+            // 입력기가 끝내 주지 않았으면 조합 중인 글자를 그대로 확정한다(포커스가 없는 뷰에 조합이 남지 않게).
+            inputContext?.discardMarkedText()
+            unmarkText()
+        } else if wasComposing {
+            editor?.flushPendingChange()
+            editor?.compositionDidChange()
+        }
         if accepted { editor?.focusDidChange() }
         return accepted
+    }
+
+    /// 텍스트 뷰가 조합을 끝내는 동안에는 조합 중인 글자가 잠깐 비어 보인다(지웠다가 다시 넣는다). 그 사이에
+    /// 편집기가 "조합이 글자 없이 끝났다"로 보고 기호를 치우거나 중간 원문을 알리지 않게 한다.
+    private func endingComposition<T>(_ body: () -> T) -> T {
+        let wasEnding = editor?.isEndingComposition ?? false
+        editor?.isEndingComposition = true
+        defer { editor?.isEndingComposition = wasEnding }
+        return body()
     }
 
     override func viewDidMoveToWindow() {
@@ -66,13 +106,28 @@ final class EditorTextView: NSTextView {
     // 조합 중인 글자는 원문에 들어가지만 `textDidChange`가 오지 않는다. 그 글자까지 저장되고
     // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        var replacement = replacementRange
+        // 조합을 시작하기 전에 자리를 만든다(고른 글자를 기호와 함께 지우고, 정해 둔 서식의 기호를 넣는다).
+        // 조합이 시작된 뒤에는 원문을 따로 고치지 않는다.
+        if !hasMarkedText(), let editor,
+           replacementRange.location == NSNotFound || replacementRange == self.selectedRange() {
+            editor.prepareForComposition()
+            replacement = NSRange(location: NSNotFound, length: 0)
+        }
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacement)
         editor?.flushPendingChange()
+        editor?.compositionDidChange()
     }
 
     override func unmarkText() {
-        super.unmarkText()
+        endingComposition { super.unmarkText() }
         editor?.flushPendingChange()
+        editor?.compositionDidChange()
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        super.insertText(string, replacementRange: replacementRange)
+        editor?.compositionDidChange()
     }
 
     // MARK: 마우스
