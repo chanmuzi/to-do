@@ -20,6 +20,32 @@ import Testing
         #expect(BrowseSelection.initial(in: [.header("x"), .separator]) == nil)
     }
 
+    /// 목록을 다시 만든 뒤에도 고른 줄은 같은 노트다. 줄의 내용(제목, 본문 첫머리, 리마인더)이 바뀌어도 그렇다.
+    @Test func selectionIsKeptByNoteIDNotByRowContent() {
+        let changed = Sample.notes.map { indexed in
+            indexed.note.id.rawValue == "release"
+                ? Sample.note("release", title: "새 제목", body: "새 본문\n", space: Sample.work, reminder: nil)
+                : indexed
+        }
+        let rebuilt = BrowseContent(
+            notes: changed, floating: Sample.floating, query: BrowseQuery(""), excluding: nil
+        ).entries
+        let selected = entries[5]
+        #expect(selected.label == "release")
+        // 줄 전체로 견주면 같은 줄이 없다.
+        #expect(!rebuilt.contains(selected))
+        #expect(BrowseSelection.index(keeping: selected, in: rebuilt) == 5)
+        // 노트가 아닌 줄은 같은 줄로, 없어진 줄과 고른 것이 없을 때는 맨 윗줄로.
+        #expect(BrowseSelection.index(keeping: .library, in: rebuilt) == 10)
+        #expect(BrowseSelection.index(keeping: .create(query: "x"), in: rebuilt) == 1)
+        #expect(BrowseSelection.index(keeping: nil, in: rebuilt) == 1)
+        let withoutIt = BrowseContent(
+            notes: Sample.notes.filter { $0.note.id.rawValue != "release" }, floating: Sample.floating,
+            query: BrowseQuery(""), excluding: nil
+        ).entries
+        #expect(BrowseSelection.index(keeping: selected, in: withoutIt) == 1)
+    }
+
     @Test func arrowsSkipHeadersAndTheSeparatorAndStopAtTheEnds() {
         // 0 이름, 1~3 떠 있는 노트, 4 이름, 5~8 최근, 9 구분선, 10 라이브러리.
         #expect(entries.count == 11)

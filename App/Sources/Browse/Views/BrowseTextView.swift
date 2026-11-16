@@ -12,27 +12,27 @@ enum BrowseCommand: Hashable {
 
 /// 검색 칸의 한 줄 입력. 글자 입력은 시스템 텍스트 뷰에 맡기고 명령 키만 가로챈다.
 ///
-/// 한글 조합: 조합 중인 글자가 있을 때 ↵는 조합을 끝내기만 하고 열지 않는다. 조합 중에도 글이 바뀔 때마다
-/// `onTextChange`를 부르지만 이 칸의 글은 건드리지 않으므로 조합이 끊기지 않는다.
+/// 조합 중의 ↵: 한글 두벌식은 마지막 글자가 늘 조합 중이다. ↵를 누르면 입력기가 그 글자를 `insertText`로 확정하고
+/// 같은 키 입력에서 `insertNewline:`을 보내므로, 명령이 올 때는 조합이 끝나 있고 ↵ 한 번에 고른 줄이 열린다.
+/// 키를 누른 순간의 조합 여부는 보지 않는다(보면 한글에서 ↵를 두 번 눌러야 한다).
+/// 명령이 왔는데도 조합 중인 글자가 남아 있을 때만 조합을 끝내고 열지 않는다(일본어, 중국어 입력기는 후보를 고르는 ↵를
+/// 스스로 받아 명령을 보내지 않는다. 남아 있다면 아직 고르는 중이다).
+///
+/// 조합 중에도 글이 바뀔 때마다 `onTextChange`를 부르지만 이 칸의 글은 건드리지 않으므로 조합이 끊기지 않는다.
 final class BrowseTextView: NSTextView {
     var onCommand: ((BrowseCommand) -> Void)?
     var onTextChange: (() -> Void)?
     var caretWidth: CGFloat = 1
 
-    /// 이번 키 입력이 시작될 때 조합 중이었는지. 입력기가 조합을 끝낸 뒤 같은 키로 ↵ 명령을 보내는 경우를 가린다.
-    private var wasComposingAtKeyDown = false
-
-    override func keyDown(with event: NSEvent) {
-        wasComposingAtKeyDown = hasMarkedText()
-        defer { wasComposingAtKeyDown = false }
-        super.keyDown(with: event)
-    }
+    /// 확인용: 입력기 흉내. 넣으면 시스템 입력기 대신 이것이 키 입력을 푼다(테스트가 쓰는 사람의 입력기에 기대지 않게).
+    var inputContextOverride: NSTextInputContext?
+    override var inputContext: NSTextInputContext? { inputContextOverride ?? super.inputContext }
 
     override func doCommand(by selector: Selector) {
         switch selector {
         case #selector(insertNewline(_:)):
-            if hasMarkedText() || wasComposingAtKeyDown {
-                if hasMarkedText() { unmarkText() }
+            if hasMarkedText() {
+                unmarkText()
                 return
             }
             onCommand?(.open)

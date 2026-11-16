@@ -23,6 +23,8 @@ public final class BrowseCoordinator {
     private var rootView: BrowseRootView?
     private var observers: [NSObjectProtocol] = []
     private var storeObservation: StoreObservation?
+    /// 다음 차례에 목록을 다시 읽기로 해 두었다. 그사이의 변경은 한 번에 읽는다.
+    private var isReloadScheduled = false
     /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 친다.
     private var isClosing = false
 
@@ -45,6 +47,10 @@ public final class BrowseCoordinator {
     @_spi(Verification) public var isShownOpaque = true
     /// 확인용: 띄울 화면을 정한다. 없으면 마우스가 있는 화면.
     @_spi(Verification) public var preferredScreen: NSScreen?
+    /// 확인용: 알림을 걸 곳. 처음 띄우기 전에만 바꾼다.
+    @_spi(Verification) public var notificationCenter: NotificationCenter = .default
+    /// 확인용: 노트 목록을 저장소에서 읽은 횟수.
+    @_spi(Verification) public private(set) var listReadCount = 0
 
     /// - Parameter windowStates: 떠 있는 노트를 알아내는 창 상태. 주지 않으면 "떠 있는 노트" 구획과 핀이 보이지 않는다.
     public init(
@@ -62,6 +68,10 @@ public final class BrowseCoordinator {
         self.windowStates = windowStates
         self.log = log
         style = BrowseStyle(theme: theme)
+    }
+
+    isolated deinit {
+        observers.forEach(notificationCenter.removeObserver)
     }
 
     public var isVisible: Bool { panel?.isVisible == true && !isClosing }
@@ -152,7 +162,7 @@ public final class BrowseCoordinator {
         rootView.listView.onHover = { [weak self] in self?.rootView?.listView.select($0, animated: true) }
         rootView.listView.onActivate = { [weak self] in self?.activate($0) }
 
-        let center = NotificationCenter.default
+        let center = notificationCenter
         observers = [
             // 바깥을 누르면 키 창에서 물러난다. 그때 닫는다(포커스는 누른 곳에 둔다).
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
@@ -215,20 +225,34 @@ public final class BrowseCoordinator {
 
     // MARK: - 내용
 
+    /// 노트 목록과 떠 있는 노트를 다시 읽는다.
+    ///
+    /// 목록을 읽지 못하면 까닭을 `log`로 알리고, 앞서 읽은 목록이 있으면 그대로 둔다(열려 있던 목록이 비지 않게).
+    /// 처음부터 읽지 못했으면 노트 줄 없이 "새 노트 만들기"(글자를 치면)와 "라이브러리 열기"만 보인다.
     private func reloadNotes() {
+        listReadCount += 1
         do {
             let listing = try notes.list()
             listing.failures.forEach { log("노트 찾기: 읽지 못한 노트 \($0.id): \($0.error)") }
             indexedNotes = listing.notes.map(BrowseIndexedNote.init)
         } catch {
             log("노트 찾기: 노트 목록을 읽지 못했습니다: \(error)")
-            indexedNotes = []
         }
+        // 창 상태와 스페이스 저장소는 바뀐 것을 알려 주지 않는다. 목록을 다시 읽을 때마다 함께 다시 본다.
         floating = windowStates.map { BrowseFloating.ids(from: $0.all) } ?? []
     }
 
-    /// 열려 있는 동안 노트가 바뀌면 목록을 다시 만든다. 고른 줄은 같은 것으로 둔다.
+    /// 열려 있는 동안 노트가 바뀌면 목록을 다시 만든다. 변경이 잇달아 와도(여러 노트를 한꺼번에 저장, 폴더 다시 훑기)
+    /// 노트 파일은 다음 차례에 한 번만 다시 읽는다.
     private func notesDidChange() {
+        guard isVisible, !isReloadScheduled else { return }
+        isReloadScheduled = true
+        DispatchQueue.main.async { [weak self] in self?.reloadAfterChanges() }
+    }
+
+    /// 고른 줄은 같은 것으로 둔다(노트 줄은 같은 노트).
+    private func reloadAfterChanges() {
+        isReloadScheduled = false
         guard isVisible, let listView = rootView?.listView else { return }
         let selected = listView.selectedIndex.map { listView.entries[$0] }
         reloadNotes()
@@ -241,8 +265,7 @@ public final class BrowseCoordinator {
         let query = BrowseQuery(textView.string, isComposing: textView.hasMarkedText())
         let content = BrowseContent(notes: indexedNotes, floating: floating, query: query, excluding: current)
         let views = content.entries.map(makeView(for:))
-        let selection = selected.flatMap { content.entries.firstIndex(of: $0) }
-            ?? BrowseSelection.initial(in: content.entries)
+        let selection = BrowseSelection.index(keeping: selected, in: content.entries)
         rootView.searchField.updatePlaceholder(animated: animated)
         rootView.listView.setEntries(content.entries, views: views, selected: selection)
 

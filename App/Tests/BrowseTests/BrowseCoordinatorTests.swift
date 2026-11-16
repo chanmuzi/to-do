@@ -140,7 +140,47 @@ import Testing
         #expect(rows.count == 5)
     }
 
-    @Test func returnDuringCompositionCommitsInsteadOfOpening() throws {
+    private func useInputMethod(_ behavior: FakeInputContext.Behavior) throws {
+        let view = try #require(browse.inputView as? BrowseTextView)
+        view.inputContextOverride = FakeInputContext(textView: view, behavior: behavior)
+    }
+
+    /// 한글 두벌식: 마지막 글자가 조합 중일 때 ↵를 한 번 누르면, 입력기가 그 글자를 확정하고 같은 키 입력에서
+    /// 줄바꿈 명령을 보낸다. 그 한 번으로 고른 줄이 열린다(↵를 두 번 누르게 하지 않는다).
+    @Test func oneReturnOpensTheSelectedRowWithAKoreanInputMethod() throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try useInputMethod(.commitsThenSendsNewline)
+        try input().type("배")
+        try input().compose("포")
+        #expect(try input().hasMarkedText())
+        #expect(rows.first?.hasPrefix("*note today") == true)
+
+        try input().pressReturnKey()
+
+        #expect(fixture.routes == [.openNote(try id("today"))])
+        #expect(!browse.isVisible)
+    }
+
+    /// 일본어, 중국어 입력기: 조합 중의 ↵는 입력기가 후보를 확정하는 데 쓰고 명령을 보내지 않는다. 열지 않는다.
+    @Test func returnConsumedByTheInputMethodDoesNotOpen() throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try useInputMethod(.consumesReturnWhileComposing)
+        try input().compose("API")
+        try input().pressReturnKey()
+        #expect(browse.isVisible)
+        #expect(fixture.routes.isEmpty)
+        #expect(try !input().hasMarkedText())
+        #expect(try input().string == "API")
+
+        try input().pressReturnKey()
+        #expect(fixture.routes == [.openNote(try id("api"))])
+        #expect(!browse.isVisible)
+    }
+
+    /// 줄바꿈 명령이 왔는데 조합 중인 글자가 남아 있으면 조합을 끝내기만 한다.
+    @Test func newlineCommandWhileStillComposingOnlyEndsTheComposition() throws {
         defer { fixture.cleanUp() }
         browse.show(anchoredTo: nil, excluding: nil)
         try input().compose("배포")
@@ -149,10 +189,6 @@ import Testing
         #expect(fixture.routes.isEmpty)
         #expect(try !input().hasMarkedText())
         #expect(try input().string == "배포")
-
-        try press(returnKey)
-        #expect(fixture.routes == [.openNote(try id("today"))])
-        #expect(!browse.isVisible)
     }
 
     /// 높이가 움직이는 중에 내용이 다시 바뀌어도 마지막 내용의 높이로 끝난다(조합을 끝낸 직후에 지우고 다시 칠 때).
@@ -276,17 +312,145 @@ import Testing
         #expect(frame.width == 300)
     }
 
+    /// 저장소 변경은 다음 차례에 한꺼번에 읽힌다. 그때까지 기다린다.
+    private func waitForReload(after count: Int) async throws {
+        let deadline = Date().addingTimeInterval(3)
+        while browse.listReadCount == count, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(browse.listReadCount == count + 1)
+    }
+
     /// 열려 있는 동안 노트가 바뀌면 목록이 따라온다.
-    @Test func listFollowsStoreChangesWhileOpen() throws {
+    @Test func listFollowsStoreChangesWhileOpen() async throws {
         defer { fixture.cleanUp() }
         browse.show(anchoredTo: nil, excluding: nil)
         try press(downKey)
+        var reads = browse.listReadCount
         try fixture.notes.update(try id("api")) { $0.title = "API 메모" }
+        try await waitForReload(after: reads)
         #expect(rows.contains { $0.contains("| API 메모 |") })
         // 고른 줄은 그대로다.
         #expect(selectedRow?.hasPrefix("*note home") == true)
+        reads = browse.listReadCount
         try fixture.notes.moveToTrash(try id("home"))
+        try await waitForReload(after: reads)
         #expect(rows.contains { $0.contains("note home") } == false)
+    }
+
+    /// 고른 노트의 제목, 본문, 리마인더가 바뀌어도 고른 줄은 그 노트를 따라간다(줄 전체가 아니라 노트 id로 견준다).
+    @Test func selectionFollowsTheNoteWhenItsContentChanges() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try press(downKey)
+        try press(downKey)
+        #expect(selectedRow?.hasPrefix("*note release") == true)
+        let reads = browse.listReadCount
+        try fixture.notes.update(try id("release")) {
+            $0.title = "릴리즈 노트 2.3"
+            $0.body = "고친 본문\n"
+            $0.reminder = TestClock.date(11, 18, 9, 0)
+        }
+        try await waitForReload(after: reads)
+        #expect(selectedRow?.hasPrefix("*note release | 릴리즈 노트 2.3 | 고친 본문 |") == true)
+        // 그 줄에서 ↵를 누르면 그 노트가 열린다.
+        try press(returnKey)
+        #expect(fixture.routes == [.openNote(try id("release"))])
+    }
+
+    /// 변경이 잇달아 와도 노트 파일은 한 번만 다시 읽는다.
+    @Test func burstOfStoreChangesReloadsOnce() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let reads = browse.listReadCount
+        #expect(reads == 1)
+        try fixture.notes.update(try id("api")) { $0.title = "하나" }
+        try fixture.notes.update(try id("release")) { $0.title = "둘" }
+        try fixture.notes.update(try id("untitled")) { $0.title = "셋" }
+        _ = try fixture.add("넷", body: "새 노트\n")
+        // 바로는 읽지 않는다.
+        #expect(browse.listReadCount == reads)
+        try await waitForReload(after: reads)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(browse.listReadCount == reads + 1)
+        #expect(rows.contains { $0.contains("| 하나 |") })
+        #expect(rows.contains { $0.contains("| 둘 |") })
+        #expect(rows.contains { $0.contains("| 셋 |") })
+        #expect(rows.contains { $0.contains("| 넷 |") })
+    }
+
+    /// 닫힌 뒤에 온 변경으로는 다시 읽지 않는다.
+    @Test func changesAfterClosingDoNotReload() async throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        try fixture.notes.update(try id("api")) { $0.title = "닫기 직전" }
+        try press(escapeKey)
+        let reads = browse.listReadCount
+        try fixture.notes.update(try id("api")) { $0.title = "닫은 뒤" }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(browse.listReadCount == reads)
+    }
+
+    /// 노트 목록을 읽지 못해도 창은 쓸 수 있다: "라이브러리 열기"와 "새 노트 만들기"는 그대로 있고, 까닭은 기록으로 나간다.
+    @Test func unreadableListStillShowsTheActionRowsAndReportsTheFailure() throws {
+        defer { fixture.cleanUp(expectingLogs: true) }
+        let store = UnreadableListNoteStore(base: fixture.notes)
+        store.failsListing = true
+        let browse = fixture.makeCoordinator(notes: store)
+        browse.show(anchoredTo: nil, excluding: nil)
+        #expect(browse.isVisible)
+        #expect(browse.rowDescriptions == ["*library 라이브러리 열기"])
+        #expect(fixture.logs.count == 1)
+        #expect(fixture.logs.first?.contains("노트 목록을 읽지 못했습니다") == true)
+
+        let input = try #require(browse.inputView)
+        input.type("새 계획")
+        #expect(browse.rowDescriptions == ["*create “새 계획” 새 노트 만들기", " separator", " library 라이브러리 열기"])
+        input.doCommand(by: returnKey)
+        #expect(fixture.routes == [.newNote(NewNoteRequest(draft: NoteDraft(title: "새 계획"), nextTo: nil))])
+    }
+
+    /// 열려 있는 동안 목록을 읽지 못하게 되면 보이던 목록을 그대로 두고 까닭을 기록한다. 다시 읽히면 따라온다.
+    @Test func failedReloadKeepsTheListThatWasShown() async throws {
+        defer { fixture.cleanUp(expectingLogs: true) }
+        let store = UnreadableListNoteStore(base: fixture.notes)
+        let browse = fixture.makeCoordinator(notes: store)
+        browse.show(anchoredTo: nil, excluding: nil)
+        let shown = browse.rowDescriptions
+        #expect(shown.count == 9)
+        #expect(fixture.logs.isEmpty)
+
+        store.failsListing = true
+        try fixture.notes.update(try id("api")) { $0.title = "API 메모" }
+        var deadline = Date().addingTimeInterval(3)
+        while fixture.logs.isEmpty, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(fixture.logs.count == 1)
+        #expect(browse.rowDescriptions == shown)
+
+        store.failsListing = false
+        try fixture.notes.update(try id("api")) { $0.title = "API 기록" }
+        deadline = Date().addingTimeInterval(3)
+        while !browse.rowDescriptions.contains(where: { $0.contains("| API 기록 |") }), Date() < deadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(browse.rowDescriptions.contains { $0.contains("| API 기록 |") })
+        #expect(fixture.logs.count == 1)
+    }
+
+    /// 걸어 둔 알림은 노트 찾기가 없어질 때 모두 푼다.
+    @Test func observersAreRemovedWhenTheCoordinatorGoesAway() throws {
+        defer { fixture.cleanUp() }
+        let center = CountingNotificationCenter()
+        var coordinator: BrowseCoordinator? = fixture.makeCoordinator()
+        coordinator?.notificationCenter = center
+        coordinator?.show(anchoredTo: nil, excluding: nil)
+        #expect(center.added == 2)
+        coordinator?.show(anchoredTo: nil, excluding: nil)
+        #expect(center.added == 2)
+        #expect(center.removed == 0)
+        coordinator?.window?.orderOut(nil)
+        weak let released = coordinator
+        coordinator = nil
+        #expect(released == nil)
+        #expect(center.removed == 2)
     }
 
     @Test func pastedLineBreaksBecomeSpaces() throws {
