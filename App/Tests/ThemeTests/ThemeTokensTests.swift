@@ -62,7 +62,8 @@ import Testing
         #expect(Set(try section("shape").keys) == Set(ShapeToken.allCases.map(\.rawValue)))
         #expect(Set(try section("component").keys)
             == Set(ComponentToken.allCases.map(\.rawValue))
-            .union(RatioToken.allCases.map(\.rawValue)).union(["doc-pad"]))
+            .union(RatioToken.allCases.map(\.rawValue)).union(CountToken.allCases.map(\.rawValue))
+            .union(["doc-pad"]))
         #expect(Set(try section("motion").keys) == Set(MotionToken.allCases.map(\.rawValue)))
         #expect(Set(try section("fonts").keys) == Set(FontRole.allCases.map(\.rawValue)))
 
