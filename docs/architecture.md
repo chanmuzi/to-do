@@ -57,6 +57,7 @@ scripts/
 - Xcode 프로젝트 파일은 없다(D-011). `cd App && swift build`, `swift test`.
 - `Sources/Theme/Resources/`의 `tokens.json`, `Fonts`는 `App/Resources/`를 가리키는 심볼릭 링크다. 정본은 `App/Resources/` 하나다.
 - 실행 인자(확인용): `--notes-dir <경로>`(그 폴더만 읽고 씀), `--appearance light|dark`. 환경 변수 `FLOATING_NOTES_DIR`도 같은 일을 한다.
+- 확인용 실행 인자: `--debug-hover <노트 id>`(그 노트를 마우스가 올라간 모습으로 띄움), `--debug-control`(다른 프로세스가 분산 알림 `local.floating-notes.debug`로 보내는 명령을 받음. 명령 목록은 `DebugControl.swift`의 주석). 마우스와 키보드를 건드리지 않고 창 상태를 바꾸고 읽을 때 쓴다.
 
 ## 빌드 설정
 
@@ -84,6 +85,7 @@ scripts/
 - `FontRegistrar.registerBundledFonts() -> FontRegistration`(`registered: [URL]`, `problems: [String]`): App이 켤 때 부른다. 던지지 않는다. 등록하지 못한 글꼴은 `problems`에 적히고 글꼴 고르기는 시스템 글꼴로 넘어간다. 기능 모듈은 부르지 않는다.
 - 글꼴 고르기: 가족 이름은 `<이름> Variable`(번들의 가변 글꼴)을 먼저 찾고 그다음 `<이름>`을 찾는다. 가변 글꼴은 굵기 축에 토큰 값을 그대로 넣고, 굵기별 파일로 된 가족은 CSS 굵기가 가장 가까운 파일을 고른다.
 - 새 토큰을 쓰려면 `tokens.json`에 값을 넣고 `TokenKeys.swift`의 enum에 case를 더한다. 테스트가 파일과 enum이 어긋나면 실패한다.
+- 노트 창 단계에서 더한 토큰(시안의 CSS에만 있던 값): `component`의 `chrome-gap`, `chrome-pad-end`, `icon-s|m|l`(12, 13, 14), `icon-btn-gap`, `swatch-size|gap|ring`, `menu-w`, `note-w`, `note-w-min`, `note-w-max`와 `type.fw-ui-strong`(`TextStyle.uiStrong`, 임박한 리마인더).
 
 ### Models
 
@@ -129,14 +131,52 @@ scripts/
 
 ### Routing
 
-- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAIPanel(context: NoteID?)`, `.openSettings`, `.openShortcuts`.
+- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAIPanel(context: NoteID?)`, `.openSettings`, `.openShortcuts`, `.openReminderEditor(NoteID)`, `.openSpacePicker(NoteID)`.
 - `Routing` (`@MainActor` 프로토콜): `route(_: Route)`. 기능 모듈은 `any Routing`을 받아 부르기만 한다. SwiftUI는 `@Environment(\.router)`.
 - `RouteDispatcher(handler:)`: 클로저로 받는 기본 구현(테스트용으로도 쓴다).
 
+## NotePanel 공개 API
+
+플로팅 노트 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routing`으로만 부른다.
+
+- `NotePanelCoordinator`: 떠 있는 노트 창 전부를 맡는다. App이 하나 만든다.
+  - `init(theme:notes:windowStates:spaces:router:makeBodyEditor:log:)`. `makeBodyEditor`를 주지 않으면 기본 편집기(`PlainTextBodyEditor`)를 쓴다.
+  - `restoreOpenNotes() -> [NoteID]`(지난번에 떠 있던 창을 제자리에), `open(_:nextTo:focus:) throws`, `createNote(_: NewNoteRequest) throws -> NoteID`(지금 노트 옆에 핀이 켜진 채), `closeWindow(_:)`(창만 내림), `moveToTrash(_:)`, `toggleAllHidden()`, `areNotesHidden`.
+  - 창마다: `openNoteIDs`, `keyNoteID`, `snapshot(of:) -> NoteWindowSnapshot?`(틀, 핀, 창 단계, 보임, 호버), `setPinned(_:for:)`, `setColor(_:for:)`, `focusBody(of:)`, `popUpMoreMenu(for:)`, `setHoverOverride(_:for:)`(확인용).
+  - `displayOptions: NotePanelDisplayOptions`: 스페이스 표시(아이콘, 아이콘+이름, 이름), 리마인더 표시(시간, 남은 시간, 아이콘), 시간 형식, 임박 기준. 설정 화면이 생기면 여기에 넣는다.
+- 노트 창이 하는 일과 하지 않는 일:
+  - 제목, 노트 색은 `update`/`scheduleUpdate`로 그 항목만 고친다. 핀과 창 틀, 열림 상태는 `WindowStateStore`에 둔다.
+  - 노트 찾기, 새 노트, 창 닫기, 리마인더 설정, 스페이스 옮기기, AI 패널은 `Route`를 보낸다. 직접 열지 않는다.
+  - 저장소 변경을 받아 다시 읽는다(`.updated`는 `load`, `.removed`는 창을 내림). 충돌(`.conflict`)이나 저장 실패가 나면 사용자가 쓴 글을 그대로 두고 상단 줄에 표시 하나를 띄운다. 누르면 내 내용으로 저장 / 파일의 내용으로 되돌리기(`resolveConflict`), 다시 저장을 고른다. 쓰지 못한 글이 있는 창은 닫지 않는다.
+- 안쪽 구조: `Logic/`은 화면 없이 시험하는 값 계산(`TopRowState` 상단 줄의 내용과 색, `TopRowLayout` 요소 자리, `ReminderPresentation`, `NoteSizePolicy`, `WindowPlacement`, `HeightTransition`, `WindowStateRecorder`), `Views/`는 AppKit 뷰, `Menu/`는 더 보기 메뉴, `Body/`는 본문 이음매.
+
+### 본문 편집기 이음매
+
+노트 창은 편집기 모듈을 import하지 않는다. 아래 프로토콜의 구현을 App이 만들어 넘긴다.
+
+```swift
+@MainActor public protocol NoteBodyEditing: AnyObject {
+    var view: NSView { get }
+    var text: String { get set }
+    var onTextChange: ((String) -> Void)? { get set }
+    var onContentHeightChange: ((CGFloat) -> Void)? { get set }
+    func focus()
+}
+public struct NoteBodyEditorContext { public let theme: Theme; public let noteID: NoteID }
+public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> any NoteBodyEditing
+```
+
+- `view`는 노트 창이 가진 스크롤 뷰의 문서 뷰가 된다. 노트 창은 너비만 맞추고, 높이는 `view`가 내용에 맞춘다. 뒤집힌 좌표(`isFlipped`)여야 한다.
+- 안쪽 여백(`Theme.docPadding`)은 편집기가 넣는다.
+- `onContentHeightChange`에는 여백을 포함한 내용 높이를 넘긴다(글이나 너비가 바뀔 때마다, 처음 배치된 뒤 한 번). 노트 창이 이 값으로 창 높이를 맞춘다(위쪽 고정, 아래로, `dur` 동안).
+- `text`를 밖에서 넣을 때는 `onTextChange`를 부르지 않는다. 노트 창은 `onTextChange`를 받아 `scheduleUpdate(id) { $0.body = text }`를 부르고, 저장소에서 온 변경은 `text`에 넣는다.
+- `PlainTextBodyEditor(theme:)`: 서식 없는 기본 구현(TextKit 1). Editor 모듈을 끼울 때는 이 프로토콜에 맞춘 어댑터를 App 타깃에 두고 `makeBodyEditor`로 넘긴다.
+
 ## App 타깃 (`Sources/FloatingNotes/`)
 
-- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. 지금 `AppRouter`는 요청을 기록만 한다.
+- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. `AppRouter`는 `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로 넘기고, 나머지는 아직 기록만 한다.
 - 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일도 같은 방식으로 남기고 건너뛴다.
 - `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다. 끝낼 때(`applicationShouldTerminate`) `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
-- 지금은 `PlaceholderWindowController`가 테마 확인용 창 하나를 띄운다. 2단계에서 `AppDelegate.showInitialWindows()`를 노트 창을 되살리는 코드로 바꾸고 `Placeholder*` 두 파일을 지운다.
-- Features 타깃 `NotePanel`, `Editor`, `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`, `Models`에만 의존한다. `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
+- 켤 때 `NotePanelCoordinator.restoreOpenNotes()`로 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 가장 최근에 고친 노트를, 노트가 하나도 없으면 빈 노트를 새로 만들어 띄운다(D-017). Dock 아이콘을 눌렀을 때도 같다.
+- 앱 메뉴(`MainMenu`)에는 글을 쓰는 데 필요한 것만 있다: 편집(실행 취소, 오려두기, 복사, 붙여넣기, 모두 선택), 새 노트, 창 닫기, 종료. 메뉴 막대 아이콘과 단축키 표는 4단계에서 만든다.
+- Features 타깃 `Editor`, `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`, `Models`에만 의존한다. `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
