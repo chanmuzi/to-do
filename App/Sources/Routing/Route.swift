@@ -19,6 +19,10 @@ public enum Route: Hashable, Sendable {
     case openAIPanel(context: NoteID?)
     case openSettings
     case openShortcuts
+    /// 노트의 리마인더를 정하는 화면(Reminders 단계).
+    case openReminderEditor(NoteID)
+    /// 노트를 다른 스페이스로 옮기는 고르기(Library 단계).
+    case openSpacePicker(NoteID)
 }
 
 /// 새 노트 요청.

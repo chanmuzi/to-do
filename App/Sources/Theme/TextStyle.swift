@@ -10,6 +10,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
     case row        // 라이브러리 줄 제목
     case rowSub     // 라이브러리 줄 미리 보기
     case ui         // 정보(시간, 개수)
+    case uiStrong   // 임박한 리마인더(spec 5.2)
     case micro      // 날짜, 보조 숫자
     case code       // 인라인 코드
     case capture    // 캡처 입력
@@ -34,6 +35,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
         case .row: Keys(font: .body, size: "fs-row", lineHeight: "lh-row", weight: "fw-title")
         case .rowSub: Keys(font: .body, size: "fs-row-sub", lineHeight: "lh-ui", weight: "fw-body")
         case .ui: Keys(font: .ui, size: "fs-ui", lineHeight: "lh-ui", weight: "fw-ui")
+        case .uiStrong: Keys(font: .ui, size: "fs-ui", lineHeight: "lh-ui", weight: "fw-ui-strong")
         case .micro: Keys(font: .micro, size: "fs-micro", lineHeight: "lh-micro", weight: "fw-ui")
         case .code: Keys(font: .mono, size: "fs-code", lineHeight: "lh-body", weight: "fw-body")
         case .capture: Keys(font: .body, size: "fs-capture", lineHeight: "lh-body", weight: "fw-body")

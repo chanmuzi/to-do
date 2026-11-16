@@ -88,4 +88,22 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case iconButton = "icon-btn"
     case menubarIcon = "menubar-icon"
     case browseWidth = "browse-w"
+    /// 노트 상단 줄: 요소 사이, 오른쪽 여백(spec 5.1).
+    case chromeGap = "chrome-gap"
+    case chromePaddingEnd = "chrome-pad-end"
+    /// 선 아이콘 크기 세 단계(spec 18.2의 12, 13, 14pt).
+    case iconSmall = "icon-s"
+    case iconMedium = "icon-m"
+    case iconLarge = "icon-l"
+    /// 나란히 놓인 아이콘 버튼 사이(spec 5.3).
+    case iconButtonGap = "icon-btn-gap"
+    /// 노트 색 칸(spec 5.4): 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리.
+    case swatchSize = "swatch-size"
+    case swatchGap = "swatch-gap"
+    case swatchRing = "swatch-ring"
+    case menuWidth = "menu-w"
+    /// 노트 창 너비: 기본, 최소, 최대(spec 4.1, 임시 값).
+    case noteWidth = "note-w"
+    case noteWidthMin = "note-w-min"
+    case noteWidthMax = "note-w-max"
 }
