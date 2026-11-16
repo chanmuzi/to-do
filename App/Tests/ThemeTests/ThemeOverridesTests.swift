@@ -73,6 +73,49 @@ import Testing
         #expect(reloaded.rgba(.accent) == theme.rgba(.accent))
     }
 
+    /// 저장된 덮어쓰기에 없어진 키나 잘못된 값이 있어도 테마는 만들어진다. 쓸 수 있는 것만 얹고 나머지를 알린다.
+    @Test func staleOrInvalidStoredOverridesAreDroppedNotFatal() throws {
+        let store = ThemeOverrideStore(url: temporaryFile())
+        defer { try? FileManager.default.removeItem(at: store.url.deletingLastPathComponent()) }
+        try store.save(ThemeOverrides(values: [
+            "color.dark.accent": "#3DDC84",
+            "color.light.removed-token": "#000000",
+            "type.fs-body": "nan",
+        ]))
+
+        let theme = try Theme.bundled(overrideStore: store, appearance: .dark)
+        #expect(theme.overrides == ThemeOverrides(values: ["color.dark.accent": "#3DDC84"]))
+        #expect(theme.rgba(.accent) == RGBA(red: 61 / 255, green: 220 / 255, blue: 132 / 255))
+        #expect(theme.tokens.textStyle(.body).size == 13)
+        #expect(theme.loadWarnings.count == 2)
+        #expect(theme.loadWarnings.contains { $0.contains("color.light.removed-token") })
+        #expect(theme.loadWarnings.contains { $0.contains("type.fs-body") })
+
+        let base = try ThemeTokens.bundled()
+        let applied = base.applyingValid(ThemeOverrides(values: ["color.light.nope": "#000000"]))
+        #expect(applied.tokens == base)
+        #expect(applied.accepted.isEmpty)
+        #expect(applied.rejected == [.unknownOverrideKey("color.light.nope")])
+    }
+
+    /// 잘린 덮어쓰기 파일은 옆으로 옮기고 기본 테마로 시작한다.
+    @Test func corruptOverrideFileIsSetAside() throws {
+        let store = ThemeOverrideStore(url: temporaryFile())
+        let directory = store.url.deletingLastPathComponent()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let truncated = Data("{\"values\":{\"color.dark.acc".utf8)
+        try truncated.write(to: store.url)
+
+        let theme = try Theme.bundled(overrideStore: store)
+        #expect(theme.overrides.isEmpty)
+        #expect(theme.tokens == (try ThemeTokens.bundled()))
+        #expect(theme.loadWarnings.count == 1)
+        #expect(theme.loadWarnings.first?.contains("theme-overrides.json.corrupt") == true)
+        #expect(try Data(contentsOf: directory.appendingPathComponent("theme-overrides.json.corrupt")) == truncated)
+        #expect(!FileManager.default.fileExists(atPath: store.url.path))
+    }
+
     @Test func dynamicColorsResolvePerAppearance() throws {
         let theme = try Theme.bundled()
         let color = theme.nsColor(.surface)

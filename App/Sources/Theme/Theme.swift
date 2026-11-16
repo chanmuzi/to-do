@@ -18,6 +18,10 @@ public final class Theme {
     /// 지금의 라이트·다크. `followAppearance(of:)`를 부른 뒤로는 앱 모양을 따라간다.
     public private(set) var appearance: ThemeAppearance
 
+    /// 저장된 덮어쓰기를 읽으면서 버린 것(없어진 키, 잘못된 값, 망가진 파일)의 설명.
+    /// 앱이 켤 때 모아서 기록한다. 문제가 없었으면 비어 있다.
+    public let loadWarnings: [String]
+
     @ObservationIgnored private let baseTokens: ThemeTokens
     @ObservationIgnored private let overrideStore: ThemeOverrideStore?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
@@ -25,17 +29,21 @@ public final class Theme {
     /// - Parameters:
     ///   - baseTokens: `tokens.json`에서 읽은 값.
     ///   - overrideStore: 덮어쓰기를 저장할 곳. 있으면 저장된 값을 읽어 얹고, 바꿀 때마다 저장한다.
+    ///     저장된 값 가운데 쓸 수 없는 것은 버리고 `loadWarnings`에 적는다(파일은 다음 저장 때 정리된다).
     public init(
         baseTokens: ThemeTokens,
         overrideStore: ThemeOverrideStore? = nil,
         appearance: ThemeAppearance = .light
     ) throws {
-        let overrides = try overrideStore?.load() ?? ThemeOverrides()
+        let stored = try overrideStore?.loadRecovering()
+        let applied = baseTokens.applyingValid(stored?.overrides ?? ThemeOverrides())
         self.baseTokens = baseTokens
         self.overrideStore = overrideStore
-        self.overrides = overrides
-        self.tokens = try baseTokens.applying(overrides)
+        self.overrides = applied.accepted
+        self.tokens = applied.tokens
         self.appearance = appearance
+        self.loadWarnings = [stored?.warning].compactMap { $0 }
+            + applied.rejected.map { "테마 덮어쓰기를 버렸습니다: \($0)" }
     }
 
     /// 번들의 `tokens.json`으로 만든다.

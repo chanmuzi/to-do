@@ -17,6 +17,6 @@ struct TemporaryStore {
     }
 
     func noteFile(_ id: String) -> URL {
-        location.notesDirectory.appendingPathComponent("\(id).md")
+        location.notesDirectory.appendingPathComponent("\(id).md", isDirectory: false)
     }
 }

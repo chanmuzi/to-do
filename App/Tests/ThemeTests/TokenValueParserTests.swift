@@ -13,6 +13,45 @@ import Testing
         #expect(TokenValueParser.em("-.02em") == -0.02)
     }
 
+    /// 수처럼 보이지만 값이 아닌 표기와 범위를 벗어난 값은 받지 않는다.
+    @Test(arguments: ["nan", "inf", "-inf", "infinity", "0x10", "1e3", "+5", "1.2.3", "-", ".", "", "１２"])
+    func rejectsNonDecimalNumbers(text: String) {
+        #expect(TokenValueParser.number(text) == nil)
+        #expect(TokenValueParser.points(text + "px") == nil)
+        #expect(TokenValueParser.size(text + "px") == nil)
+        #expect(TokenValueParser.seconds(text + "ms") == nil)
+        #expect(TokenValueParser.fraction(text + "%") == nil)
+    }
+
+    @Test func rejectsOutOfRangeSizes() throws {
+        #expect(TokenValueParser.size("13px") == 13)
+        #expect(TokenValueParser.size("0") == nil)
+        #expect(TokenValueParser.size("-13px") == nil)
+        #expect(TokenValueParser.length("0") == 0)
+        #expect(TokenValueParser.length("-4px") == nil)
+        #expect(TokenValueParser.weight("650") == 650)
+        #expect(TokenValueParser.weight("0") == nil)
+        #expect(TokenValueParser.weight("1200") == nil)
+        #expect(TokenValueParser.unitNumber("1.5") == nil)
+        #expect(TokenValueParser.fraction("140%") == nil)
+        #expect(TokenValueParser.seconds("-180ms") == nil)
+        #expect(TokenValueParser.insets("10px -14px") == nil)
+        #expect(TokenValueParser.color("rgba(300,0,0,1)") == nil)
+        #expect(TokenValueParser.color("rgba(0,0,0,2)") == nil)
+        #expect(TokenValueParser.shadow("0 4px -12px 0 rgba(0,0,0,.1)") == nil)
+
+        let base = try ThemeTokens.bundled()
+        for (key, value) in [
+            ("type.fs-body", "nan"), ("type.fs-body", "inf"), ("type.fs-body", "-13px"),
+            ("type.fs-body", "0x10"), ("type.lh-body", "0"), ("type.fw-body", "-400"),
+            ("space.sp-1", "-4px"), ("material.opacity", "7"), ("material.blur", "-1px"),
+        ] {
+            #expect(throws: ThemeError.invalidValue(key: key, value: value)) {
+                try base.applying(ThemeOverrides(values: [key: value]))
+            }
+        }
+    }
+
     @Test func parsesColors() {
         #expect(TokenValueParser.color("#FFEB85") == RGBA(red: 1, green: 235 / 255, blue: 133 / 255))
         #expect(TokenValueParser.color("rgba(255,255,255,.11)") == RGBA(red: 1, green: 1, blue: 1, alpha: 0.11))

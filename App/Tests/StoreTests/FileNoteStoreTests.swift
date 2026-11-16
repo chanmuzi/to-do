@@ -37,12 +37,12 @@ import Models
         #expect(loaded == created)
         #expect(Array(loaded.body.utf8) == Array(sampleBody.utf8))
 
-        var edited = loaded
-        edited.title = "바꾼 제목"
-        edited.body = sampleBody + "\n추가\n"
-        edited.colorID = PaletteID(rawValue: "tint-1")
-        edited.reminder = Date(timeIntervalSince1970: 1_800_000_000)
-        let saved = try store.save(edited)
+        let saved = try store.update(created.id) { note in
+            note.title = "바꾼 제목"
+            note.body = sampleBody + "\n추가\n"
+            note.colorID = PaletteID(rawValue: "tint-1")
+            note.reminder = Date(timeIntervalSince1970: 1_800_000_000)
+        }
 
         // 새 저장소 인스턴스로 다시 읽어도 같다.
         let reloaded = try makeStore().load(created.id)
@@ -62,7 +62,7 @@ import Models
         )
         try Data("x".utf8).write(to: temporary.location.notesDirectory.appendingPathComponent("메모.txt"))
 
-        #expect(try store.list().map(\.id) == [second.id, first.id])
+        #expect(try store.list().notes.map(\.id) == [second.id, first.id])
     }
 
     @Test func externallyWrittenMarkdownIsReadable() throws {
@@ -78,9 +78,7 @@ import Models
         defer { temporary.cleanUp() }
         let store = try makeStore()
         try Data("---\ntitle: 손으로\ntags: [a]\n---\n본문".utf8).write(to: temporary.noteFile("tagged"))
-        var note = try store.load(NoteID(rawValue: "tagged"))
-        note.body = "고친 본문"
-        try store.save(note)
+        try store.update(NoteID(rawValue: "tagged")) { $0.body = "고친 본문" }
         let text = try String(contentsOf: temporary.noteFile("tagged"), encoding: .utf8)
         #expect(text.contains("\ntags: [a]\n"))
         #expect(text.hasSuffix("---\n고친 본문"))
@@ -94,7 +92,8 @@ import Models
         try FileManager.default.setAttributes(
             [.modificationDate: old], ofItemAtPath: temporary.noteFile(note.id.rawValue).path
         )
-        #expect(try store.save(note).modified == old)
+        #expect(try store.update(note.id) { _ in }.modified == old)
+        #expect(try store.update(note.id) { $0.body = "본문" }.modified == old)
     }
 
     @Test func trashMovesTheFileAndRestoreBringsItBack() throws {
@@ -104,21 +103,21 @@ import Models
         let keep = try store.create(NoteDraft(title: "남길 노트"))
 
         try store.moveToTrash(note.id)
-        #expect(try store.list().map(\.id) == [keep.id])
+        #expect(try store.list().notes.map(\.id) == [keep.id])
         #expect(throws: StoreError.noteNotFound(note.id)) { try store.load(note.id) }
         #expect(!FileManager.default.fileExists(atPath: temporary.noteFile(note.id.rawValue).path))
         let trashed = temporary.location.trashDirectory.appendingPathComponent("\(note.id.rawValue).md")
         #expect(FileManager.default.fileExists(atPath: trashed.path))
-        #expect(try store.listTrash().map(\.id) == [note.id])
-        #expect(try store.listTrash().first?.body == sampleBody)
+        #expect(try store.listTrash().notes.map(\.id) == [note.id])
+        #expect(try store.listTrash().notes.first?.body == sampleBody)
 
         #expect(throws: StoreError.noteNotFound(note.id)) { try store.moveToTrash(note.id) }
 
         let restored = try store.restoreFromTrash(note.id)
         #expect(restored.body == sampleBody)
         #expect(restored.title == "버릴 노트")
-        #expect(try store.listTrash().isEmpty)
-        #expect(Set(try store.list().map(\.id)) == [note.id, keep.id])
+        #expect(try store.listTrash().notes.isEmpty)
+        #expect(Set(try store.list().notes.map(\.id)) == [note.id, keep.id])
     }
 
     @Test func missingNoteThrows() throws {
@@ -129,10 +128,70 @@ import Models
         }
     }
 
-    @Test func nonUTF8FileIsReportedNotSkipped() throws {
+    /// 읽지 못하는 `.md` 하나가 목록 전체를 막지 않는다. 읽은 노트와 실패를 함께 돌려준다.
+    @Test func unreadableFilesAreReportedAlongsideReadableNotes() throws {
         defer { temporary.cleanUp() }
         let store = try makeStore()
+        let good = try store.create(NoteDraft(title: "멀쩡한 노트"))
         try Data([0xFF, 0xFE, 0xFD]).write(to: temporary.noteFile("broken"))
-        #expect(throws: StoreError.unreadableFile(temporary.noteFile("broken"))) { try store.list() }
+        try FileManager.default.createDirectory(at: temporary.noteFile("x"), withIntermediateDirectories: true)
+
+        let listing = try store.list()
+        #expect(listing.notes.map(\.id) == [good.id])
+        #expect(listing.failures == [
+            NoteReadFailure(
+                id: NoteID(rawValue: "broken"), url: temporary.noteFile("broken"),
+                error: .unreadableFile(temporary.noteFile("broken"))
+            ),
+            NoteReadFailure(
+                id: NoteID(rawValue: "x"), url: temporary.noteFile("x"),
+                error: .unreadableFile(temporary.noteFile("x"))
+            ),
+        ])
+        #expect(throws: StoreError.unreadableFile(temporary.noteFile("broken"))) {
+            try store.load(NoteID(rawValue: "broken"))
+        }
+        // 새 저장소도 이 폴더로 만들어진다(앱이 켜진다).
+        #expect(try makeStore().list().notes.count == 1)
+    }
+
+    /// 읽지 못한 날짜와 초 아래 자리가 있는 날짜가 본문을 고쳐 저장한 뒤에도 남는다.
+    @Test func unparsableAndFractionalDatesSurviveABodyEdit() throws {
+        defer { temporary.cleanUp() }
+        let store = try makeStore()
+        let id = NoteID(rawValue: "dates")
+        try Data("---\ntitle: 날짜\nreminder: 2026-11-17 09:00\ncreated: 2026-11-16T12:08:00.123Z\n---\n본문"
+            .utf8).write(to: temporary.noteFile("dates"))
+
+        let loaded = try store.load(id)
+        #expect(loaded.reminder == nil)
+        #expect(abs(loaded.created.timeIntervalSince1970 - 1_794_830_880.123) < 0.0005)
+        try store.update(id) { $0.body = "고친 본문" }
+        #expect(try String(contentsOf: temporary.noteFile("dates"), encoding: .utf8)
+            == "---\ntitle: 날짜\nreminder: 2026-11-17 09:00\ncreated: 2026-11-16T12:08:00.123Z\n---\n고친 본문")
+
+        // 리마인더를 새로 정하면 그 줄만 바뀐다.
+        try store.update(id) { $0.reminder = Date(timeIntervalSince1970: 1_800_000_000) }
+        #expect(try String(contentsOf: temporary.noteFile("dates"), encoding: .utf8)
+            == "---\ntitle: 날짜\nreminder: 2027-01-15T08:00:00Z\ncreated: 2026-11-16T12:08:00.123Z\n---\n고친 본문")
+    }
+
+    /// BOM으로 시작하는 파일도 머리를 읽고, 저장해도 머리가 하나 더 생기지 않는다.
+    @Test func fileStartingWithByteOrderMarkKeepsASingleHeader() throws {
+        defer { temporary.cleanUp() }
+        let store = try makeStore()
+        let id = NoteID(rawValue: "bom")
+        try Data([0xEF, 0xBB, 0xBF] + Array("---\ntitle: 윈도에서\n---\n본문".utf8)).write(to: temporary.noteFile("bom"))
+
+        #expect(try store.load(id).title == "윈도에서")
+        try store.update(id) { $0.body = "고친 본문" }
+        // BOM은 그대로고 머리는 하나다(머리에 없던 만든 날짜만 더해진다).
+        let data = try Data(contentsOf: temporary.noteFile("bom"))
+        #expect(Array(data.prefix(3)) == [0xEF, 0xBB, 0xBF])
+        let text = String(decoding: data.dropFirst(3), as: UTF8.self)
+        #expect(text.hasPrefix("---\ntitle: 윈도에서\ncreated: "))
+        #expect(text.hasSuffix("Z\n---\n고친 본문"))
+        #expect(text.components(separatedBy: "---\n").count == 3)
+        #expect(try makeStore().load(id).title == "윈도에서")
     }
 }

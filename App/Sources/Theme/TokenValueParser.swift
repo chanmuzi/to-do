@@ -3,34 +3,69 @@ import Foundation
 
 /// `tokens.json`의 CSS식 문자열을 값으로 바꾼다. 해석하지 못하면 `nil`.
 enum TokenValueParser {
-    /// `13px`, `1.5px`, `-12px`, `0`.
+    /// `13px`, `1.5px`, `-12px`, `0`. 음수도 받는다(그림자 위치·번짐 줄임).
     static func points(_ raw: String) -> CGFloat? {
         let text = raw.trimmingCharacters(in: .whitespaces)
         let digits = text.hasSuffix("px") ? String(text.dropLast(2)) : text
         return number(digits).map { CGFloat($0) }
     }
 
-    /// `.92`, `600`, `-.02`.
-    static func number(_ raw: String) -> Double? {
-        var text = raw.trimmingCharacters(in: .whitespaces)
-        if text.hasPrefix(".") { text = "0" + text }
-        if text.hasPrefix("-.") { text = "-0" + text.dropFirst() }
-        return Double(text)
+    /// 0 이상인 길이(간격, 모서리, 여백, 흐림).
+    static func length(_ raw: String) -> CGFloat? {
+        points(raw).flatMap { $0 >= 0 ? $0 : nil }
     }
 
-    /// `26%` → 0.26.
+    /// 0보다 큰 길이(글자 크기, 줄 높이).
+    static func size(_ raw: String) -> CGFloat? {
+        points(raw).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    /// `.92`, `600`, `-.02`. 십진 표기만 받는다(`nan`, `inf`, `0x10`, `1e3`은 값이 아니다).
+    static func number(_ raw: String) -> Double? {
+        let text = raw.trimmingCharacters(in: .whitespaces)
+        let isNegative = text.hasPrefix("-")
+        let parts = (isNegative ? text.dropFirst() : text[...])
+            .split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= 2,
+              parts.contains(where: { !$0.isEmpty }),
+              parts.allSatisfy({ $0.allSatisfy { ("0"..."9").contains($0) } })
+        else { return nil }
+        let whole = parts[0].isEmpty ? "0" : parts[0]
+        let fraction = parts.count == 2 && !parts[1].isEmpty ? parts[1] : "0"
+        guard let value = Double("\(whole).\(fraction)"), value.isFinite else { return nil }
+        return isNegative ? -value : value
+    }
+
+    /// 0~1 사이의 수(불투명도).
+    static func unitNumber(_ raw: String) -> Double? {
+        number(raw).flatMap { (0...1).contains($0) ? $0 : nil }
+    }
+
+    /// CSS 글꼴 굵기(1~1000).
+    static func weight(_ raw: String) -> Double? {
+        number(raw).flatMap { (1...1000).contains($0) ? $0 : nil }
+    }
+
+    /// `26%` → 0.26. 0~100%만 받는다.
     static func fraction(_ raw: String) -> Double? {
         let text = raw.trimmingCharacters(in: .whitespaces)
-        guard text.hasSuffix("%") else { return nil }
-        return number(String(text.dropLast())).map { $0 / 100 }
+        guard text.hasSuffix("%"), let percent = number(String(text.dropLast())),
+              (0...100).contains(percent)
+        else { return nil }
+        return percent / 100
     }
 
-    /// `180ms` → 0.18초.
+    /// `180ms` → 0.18초. 음수는 받지 않는다.
     static func seconds(_ raw: String) -> TimeInterval? {
         let text = raw.trimmingCharacters(in: .whitespaces)
-        if text.hasSuffix("ms") { return number(String(text.dropLast(2))).map { $0 / 1000 } }
-        if text.hasSuffix("s") { return number(String(text.dropLast())) }
-        return nil
+        let value: Double? = if text.hasSuffix("ms") {
+            number(String(text.dropLast(2))).map { $0 / 1000 }
+        } else if text.hasSuffix("s") {
+            number(String(text.dropLast()))
+        } else {
+            nil
+        }
+        return value.flatMap { $0 >= 0 ? $0 : nil }
     }
 
     /// `-.02em` → 글자 크기에 곱할 배수.
@@ -46,7 +81,10 @@ enum TokenValueParser {
         if text.hasPrefix("#") { return hexColor(String(text.dropFirst())) }
         guard let arguments = functionArguments(text, names: ["rgba", "rgb"]) else { return nil }
         let parts = arguments.compactMap(number)
-        guard parts.count == arguments.count, parts.count == 3 || parts.count == 4 else { return nil }
+        guard parts.count == arguments.count, parts.count == 3 || parts.count == 4,
+              parts.prefix(3).allSatisfy({ (0...255).contains($0) }),
+              parts.count == 3 || (0...1).contains(parts[3])
+        else { return nil }
         return RGBA(
             red: parts[0] / 255, green: parts[1] / 255, blue: parts[2] / 255,
             alpha: parts.count == 4 ? parts[3] : 1
@@ -57,7 +95,10 @@ enum TokenValueParser {
     static func bezier(_ raw: String) -> BezierCurve? {
         guard let arguments = functionArguments(raw, names: ["cubic-bezier"]) else { return nil }
         let parts = arguments.compactMap(number)
-        guard parts.count == 4, arguments.count == 4 else { return nil }
+        // 시간 축(x)은 0~1 안이어야 곡선이 된다.
+        guard parts.count == 4, arguments.count == 4,
+              (0...1).contains(parts[0]), (0...1).contains(parts[2])
+        else { return nil }
         return BezierCurve(x1: parts[0], y1: parts[1], x2: parts[2], y2: parts[3])
     }
 
@@ -67,7 +108,7 @@ enum TokenValueParser {
             let fields = splitTopLevel(layer, separator: " ")
             guard fields.count == 5,
                   let x = points(fields[0]), let y = points(fields[1]),
-                  let blur = points(fields[2]), let spread = points(fields[3]),
+                  let blur = length(fields[2]), let spread = points(fields[3]),
                   let color = color(fields[4])
             else { return nil }
             return ShadowLayer(x: x, y: y, blur: blur, spread: spread, color: color)
@@ -79,7 +120,7 @@ enum TokenValueParser {
     /// CSS 여백 줄임 표기(값 1~4개). `10px 14px 18px` → 위 10, 좌우 14, 아래 18.
     static func insets(_ raw: String) -> ThemeInsets? {
         let fields = splitTopLevel(raw, separator: " ")
-        let values = fields.compactMap(points)
+        let values = fields.compactMap(length)
         guard values.count == fields.count else { return nil }
         switch values.count {
         case 1: return ThemeInsets(top: values[0], trailing: values[0], bottom: values[0], leading: values[0])

@@ -29,39 +29,41 @@ struct NoteFileContent: Equatable {
 ///
 /// 값이 없는 항목은 줄을 쓰지 않는다. 제목은 JSON 문자열로 따옴표에 넣어 어떤 글자든 담는다.
 /// 머리가 없는 파일은 전체를 본문으로 읽는다.
+///
+/// 아는 항목은 줄 맨 앞(들여쓰기 없음)에서 시작하는 `title`, `space`, `color`, `reminder`, `created`뿐이다.
+/// 들여쓴 줄과 그 밖의 줄은 모르는 줄로 두고 건드리지 않는다.
+/// 이미 있는 파일을 고쳐 쓸 때는 `encode(_:over:)`를 쓴다.
 enum NoteFileCodec {
-    private static let delimiter = "---"
+    static let delimiter = "---"
+    static let byteOrderMark: Unicode.Scalar = "\u{FEFF}"
 
+    /// 머리에서 이 앱이 아는 항목. 순서는 새 파일에 쓰는 순서다.
+    enum Key: String, CaseIterable {
+        case title, space, color, reminder, created
+    }
+
+    /// 새 파일의 표기.
     static func encode(_ content: NoteFileContent) -> String {
-        var lines = [delimiter, "title: \(quoted(content.title))"]
-        if let space = content.spaceID { lines.append("space: \(quoted(space.rawValue))") }
-        if let color = content.colorID { lines.append("color: \(color.rawValue)") }
-        if let reminder = content.reminder { lines.append("reminder: \(format(reminder))") }
-        if let created = content.created { lines.append("created: \(format(created))") }
-        lines.append(contentsOf: content.unknownLines)
-        lines.append(delimiter)
+        let known = Key.allCases.compactMap { line($0, in: content) }
+        let lines = [delimiter] + known + content.unknownLines + [delimiter]
         return lines.joined(separator: "\n") + "\n" + content.body
     }
 
     static func decode(_ text: String) -> NoteFileContent {
-        guard let (headerLines, bodyStart) = splitHeader(text) else {
-            return NoteFileContent(body: text)
-        }
-        var content = NoteFileContent(body: String(text[bodyStart...]))
-        for line in headerLines {
-            guard let colon = line.firstIndex(of: ":") else {
+        guard let header = Header(text) else { return NoteFileContent(body: text) }
+        var content = NoteFileContent(body: String(text[header.bodyStart...]))
+        for line in header.lines {
+            guard let field = field(line) else {
                 content.unknownLines.append(line)
                 continue
             }
-            let key = line[..<colon].trimmingCharacters(in: .whitespaces)
-            let value = unquoted(line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces))
-            switch key {
-            case "title": content.title = value
-            case "space": content.spaceID = value.isEmpty ? nil : SpaceID(rawValue: value)
-            case "color": content.colorID = value.isEmpty ? nil : PaletteID(rawValue: value)
-            case "reminder": content.reminder = parseDate(value)
-            case "created": content.created = parseDate(value)
-            default: content.unknownLines.append(line)
+            switch field.key {
+            case .title: content.title = field.value
+            case .space: content.spaceID = field.value.isEmpty ? nil : SpaceID(rawValue: field.value)
+            case .color: content.colorID = field.value.isEmpty ? nil : PaletteID(rawValue: field.value)
+            // 읽지 못한 날짜 줄은 값 없음으로 읽고, 다시 쓸 때 `encode(_:over:)`가 원래 줄을 남긴다.
+            case .reminder: content.reminder = parseDate(field.value)
+            case .created: content.created = parseDate(field.value)
             }
         }
         return content
@@ -72,40 +74,36 @@ enum NoteFileCodec {
         Date(timeIntervalSince1970: date.timeIntervalSince1970.rounded(.down))
     }
 
-    // MARK: - 내부
+    // MARK: - 줄 하나
 
-    /// 머리 줄들과 본문이 시작하는 자리. 머리가 없으면 `nil`.
-    /// 줄바꿈 바이트 단위로 훑어 본문의 글자를 건드리지 않는다.
-    private static func splitHeader(_ text: String) -> (lines: [String], bodyStart: String.Index)? {
-        let utf8 = text.utf8
-        var lines: [String] = []
-        var cursor = utf8.startIndex
-        var isFirst = true
-        while cursor < utf8.endIndex {
-            guard let newline = utf8[cursor...].firstIndex(of: UInt8(ascii: "\n")) else {
-                // 마지막 줄이 줄바꿈 없이 끝났다. 닫는 구분선이면 본문은 비어 있다.
-                let last = line(utf8[cursor...])
-                return !isFirst && last == delimiter ? (lines, utf8.endIndex) : nil
-            }
-            let current = line(utf8[cursor..<newline])
-            let next = utf8.index(after: newline)
-            if isFirst {
-                guard current == delimiter else { return nil }
-                isFirst = false
-            } else if current == delimiter {
-                return (lines, next)
-            } else {
-                lines.append(current)
-            }
-            cursor = next
-        }
-        return nil
+    /// 머리 줄이 아는 항목이면 그 키와 값. 들여쓴 줄, 콜론 없는 줄, 모르는 키는 `nil`.
+    static func field(_ line: String) -> (key: Key, value: String)? {
+        guard let colon = line.firstIndex(of: ":"),
+              let key = Key(rawValue: String(line[..<colon]))
+        else { return nil }
+        return (key, unquoted(line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)))
     }
 
-    private static func line(_ bytes: Substring.UTF8View) -> String {
-        var string = String(decoding: bytes, as: UTF8.self)
-        if string.unicodeScalars.last == "\r" { string.unicodeScalars.removeLast() }
-        return string
+    /// 항목 하나를 새로 적은 줄. 값이 없으면 `nil`(제목은 비어 있어도 적는다).
+    static func line(_ key: Key, in content: NoteFileContent) -> String? {
+        switch key {
+        case .title: "title: \(quoted(content.title))"
+        case .space: content.spaceID.map { "space: \(quoted($0.rawValue))" }
+        case .color: content.colorID.map { "color: \($0.rawValue)" }
+        case .reminder: content.reminder.map { "reminder: \(format($0))" }
+        case .created: content.created.map { "created: \(format($0))" }
+        }
+    }
+
+    /// ISO 8601 날짜를 읽는다. 초 아래 자리(`…00.123Z`)와 날짜만 있는 값(`2026-11-17`, UTC 자정)도 받는다.
+    static func parseDate(_ value: String) -> Date? {
+        if let date = try? Date(value, strategy: .iso8601) { return date }
+        if let date = try? Date(value, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) {
+            return date
+        }
+        // 날짜만 읽는 방식은 뒤에 딸린 글자를 무시하므로 모양이 정확히 `YYYY-MM-DD`일 때만 쓴다.
+        guard value.wholeMatch(of: /\d{4}-\d{2}-\d{2}/) != nil else { return nil }
+        return try? Date(value, strategy: Date.ISO8601FormatStyle().year().month().day())
     }
 
     private static func quoted(_ string: String) -> String {
@@ -123,9 +121,5 @@ enum NoteFileCodec {
 
     private static func format(_ date: Date) -> String {
         date.formatted(.iso8601)
-    }
-
-    private static func parseDate(_ value: String) -> Date? {
-        try? Date(value, strategy: .iso8601)
     }
 }

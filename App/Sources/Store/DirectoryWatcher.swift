@@ -19,7 +19,8 @@ final class DirectoryWatcher {
         source.resume()
     }
 
-    func stop() {
+    /// 감시를 멈추고 폴더 디스크립터를 닫는다(닫기는 취소 핸들러가 한다).
+    isolated deinit {
         source.cancel()
     }
 }

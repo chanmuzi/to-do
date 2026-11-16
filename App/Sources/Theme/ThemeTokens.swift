@@ -39,6 +39,29 @@ public struct ThemeTokens: Hashable, Sendable {
         try ThemeTokens(raw: raw.applying(overrides))
     }
 
+    /// 얹을 수 있는 덮어쓰기만 얹는다. 모르는 키나 해석할 수 없는 값은 버리고 그 까닭을 함께 돌려준다.
+    /// 저장해 둔 덮어쓰기를 읽을 때 쓴다(토큰이 없어졌거나 파일을 손으로 고친 경우에도 앱이 켜져야 한다).
+    public func applyingValid(
+        _ overrides: ThemeOverrides
+    ) -> (tokens: ThemeTokens, accepted: ThemeOverrides, rejected: [ThemeError]) {
+        if let tokens = try? applying(overrides) { return (tokens, overrides, []) }
+        var tokens = self
+        var accepted = ThemeOverrides()
+        var rejected: [ThemeError] = []
+        for (key, value) in overrides.values.sorted(by: { $0.key < $1.key }) {
+            let candidate = accepted.setting(key, to: value)
+            do {
+                tokens = try applying(candidate)
+                accepted = candidate
+            } catch let error as ThemeError {
+                rejected.append(error)
+            } catch {
+                rejected.append(.invalidValue(key: key, value: value))
+            }
+        }
+        return (tokens, accepted, rejected)
+    }
+
     // MARK: - 접근자
 
     public func color(_ token: ColorToken, _ appearance: ThemeAppearance) -> RGBA {
@@ -103,13 +126,13 @@ public struct ThemeTokens: Hashable, Sendable {
         var textStyles: [TextStyle: TextStyleSpec] = [:]
         for style in TextStyle.allCases {
             let keys = style.keys
-            let size = try parse("type.\(keys.size)", TokenValueParser.points)
+            let size = try parse("type.\(keys.size)", TokenValueParser.size)
             let em = try keys.tracking.map { try parse("type.\($0)", TokenValueParser.em) } ?? 0
             textStyles[style] = TextStyleSpec(
                 families: fontFamilies[keys.font]!,
                 size: size,
-                lineHeight: try parse("type.\(keys.lineHeight)", TokenValueParser.points),
-                weight: CGFloat(try parse("type.\(keys.weight)", TokenValueParser.number)),
+                lineHeight: try parse("type.\(keys.lineHeight)", TokenValueParser.size),
+                weight: CGFloat(try parse("type.\(keys.weight)", TokenValueParser.weight)),
                 tracking: size * CGFloat(em)
             )
         }
@@ -119,13 +142,13 @@ public struct ThemeTokens: Hashable, Sendable {
         self.shadows = shadows
         self.fontFamilies = fontFamilies
         self.textStyles = textStyles
-        self.spaces = try table("space", TokenValueParser.points)
-        self.shapes = try table("shape", TokenValueParser.points)
-        self.components = try table("component", TokenValueParser.points)
+        self.spaces = try table("space", TokenValueParser.length)
+        self.shapes = try table("shape", TokenValueParser.length)
+        self.components = try table("component", TokenValueParser.length)
         self.docPadding = try parse("component.doc-pad", TokenValueParser.insets)
         self.material = MaterialTokens(
-            opacity: try parse("material.opacity", TokenValueParser.number),
-            blur: try parse("material.blur", TokenValueParser.points),
+            opacity: try parse("material.opacity", TokenValueParser.unitNumber),
+            blur: try parse("material.blur", TokenValueParser.length),
             tintMix: try parse("material.tint-mix", TokenValueParser.fraction),
             tintMixRow: try parse("material.tint-mix-row", TokenValueParser.fraction)
         )

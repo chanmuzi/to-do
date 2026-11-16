@@ -7,7 +7,8 @@ import Theme
 final class PlaceholderWindowController: NSWindowController {
     static let windowTitle = "FloatingNotes Placeholder"
 
-    init(environment: AppEnvironment) throws {
+    /// - Parameter noteCount: 읽을 수 있는 노트 수.
+    init(environment: AppEnvironment, noteCount: Int) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 440, height: 260),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -18,7 +19,7 @@ final class PlaceholderWindowController: NSWindowController {
         window.contentView = NSHostingView(
             rootView: PlaceholderView(
                 theme: environment.theme,
-                noteCount: try environment.notes.list().count,
+                noteCount: noteCount,
                 notesPath: environment.location.notesDirectory.path
             )
         )

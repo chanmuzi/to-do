@@ -6,10 +6,15 @@ import Models
 public final class WindowStateStore {
     private let file: JSONFile<[String: NoteWindowState]>
     private var states: [String: NoteWindowState]
+    /// 저장된 파일을 읽지 못해 빈 상태로 시작했으면 그 설명. 앱이 켤 때 모아서 기록한다.
+    public let loadWarning: String?
 
+    /// 파일이 망가져 있으면 옆으로 옮겨 두고(`windows.json.corrupt`) 빈 상태로 시작한다.
     public init(location: StoreLocation) throws {
         file = JSONFile(url: location.stateDirectory.appendingPathComponent("windows.json"))
-        states = try file.load() ?? [:]
+        let loaded = try file.loadRecovering()
+        states = loaded.value ?? [:]
+        loadWarning = loaded.warning
     }
 
     public var all: [NoteID: NoteWindowState] {

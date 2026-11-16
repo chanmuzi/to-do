@@ -78,4 +78,69 @@ import Models
     @Test func frontmatterEndingAtEndOfFileHasEmptyBody() {
         #expect(NoteFileCodec.decode("---\ntitle: \"t\"\n---") == NoteFileContent(title: "t", body: ""))
     }
+
+    @Test func readsFractionalAndDateOnlyDates() throws {
+        #expect(NoteFileCodec.parseDate("2026-11-16T12:08:00Z") == Date(timeIntervalSince1970: 1_794_830_880))
+        let fractional = try #require(NoteFileCodec.parseDate("2026-11-16T12:08:00.123Z"))
+        #expect(abs(fractional.timeIntervalSince1970 - 1_794_830_880.123) < 0.0005)
+        #expect(NoteFileCodec.parseDate("2026-11-16T21:08:00+09:00") == Date(timeIntervalSince1970: 1_794_830_880))
+        #expect(NoteFileCodec.parseDate("2026-11-17") == Date(timeIntervalSince1970: 1_794_873_600))
+        #expect(NoteFileCodec.parseDate("2026-11-17 09:00") == nil)
+        #expect(NoteFileCodec.parseDate("내일") == nil)
+    }
+
+    /// 고쳐 쓸 때 값이 그대로인 줄은 원래 표기 그대로 남는다.
+    @Test func rewritingKeepsLinesWhoseValueDidNotChange() {
+        let text = "---\ncreated: 2026-11-16T12:08:00.123Z\ntags: [a]\ntitle: 손으로 쓴 제목\n"
+            + "reminder: 2026-11-17 09:00\n---\n본문"
+        var content = NoteFileCodec.decode(text)
+        #expect(content.reminder == nil)
+        #expect(content.unknownLines == ["tags: [a]"])
+        #expect(NoteFileCodec.encode(content, over: text) == text)
+
+        content.body = "고친 본문"
+        content.colorID = PaletteID(rawValue: "tint-2")
+        #expect(NoteFileCodec.encode(content, over: text)
+            == "---\ncreated: 2026-11-16T12:08:00.123Z\ntags: [a]\ntitle: 손으로 쓴 제목\n"
+            + "reminder: 2026-11-17 09:00\ncolor: tint-2\n---\n고친 본문")
+
+        content.title = "새 제목"
+        content.reminder = Date(timeIntervalSince1970: 1_800_000_000)
+        content.colorID = nil
+        #expect(NoteFileCodec.encode(content, over: text)
+            == "---\ncreated: 2026-11-16T12:08:00.123Z\ntags: [a]\ntitle: \"새 제목\"\n"
+            + "reminder: 2027-01-15T08:00:00Z\n---\n고친 본문")
+    }
+
+    @Test func rewritingKeepsLineEndingsAndMissingFinalNewline() {
+        let windows = "---\r\ntitle: 윈도\r\ntags: [a]\r\n---\r\n본문\r\n"
+        #expect(NoteFileCodec.encode(NoteFileCodec.decode(windows), over: windows) == windows)
+        let unterminated = "---\ntitle: \"t\"\n---"
+        #expect(NoteFileCodec.encode(NoteFileCodec.decode(unterminated), over: unterminated) == unterminated)
+        // 머리가 없던 파일은 새 파일의 표기로 쓴다.
+        let content = NoteFileContent(title: "t", body: "# 그냥 마크다운")
+        #expect(NoteFileCodec.encode(content, over: "# 그냥 마크다운") == NoteFileCodec.encode(content))
+    }
+
+    /// 들여쓴 줄은 아는 키처럼 보여도 최상위 항목이 아니다.
+    @Test func indentedLinesAreNotTopLevelKeys() {
+        let text = "---\ntitle: real\nmeta:\n  title: inner\n\tcolor: tint-9\n---\n본문"
+        var content = NoteFileCodec.decode(text)
+        #expect(content.title == "real")
+        #expect(content.colorID == nil)
+        #expect(content.unknownLines == ["meta:", "  title: inner", "\tcolor: tint-9"])
+
+        content.body = "고친 본문"
+        #expect(NoteFileCodec.encode(content, over: text)
+            == "---\ntitle: real\nmeta:\n  title: inner\n\tcolor: tint-9\n---\n고친 본문")
+    }
+
+    @Test func byteOrderMarkBeforeTheHeaderIsSkippedAndKept() {
+        let text = "\u{FEFF}---\ntitle: bom\n---\n본문"
+        var content = NoteFileCodec.decode(text)
+        #expect(content.title == "bom")
+        #expect(content.body == "본문")
+        content.body = "고친 본문"
+        #expect(NoteFileCodec.encode(content, over: text) == "\u{FEFF}---\ntitle: bom\n---\n고친 본문")
+    }
 }

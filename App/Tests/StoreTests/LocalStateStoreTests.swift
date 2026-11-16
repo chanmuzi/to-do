@@ -43,6 +43,37 @@ import Store
         #expect(reloaded.space(for: SpaceID(rawValue: "home"))?.name == "개인")
     }
 
+    /// 잘린 상태 파일은 앱을 막지 않는다. 빈 상태로 시작하고 원래 파일은 옆에 남긴다.
+    @Test func corruptStateFilesAreSetAsideInsteadOfBlocking() throws {
+        defer { temporary.cleanUp() }
+        let directory = temporary.location.stateDirectory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let truncated = Data("{\"n1\":{\"isOpen\":tr".utf8)
+        try truncated.write(to: directory.appendingPathComponent("windows.json"))
+        try truncated.write(to: directory.appendingPathComponent("spaces.json"))
+
+        let windows = try WindowStateStore(location: temporary.location)
+        #expect(windows.all.isEmpty)
+        #expect(windows.loadWarning?.contains("windows.json.corrupt") == true)
+        #expect(try Data(contentsOf: directory.appendingPathComponent("windows.json.corrupt")) == truncated)
+
+        let spaces = try SpaceStore(location: temporary.location)
+        #expect(spaces.spaces.isEmpty)
+        #expect(spaces.loadWarning?.contains("spaces.json.corrupt") == true)
+        #expect(try Data(contentsOf: directory.appendingPathComponent("spaces.json.corrupt")) == truncated)
+
+        // 새로 저장할 수 있고, 다음에는 경고 없이 읽힌다.
+        try windows.set(NoteWindowState(), for: NoteID(rawValue: "n1"))
+        let reloaded = try WindowStateStore(location: temporary.location)
+        #expect(reloaded.loadWarning == nil)
+        #expect(reloaded.all.count == 1)
+
+        // 또 망가지면 먼저 옮겨 둔 파일을 덮지 않는다.
+        try Data("[".utf8).write(to: directory.appendingPathComponent("windows.json"))
+        #expect(try WindowStateStore(location: temporary.location).loadWarning?.contains("windows.json.corrupt-2") == true)
+        #expect(try Data(contentsOf: directory.appendingPathComponent("windows.json.corrupt")) == truncated)
+    }
+
     @Test func locationsStayInsideTheGivenDirectory() throws {
         let notes = URL(fileURLWithPath: "/tmp/fn-example/notes", isDirectory: true)
         let isolated = StoreLocation.isolated(notesDirectory: notes)

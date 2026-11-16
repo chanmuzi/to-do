@@ -22,10 +22,9 @@ import Models
         var changes: [StoreChange] = []
         let observation = store.observe { changes.append($0) }
 
-        var note = try store.create(NoteDraft(title: "하나"))
-        note.body = "고침"
-        try store.save(note)
-        try store.save(note) // 내용이 같으면 알리지 않는다.
+        let note = try store.create(NoteDraft(title: "하나"))
+        try store.update(note.id) { $0.body = "고침" }
+        try store.update(note.id) { $0.body = "고침" } // 내용이 같으면 알리지 않는다.
         try store.moveToTrash(note.id)
 
         #expect(changes == [
@@ -55,30 +54,30 @@ import Models
     @Test func scheduledSaveIsDebouncedAndWritesTheLatest() async throws {
         defer { temporary.cleanUp() }
         let store = try FileNoteStore(location: temporary.location, autosaveDelay: .milliseconds(80))
-        var note = try store.create(NoteDraft(title: "자동 저장"))
+        let note = try store.create(NoteDraft(title: "자동 저장"))
         var updates = 0
         let observation = store.observe { if $0.kind == .updated { updates += 1 } }
         defer { observation.cancel() }
 
         for text in ["가", "가나", "가나다"] {
-            note.body = text
-            store.scheduleSave(note)
+            try store.scheduleUpdate(note.id) { $0.body = text }
         }
-        // 아직 디스크에는 없다.
-        #expect(try store.load(note.id).body == "")
+        // 아직 디스크에는 없다. 저장소의 지금 값에는 있다.
+        #expect(try String(contentsOf: temporary.noteFile(note.id.rawValue), encoding: .utf8).hasSuffix("---\n"))
+        #expect(try store.load(note.id).body == "가나다")
+        #expect(try store.list().notes.first?.body == "가나다")
         #expect(await wait { updates > 0 })
         #expect(updates == 1)
-        #expect(try store.load(note.id).body == "가나다")
+        #expect(try String(contentsOf: temporary.noteFile(note.id.rawValue), encoding: .utf8).hasSuffix("---\n가나다"))
     }
 
     @Test func flushWritesPendingSavesImmediately() throws {
         defer { temporary.cleanUp() }
         let store = try FileNoteStore(location: temporary.location, autosaveDelay: .seconds(60))
-        var note = try store.create(NoteDraft())
-        note.body = "끝내기 직전"
-        store.scheduleSave(note)
+        let note = try store.create(NoteDraft())
+        try store.scheduleUpdate(note.id) { $0.body = "끝내기 직전" }
         try store.flushPendingSaves()
-        #expect(try store.load(note.id).body == "끝내기 직전")
+        #expect(try FileNoteStore(location: temporary.location).load(note.id).body == "끝내기 직전")
     }
 
     @Test func failedScheduledSaveIsReported() async throws {
@@ -90,14 +89,17 @@ import Models
         }
         defer { observation.cancel() }
 
-        // 노트 파일 자리에 폴더가 있으면 쓸 수 없다.
-        let note = Note(id: NoteID(rawValue: "blocked"), created: Date(), modified: Date())
+        // 고치는 사이에 노트 파일 자리가 폴더로 바뀌면 쓸 수 없다.
+        let note = try store.create(NoteDraft(title: "막힌 노트"))
+        try store.scheduleUpdate(note.id) { $0.body = "쓰지 못할 글" }
+        try FileManager.default.removeItem(at: temporary.noteFile(note.id.rawValue))
         try FileManager.default.createDirectory(
-            at: temporary.noteFile("blocked"), withIntermediateDirectories: true
+            at: temporary.noteFile(note.id.rawValue), withIntermediateDirectories: true
         )
-        store.scheduleSave(note)
         #expect(await wait { !failures.isEmpty })
         #expect(failures.first?.id == note.id)
+        // 고친 내용은 버리지 않고 들고 있다.
+        #expect(try store.load(note.id).body == "쓰지 못할 글")
     }
 
     @Test func externalChangesAreReported() async throws {
@@ -125,5 +127,52 @@ import Models
 
         try FileManager.default.removeItem(at: temporary.noteFile("outside"))
         #expect(await wait { changes.contains(StoreChange(id: id, kind: .removed, origin: .external)) })
+    }
+
+    /// 계속 고치는 중이어도 첫 변경 뒤 최대 대기가 지나면 디스크에 쓴다.
+    @Test func continuousEditingStillReachesDiskWithinTheMaximumWait() async throws {
+        defer { temporary.cleanUp() }
+        let store = try FileNoteStore(
+            location: temporary.location, autosaveDelay: .seconds(60), autosaveMaxWait: .milliseconds(200)
+        )
+        let note = try store.create(NoteDraft(title: "계속 치는 중"))
+        var updates = 0
+        let observation = store.observe { if $0.kind == .updated { updates += 1 } }
+        defer { observation.cancel() }
+
+        // 디바운스(60초)보다 훨씬 촘촘하게 계속 고친다. 디바운스만으로는 영영 쓰지 않는다.
+        var typed = ""
+        let deadline = Date().addingTimeInterval(3)
+        while updates == 0, Date() < deadline {
+            typed += "가"
+            try store.scheduleUpdate(note.id) { $0.body = typed }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(updates >= 1)
+        let onDisk = try String(contentsOf: temporary.noteFile(note.id.rawValue), encoding: .utf8)
+        #expect(onDisk.hasSuffix("가"))
+    }
+
+    /// 저장소를 버리면 폴더 감시가 쥔 디스크립터도 닫힌다.
+    @Test func droppedStoresReleaseTheirDirectoryDescriptors() async throws {
+        defer { temporary.cleanUp() }
+        let directory = temporary.location.notesDirectory.lastPathComponent
+        let marker = "/\(temporary.root.lastPathComponent)/\(directory)"
+        func openDescriptors() -> Int {
+            (0..<getdtablesize()).filter { descriptor in
+                var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
+                guard fcntl(descriptor, F_GETPATH, &buffer) != -1 else { return false }
+                return String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                    .hasSuffix(marker)
+            }.count
+        }
+
+        do {
+            let alive = try FileNoteStore(location: temporary.location)
+            #expect(openDescriptors() == 1)
+            _ = alive
+        }
+        for _ in 0..<50 { _ = try FileNoteStore(location: temporary.location) }
+        #expect(await wait { openDescriptors() == 0 })
     }
 }
