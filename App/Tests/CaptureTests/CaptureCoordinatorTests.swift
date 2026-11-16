@@ -6,8 +6,10 @@ import Testing
 @_spi(Verification) @testable import Capture
 
 /// 캡처 바를 실제로 띄우고 입력 경로(`insertText`, `setMarkedText`, `doCommand(by:)`)로 움직여 본다.
+/// 한 번에 하나씩 돈다(`.serialized`): 창을 띄우는 시험이 한꺼번에 시작하면 메인 액터가 밀려, 전환 시간을
+/// 기다리는 다른 시험이 제때 차례를 받지 못한다.
 @MainActor
-@Suite struct CaptureCoordinatorTests {
+@Suite(.serialized) struct CaptureCoordinatorTests {
     private let fixture: CaptureFixture
     private let capture: CaptureCoordinator
     private let work = CaptureFixture.work.id
@@ -434,7 +436,7 @@ import Testing
     // MARK: - 닫힘과 실패를 알리기
 
     /// 닫힐 때 포커스를 열기 전의 자리로 돌려줄지 알린다: esc, ↵로 넣음, `hide()`는 돌려주고,
-    /// ⌘↵는 새 노트가 키 창이 되므로 돌려주지 않는다. 알림은 새 노트 요청보다 먼저 온다.
+    /// ⌘↵는 새 노트가 키 창이 되므로 돌려주지 않는다. ⌘↵는 새 노트가 만들어진 뒤에 닫히므로 알림이 요청 뒤에 온다.
     @Test func dismissalTellsWhetherFocusShouldGoBack() throws {
         defer { fixture.cleanUp() }
         var events: [String] = []
@@ -454,7 +456,7 @@ import Testing
         capture.performSubmitAsNewNote()
 
         #expect(events == [
-            "dismiss true routes 0", "dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 0",
+            "dismiss true routes 0", "dismiss true routes 0", "dismiss true routes 0", "dismiss false routes 1",
         ])
         #expect(fixture.routes.count == 1)
     }
@@ -516,5 +518,144 @@ import Testing
         capture.show()
         try input().type("첫 줄\n둘째 줄\t끝")
         #expect(try input().string == "첫 줄 둘째 줄 끝")
+    }
+
+    // MARK: - 닫히는 중에는 명령을 받지 않는다
+
+    /// 검토에서 나온 문제: 다른 앱에서 연 캡처 바에 글을 적고 ↵를 잇달아 두 번 누르면(사라지는 `dur` 안에)
+    /// 투두가 두 번 들어갔다. 닫히기 시작한 바는 명령도 글도 받지 않는다.
+    @Test func secondReturnWhileClosingAddsNothing() throws {
+        defer { fixture.cleanUp() }
+        capture.show()
+        try input().type("우유 사기")
+        try press(returnKey)
+        #expect(!capture.isVisible)
+        #expect(try !input().isEditable)
+        // 창은 아직 내려가지 않았다(사라지는 중). 그사이의 ↵, ⌘↵, ⇥.
+        try press(returnKey)
+        capture.performSubmit()
+        capture.performSubmitAsNewNote()
+        try press(tabKey)
+
+        let notes = try fixture.notes.list().notes
+        #expect(notes.count == 1)
+        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("---\n[ ] 우유 사기\n"))
+        #expect(fixture.routes.isEmpty)
+
+        // 다시 띄우면 전처럼 글을 받는다.
+        capture.show()
+        #expect(try input().isEditable)
+        try input().type("빵 사기")
+        try press(returnKey)
+        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("[ ] 우유 사기\n[ ] 빵 사기\n"))
+    }
+
+    /// 창을 내리는 일은 움직임이 끝났다는 알림이 아니라 전환 시간에 걸려 있다: 화면이 꺼져 움직임이 나아가지
+    /// 않아도 `dur` 뒤에는 창이 내려가 있고 끝의 자리와 알파에 놓여 있다.
+    @Test func hiddenBarIsOrderedOutAfterTheTransitionTimeWhateverTheAnimationDid() async throws {
+        defer { fixture.cleanUp() }
+        capture.show()
+        let window = try #require(capture.window)
+        var deadline = Date().addingTimeInterval(3)
+        while window.frame != capture.settledFrame, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(window.frame == capture.settledFrame)
+
+        capture.hide()
+        // 닫히기 시작하면 곧바로 글을 받지 않고, 창은 전환 시간 뒤에 내려간다.
+        #expect(try !input().isEditable)
+        deadline = Date().addingTimeInterval(3)
+        while window.isVisible, Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(!window.isVisible)
+        #expect(window.alphaValue == 0)
+        #expect(window.frame == capture.entranceFrame)
+        #expect(!capture.isVisible)
+    }
+
+    // MARK: - ⌘↵의 답
+
+    /// 검토에서 나온 문제: ⌘↵로 새 노트를 만들지 못하면(쓸 수 없는 폴더) 알림은 뜨는데 바는 이미 닫히고
+    /// 적은 글이 사라져 있었다. 만들어졌을 때만 닫는다.
+    @Test func commandReturnKeepsTheBarAndItsTextWhenTheNoteCannotBeMade() throws {
+        defer { fixture.cleanUp() }
+        var dismissals: [Bool] = []
+        capture.onDismiss = { dismissals.append($0) }
+        fixture.routeResult = { _ in .failed }
+
+        capture.show()
+        try input().type("분기 회고")
+        capture.performSubmitAsNewNote()
+
+        #expect(fixture.routes.count == 1)
+        #expect(capture.isVisible)
+        #expect(try input().string == "분기 회고")
+        #expect(try input().isEditable)
+        #expect(dismissals.isEmpty)
+        #expect(fixture.logs.contains { $0.contains("새 노트를 만들지 못해") })
+
+        // 이어지지 않은 요청이어도 같다(닫고 아무 일도 없는 것처럼 보이지 않는다).
+        fixture.routeResult = { _ in .unconnected }
+        capture.performSubmitAsNewNote()
+        #expect(capture.isVisible)
+        #expect(try input().string == "분기 회고")
+
+        // 문제가 풀린 뒤 다시 누르면 만들어지고 닫힌다. 새 노트가 키 창이므로 포커스를 돌려주지 않는다.
+        fixture.routeResult = { _ in .handled }
+        capture.performSubmitAsNewNote()
+        #expect(!capture.isVisible)
+        #expect(dismissals == [false])
+        #expect(fixture.routes.count == 3)
+    }
+
+    /// ⌘↵의 요청이 돌아오기 전에 키 창에서 물러나도(실패 알림 창, 새로 뜬 노트) 그 때문에 닫히지 않는다.
+    @Test func resigningKeyWhileTheNewNoteRequestIsOutDoesNotDismiss() throws {
+        defer { fixture.cleanUp() }
+        let center = NotificationCenter()
+        let capture = fixture.makeCoordinator()
+        capture.notificationCenter = center
+        var dismissals: [Bool] = []
+        capture.onDismiss = { dismissals.append($0) }
+        capture.show()
+        let window = try #require(capture.window)
+        fixture.routeResult = { _ in
+            center.post(name: NSWindow.didResignKeyNotification, object: window)
+            return .failed
+        }
+
+        try #require(capture.inputView).type("분기 회고")
+        capture.performSubmitAsNewNote()
+        #expect(capture.isVisible)
+        #expect(dismissals.isEmpty)
+
+        // 여느 때 키 창에서 물러나면(바깥을 누름) 닫히고 포커스는 누른 곳에 둔다.
+        center.post(name: NSWindow.didResignKeyNotification, object: window)
+        #expect(!capture.isVisible)
+        #expect(dismissals == [false])
+    }
+
+    // MARK: - ⌘W
+
+    /// ⌘W는 esc처럼 바를 닫는다(테두리 없는 창은 `performClose`를 받지 못해 경고음만 났다).
+    /// 한글 입력 상태에서는 글자가 자모로 오므로 키 자리로 견준다.
+    @Test func commandWClosesTheBarLikeEscape() throws {
+        defer { fixture.cleanUp() }
+        var dismissals: [Bool] = []
+        capture.onDismiss = { dismissals.append($0) }
+        for characters in ["w", "ㅈ"] {
+            capture.show()
+            try input().type("버릴 글")
+            let event = try #require(NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: .command,
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: capture.window?.windowNumber ?? 0, context: nil, characters: characters,
+                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: 13
+            ))
+            #expect(try input().performKeyEquivalent(with: event))
+            #expect(!capture.isVisible)
+        }
+        #expect(dismissals == [true, true])
+        #expect(try fixture.notes.list().notes.isEmpty)
+        #expect(fixture.routes.isEmpty)
     }
 }

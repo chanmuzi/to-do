@@ -16,6 +16,10 @@ final class CaptureBadgeView: NSView {
     private let iconView = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private(set) var content: Content?
+    /// 보여야 하는지(움직이는 중이어도 가려는 쪽).
+    private var isShown = false
+    /// 다 흐려진 뒤 자리를 비우는 일.
+    private var vacate: Task<Void, Never>?
 
     init(style: CaptureStyle) {
         self.style = style
@@ -36,22 +40,31 @@ final class CaptureBadgeView: NSView {
 
     /// 내용을 바꾼다. 나타나고 사라지는 것은 알파로 `dur` 동안(규칙 8). 사라질 때는 마지막 내용을 그대로 둔 채 흐려진다.
     func apply(_ newContent: Content?, animated: Bool) {
+        vacate?.cancel()
+        vacate = nil
+        isShown = newContent != nil
         if let newContent {
             content = newContent
             refresh()
         }
-        let alpha: CGFloat = newContent == nil ? 0 : 1
-        let finish: @MainActor () -> Void = { [weak self] in
-            guard let self, newContent == nil, self.alphaValue == 0 else { return }
-            self.content = nil
-            self.superview?.needsLayout = true
-        }
+        let alpha: CGFloat = isShown ? 1 : 0
         guard animated, alpha != alphaValue else {
             alphaValue = alpha
-            finish()
+            if !isShown { vacateSlot() }
             return
         }
-        style.animate({ animator().alphaValue = alpha }, completion: finish)
+        style.animate { animator().alphaValue = alpha }
+        // 다 흐려진 뒤에 자리를 비운다. 움직임이 끝났다는 알림이 아니라 `dur` 뒤의 시계로 한다.
+        if !isShown { vacate = style.afterTransition { [weak self] in self?.vacateSlot() } }
+    }
+
+    /// 사라진 표시의 내용을 버리고 자리를 비운다. 그사이 다시 나타났으면 두지 않는다.
+    private func vacateSlot() {
+        vacate = nil
+        guard !isShown, content != nil else { return }
+        alphaValue = 0
+        content = nil
+        superview?.needsLayout = true
     }
 
     func refresh() {
