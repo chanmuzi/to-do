@@ -18,12 +18,6 @@ extension EditorController {
         // 화면의 원문과 견준다. 미뤄 둔 변경이 있었다면 새 글에 이미 들어 있으므로 갈아 치운다.
         deferredOutsideEdit = nil
         guard let edit = OutsideEdit(from: document.text, to: target) else { return }
-        // 앞뒤로 같은 부분이 하나도 없으면 다른 글이다. 지킬 자리가 없으므로 통째로 넣는다(되돌리기 기록을 비운다).
-        if edit.range.location == 0, edit.range.length == document.length, document.length > 0,
-           editorUndoManager.groupsByEvent || editorUndoManager.groupingLevel == 0 {
-            text = target
-            return
-        }
         guard textView.hasMarkedText() else {
             perform(edit)
             return
@@ -58,17 +52,16 @@ extension EditorController {
         let touchesEnd = NSMaxRange(edit.range) == oldLength
         let replacement = NSAttributedString(string: edit.replacement, attributes: baseAttributes)
 
-        isApplyingOutsideChange = true
-        if edit.range.location == oldLength {
-            // 끝에 붙기만 한 글: 되돌리기에 적지 않는다(⌘Z는 붙인 글을 지우지 않는다). 앞선 기록이
-            // 가리키는 범위는 모두 붙인 글보다 앞이라 어긋나지 않는다.
-            storage.replaceCharacters(in: edit.range, with: replacement)
-        } else if textView.shouldChangeText(in: edit.range, replacementString: edit.replacement) {
-            // 그 밖의 변경: 텍스트 뷰의 편집 경로로 넣어 되돌리기 한 단계가 되게 한다. 그래야 앞선 기록이
-            // 가리키는 범위가 이 변경과 어긋나지 않는다.
-            storage.replaceCharacters(in: edit.range, with: replacement)
-            textView.didChangeText()
+        // 되돌리기에 적지 않는다(⌘Z는 바깥이 쓴 글을 지우지도 되살리지도 않는다). 사용자의 기록이 가리키는
+        // 위치는 이 변경만큼 따라 옮기고, 이 변경이 사용자가 고친 자리에 겹쳐 옮길 수 없는 단계는 버린다.
+        if edit.range.location == 0, edit.range.length == oldLength, oldLength > 0 {
+            // 앞뒤로 같은 부분이 하나도 없는 다른 글이다. 지킬 위치가 없다.
+            history = UndoHistory()
+        } else {
+            history.shift(outside: edit.range, delta: edit.delta)
         }
+        isApplyingOutsideChange = true
+        storage.replaceCharacters(in: edit.range, with: replacement)
         hasPendingChange = wasPending
         selectionVersion = documentVersion
 
@@ -76,7 +69,10 @@ extension EditorController {
         // 문서 끝의 커서는, 바깥의 글이 커서가 있는 줄에 이어 붙었으면(줄바꿈으로 시작하지 않는다) 그 글 뒤로
         // 보낸다. 제자리에 두면 사용자가 이어 치는 글이 바깥이 쓴 줄의 머리에 끼어든다. 바깥의 글이
         // 줄바꿈으로 시작하면 커서의 줄은 그대로이므로 제자리에 둔다.
-        let sticks = caretWasAtEnd && touchesEnd && !edit.replacement.hasPrefix("\n")
+        // 앞서 붙은 줄 뒤에서 "이어 치는 글은 새 줄에서"로 기다리던 커서는 새 빈 마지막 줄에 있는 셈이다.
+        // 이어서 붙는 글이 줄바꿈으로 시작해도 그 뒤로 따라간다.
+        let waitsOnNewLine = caretWasAtEnd && pendingLineBreak.map { $0.location == oldLength } == true
+        let sticks = caretWasAtEnd && touchesEnd && (!edit.replacement.hasPrefix("\n") || waitsOnNewLine)
         let start = edit.moved(selection.location, sticksToEnd: sticks)
         let end = selection.length == 0 ? start : max(start, edit.moved(NSMaxRange(selection), sticksToEnd: false))
         setSelection(NSRange(location: start, length: end - start))

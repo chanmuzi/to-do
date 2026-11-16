@@ -35,6 +35,23 @@ final class EditorHarness {
         editor.undoManager.groupsByEvent = false
     }
 
+    /// `|`로 커서(둘이면 선택)를 적은 원문으로 시작한다.
+    static func at(_ marked: String) throws -> EditorHarness {
+        let scenario = Scenario(marked)
+        let harness = try EditorHarness(scenario.text)
+        harness.place(at: scenario.selection.location, length: scenario.selection.length)
+        return harness
+    }
+
+    /// 다른 앱에서 복사한 글자를 붙여 넣는다(이름 붙인 클립보드를 쓴다. 시스템 클립보드는 건드리지 않는다).
+    func paste(_ text: String) {
+        let board = NSPasteboard(name: NSPasteboard.Name("floating-notes-tests-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        board.clearContents()
+        board.setString(text, forType: .string)
+        step { controller.paste(from: board) }
+    }
+
     var controller: EditorController { editor.controller }
     var view: EditorTextView { controller.textView }
     var document: MarkdownDocument { controller.document }

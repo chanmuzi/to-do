@@ -94,7 +94,8 @@ import Testing
         // 구간의 끝이나 앞에서는 나눌 것이 없다. 빈 구간을 남기지 않는다.
         #expect(newline("**굵게|**") == "**굵게**\n|")
         #expect(newline("**|굵게**") == "\n**|굵게**")
-        #expect(newline("가 **굵게**| 나") == "가 **굵게**\n| 나")
+        // 커서 뒤의 공백은 줄바꿈과 함께 지운다(새 줄의 맨 앞에서 감춘 들여쓰기가 되지 않게).
+        #expect(newline("가 **굵게**| 나") == "가 **굵게**\n|나")
     }
 
     @Test func returnOnTheEmptyLastLineLeavesTheCodeBlock() {
@@ -201,10 +202,25 @@ import Testing
         // 다른 종류의 줄에서는 줄 머리를 떼고, 들여쓰기는 그대로 둔다.
         #expect(backtick("- ``|항목") == "```\n|항목\n```")
         #expect(backtick("\t# ``|제목") == "\t```\n\t|제목\n\t```")
-        // 줄 맨 앞이 아니면, 그리고 코드 블록 안에서는 바꾸지 않는다.
+        // 줄 맨 앞이 아니면 바꾸지 않는다.
         #expect(backtick("글 ``|") == nil)
         #expect(backtick("`|") == nil)
-        #expect(backtick("```\n``|\n```") == nil)
+    }
+
+    /// 코드 블록 안에서 빈 줄에 친 백틱 셋은 블록에서 나가게 한다(새 ``` 줄이 생기지 않는다).
+    @Test func thirdBacktickInsideACodeBlockLeavesTheBlock() {
+        // 마지막 줄: Return과 같다.
+        #expect(backtick("```\ncode\n``|\n```\nafter **b**") == "```\ncode\n```\n|\nafter **b**")
+        // 첫 줄: 블록 위에 문단을 연다. 가운데 줄: 블록을 둘로 나눈다.
+        #expect(backtick("```\n``|\ncode\n```") == "|\n```\ncode\n```")
+        #expect(backtick("```\na\n``|\nb\n```") == "```\na\n```\n|\n```\nb\n```")
+        // 줄이 하나뿐인 블록은 블록을 없앤다.
+        #expect(backtick("```\n``|\n```") == "|")
+        // 닫히지 않은 블록은 닫는다.
+        #expect(backtick("```\ncode\n``|") == "```\ncode\n```\n|")
+        // 글이 있는 줄, 줄 가운데에서는 백틱이 글자로 들어간다.
+        #expect(backtick("```\nx``|\n```") == nil)
+        #expect(backtick("```\n``|x\n```") == nil)
     }
 
     @Test func backspaceAtContentStartRemovesTheMarker() {
@@ -260,7 +276,8 @@ import Testing
         #expect(wrap("**가나|다|**", .bold) == "**가나**|다|")
         #expect(wrap("`가|나|다`", .code) == "`가`|나|`다`")
         // 안쪽의 다른 구간과 엇갈리면 그 구간까지 넣는다.
-        #expect(wrap("**가 ~~나|다~~ 라|**", .bold) == "**가 **|~~나다~~ 라|")
+        // 남는 조각의 끝 공백은 기호 밖에 둔다(닫는 기호 바로 앞은 공백일 수 없다).
+        #expect(wrap("**가 ~~나|다~~ 라|**", .bold) == "**가** |~~나다~~ 라|")
     }
 
     @Test func wrappingMergesRunsOfTheSameKind() {

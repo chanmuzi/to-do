@@ -183,10 +183,13 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.marked == "|")
         h.undo()
         #expect(h.marked == "```\n|\n```")
+        // 글이 있는 블록의 첫 줄 맨 앞에서는 블록을 푼다(``` 줄이 지워지고 글은 남는다).
         h.type("x")
         h.press(NSResponder.home)
         h.press(NSResponder.backspace)
-        #expect(h.marked == "```\n|x\n```")
+        #expect(h.marked == "|x")
+        h.undo()
+        #expect(h.editor.text == "```\nx\n```")
     }
 }
 
@@ -214,12 +217,20 @@ private typealias Key = EditorShortcuts.Key
         h.type(" 뒤")
         #expect(h.marked == "앞 \(source) 뒤|")
         #expect(h.document.lines[0].spans == [span])
-        // 되돌리면 한 글자씩 풀린다: 닫는 기호의 마지막 글자가 지워지면 다시 보통 글자다.
+        // 되돌리면 한 글자씩 풀린다. 서식이 된 것을 되돌리면 친 기호가 글자 그대로 남는다
+        // (원문에서는 백슬래시로 막아 두어 다시 서식이 되지 않는다).
         h.undo()
         h.undo()
+        h.undo()
+        let literal = EditorCommands.escaped(source)
+        #expect(h.marked == "앞 \(literal)|")
+        #expect(h.document.lines[0].markedSpans.isEmpty)
+        #expect(h.document.lines[0].escapes.count == literal.count - source.count)
+        // 한 번 더 되돌리면 마지막에 친 글자가 지워진다.
         h.undo()
         #expect(h.marked == "앞 \(unfinished)|")
         #expect(h.document.lines[0].spans.isEmpty)
+        h.redo()
         h.redo()
         #expect(h.document.lines[0].spans == [span])
     }
@@ -386,7 +397,7 @@ private typealias Key = EditorShortcuts.Key
 @MainActor
 @Suite struct HiddenMarkerMovementTests {
     // a0 b1 c2 *3 *4 d5 e6 f7 *8 *9 g10 h11 i12
-    private func harness() throws -> EditorHarness { try EditorHarness("abc**def**ghi") }
+    private func harness() throws -> EditorHarness { try EditorHarness("가나다**라마바**사아자") }
 
     @Test func arrowsNeverStopInsideAMarker() throws {
         let h = try harness()
@@ -416,20 +427,20 @@ private typealias Key = EditorShortcuts.Key
             h.press(NSResponder.shiftRight)
             seen.append(h.marked)
         }
-        #expect(seen == ["ab|c|**def**ghi", "ab|c**d|ef**ghi", "ab|c**de|f**ghi", "ab|c**def|**ghi", "ab|c**def**g|hi"])
+        #expect(seen == ["가나|다|**라마바**사아자", "가나|다**라|마바**사아자", "가나|다**라마|바**사아자", "가나|다**라마바|**사아자", "가나|다**라마바**사|아자"])
         seen = []
         for _ in 0..<5 {
             h.press(NSResponder.shiftLeft)
             seen.append(h.marked)
         }
-        #expect(seen == ["ab|c**def|**ghi", "ab|c**de|f**ghi", "ab|c**d|ef**ghi", "ab|c|**def**ghi", "ab|c**def**ghi"])
+        #expect(seen == ["가나|다**라마바|**사아자", "가나|다**라마|바**사아자", "가나|다**라|마바**사아자", "가나|다|**라마바**사아자", "가나|다**라마바**사아자"])
         h.place(at: 11)
         seen = []
         for _ in 0..<5 {
             h.press(NSResponder.shiftLeft)
             seen.append(h.marked)
         }
-        #expect(seen == ["abc**def**|g|hi", "abc**de|f**g|hi", "abc**d|ef**g|hi", "abc**|def**g|hi", "ab|c**def**g|hi"])
+        #expect(seen == ["가나다**라마바**|사|아자", "가나다**라마|바**사|아자", "가나다**라|마바**사|아자", "가나다**|라마바**사|아자", "가나|다**라마바**사|아자"])
     }
 
     @Test func wordAndLineMovementLandOnValidPositions() throws {
@@ -453,7 +464,7 @@ private typealias Key = EditorShortcuts.Key
     }
 
     @Test func clickAndDragLandOnTheVisibleText() throws {
-        let h = try EditorHarness("abc**def**ghi 그리고 [링크](https://a.example) 끝")
+        let h = try EditorHarness("가나다**라마바**사아자 그리고 [링크](https://a.example) 끝")
         h.window.layoutIfNeeded()
         func point(_ location: Int) throws -> CGPoint {
             let rect = try #require(h.controller.segmentRects(for: NSRange(location: location, length: 0)).first)
@@ -468,10 +479,10 @@ private typealias Key = EditorShortcuts.Key
         let from = h.view.characterIndexForInsertion(at: try point(1))
         let to = h.view.characterIndexForInsertion(at: try point(7))
         h.view.setSelectedRange(NSRange(location: from, length: to - from))
-        #expect(h.marked == "a|bc**de|f**ghi 그리고 [링크](https://a.example) 끝")
+        #expect(h.marked == "가|나다**라마|바**사아자 그리고 [링크](https://a.example) 끝")
         let later = h.view.characterIndexForInsertion(at: try point(12))
         h.view.setSelectedRange(NSRange(location: to, length: later - to))
-        #expect(h.marked == "abc**de|f**gh|i 그리고 [링크](https://a.example) 끝")
+        #expect(h.marked == "가나다**라마|바**사아|자 그리고 [링크](https://a.example) 끝")
     }
 
     @Test func caretIsAFullLineTallNextToHiddenMarkers() throws {
@@ -529,7 +540,8 @@ private typealias Key = EditorShortcuts.Key
             ("가**나다**라", NSRange(location: 0, length: 4), nil, "|**다**라"),
             ("가**나다**라", NSRange(location: 4, length: 4), "x", "가**나**x|"),
             ("**가나** ~~다라~~", NSRange(location: 3, length: 7), nil, "**가**|~~라~~"),
-            ("[글자](https://a.example) 뒤", NSRange(location: 1, length: 2), nil, "| 뒤"),
+            // 지운 뒤에 줄 맨 앞에 남는 공백은 함께 지운다(남겨 두면 감춘 들여쓰기가 된다).
+            ("[글자](https://a.example) 뒤", NSRange(location: 1, length: 2), nil, "|뒤"),
             ("==형광=={2}", NSRange(location: 2, length: 2), nil, "|"),
         ]
         for item in cases {

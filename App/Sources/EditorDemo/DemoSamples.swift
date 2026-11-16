@@ -5,10 +5,27 @@ enum DemoSamples {
         case "note": note
         case "elements": elements
         case "code": code
+        case "literal": literal
         case "empty": ""
         default: nil
         }
     }
+
+    /// 서식처럼 생겼지만 글자인 것, 백슬래시로 막은 글자, 줄이 없는 코드 블록과 닫히지 않은 블록.
+    static let literal = """
+    if a == 1 && b == 2
+    char **argv, int **p
+    2 ** 3 ** 4 그리고 x==1&y==2
+    use ` and ` here
+    막은 글자: \\*\\*굵게 아님\\*\\* \\=\\=형광 아님\\=\\=
+    진짜 서식: **굵게** ==형광== `코드` ~~취소~~
+    줄이 없는 블록:
+    ```
+    ```
+    닫히지 않은 블록:
+    ```swift
+    let a = 1
+    """
 
     /// 화면 2 맨 위의 "오늘 할 일" 노트.
     static let note = """

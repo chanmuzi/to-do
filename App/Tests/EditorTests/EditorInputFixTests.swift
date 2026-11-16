@@ -377,15 +377,11 @@ private func namedPasteboard() -> NSPasteboard {
         // 닫힌 블록의 상자는 닫는 줄에서 끝난다.
         #expect(box.maxY <= empty.typographicBounds.minY)
 
-        // 닫는 줄이 없어지면(사용자는 지울 수 없다. 명령이 지운 것으로 본다) 빈 줄이 코드가 되고, 되돌리면 돌아온다.
-        h.step {
-            h.controller.apply(TextEdit(range: NSRange(location: 9, length: 3), replacement: "", selection: NSRange(location: 9, length: 0)))
-        }
-        #expect(h.document.lines.last?.kind == .code)
-        let open = try lastFragment(h)
+        // 닫는 줄이 없는 글(다른 프로그램이 쓴 파일)에서는 빈 마지막 줄이 코드다.
+        let k = try EditorHarness("```\ncode\n")
+        k.caret(at: k.document.length)
+        #expect(k.document.lines.last?.kind == .code)
+        let open = try lastFragment(k)
         #expect(open.codeBoxRect?.maxY == open.textLineFragments.last?.typographicBounds.maxY)
-        h.undo()
-        let again = try lastFragment(h)
-        #expect(try #require(again.codeBoxRect).maxY <= (try #require(again.textLineFragments.last)).typographicBounds.minY)
     }
 }

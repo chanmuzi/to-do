@@ -94,13 +94,71 @@ nonisolated extension EditorCommands {
 
     /// 정해 둔 서식대로 글자를 칠 자리를 만드는 편집. 빈 기호 쌍을 넣고 커서를 그 사이에 둔다
     /// (바꿔 쓸 글이 비어 있으면 커서만 옮긴다). 만들 수 없으면 `nil`.
+    /// 조합(한글 입력)을 시작하기 직전에 쓴다. 글자를 바로 넣을 때는 `typing`을 쓴다.
     static func materialize(_ doc: MarkdownDocument, caret: Int, marks: TypingMarks) -> TextEdit? {
+        guard let place = typingPlace(doc, caret: caret, marks: marks) else { return nil }
+        return TextEdit(
+            range: NSRange(location: place.location, length: 0),
+            replacement: place.before + place.after,
+            selection: NSRange(location: place.location + place.before.utf16.count, length: 0)
+        )
+    }
+
+    /// 정해 둔 서식으로 `text`를 넣는 편집(기호와 글자가 한 번의 편집이다). 그 서식으로 넣을 수 없으면 `nil`
+    /// (서식 없이 넣는다): 기호가 기호로 읽히지 않는 자리(낱말 한가운데)이거나 글이 공백으로 시작하거나 끝난다.
+    ///
+    /// 여러 줄의 글은 줄마다 따로 감싼다(구간은 줄을 넘지 못한다). 빈 줄은 감싸지 않는다.
+    static func typing(_ doc: MarkdownDocument, _ text: String, caret: Int, marks: TypingMarks) -> TextEdit? {
+        guard let place = typingPlace(doc, caret: caret, marks: marks) else { return nil }
+        let opens = place.opens.joined()
+        let closes = place.closes.joined()
+        if text.contains("\n") {
+            let wrapped = text.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces).isEmpty ? $0 : opens + $0 + closes }
+                .joined(separator: "\n")
+            // 커서를 안에 둔 구간은 `replacing`이 줄바꿈 앞에서 닫고 뒤에서 다시 연다.
+            return insert(doc, wrapped, replacing: NSRange(location: place.location, length: 0))
+        }
+        let inserted = place.before + text
+        let edit = TextEdit(
+            range: NSRange(location: place.location, length: 0),
+            replacement: inserted + place.after,
+            selection: NSRange(location: place.location + inserted.utf16.count, length: 0)
+        )
+        var markers: [NSRange] = []
+        var offset = 0
+        for marker in [place.exitClose] + place.opens {
+            markers.append(NSRange(location: offset, length: marker.utf16.count))
+            offset += marker.utf16.count
+        }
+        offset += text.utf16.count
+        for marker in place.closes + [place.exitOpen] {
+            markers.append(NSRange(location: offset, length: marker.utf16.count))
+            offset += marker.utf16.count
+        }
+        return marksAreRecognized(doc, edit, markers: markers) ? edit : nil
+    }
+
+    /// 정해 둔 서식으로 글자를 넣을 자리와, 그 앞뒤에 넣을 기호.
+    struct TypingPlace: Equatable, Sendable {
+        var location: Int
+        /// 구간 한가운데에서 끄는 서식: 그 구간을 여기서 닫고(`exitClose`) 글자 뒤에서 다시 연다(`exitOpen`).
+        var exitClose = ""
+        var exitOpen = ""
+        /// 새로 여는 구간들의 기호. 바깥 것부터.
+        var opens: [String] = []
+        /// 안쪽 것부터.
+        var closes: [String] = []
+
+        var before: String { exitClose + opens.joined() }
+        var after: String { closes.joined() + exitOpen }
+    }
+
+    static func typingPlace(_ doc: MarkdownDocument, caret: Int, marks: TypingMarks) -> TypingPlace? {
         let line = doc.line(at: caret)
         guard !marks.isEmpty, !line.kind.isCode, caret >= line.contentStart, line.marker(enclosing: caret) == nil else { return nil }
         let containing = line.spansContaining(caret)
-        var location = caret
-        var before = ""
-        var after = ""
+        var place = TypingPlace(location: caret)
         var remaining = containing
 
         // 끄는 서식: 그 구간에서 나가거나, 한가운데면 구간을 나눈다.
@@ -110,19 +168,19 @@ nonisolated extension EditorCommands {
             case .strike: marks.strike == false
             case .code: marks.code == false
             case .highlight(let number): marks.highlight != nil && marks.highlight != number
-            case .link: false
+            case .link, .escape: false
             }
         }
         if let outer = exits.last {
             if line.visualEnd(from: caret) >= NSMaxRange(outer.contentRange) {
-                location = NSMaxRange(outer.range)
-                remaining = line.spansContaining(location)
+                place.location = NSMaxRange(outer.range)
+                remaining = line.spansContaining(place.location)
             } else if line.visualStart(from: caret) <= outer.contentRange.location {
-                location = outer.range.location
-                remaining = line.spansContaining(location)
+                place.location = outer.range.location
+                remaining = line.spansContaining(place.location)
             } else if containing.first == outer {
-                before = doc.string(in: outer.closeMarker)
-                after = doc.string(in: outer.openMarker)
+                place.exitClose = doc.string(in: outer.closeMarker)
+                place.exitOpen = doc.string(in: outer.openMarker)
                 remaining.removeFirst()
             } else {
                 return nil
@@ -131,25 +189,17 @@ nonisolated extension EditorCommands {
 
         // 켜는 서식: 새 구간을 연다. 인라인 코드 안에는 열지 않는다.
         if !remaining.contains(where: { $0.kind == .code }) {
-            var opens = ""
-            var closes = ""
             func has(_ matches: (InlineSpan.Kind) -> Bool) -> Bool { remaining.contains { matches($0.kind) } }
             if let number = marks.highlight, number > 0, !has({ $0 == .highlight(number) }) {
-                opens += "=="
-                closes = highlightClose(number) + closes
+                place.opens.append("==")
+                place.closes.insert(highlightClose(number), at: 0)
             }
             for wrap in [Wrap.bold, .strike, .code] where marks[wrap] == true && !has(wrap.matches) {
-                opens += wrap.marker
-                closes = wrap.marker + closes
+                place.opens.append(wrap.marker)
+                place.closes.insert(wrap.marker, at: 0)
             }
-            before += opens
-            after = closes + after
         }
-        guard !before.isEmpty || !after.isEmpty || location != caret else { return nil }
-        return TextEdit(
-            range: NSRange(location: location, length: 0),
-            replacement: before + after,
-            selection: NSRange(location: location + before.utf16.count, length: 0)
-        )
+        guard !place.before.isEmpty || !place.after.isEmpty || place.location != caret else { return nil }
+        return place
     }
 }

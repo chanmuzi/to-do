@@ -57,15 +57,18 @@ nonisolated extension EditorCommands {
     static func inlineLine(_ doc: MarkdownDocument, _ selection: NSRange) -> MarkdownLine? {
         let index = doc.lineIndex(at: selection.location)
         let line = doc.lines[index]
+        // 줄 머리(감춘 기호)부터 고른 선택(⇧Home)은 글자가 보이기 시작하는 자리부터로 본다.
         guard doc.lineIndex(at: NSMaxRange(selection)) == index, !line.kind.isCode,
-              selection.location >= line.contentStart else { return nil }
+              NSMaxRange(selection) >= line.contentStart else { return nil }
         return line
     }
 
     /// 선택의 양 끝을 보이는 글자에 붙인다. 보이는 글자가 없으면 `nil`.
     static func visibleSelection(_ selection: NSRange, in line: MarkdownLine) -> NSRange? {
         guard selection.length > 0 else { return nil }
-        let start = line.visualEnd(from: selection.location)
+        var start = line.visualEnd(from: max(selection.location, line.contentStart))
+        // 백슬래시로 막은 글자는 백슬래시째로 고른다.
+        if let escape = line.escape(splitAt: start) { start = escape.range.location }
         let end = line.visualStart(from: NSMaxRange(selection))
         return end > start ? NSRange(location: start, length: end - start) : nil
     }
@@ -84,6 +87,11 @@ nonisolated extension EditorCommands {
             for span in line.markedSpans where span != ignored {
                 guard NSIntersectionRange(span.range, result).length > 0,
                       !contains(result, span.range), !contains(span.contentRange, result) else { continue }
+                result = NSUnionRange(result, span.range)
+                changed = true
+            }
+            // 백슬래시로 막은 글자는 백슬래시와 떨어지지 않는다.
+            for span in line.escapes where NSIntersectionRange(span.range, result).length > 0 && !contains(result, span.range) {
                 result = NSUnionRange(result, span.range)
                 changed = true
             }
@@ -115,7 +123,7 @@ nonisolated extension EditorCommands {
         _ selected: NSRange,
         open: String,
         close: String
-    ) -> TextEdit {
+    ) -> TextEdit? {
         let content = span.contentRange
         // 안쪽의 다른 구간과 엇갈리면 그 구간까지 넣는다. 그래도 밖으로 나가면 구간 전체를 바꾼다.
         var middle = content
@@ -137,16 +145,37 @@ nonisolated extension EditorCommands {
         if !contains(content, middle) { middle = content }
         let spanOpen = doc.string(in: span.openMarker)
         let spanClose = doc.string(in: span.closeMarker)
-        let left = doc.string(in: NSRange(location: content.location, length: middle.location - content.location))
-        let right = doc.string(in: NSRange(location: NSMaxRange(middle), length: NSMaxRange(content) - NSMaxRange(middle)))
-        let head = (left.isEmpty ? "" : spanOpen + left + spanClose) + open
+        let wholeLeft = doc.string(in: NSRange(location: content.location, length: middle.location - content.location))
+        let wholeRight = doc.string(in: NSRange(location: NSMaxRange(middle), length: NSMaxRange(content) - NSMaxRange(middle)))
+        // 남는 조각의 가장자리 공백은 기호 밖에 둔다(여는 기호 뒤와 닫는 기호 앞은 공백일 수 없다).
+        let leftSpace = String(wholeLeft.reversed().prefix { $0 == " " || $0 == "\t" }.reversed())
+        let rightSpace = String(wholeRight.prefix { $0 == " " || $0 == "\t" })
+        let left = String(wholeLeft.dropLast(leftSpace.count))
+        let right = String(wholeRight.dropFirst(rightSpace.count))
+        let head = (left.isEmpty ? "" : spanOpen + left + spanClose) + leftSpace + open
         let body = doc.string(in: middle)
-        let tail = close + (right.isEmpty ? "" : spanOpen + right + spanClose)
-        return TextEdit(
+        let tail = close + rightSpace + (right.isEmpty ? "" : spanOpen + right + spanClose)
+        let edit = TextEdit(
             range: span.range,
             replacement: head + body + tail,
             selection: NSRange(location: span.range.location + head.utf16.count, length: body.utf16.count)
         )
+        // 나눈 조각의 기호가 모두 기호로 읽혀야 한다. 낱말 한가운데여서 읽히지 않으면 나누지 않는다.
+        var markers: [NSRange] = []
+        func length(_ text: String) -> Int { text.utf16.count }
+        if !left.isEmpty {
+            markers.append(NSRange(location: 0, length: length(spanOpen)))
+            markers.append(NSRange(location: length(spanOpen) + length(left), length: length(spanClose)))
+        }
+        markers.append(NSRange(location: length(head) - length(open), length: length(open)))
+        let tailStart = length(head) + length(body)
+        markers.append(NSRange(location: tailStart, length: length(close)))
+        if !right.isEmpty {
+            let rightStart = tailStart + length(close) + length(rightSpace)
+            markers.append(NSRange(location: rightStart, length: length(spanOpen)))
+            markers.append(NSRange(location: rightStart + length(spanOpen) + length(right), length: length(spanClose)))
+        }
+        return marksAreRecognized(doc, edit, markers: markers) ? edit : nil
     }
 
     /// 선택을 `open`…`close`로 감싼다. 선택에 든 같은 서식의 기호는 벗겨 하나로 합친다.
@@ -159,6 +188,13 @@ nonisolated extension EditorCommands {
         strips: (InlineSpan.Kind) -> Bool
     ) -> TextEdit? {
         let isCode = open == Wrap.code.marker
+        // 고른 글의 가장자리 공백은 감싸지 않는다(여는 기호 뒤와 닫는 기호 앞은 공백일 수 없다).
+        var lower = selected.location
+        var upper = NSMaxRange(selected)
+        while lower < upper, InlineParser.isWhitespace(doc.units[lower]) { lower += 1 }
+        while upper > lower, InlineParser.isWhitespace(doc.units[upper - 1]) { upper -= 1 }
+        guard upper > lower else { return nil }
+        let selected = NSRange(location: lower, length: upper - lower)
         guard let selected = outsideCode(selected, in: line, allowsInside: false) else { return nil }
         let range = balanced(selected, in: line)
         let inner = line.markedSpans.filter { contains(range, $0.range) }
@@ -169,17 +205,44 @@ nonisolated extension EditorCommands {
             removed.append(span.openMarker)
             removed.append(span.closeMarker)
         }
-        var body = ""
-        var position = range.location
-        for marker in removed.sorted(by: { $0.location < $1.location }) where marker.length > 0 {
-            body += doc.string(in: NSRange(location: position, length: marker.location - position))
-            position = NSMaxRange(marker)
+        let removedMarkers = removed.filter { $0.length > 0 }
+        // 감싸는 기호와 같은 글자가 본문에 있으면 그 글자가 닫는 기호로 읽힐 수 있다. 먼저 그대로 감싸 보고,
+        // 기호가 뜻대로 읽히지 않으면 본문의 그 글자를 백슬래시로 막아 다시 감싼다. 그래도 안 되면(인라인
+        // 코드 안에는 백슬래시를 쓸 수 없다, 낱말 한가운데다) 감싸지 않는다.
+        let delimiter = isCode ? nil : open.utf16.first
+        let protected = line.hiddenSpans.filter { contains(range, $0.range) }.flatMap { span -> [NSRange] in
+            span.kind == .code || span.kind == .escape ? [span.range] : [span.openMarker, span.closeMarker]
         }
-        body += doc.string(in: NSRange(location: position, length: NSMaxRange(range) - position))
-        return TextEdit(
-            range: range,
-            replacement: open + body + close,
-            selection: NSRange(location: range.location + open.utf16.count, length: body.utf16.count)
-        )
+        func body(escaping: Bool) -> String {
+            var units: [unichar] = []
+            var position = range.location
+            while position < NSMaxRange(range) {
+                if let marker = removedMarkers.first(where: { NSLocationInRange(position, $0) }) {
+                    position = NSMaxRange(marker)
+                    continue
+                }
+                let unit = doc.units[position]
+                if escaping, unit == delimiter, !protected.contains(where: { NSLocationInRange(position, $0) }) {
+                    units.append(0x5C)
+                }
+                units.append(unit)
+                position += 1
+            }
+            return String(utf16CodeUnits: units, count: units.count)
+        }
+        for escaping in delimiter == nil ? [false] : [false, true] {
+            let text = body(escaping: escaping)
+            let edit = TextEdit(
+                range: range,
+                replacement: open + text + close,
+                selection: NSRange(location: range.location + open.utf16.count, length: text.utf16.count)
+            )
+            let markers = [
+                NSRange(location: 0, length: open.utf16.count),
+                NSRange(location: open.utf16.count + text.utf16.count, length: close.utf16.count),
+            ]
+            if marksAreRecognized(doc, edit, markers: markers) { return edit }
+        }
+        return nil
     }
 }

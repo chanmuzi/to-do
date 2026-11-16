@@ -78,8 +78,10 @@ private typealias Key = EditorShortcuts.Key
         h.type("*")
         #expect(h.marked == "**굵**|")
         #expect(h.document.lines[0].spans.first?.kind == .bold)
+        // 되돌리면 친 기호가 글자 그대로 남는다(백슬래시로 막는다).
         h.undo()
-        #expect(h.document.lines[0].spans.isEmpty)
+        #expect(h.editor.text == "\\*\\*굵\\*\\*")
+        #expect(h.document.lines[0].markedSpans.isEmpty)
         h.redo()
         #expect(h.document.lines[0].spans.first?.kind == .bold)
     }
@@ -402,15 +404,16 @@ private typealias Key = EditorShortcuts.Key
         }
     }
 
-    @Test func selectAllInsideABlockSelectsItsCodeAndTwoBackspacesRemoveTheBlock() throws {
+    /// 모두 선택은 블록뿐인 문서에서도 ``` 줄까지 고른다. ⌫ 한 번으로 문서가 빈다.
+    @Test func selectAllInADocumentThatIsOnlyABlockSelectsTheFencesToo() throws {
         let h = try EditorHarness("```\na\nb\n```")
         h.place(at: 4)
         h.view.selectAll(nil)
-        #expect(h.marked == "```\n|a\nb|\n```")
-        h.press(NSResponder.backspace)
-        #expect(h.marked == "```\n|\n```")
+        #expect(h.marked == "|```\na\nb\n```|")
         h.press(NSResponder.backspace)
         #expect(h.marked == "|")
+        h.undo()
+        #expect(h.editor.text == "```\na\nb\n```")
     }
 
     @Test func typingOverASelectionThatLeavesTheBlockReplacesTheWholeBlock() throws {

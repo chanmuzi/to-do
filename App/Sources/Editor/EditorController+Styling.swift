@@ -78,6 +78,7 @@ extension EditorController: NSTextStorageDelegate {
             folded.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
         } else {
             editsSinceFlush.append((old, editedRange, delta))
+            recordForUndo(old: old, editedRange: editedRange, delta: delta)
         }
         markTextChanged()
     }

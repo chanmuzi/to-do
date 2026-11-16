@@ -45,7 +45,7 @@ nonisolated struct CopyExport: Sendable {
         var closes = ""
         let first = document.line(at: start)
         if !first.kind.isCode {
-            let spans = first.markedSpans.sorted { $0.range.length < $1.range.length }
+            let spans = first.hiddenSpans.sorted { $0.range.length < $1.range.length }
             // 글자 맨 앞에 닿은 구간은 여는 기호까지 넣는다. 안쪽 구간부터.
             for span in spans where lower == span.contentRange.location && end > lower {
                 lower = span.range.location
@@ -57,7 +57,7 @@ nonisolated struct CopyExport: Sendable {
         }
         let last = document.line(at: end)
         if !last.kind.isCode {
-            let spans = last.markedSpans.sorted { $0.range.length < $1.range.length }
+            let spans = last.hiddenSpans.sorted { $0.range.length < $1.range.length }
             for span in spans where upper == NSMaxRange(span.contentRange) && start < upper {
                 upper = NSMaxRange(span.range)
             }
@@ -207,6 +207,9 @@ nonisolated struct CopyExport: Sendable {
                 } else {
                     out += body
                 }
+            case .escape:
+                // 백슬래시는 내보내지 않는다. 막은 글자만 남는다.
+                out += body
             }
             position = NSMaxRange(span.range)
         }

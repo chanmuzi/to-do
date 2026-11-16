@@ -16,7 +16,7 @@ nonisolated extension EditorCommands {
         var lower = range.location
         var upper = NSMaxRange(range)
         let lines = doc.lineIndex(at: lower)...doc.lineIndex(at: upper)
-        let spans = lines.flatMap { doc.lines[$0].markedSpans }
+        let spans = lines.flatMap { doc.lines[$0].hiddenSpans }
         guard !spans.isEmpty else { return nil }
 
         // 기호 한가운데에서 끝나는 범위는 그 기호를 통째로 넣는다.
@@ -35,7 +35,8 @@ nonisolated extension EditorCommands {
         while changed {
             changed = false
             for span in spans where covers(span.contentRange) && !covers(span.range) {
-                if !text.isEmpty, !isMultiline, isWithin(span.contentRange) { continue }
+                // 백슬래시로 막은 글자는 글자가 바뀌면 백슬래시도 함께 지운다.
+                if !text.isEmpty, !isMultiline, isWithin(span.contentRange), span.kind != .escape { continue }
                 lower = min(lower, span.range.location)
                 upper = max(upper, NSMaxRange(span.range))
                 changed = true
@@ -45,9 +46,12 @@ nonisolated extension EditorCommands {
         // 줄바꿈이 든 글: 범위를 안에 둔 구간을 나눈다. 안쪽 구간부터.
         var closesBefore = ""
         var opensAfter = ""
+        var spaceBefore = ""
+        var spaceAfter = ""
         var split: Set<InlineSpan> = []
         if isMultiline {
-            for span in spans.sorted(by: { $0.range.length < $1.range.length }) where isWithin(span.contentRange) {
+            for span in spans.sorted(by: { $0.range.length < $1.range.length })
+            where isWithin(span.contentRange) && span.kind != .escape {
                 split.insert(span)
                 let open = doc.string(in: span.openMarker)
                 let close = doc.string(in: span.closeMarker)
@@ -76,7 +80,26 @@ nonisolated extension EditorCommands {
             if span.closeMarker.length > 0, covers(span.closeMarker) { closes += doc.string(in: span.closeMarker) }
         }
 
-        let head = closes + closesBefore + text
+        // 닫는 기호 앞과 여는 기호 뒤는 공백일 수 없다. 기호가 놓일 자리에 닿은 공백은 기호 밖으로 낸다.
+        // 링크의 글자는 공백으로 시작하거나 끝나도 되므로, 링크의 기호만 걸린 자리는 그대로 둔다.
+        let touchesLink = spans.contains { span in
+            guard case .link = span.kind else { return false }
+            return !covers(span.range) && (covers(span.openMarker) || covers(span.closeMarker) || split.contains(span))
+        }
+        if !touchesLink, !closes.isEmpty || !closesBefore.isEmpty {
+            var start = lower
+            while start > 0, InlineParser.isWhitespace(doc.units[start - 1]) { start -= 1 }
+            spaceBefore = doc.string(in: NSRange(location: start, length: lower - start))
+            lower = start
+        }
+        if !touchesLink, !opens.isEmpty || !opensAfter.isEmpty {
+            var end = upper
+            while end < doc.length, InlineParser.isWhitespace(doc.units[end]) { end += 1 }
+            // 줄바꿈으로 끝나는 글 뒤의 공백은 버린다(새 줄의 맨 앞이 된다).
+            if !text.hasSuffix("\n") { spaceAfter = doc.string(in: NSRange(location: upper, length: end - upper)) }
+            upper = end
+        }
+        let head = closes + closesBefore + spaceBefore + text + spaceAfter
         let replacement = head + opensAfter + opens
         let result = NSRange(location: lower, length: upper - lower)
         if result == range, replacement == text { return nil }

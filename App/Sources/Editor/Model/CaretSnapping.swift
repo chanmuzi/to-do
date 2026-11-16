@@ -37,6 +37,7 @@ nonisolated enum CaretSnapping {
         guard !line.kind.isCode, position >= line.contentStart else { return NSRange(location: position, length: 0) }
         if textChanged {
             if line.marker(enclosing: position) != nil { position = canonical(position, in: line) }
+            if let escape = line.escape(splitAt: position) { position = escape.range.location }
             return NSRange(location: position, length: 0)
         }
         if position == new.location, old.length == 0, old.location != position,
@@ -56,7 +57,9 @@ nonisolated enum CaretSnapping {
         let first = line.visualStart(from: position)
         let last = line.visualEnd(from: position)
         guard first != last else { return position }
-        return first > line.contentStart ? first : last
+        let result = first > line.contentStart ? first : last
+        // 백슬래시와 그것이 막은 글자 사이에는 놓이지 않는다. 백슬래시 앞이 그 글자의 앞이다.
+        return line.escape(splitAt: result)?.range.location ?? result
     }
 
     // MARK: 인라인 기호
@@ -69,7 +72,9 @@ nonisolated enum CaretSnapping {
             return result
         }
         let visible = line.visualEnd(from: position)
-        return visible < line.end ? NSMaxRange(doc.characterRange(at: visible)) : visible
+        guard visible < line.end else { return visible }
+        let next = NSMaxRange(doc.characterRange(at: visible))
+        return line.escape(splitAt: next)?.range.location ?? next
     }
 
     private static func stepBackward(from position: Int, in line: MarkdownLine, _ doc: MarkdownDocument) -> Int {
@@ -105,6 +110,16 @@ nonisolated enum CaretSnapping {
 
         let line = doc.lines[index]
         if line.kind == .fenceOpen || line.kind == .fenceClose {
+            // 줄이 없는 블록에는 커서 자리가 하나 있다(`EditorCommands.emptyBlockCaret`).
+            if let block = EditorCommands.emptyBlock(doc, at: index) {
+                let spot = EditorCommands.emptyBlockCaret(doc, block)
+                if position == spot { return position }
+                if old.length > 0 || old.location != spot { return spot }
+                // 그 자리에서 나가는 길.
+                if forward, block.upperBound + 1 < doc.lines.count { return doc.lines[block.upperBound + 1].caretStart }
+                if !forward, block.lowerBound > 0 { return previousLineEnd(block.lowerBound, in: doc, folded: folded) }
+                return spot
+            }
             return fencePosition(index, old: old, forward: forward, in: doc, folded: folded)
         }
 
@@ -198,7 +213,11 @@ nonisolated enum CaretSnapping {
         }
         // 양 끝을 보이는 글자에 붙인다.
         let startLine = doc.line(at: start)
-        if !startLine.kind.isCode, start >= startLine.contentStart { start = startLine.visualEnd(from: start) }
+        if !startLine.kind.isCode, start >= startLine.contentStart {
+            start = startLine.visualEnd(from: start)
+            // 백슬래시로 막은 글자는 백슬래시째로 고른다.
+            if let escape = startLine.escape(splitAt: start) { start = escape.range.location }
+        }
         let endLine = doc.line(at: end)
         if !endLine.kind.isCode, end >= endLine.contentStart { end = endLine.visualStart(from: end) }
         guard end > start else {
@@ -240,6 +259,10 @@ nonisolated enum CaretSnapping {
         }
 
         if startBlock == endBlock, let block = startBlock {
+            // 블록을 통째로 덮는 선택(모두 선택)은 ``` 줄까지 넣는다.
+            if new.location <= blockStart(block), NSMaxRange(new) >= doc.lines[block.upperBound].end {
+                return (blockStart(block), blockEnd(block))
+            }
             let code = block.filter { doc.lines[$0].kind == .code }
             guard let first = code.first, let last = code.last else { return (blockStart(block), blockEnd(block)) }
             var s = start

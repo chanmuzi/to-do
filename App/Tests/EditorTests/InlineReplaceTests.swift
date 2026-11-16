@@ -158,9 +158,12 @@ import Testing
     @Test func backspaceAtTheStartOfAnEmptyBlockRemovesTheBlock() {
         #expect(applied("앞\n```swift\n|\n```\n뒤", backspace("앞\n```swift\n|\n```\n뒤")) == "앞\n|\n뒤")
         #expect(applied("```\n|\n```", backspace("```\n|\n```")) == "|")
-        // 글이 있거나 줄이 더 있으면 ``` 줄과 합쳐지지 않게 아무것도 하지 않는다.
-        #expect(backspace("```\n|code\n```") == .ignore)
-        #expect(backspace("```\n|\ncode\n```") == .ignore)
+        // 글이 있거나 줄이 더 있으면 블록을 풀어 그 줄들을 본문으로 둔다(``` 줄은 보이지 않으므로 블록의
+        // 경계를 지우는 길이 여기다).
+        #expect(applied("앞\n```\n|code\n```\n뒤", backspace("앞\n```\n|code\n```\n뒤")) == "앞\n|code\n뒤")
+        #expect(applied("```\n|\ncode\n```", backspace("```\n|\ncode\n```")) == "|\ncode")
+        // 닫는 줄이 없는 블록(다른 프로그램이 쓴 파일)도 같다: 여는 줄이 지워진다.
+        #expect(applied("```\n|code\n더", backspace("```\n|code\n더")) == "|code\n더")
         // 블록 안의 다른 줄에서는 보통의 지우기다.
         #expect(backspace("```\ncode\n|more\n```") == .passThrough)
         #expect(backspace("```\nco|de\n```") == .passThrough)
@@ -173,7 +176,8 @@ import Testing
     }
 
     @Test func forwardDeleteNeverJoinsAFenceLine() {
-        #expect(forwardDelete("```\ncode|\n```") == .ignore)
+        // 블록의 마지막 줄 끝에서는 블록을 푼다(커서는 제자리).
+        #expect(applied("```\ncode|\n```\n뒤", forwardDelete("```\ncode|\n```\n뒤")) == "code|\n뒤")
         #expect(forwardDelete("```\ncode|\nmore\n```") == .passThrough)
         #expect(forwardDelete("앞|\n```\ncode\n```") == .ignore)
         // 블록 바로 위의 빈 줄은 지울 수 있다.

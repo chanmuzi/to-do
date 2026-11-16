@@ -136,16 +136,16 @@ import Testing
         #expect(h.editor.undoManager.canUndo)
         h.type("이어서")
         #expect(h.editor.text == "첫 줄!\n둘째\n[ ] 우유\n이어서")
-        // 되돌리기: 친 글, 그다음 바깥의 변경(되돌리면 사용자의 편집으로 알린다), 그다음 예전에 친 글.
+        // 되돌리기: 친 글, 그다음 예전에 친 글. 바깥의 변경은 되돌리기에 없다(붙은 줄이 그대로 남는다).
         for _ in 0..<3 { h.undo() }
         #expect(h.editor.text == "첫 줄!\n둘째\n[ ] 우유\n")
         h.undo()
-        #expect(h.editor.text == "첫 줄!\n둘째\n\n")
-        // 되돌리기는 다음 메인 큐 차례에 알린다. 여기서는 곧바로 내놓게 한다.
+        #expect(h.editor.text == "첫 줄\n둘째\n[ ] 우유\n")
+        #expect(!h.editor.undoManager.canUndo)
         h.editor.flushPendingChange()
-        #expect(h.changes.last == "첫 줄!\n둘째\n\n")
-        h.undo()
-        #expect(h.editor.text == "첫 줄\n둘째\n\n")
+        #expect(h.changes.last == "첫 줄\n둘째\n[ ] 우유\n")
+        h.redo()
+        #expect(h.marked == "첫 줄!|\n둘째\n[ ] 우유\n")
     }
 
     @Test func changeInTheMiddleKeepsSelectionFoldsAndReportsNothing() throws {

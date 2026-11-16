@@ -12,6 +12,27 @@ final class EditorTextView: NSTextView {
     // 텍스트 뷰가 그리는 것이 아니라 따로 놓이는 표시 뷰여서, 옛 그리기 경로(`drawInsertionPoint`)를
     // 덮어써 너비를 줄이면 두 번째 커서가 그려지고 지워지지 않는 자국이 남는다(D-025).
 
+    // MARK: 되돌리기
+
+    /// 되돌리기 기록은 편집기가 직접 든다. 편집 메뉴와 ⌘Z가 창의 기록이 아니라 이것을 쓰게 한다.
+    override var undoManager: UndoManager? { editor?.editorUndoManager ?? super.undoManager }
+
+    @objc func undo(_ sender: Any?) {
+        editor?.editorUndoManager.undo()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        editor?.editorUndoManager.redo()
+    }
+
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(undo(_:)): editor?.editorUndoManager.canUndo ?? false
+        case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
+        default: super.validateUserInterfaceItem(item)
+        }
+    }
+
     // MARK: 포커스
 
     override func becomeFirstResponder() -> Bool {

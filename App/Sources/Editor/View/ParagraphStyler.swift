@@ -229,6 +229,10 @@ nonisolated enum ParagraphStyler {
                 out.addAttributes(attributes, range: content)
                 marker(span.openMarker)
                 marker(span.closeMarker)
+
+            case .escape:
+                // 백슬래시만 감춘다. 막은 글자는 보통 글자다.
+                marker(span.openMarker)
             }
         }
 
@@ -252,7 +256,8 @@ nonisolated enum ParagraphStyler {
                 // ``` 줄은 보이지 않고(언어 이름도), 상자의 위아래 안쪽 여백 높이만 차지한다(D-036).
                 if key.kind == .fenceOpen, !key.isFirst { paragraph.paragraphSpacingBefore = style.codeBlockGap }
                 if key.kind == .fenceClose { paragraph.paragraphSpacing = style.codeBlockGap }
-                lineHeight = style.codeBlockPadY
+                // 코드 줄이 없는 블록은 커서가 놓이는 ``` 줄을 빈 코드 줄의 높이로 둔다.
+                lineHeight = key.isEmptyBlockSpot ? font.lineHeight : style.codeBlockPadY
                 paragraph.lineBreakMode = .byClipping
             } else if isComment(out.string) {
                 color = style.text3

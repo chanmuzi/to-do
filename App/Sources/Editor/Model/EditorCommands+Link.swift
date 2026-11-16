@@ -21,7 +21,26 @@ nonisolated extension EditorCommands {
         }
         guard let visible = visibleSelection(selection, in: line),
               let outside = outsideCode(visible, in: line, allowsInside: false) else { return nil }
-        let range = balanced(outside, in: line)
+        // 고른 글자만 링크로 만든다. 글자가 통째로 든 구간은 기호까지 넣고, 한쪽만 걸친 구간은 넓히지 않는다
+        // (넣을 때 그 구간을 링크 앞뒤에서 나눈다).
+        var lower = outside.location
+        var upper = NSMaxRange(outside)
+        var changed = true
+        while changed {
+            changed = false
+            // 선택을 통째로 안에 둔 구간은 그대로 둔다(링크가 그 구간 안에 들어간다).
+            for span in line.hiddenSpans where !(span.contentRange.location <= lower && upper <= NSMaxRange(span.contentRange)) {
+                if span.contentRange.location == lower, span.range.location < lower, NSMaxRange(span.contentRange) <= upper {
+                    lower = span.range.location
+                    changed = true
+                }
+                if NSMaxRange(span.contentRange) == upper, NSMaxRange(span.range) > upper, span.contentRange.location >= lower {
+                    upper = NSMaxRange(span.range)
+                    changed = true
+                }
+            }
+        }
+        let range = NSRange(location: lower, length: upper - lower)
         guard !line.markedSpans.contains(where: { isLink($0) && NSIntersectionRange($0.range, range).length > 0 }) else { return nil }
         let text = doc.string(in: range)
         guard !text.contains("["), !text.contains("]") else { return nil }
@@ -61,11 +80,37 @@ nonisolated extension EditorCommands {
         case .new(let range):
             guard !url.isEmpty else { return nil }
             let text = doc.string(in: range)
-            return TextEdit(
+            let line = doc.line(at: range.location)
+            // 링크의 한쪽 끝만 걸친 구간은 그 끝에서 닫고 건너편에서 다시 연다(구간이 링크의 기호와 엇갈리지 않게).
+            func cut(at position: Int) -> [InlineSpan] {
+                line.markedSpans.filter { span in
+                    span.contentRange.location < position && position < NSMaxRange(span.contentRange)
+                        && !(span.contentRange.location <= range.location && NSMaxRange(range) <= NSMaxRange(span.contentRange))
+                }.sorted { $0.range.length < $1.range.length }
+            }
+            var pieces: [(text: String, isMarker: Bool)] = []
+            let atStart = cut(at: range.location)
+            let atEnd = cut(at: NSMaxRange(range))
+            pieces += atStart.map { (doc.string(in: $0.closeMarker), true) }
+            pieces.append(("[", true))
+            pieces += atStart.reversed().map { (doc.string(in: $0.openMarker), true) }
+            pieces.append((text, false))
+            pieces += atEnd.map { (doc.string(in: $0.closeMarker), true) }
+            let caret = pieces.reduce(0) { $0 + $1.text.utf16.count }
+            pieces.append(("](\(url))", true))
+            pieces += atEnd.reversed().map { (doc.string(in: $0.openMarker), true) }
+            var markers: [NSRange] = []
+            var offset = 0
+            for piece in pieces {
+                if piece.isMarker { markers.append(NSRange(location: offset, length: piece.text.utf16.count)) }
+                offset += piece.text.utf16.count
+            }
+            let edit = TextEdit(
                 range: range,
-                replacement: "[\(text)](\(url))",
-                selection: NSRange(location: range.location + 1 + text.utf16.count, length: 0)
+                replacement: pieces.map(\.text).joined(),
+                selection: NSRange(location: range.location + caret, length: 0)
             )
+            return marksAreRecognized(doc, edit, markers: markers) ? edit : nil
         }
     }
 

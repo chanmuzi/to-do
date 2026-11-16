@@ -17,6 +17,9 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     /// 닫히지 않은 코드 블록이 줄바꿈으로 끝나서, 이 줄 바로 뒤에 문서 끝의 빈 코드 줄이 있다.
     /// 그 빈 줄은 문단이 따로 없고 이 줄의 조각에 붙어 그려지므로, 코드 상자를 그 줄까지 늘려 닫는다.
     var hasTrailingCodeLine = false
+    /// 코드 줄이 없는 블록의 ``` 줄 가운데 커서가 놓이는 줄(`EditorCommands.emptyBlockCaret`).
+    /// 빈 코드 줄 하나의 높이로 그려, 블록에 들어가 쓸 수 있게 한다.
+    var isEmptyBlockSpot = false
     /// 마우스가 올라간 링크의 줄 안 위치.
     var hoveredLink: Int?
 }
@@ -40,6 +43,8 @@ nonisolated enum LinePresentation {
             if let block = line.codeBlock {
                 key.isCodeTop = index == block.lowerBound
                 key.isCodeBottom = index == block.upperBound
+                key.isEmptyBlockSpot = index == block.upperBound && line.kind != .code
+                    && EditorCommands.emptyBlock(doc, at: index) != nil
             }
             if let hoveredLink, hoveredLink.line == index { key.hoveredLink = hoveredLink.offset }
             key.hasTrailingCodeLine = trailingCode && index == doc.lines.count - 2 && !key.isCollapsed

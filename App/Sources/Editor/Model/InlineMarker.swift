@@ -10,15 +10,30 @@ nonisolated struct InlineMarker: Hashable, Sendable {
 
 // 감춘 기호는 너비가 없다. 같은 자리에 겹쳐 보이는 원문 위치들 사이를 오가는 데 쓰는 계산이다.
 nonisolated extension MarkdownLine {
-    /// 기호가 있는 구간(주소만 적은 링크는 기호가 없다).
+    /// 기호가 있는 서식 구간(주소만 적은 링크는 기호가 없다). 백슬래시로 막은 글자는 서식이 아니므로 뺀다.
     var markedSpans: [InlineSpan] {
+        spans.filter { $0.range.length > $0.contentRange.length && $0.kind != .escape }
+    }
+
+    /// 감춘 글자가 있는 구간 모두(서식 구간과 백슬래시로 막은 글자).
+    var hiddenSpans: [InlineSpan] {
         spans.filter { $0.range.length > $0.contentRange.length }
+    }
+
+    /// 백슬래시로 막은 글자들.
+    var escapes: [InlineSpan] {
+        spans.filter { $0.kind == .escape }
+    }
+
+    /// 그 위치가 백슬래시와 그것이 막은 글자 사이면 그 구간. 커서와 편집의 경계는 여기에 놓이지 않는다.
+    func escape(splitAt position: Int) -> InlineSpan? {
+        spans.first { $0.kind == .escape && $0.contentRange.location == position }
     }
 
     /// 감춘 기호들. 앞에서부터.
     var markers: [InlineMarker] {
         var result: [InlineMarker] = []
-        for span in markedSpans {
+        for span in hiddenSpans {
             if span.openMarker.length > 0 { result.append(InlineMarker(range: span.openMarker, isOpen: true, span: span)) }
             if span.closeMarker.length > 0 { result.append(InlineMarker(range: span.closeMarker, isOpen: false, span: span)) }
         }

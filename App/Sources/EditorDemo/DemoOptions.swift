@@ -7,7 +7,7 @@ import Theme
 /// - `--appearance light|dark`
 /// - `--checkbox box|bracket`
 /// - `--code-style accent|plain`: 인라인 코드의 글자색(기본 `accent`)
-/// - `--sample note|elements|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
+/// - `--sample note|elements|code|literal|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
 /// - `--caret-line <n>`: 커서를 둘 줄(0부터). 그 줄 끝에 놓는다
 /// - `--fold <n,n>`: 접어 둘 토글의 줄 번호
 /// - `--width <pt>`: 창 너비(기본 340)

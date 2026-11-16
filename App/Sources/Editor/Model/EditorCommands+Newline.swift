@@ -8,6 +8,14 @@ nonisolated extension EditorCommands {
         let line = doc.lines[index]
         let indent = doc.string(in: line.indentRange)
         let isCaret = selection.length == 0
+        // 커서 뒤의 공백은 줄바꿈과 함께 지운다. 남겨 두면 새 줄의 맨 앞에서 감춘 들여쓰기가 된다.
+        var selection = selection
+        if !line.kind.isCode, selection.location >= line.contentStart {
+            let endLine = doc.line(at: NSMaxRange(selection))
+            var upper = NSMaxRange(selection)
+            while upper < endLine.end, doc.units[upper] == 0x20 || doc.units[upper] == 0x09 { upper += 1 }
+            selection.length = upper - selection.location
+        }
 
         switch line.kind {
         case .code:
@@ -18,6 +26,10 @@ nonisolated extension EditorCommands {
             return .insert("\n" + doc.string(in: NSRange(location: line.start, length: end - line.start)), replacing: selection)
 
         case .fenceOpen, .fenceClose:
+            // 줄이 없는 블록의 커서 자리: 빈 코드 줄 둘을 만들고 둘째 줄로 간다.
+            if isCaret, let block = emptyBlock(doc, caretAt: selection.location) {
+                return insertingIntoEmptyBlock(doc, block, "\n")
+            }
             // ``` 줄에는 커서가 놓이지 않는다. 놓였더라도 줄만 나눈다.
             return .insert("\n" + (line.kind == .fenceOpen ? indent : ""), replacing: selection)
 

@@ -5,7 +5,7 @@ import Testing
 /// 감춘 인라인 기호와 ``` 줄을 커서와 선택이 어떻게 지나는지(`CaretSnapping`, D-036).
 @Suite struct InlineCaretTests {
     // a0 b1 c2 *3 *4 d5 e6 f7 *8 *9 g10 h11 i12
-    let doc = MarkdownDocument("abc**def**ghi")
+    let doc = MarkdownDocument("가나다**라마바**사아자")
 
     private func caret(_ doc: MarkdownDocument, from old: Int, to new: Int, textChanged: Bool = false) -> Int {
         let result = CaretSnapping.snap(
@@ -52,13 +52,13 @@ import Testing
         #expect(caret(doc, from: 8, to: 9) == 10)
         #expect(caret(doc, from: 10, to: 11) == 11)
         // 줄 끝의 구간도 같다. 한 번 더 누르면 다음 줄로 간다.
-        let end = MarkdownDocument("abc**def**\n다음")
+        let end = MarkdownDocument("가나다**라마바**\n다음")
         #expect(caret(end, from: 8, to: 9) == 10)
         #expect(caret(end, from: 10, to: 11) == 11)
         // 겹친 구간이 함께 끝나면 한 번에 모두 나간다. 이어진 다른 구간으로는 들어가지 않는다.
         let nested = MarkdownDocument("**~~ab~~**c")
         #expect(caret(nested, from: 6, to: 7) == 10)
-        let adjacent = MarkdownDocument("**a**~~b~~")
+        let adjacent = MarkdownDocument("**가**~~b~~")
         #expect(caret(adjacent, from: 3, to: 4) == 5)
         #expect(caret(adjacent, from: 5, to: 6) == 8)
     }

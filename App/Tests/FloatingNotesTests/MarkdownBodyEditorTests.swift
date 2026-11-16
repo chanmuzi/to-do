@@ -223,9 +223,9 @@ import Theme
         // 창의 실행 취소 기록이 아니라 편집기의 것이 쓰인다.
         #expect(window.firstResponder?.undoManager === undoManager)
 
-        #expect(window.firstResponder?.tryToPerform(Selector(("undo:")), with: nil) == true)
+        #expect(window.firstResponder?.tryToPerform(NSSelectorFromString("undo:"), with: nil) == true)
         #expect(adapter.text == "처음")
-        #expect(window.firstResponder?.tryToPerform(Selector(("redo:")), with: nil) == true)
+        #expect(window.firstResponder?.tryToPerform(NSSelectorFromString("redo:"), with: nil) == true)
         #expect(adapter.text == "처음 더한 글")
         #expect(window.firstResponder?.tryToPerform(#selector(NSText.selectAll(_:)), with: nil) == true)
         #expect(adapter.editor.selectedRange == NSRange(location: 0, length: 7))

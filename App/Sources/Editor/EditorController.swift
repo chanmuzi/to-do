@@ -37,7 +37,7 @@ final class EditorController: NSObject {
     let textContainer = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
     let textView: EditorTextView
     let scrollView = NSScrollView()
-    let editorUndoManager = UndoManager()
+    let editorUndoManager = EditorUndoManager()
     let copyButton = CodeCopyButton()
     let linkField = LinkField()
 
@@ -73,6 +73,15 @@ final class EditorController: NSObject {
     var editsSinceFlush: [(old: MarkdownDocument, range: NSRange, delta: Int)] = []
     /// 접힌 줄 번호를 스스로 정한 편집(줄 옮기기, 줄 머리 바꾸기)이 있었다. 되돌릴 때 접힘을 그대로 되살려야 한다.
     var editSetFoldsExplicitly = false
+    /// 되돌리기 기록. 텍스트 뷰의 것을 쓰지 않는다(`EditorController+Undo`).
+    var history = UndoHistory()
+    /// 열린 되돌리기 단계가 없을 때 편집 직전의 선택. 그 단계를 되돌리면 이 선택으로 돌아간다.
+    var selectionBeforeEdit: NSRange?
+    /// 지금 들어오는 편집이 글자를 그대로 친 것인지(이어 친 글자를 한 단계로 묶는 데 쓴다).
+    var isPlainTyping = false
+    var openRecordIsComposition = false
+    var isUndoCloseScheduled = false
+    var closesUndoRecordAfterComposition = false
     /// 되돌리기, 다시 하기가 진행 중이다.
     var isReplayingUndo = false
     /// 되돌리기, 다시 하기가 시작될 때의 접힘과, 끝난 뒤에 되살릴 접힘.
@@ -90,6 +99,13 @@ final class EditorController: NSObject {
     var pendingPair: (location: Int, before: String, after: String)?
     /// 세 번째 백틱으로 코드 블록을 만든 바로 뒤. 습관대로 이어 누른 Return, Space 하나는 넣지 않는다.
     var swallowsCodeTriggerKey = false
+    /// 서식 구간의 끝에서 친 공백이 기호 밖에 놓여 있다. 이어서 글자를 치면 공백과 함께 구간 안으로 들인다
+    /// (`EditorCommands.absorbingIntoRun`). 닫는 기호가 시작하는 자리, 공백 뒤의 커서 자리, 그때의 원문.
+    var absorbRun: (closeStart: Int, location: Int, version: Int)?
+    /// 조합을 시작하며 그 공백을 구간 안으로 들여 두었다. 조합이 글자 없이 끝나면 되돌려 놓는다.
+    var pendingAbsorb: (closeStart: Int, space: String, closes: String)?
+    /// 세 번째 백틱으로 코드 블록을 만든 바로 뒤에 이어 친 언어 이름(그 블록의 여는 줄과 그때의 원문).
+    var codeTag: (openLine: Int, version: Int, typed: String)?
     /// 링크 주소를 적는 중이면 그 대상과 그때의 원문.
     var linkSession: (target: LinkTarget, version: Int)?
     /// 텍스트 뷰에 넣어 둔 문서 끝 빈 줄의 문단 모양(`updateTrailingLineStyle`).
@@ -109,6 +125,7 @@ final class EditorController: NSObject {
         contentStorage.addTextLayoutManager(layoutManager)
         textView = EditorTextView(frame: .zero, textContainer: textContainer)
         super.init()
+        editorUndoManager.controller = self
         configureViews()
         applyStyleToViews()
         observeEnvironment()
@@ -178,7 +195,8 @@ final class EditorController: NSObject {
         textView.textStorage?.delegate = self
         textView.isRichText = false
         textView.importsGraphics = false
-        textView.allowsUndo = true
+        // 되돌리기는 편집기가 직접 적는다(`UndoHistory`). 텍스트 뷰의 기록은 쓰지 않는다.
+        textView.allowsUndo = false
         textView.drawsBackground = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
@@ -243,7 +261,6 @@ final class EditorController: NSObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadStyle() }
         })
-        observeUndo()
         for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
                 let windowID = (note.object as AnyObject?).map(ObjectIdentifier.init)
@@ -294,6 +311,9 @@ final class EditorController: NSObject {
         if linkSession != nil { cancelLinkEditing() }
         typingMarks = nil
         pendingPair = nil
+        pendingAbsorb = nil
+        absorbRun = nil
+        codeTag = nil
         swallowsCodeTriggerKey = false
         if textView.hasMarkedText() { textView.unmarkText() }
         // 통째로 바꿔 넣는 글에는 미뤄 둔 바깥의 변경이 이미 들어 있거나, 더는 맞지 않는다.

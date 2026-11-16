@@ -31,11 +31,17 @@ nonisolated extension EditorCommands {
         let line = doc.lines[index]
 
         if line.kind.isCode {
+            // 줄이 없는 블록의 커서 자리: 블록을 없앤다.
+            if let block = emptyBlock(doc, caretAt: position) { return .edit(removingBlock(doc, block)) }
             guard line.kind == .code, position == line.caretStart, let block = line.codeBlock,
                   index == block.lowerBound + 1 else { return .passThrough }
-            // 블록의 첫 줄 맨 앞. 빈 블록이면 블록을 없애고, 아니면 ``` 줄과 합쳐지지 않게 둔다.
+            // 블록의 첫 줄 맨 앞. 빈 블록이면 블록을 없애고, 아니면 블록을 풀어 그 줄들을 본문으로 둔다
+            // (``` 줄은 보이지 않으므로, 블록의 경계를 지우는 길이 여기다).
             let code = block.filter { doc.lines[$0].kind == .code }
-            guard code.count == 1, line.end == line.caretStart else { return .ignore }
+            guard code.count == 1, line.end == line.caretStart else {
+                guard let edit = toggleCodeBlock(doc, selection: selection) else { return .ignore }
+                return .edit(edit)
+            }
             let open = doc.lines[block.lowerBound]
             let last = doc.lines[block.upperBound]
             return .edit(TextEdit(
@@ -62,8 +68,16 @@ nonisolated extension EditorCommands {
             let previous = doc.lines[index - 1]
             if previous.kind.isCode {
                 // 코드 블록 바로 아랫줄: ``` 줄과 합치지 않는다. 빈 줄이면 지우고 블록의 마지막 줄로 간다.
-                guard let block = previous.codeBlock,
-                      let lastCode = block.last(where: { doc.lines[$0].kind == .code }) else { return .ignore }
+                guard let block = previous.codeBlock else { return .ignore }
+                // 줄이 없는 블록은 커서가 들어갈 줄이 없다. 블록을 지운다.
+                guard let lastCode = block.last(where: { doc.lines[$0].kind == .code }) else {
+                    let open = doc.lines[block.lowerBound]
+                    return .edit(TextEdit(
+                        range: NSRange(location: open.start, length: line.start - open.start),
+                        replacement: "",
+                        selection: NSRange(location: position - (line.start - open.start), length: 0)
+                    ))
+                }
                 let target = doc.lines[lastCode].end
                 guard line.range.length == 0 else { return .select(NSRange(location: target, length: 0)) }
                 return .edit(TextEdit(
@@ -103,14 +117,25 @@ nonisolated extension EditorCommands {
         let line = doc.lines[index]
 
         if line.kind.isCode {
-            guard line.kind == .code, position == line.end, index + 1 < doc.lines.count else { return .passThrough }
-            return doc.lines[index + 1].kind == .code ? .passThrough : .ignore
+            if let block = emptyBlock(doc, caretAt: position) { return .edit(removingBlock(doc, block)) }
+            guard line.kind == .code, position == line.end else { return .passThrough }
+            if index + 1 < doc.lines.count, doc.lines[index + 1].kind == .code { return .passThrough }
+            // 블록의 마지막 줄 끝. 블록을 풀어 그 줄들을 본문으로 둔다(커서는 제자리).
+            guard let block = line.codeBlock, var edit = toggleCodeBlock(doc, selection: selection) else { return .ignore }
+            let open = doc.lines[block.lowerBound]
+            edit.selection = NSRange(location: position - (NSMaxRange(open.fullRange) - open.start), length: 0)
+            return .edit(edit)
         }
 
         if line.isVisualEnd(position) {
             guard index + 1 < doc.lines.count else { return position == line.end ? .passThrough : .ignore }
             let next = doc.lines[index + 1]
             if next.kind.isCode {
+                // 줄이 없는 블록은 블록을 지운다.
+                if let block = emptyBlock(doc, at: index + 1) {
+                    let last = doc.lines[block.upperBound]
+                    return .edit(TextEdit(range: NSRange(location: line.end, length: last.end - line.end), replacement: "", selection: selection))
+                }
                 // 코드 블록 바로 윗줄: ``` 줄과 합치지 않는다. 빈 줄이면 그 줄을 지운다.
                 guard line.range.length == 0 else { return .ignore }
                 return .edit(TextEdit(
