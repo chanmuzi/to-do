@@ -6,6 +6,7 @@ import Models
 public final class WindowStateStore {
     private let file: JSONFile<[String: NoteWindowState]>
     private var states: [String: NoteWindowState]
+    private let observers = StateObservers()
     /// 저장된 파일을 읽지 못해 빈 상태로 시작했으면 그 설명. 앱이 켤 때 모아서 기록한다.
     public let loadWarning: String?
 
@@ -34,9 +35,16 @@ public final class WindowStateStore {
         try commit(states.filter { $0.key != id.rawValue })
     }
 
+    /// 창 상태가 바뀔 때마다(파일에 쓴 뒤) 불린다. 돌려받은 값을 들고 있는 동안만 알림이 온다.
+    /// 값이 그대로인 `set`은 쓰지도 알리지도 않는다. 무엇이 바뀌었는지는 `all`, `state(for:)`로 다시 읽는다.
+    public func observe(_ handler: @escaping @MainActor () -> Void) -> StoreObservation {
+        observers.add(handler)
+    }
+
     private func commit(_ newStates: [String: NoteWindowState]) throws {
         guard newStates != states else { return }
         try file.save(newStates)
         states = newStates
+        observers.notify()
     }
 }
