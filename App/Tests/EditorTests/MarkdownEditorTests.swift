@@ -181,13 +181,13 @@ import Theme
 
     @Test func checkboxClickIsUndoable() throws {
         let h = try EditorHarness(DemoNote.text)
-        h.caret(atEndOfLine: 4)
+        h.caret(atEndOfLine: 3)
         let point = try #require(h.controller.gutterPoint(forLine: 1))
         #expect(h.controller.hit(at: point) == .checkbox(line: 1))
         h.step { #expect(h.controller.handleMouseDown(at: point)) }
         #expect(h.document.lines[1].kind == .todo(done: true))
         // 커서는 제자리에 있다.
-        #expect(h.editor.selectedRange.location == h.document.lines[4].end)
+        #expect(h.editor.selectedRange.location == h.document.lines[3].end)
         h.editor.undoManager.undo()
         #expect(h.editor.text == DemoNote.text)
     }

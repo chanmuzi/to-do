@@ -26,11 +26,11 @@ nonisolated enum ParagraphStyler {
     /// 닫히지 않은 코드 블록 끝의 빈 줄(문서의 마지막 줄)에 쓰는 문단 모양.
     /// 그 줄은 글자가 없어 문단이 만들어지지 않으므로 텍스트 뷰의 기본 문단 모양으로 넣는다.
     static func trailingCodeLineStyle(level: Int, style: EditorStyle) -> NSParagraphStyle {
-        let textStart = CGFloat(level) * style.indent + EditorMetrics.codeBlockPadX
+        let textStart = CGFloat(level) * style.indent + style.codeBlockPadX
         let paragraph = NSMutableParagraphStyle()
         paragraph.firstLineHeadIndent = textStart
         paragraph.headIndent = textStart
-        paragraph.tailIndent = -EditorMetrics.codeBlockPadX
+        paragraph.tailIndent = -style.codeBlockPadX
         paragraph.minimumLineHeight = style.codeBlock.lineHeight
         paragraph.maximumLineHeight = style.codeBlock.lineHeight
         return paragraph
@@ -67,23 +67,16 @@ nonisolated enum ParagraphStyler {
             out.removeAttribute(.strikethroughStyle, range: r)
             out.removeAttribute(.underlineStyle, range: r)
             out.removeAttribute(.kern, range: r)
+            out.removeAttribute(.baselineOffset, range: r)
+            out.removeAttribute(.markdownLink, range: r)
             if kernAfter > 0 {
                 out.addAttribute(.kern, value: kernAfter, range: NSRange(location: NSMaxRange(r) - 1, length: 1))
             }
         }
 
-        /// 편집 중인 줄에서 보이는 기호: 흐린 색, 고정폭.
-        private func showSyntax(_ range: NSRange) {
-            let r = local(range)
-            guard r.length > 0 else { return }
-            out.addAttributes([.font: style.inlineCode, .foregroundColor: style.text3], range: r)
-            out.removeAttribute(.strikethroughStyle, range: r)
-            out.removeAttribute(.underlineStyle, range: r)
-            out.removeAttribute(.kern, range: r)
-        }
-
+        /// 인라인 기호는 커서가 있는 줄에서도 보이지 않는다(D-036).
         private func marker(_ range: NSRange, kernAfter: CGFloat = 0) {
-            if key.isActive { showSyntax(range) } else { hide(range, kernAfter: kernAfter) }
+            hide(range, kernAfter: kernAfter)
         }
 
         /// 줄 앞의 감춘 탭이 자리를 차지하지 않도록 탭 자리를 글자 시작점 바로 뒤에 촘촘히 둔다.
@@ -157,13 +150,9 @@ nonisolated enum ParagraphStyler {
             let isHeading = if case .heading = key.kind { true } else { false }
             for span in line.spans { apply(span, lineFont: font, isHeading: isHeading, isDone: isDone) }
 
-            // 줄 머리: 들여쓰기와 목록 기호는 늘 감춘다. 제목의 `#`만 편집 중에 보인다.
+            // 줄 머리(들여쓰기, 목록 기호, 제목의 `#`)는 늘 감춘다.
             hide(line.indentRange)
-            if case .heading = key.kind, key.isActive {
-                showSyntax(line.markerRange)
-            } else {
-                hide(line.markerRange)
-            }
+            hide(line.markerRange)
 
             decoration.gutterX = left
             decoration.guideCount = key.level
@@ -200,26 +189,32 @@ nonisolated enum ParagraphStyler {
 
             case .highlight(let number):
                 if !isDone { out.addAttribute(.foregroundColor, value: style.highlightForeground(number), range: content) }
-                out.addAttribute(.markdownInlineBackground, value: InlineBackground(
+                out.addAttribute(.markdownHighlight, value: InlineBackground(
                     kind: .highlight(number),
                     padX: EditorMetrics.highlightPadX,
-                    height: min(lineFont.lineHeight, lineFont.glyphHeight + EditorMetrics.highlightPadY * 2)
+                    height: min(lineFont.lineHeight, lineFont.glyphHeight + EditorMetrics.highlightPadY * 2),
+                    leadShift: EditorMetrics.highlightPadX / 2
                 ), range: content)
                 marker(span.openMarker, kernAfter: EditorMetrics.highlightPadX)
                 marker(span.closeMarker, kernAfter: EditorMetrics.highlightPadX)
 
             case .code:
-                var attributes: [NSAttributedString.Key: Any] = [.font: style.inlineCode]
-                if !isDone { attributes[.foregroundColor] = style.codeForeground }
+                // 글자는 줄 글꼴에 맞춘 고정폭, 상자는 높이를 정해 두고 글자 위아래가 같게 놓는다.
+                var attributes: [NSAttributedString.Key: Any] = [
+                    .font: style.inlineCode(in: lineFont),
+                    .baselineOffset: style.codeRise,
+                ]
+                if !isDone { attributes[.foregroundColor] = style.inlineCodeForeground }
                 out.addAttributes(attributes, range: content)
-                let glyphHeight = ceil(style.inlineCode.ascender - style.inlineCode.descender)
-                // 편집 중에는 기호까지 상자 안에 넣는다.
-                out.addAttribute(.markdownInlineBackground, value: InlineBackground(
+                out.removeAttribute(.kern, range: content)
+                let room = style.codePadX + style.codeGap
+                out.addAttribute(.markdownCodeBox, value: InlineBackground(
                     kind: .code,
-                    padX: key.isActive ? EditorMetrics.inlineCodeMargin : EditorMetrics.inlineCodePadX,
-                    height: min(lineFont.lineHeight, glyphHeight + EditorMetrics.inlineCodePadY * 2)
-                ), range: key.isActive ? local(span.range) : content)
-                let room = EditorMetrics.inlineCodePadX + EditorMetrics.inlineCodeMargin
+                    padX: style.codePadX,
+                    height: style.codeHeight(in: lineFont),
+                    drop: style.codeDrop,
+                    leadShift: room / 2
+                ), range: content)
                 marker(span.openMarker, kernAfter: room)
                 marker(span.closeMarker, kernAfter: room)
 
@@ -242,11 +237,11 @@ nonisolated enum ParagraphStyler {
         func styleCode() {
             let font = style.codeBlock
             let boxX = CGFloat(key.level) * style.indent
-            let textStart = boxX + EditorMetrics.codeBlockPadX
+            let textStart = boxX + style.codeBlockPadX
             let paragraph = NSMutableParagraphStyle()
             paragraph.firstLineHeadIndent = textStart
             paragraph.headIndent = textStart
-            paragraph.tailIndent = -EditorMetrics.codeBlockPadX
+            paragraph.tailIndent = -style.codeBlockPadX
             paragraph.tabStops = tabStops(after: textStart)
             paragraph.defaultTabInterval = 4 * (" " as NSString).size(withAttributes: [.font: font.font]).width
 
@@ -254,17 +249,11 @@ nonisolated enum ParagraphStyler {
             var color = style.codeForeground
             let isFence = key.kind != .code
             if isFence {
-                // ``` 줄은 상자의 위아래 안쪽 여백을 겸한다. 커서가 블록 밖이면 여백 높이만 남긴다.
-                if key.kind == .fenceOpen, !key.isFirst { paragraph.paragraphSpacingBefore = EditorMetrics.codeBlockMargin }
-                if key.kind == .fenceClose { paragraph.paragraphSpacing = EditorMetrics.codeBlockMargin }
-                if key.isCodeActive {
-                    lineHeight += EditorMetrics.codeBlockPadY
-                    // 여는 줄의 글자는 여백 아래쪽 18pt에, 닫는 줄의 글자는 위쪽 18pt에 놓는다.
-                    decoration.centerOffset = (key.kind == .fenceOpen ? 1 : -1) * EditorMetrics.codeBlockPadY / 2
-                    color = style.text3
-                } else {
-                    lineHeight = EditorMetrics.codeBlockPadY
-                }
+                // ``` 줄은 보이지 않고(언어 이름도), 상자의 위아래 안쪽 여백 높이만 차지한다(D-036).
+                if key.kind == .fenceOpen, !key.isFirst { paragraph.paragraphSpacingBefore = style.codeBlockGap }
+                if key.kind == .fenceClose { paragraph.paragraphSpacing = style.codeBlockGap }
+                lineHeight = style.codeBlockPadY
+                paragraph.lineBreakMode = .byClipping
             } else if isComment(out.string) {
                 color = style.text3
             }
@@ -278,7 +267,7 @@ nonisolated enum ParagraphStyler {
             ], range: full)
             decoration.lineFont = font.font
             hide(line.indentRange)
-            if isFence, !key.isCodeActive { hide(line.range) }
+            if isFence { hide(line.range) }
 
             decoration.codeBox = (key.isCodeTop, key.isCodeBottom || key.hasTrailingCodeLine)
             decoration.codeBoxCoversExtraLine = key.hasTrailingCodeLine

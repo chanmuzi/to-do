@@ -72,35 +72,30 @@ import Theme
         #expect(changes == ["처음 그리고"])
     }
 
-    /// 커서가 들어간 줄은 감췄던 기호(링크의 주소)가 보여 줄이 넘어간다. 글이 바뀌지 않아도 높이를 알리고,
-    /// 커서가 나가면 줄어든 높이를 다시 알린다. 알리지 않으면 창 높이가 내용과 어긋난다.
-    @Test func heightIsReportedWhenTheCaretLineRevealsOrHidesItsMarkers() async throws {
+    /// 기호는 커서가 있는 줄에서도 보이지 않는다. 커서가 링크 줄에 드나들어도 줄이 넘어가지 않고
+    /// 높이도 그대로다(D-036. 예전에는 감췄던 주소가 드러나 줄이 넘어갔다).
+    @Test func heightStaysWhenTheCaretEntersALineWithHiddenMarkers() async throws {
         let h = try EditorHarness("첫 줄\n- [링크 글자](https://example.com/a/very/long/address/that/wraps/onto/another/line)")
         h.caret(atEndOfLine: 0)
         try await Task.sleep(for: .milliseconds(30))
-        let folded = h.editor.contentHeight
+        let height = h.editor.contentHeight
+        let reported = h.heights.count
+        let padding = h.theme.docPadding
+        #expect(height == padding.top + padding.bottom + h.theme.lineHeight(.body) * 2)
 
         h.caret(atEndOfLine: 1)
         try await Task.sleep(for: .milliseconds(30))
-        let revealed = h.editor.contentHeight
-        #expect(revealed > folded)
-        #expect(h.heights.last == revealed)
-
-        h.caret(atEndOfLine: 0)
-        try await Task.sleep(for: .milliseconds(30))
-        #expect(h.editor.contentHeight == folded)
-        #expect(h.heights.last == folded)
+        #expect(h.editor.contentHeight == height)
+        #expect(h.heights.count == reported)
     }
 
-    /// 커서 줄에서 드러난 주소 뒤에 글자를 치면 그 줄이 높아진다(작은 글자 줄에 본문 글자가 들어감).
-    /// 그 높이도 알려야 한다.
-    @Test func heightFollowsTypingOnARevealedWrappedLine() async throws {
+    /// 링크 줄 끝에 글자를 쳐도 높이를 곧바로 알린다.
+    @Test func heightFollowsTypingOnALinkLine() async throws {
         let h = try EditorHarness(
             "## 아이디어\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         )
         h.caret(atEndOfLine: 2)
-        try await Task.sleep(for: .milliseconds(30))
-        h.type("가나")
+        h.type(String(repeating: "가나다라마바사 ", count: 6))
         let immediate = h.heights.last
         try await Task.sleep(for: .milliseconds(30))
 

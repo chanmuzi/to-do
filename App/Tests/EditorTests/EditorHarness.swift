@@ -87,6 +87,42 @@ final class EditorHarness {
         step { editor.perform(action) }
     }
 
+    /// 원문에 커서(선택)를 `|`로 적어 넣은 것. 단계마다 원문과 커서를 한 번에 견준다.
+    var marked: String {
+        Scenario.marked(editor.text, selection: editor.selectedRange)
+    }
+
+    /// 커서를 그 원문 위치에 그대로 둔다(감춘 기호 옆의 어느 쪽인지까지 정해야 할 때).
+    func place(at location: Int, length: Int = 0) {
+        controller.setSelection(NSRange(location: location, length: length))
+    }
+
+    /// 키 이벤트를 만들어 단축키 경로(`performKeyEquivalent`)에 넣는다.
+    @discardableResult
+    func key(_ code: UInt16, _ characters: String, _ modifiers: NSEvent.ModifierFlags) -> Bool {
+        guard let event = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: window.windowNumber,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: code
+        ) else { return false }
+        // 선택 없이 누른 서식 단축키는 원문을 고치지 않는다(다음에 칠 글자의 서식만 정한다).
+        // 되돌리기에 빈 단계가 끼지 않게 묶음을 열지 않는다.
+        typealias Key = EditorShortcuts.Key
+        let leavesTheSourceAlone = code == Key.l
+            || (editor.selectedRange.length == 0 && [Key.b, Key.e, Key.x, Key.h].contains(code))
+        guard !leavesTheSourceAlone else { return view.performKeyEquivalent(with: event) }
+        var handled = false
+        step { handled = view.performKeyEquivalent(with: event) }
+        return handled
+    }
+
     func caret(atEndOfLine line: Int) {
         editor.selectedRange = NSRange(location: document.lines[line].end, length: 0)
     }
@@ -119,6 +155,14 @@ extension NSResponder {
     static let newline = #selector(NSResponder.insertNewline(_:))
     static let backspace = #selector(NSResponder.deleteBackward(_:))
     static let forwardDelete = #selector(NSResponder.deleteForward(_:))
+    static let left = #selector(NSResponder.moveLeft(_:))
+    static let right = #selector(NSResponder.moveRight(_:))
+    static let up = #selector(NSResponder.moveUp(_:))
+    static let down = #selector(NSResponder.moveDown(_:))
+    static let home = #selector(NSResponder.moveToBeginningOfLine(_:))
+    static let end = #selector(NSResponder.moveToEndOfLine(_:))
+    static let wordLeft = #selector(NSResponder.moveWordLeft(_:))
+    static let wordRight = #selector(NSResponder.moveWordRight(_:))
     static let shiftRight = #selector(NSResponder.moveRightAndModifySelection(_:))
     static let shiftLeft = #selector(NSResponder.moveLeftAndModifySelection(_:))
     static let shiftDown = #selector(NSResponder.moveDownAndModifySelection(_:))

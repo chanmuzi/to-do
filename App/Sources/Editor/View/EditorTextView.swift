@@ -66,13 +66,28 @@ final class EditorTextView: NSTextView {
     // 조합 중인 글자는 원문에 들어가지만 `textDidChange`가 오지 않는다. 그 글자까지 저장되고
     // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacementRange)
+        var replacement = replacementRange
+        // 조합을 시작하기 전에 자리를 만든다(고른 글자를 기호와 함께 지우고, 정해 둔 서식의 기호를 넣는다).
+        // 조합이 시작된 뒤에는 원문을 따로 고치지 않는다.
+        if !hasMarkedText(), let editor,
+           replacementRange.location == NSNotFound || replacementRange == self.selectedRange() {
+            editor.prepareForComposition()
+            replacement = NSRange(location: NSNotFound, length: 0)
+        }
+        super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacement)
         editor?.flushPendingChange()
+        editor?.compositionDidChange()
     }
 
     override func unmarkText() {
         super.unmarkText()
         editor?.flushPendingChange()
+        editor?.compositionDidChange()
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        super.insertText(string, replacementRange: replacementRange)
+        editor?.compositionDidChange()
     }
 
     // MARK: 마우스

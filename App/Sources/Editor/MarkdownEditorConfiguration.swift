@@ -6,12 +6,22 @@ nonisolated public enum CheckboxStyle: String, Sendable, CaseIterable {
     case bracket
 }
 
+/// 인라인 코드의 글자색(spec 6, 설정에서 고른다). 바탕과 치수는 같다. 코드 블록의 글자는 언제나 `code-fg`다.
+nonisolated public enum InlineCodeStyle: String, Sendable, CaseIterable {
+    /// 코드 강조색 `code-accent`(기본).
+    case accent
+    /// 본문과 같은 무채색 `code-fg`.
+    case plain
+}
+
 /// 편집기 설정. 색, 글꼴, 치수는 `Theme`에서 온다.
 nonisolated public struct MarkdownEditorConfiguration: Sendable, Equatable {
     public var checkboxStyle: CheckboxStyle
+    public var inlineCodeStyle: InlineCodeStyle
 
-    public init(checkboxStyle: CheckboxStyle = .box) {
+    public init(checkboxStyle: CheckboxStyle = .box, inlineCodeStyle: InlineCodeStyle = .accent) {
         self.checkboxStyle = checkboxStyle
+        self.inlineCodeStyle = inlineCodeStyle
     }
 }
 

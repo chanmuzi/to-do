@@ -108,18 +108,6 @@ nonisolated enum BoxPath {
         outline(rect, radius: radius, top: top, bottom: bottom, closed: true)
     }
 
-    /// 테두리. 첫 줄은 위, 마지막 줄은 아래를 닫고, 가운데 줄은 양옆 선만 긋는다.
-    static func border(_ rect: CGRect, radius: CGFloat, width: CGFloat, top: Bool, bottom: Bool) -> CGPath {
-        let half = width / 2
-        let inset = CGRect(
-            x: rect.minX + half,
-            y: rect.minY + (top ? half : 0),
-            width: rect.width - width,
-            height: rect.height - (top ? half : 0) - (bottom ? half : 0)
-        )
-        return outline(inset, radius: max(0, radius - half), top: top, bottom: bottom, closed: false)
-    }
-
     private static func outline(_ r: CGRect, radius: CGFloat, top: Bool, bottom: Bool, closed: Bool) -> CGPath {
         let path = CGMutablePath()
         let topRadius = top ? radius : 0

@@ -111,7 +111,7 @@ import Testing
         #expect(tokens.textStyle(.strong).weight == 650)
         #expect(tokens.textStyle(.row).size == 12.5)
         #expect(tokens.textStyle(.micro).families.first == "D2Coding")
-        #expect(tokens.textStyle(.code).size == 12)
+        #expect(tokens.textStyle(.code).size == 11.5)
     }
 
     @Test func paletteAndAccentPresets() {

@@ -13,6 +13,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
     case uiStrong   // 임박한 리마인더(spec 5.2)
     case micro      // 날짜, 보조 숫자
     case code       // 인라인 코드
+    case codeBlock  // 코드 블록
     case capture    // 캡처 입력
 
     struct Keys {
@@ -38,6 +39,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
         case .uiStrong: Keys(font: .ui, size: "fs-ui", lineHeight: "lh-ui", weight: "fw-ui-strong")
         case .micro: Keys(font: .micro, size: "fs-micro", lineHeight: "lh-micro", weight: "fw-ui")
         case .code: Keys(font: .mono, size: "fs-code", lineHeight: "lh-body", weight: "fw-body")
+        case .codeBlock: Keys(font: .mono, size: "fs-code", lineHeight: "lh-code", weight: "fw-body")
         case .capture: Keys(font: .body, size: "fs-capture", lineHeight: "lh-body", weight: "fw-body")
         }
     }

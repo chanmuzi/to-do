@@ -4,6 +4,7 @@ enum DemoSamples {
         switch name {
         case "note": note
         case "elements": elements
+        case "code": code
         case "empty": ""
         default: nil
         }
@@ -21,6 +22,24 @@ enum DemoSamples {
     \t[ ] `feature/quick-capture` 브랜치 정리
     \t\t- 리베이스한 뒤 푸시
     \t[x] 주간 리포트 제출
+    """
+
+    /// 인라인 코드가 다른 요소 안에 놓인 경우들과 코드 블록.
+    static let code = """
+    # 제목 1의 `code` 글자
+    ## 제목 2의 `code` 글자
+    ### 제목 3의 `code` 글자
+    본문의 `git rebase main` 한 뒤 푸시
+    [ ] 할 일의 `feature/quick-capture` 정리
+    [x] 끝낸 일의 `swift test` 실행
+    ==형광 안의 `code` 글자== 와 ==형광 `b`=={4}
+    **굵은 글 안의 `code`** 와 ~~지운 `code`~~
+    `가나다 한글 코드` 와 `a` `bb` `ccc`
+    ```swift
+    // 다른 앱 위에 항상 띄우기
+    panel.level = .floating
+    ```
+    끝 줄
     """
 
     /// 화면 2 아래쪽의 요소별 카드를 한 노트에 모은 것.

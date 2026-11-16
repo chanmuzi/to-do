@@ -15,34 +15,34 @@ import Theme
         }
     }
 
-    @Test func inlineMarkersShowOnlyOnTheCaretLine() throws {
+    @Test func inlineMarkersStayHiddenOnTheCaretLineToo() throws {
         let h = try EditorHarness(DemoNote.text)
         let bold = h.document.lines[1].spans[0]       // **PR #482**
         let highlight = h.document.lines[4].spans[0]  // ==배포 체크리스트 확인==
-        let syntaxSize = h.theme.nsFont(.code).pointSize
 
-        h.caret(atEndOfLine: 4)
-        #expect(try h.fontSize(line: 4, at: highlight.openMarker) == [syntaxSize, syntaxSize])
-        #expect(try h.fontSize(line: 4, at: highlight.closeMarker) == [syntaxSize, syntaxSize])
-        #expect(try h.color(line: 4, at: highlight.openMarker.location) == h.theme.rgba(.text3).nsColor)
+        for line in [4, 1] {
+            h.caret(atEndOfLine: line)
+            #expect(try h.fontSize(line: 4, at: highlight.openMarker) == [hidden, hidden])
+            #expect(try h.fontSize(line: 4, at: highlight.closeMarker) == [hidden, hidden])
+            #expect(try h.color(line: 4, at: highlight.openMarker.location) == .clear)
+            #expect(try h.fontSize(line: 1, at: bold.openMarker) == [hidden, hidden])
+            #expect(try h.fontSize(line: 1, at: bold.closeMarker) == [hidden, hidden])
+        }
+        // 커서를 구간 안에 두어도, 선택해도 같다.
+        h.controller.setSelection(NSRange(location: bold.contentRange.location + 1, length: 0))
         #expect(try h.fontSize(line: 1, at: bold.openMarker) == [hidden, hidden])
+        h.controller.setSelection(bold.range)
         #expect(try h.fontSize(line: 1, at: bold.closeMarker) == [hidden, hidden])
-
-        // 커서가 떠나면 사라지고, 옮겨 간 줄에서 나타난다.
-        h.caret(atEndOfLine: 1)
-        #expect(try h.fontSize(line: 4, at: highlight.openMarker) == [hidden, hidden])
-        #expect(try h.color(line: 4, at: highlight.openMarker.location) == .clear)
-        #expect(try h.fontSize(line: 1, at: bold.openMarker) == [syntaxSize, syntaxSize])
         #expect(h.editor.text == DemoNote.text)
     }
 
-    @Test func markersHideWhenTheEditorLosesFocus() throws {
+    @Test func movingTheCaretRestylesNothing() throws {
         let h = try EditorHarness(DemoNote.text)
-        let highlight = h.document.lines[4].spans[0]
+        let before = h.controller.currentKeys()
         h.caret(atEndOfLine: 4)
-        #expect(try h.fontSize(line: 4, at: highlight.openMarker).allSatisfy { $0 > 1 })
+        #expect(h.controller.currentKeys() == before)
         h.window.makeFirstResponder(nil)
-        #expect(try h.fontSize(line: 4, at: highlight.openMarker) == [hidden, hidden])
+        #expect(h.controller.currentKeys() == before)
     }
 
     @Test func listMarkersAreAlwaysReplacedByTheGutter() throws {
@@ -75,13 +75,22 @@ import Theme
         #expect(try gutter(4) == .chevron(open: false))
     }
 
-    @Test func headingMarkerShowsOnlyWhileEditing() throws {
+    @Test func headingMarkerIsAlwaysHidden() throws {
         let h = try EditorHarness("# 제목\n본문")
-        h.caret(atEndOfLine: 1)
-        #expect(try h.fontSize(line: 0, at: NSRange(location: 0, length: 2)) == [hidden, hidden])
-        #expect(try h.fontSize(line: 0, at: NSRange(location: 2, length: 1)) == [h.theme.nsFont(.h1).pointSize])
+        for line in [1, 0] {
+            h.caret(atEndOfLine: line)
+            #expect(try h.fontSize(line: 0, at: NSRange(location: 0, length: 2)) == [hidden, hidden])
+            #expect(try h.fontSize(line: 0, at: NSRange(location: 2, length: 1)) == [h.theme.nsFont(.h1).pointSize])
+        }
+    }
+
+    @Test func linkShowsOnlyItsText() throws {
+        let h = try EditorHarness("[글자](https://a.example/b) 뒤")
+        let span = h.document.lines[0].spans[0]
         h.caret(atEndOfLine: 0)
-        #expect(try h.fontSize(line: 0, at: NSRange(location: 0, length: 1)) == [h.theme.nsFont(.code).pointSize])
+        #expect(try h.fontSize(line: 0, at: span.openMarker) == [hidden])
+        #expect(try h.fontSize(line: 0, at: span.closeMarker).allSatisfy { $0 == hidden })
+        #expect(try h.fontSize(line: 0, at: span.contentRange).allSatisfy { $0 == h.theme.nsFont(.body).pointSize })
     }
 
     @Test func inlineStyles() throws {
@@ -96,10 +105,16 @@ import Theme
         #expect((attributes(0)[.font] as? NSFont) == h.theme.nsFont(.strong))
         #expect(attributes(1)[.strikethroughStyle] as? Int == NSUnderlineStyle.single.rawValue)
         #expect(attributes(1)[.foregroundColor] as? NSColor == h.theme.rgba(.text2).nsColor)
-        #expect((attributes(2)[.markdownInlineBackground] as? InlineBackground)?.kind == .highlight(3))
+        #expect((attributes(2)[.markdownHighlight] as? InlineBackground)?.kind == .highlight(3))
         #expect(attributes(2)[.foregroundColor] as? NSColor == h.theme.rgba(HighlightColor.rose.foreground).nsColor)
         #expect((attributes(3)[.font] as? NSFont) == h.theme.nsFont(.code))
-        #expect((attributes(3)[.markdownInlineBackground] as? InlineBackground)?.kind == .code)
+        let box = try #require(attributes(3)[.markdownCodeBox] as? InlineBackground)
+        #expect(box.kind == .code)
+        #expect(box.height == h.theme.component(.codeHeight))
+        #expect(box.padX == h.theme.component(.codePaddingX))
+        #expect(box.drop == h.theme.component(.codeDrop))
+        // 인라인 코드의 글자는 기본으로 코드 강조색이다(D-035).
+        #expect(attributes(3)[.foregroundColor] as? NSColor == h.theme.rgba(.codeAccent).nsColor)
         #expect(attributes(4)[.markdownLink] as? String == "https://a.example")
         #expect(attributes(4)[.underlineColor] as? NSColor == h.theme.rgba(.text3).nsColor)
         // 형광펜의 색 번호도 닫는 기호와 함께 감춘다.
@@ -114,23 +129,81 @@ import Theme
         #expect(attributes[.strikethroughStyle] as? Int == NSUnderlineStyle.single.rawValue)
     }
 
-    @Test func codeBlockFencesCollapseUnlessTheCaretIsInside() throws {
+    @Test func inlineCodeStyleSwitchesTheTextColorOnly() throws {
+        let h = try EditorHarness("앞 `코드` 뒤\n```\nlet x = 1\n```")
+        let content = h.document.lines[0].spans[0].contentRange.location
+        #expect(h.editor.configuration.inlineCodeStyle == .accent)
+        #expect(try h.color(line: 0, at: content) == h.theme.rgba(.codeAccent).nsColor)
+        let box = try h.display(line: 0).attribute(.markdownCodeBox, at: content, effectiveRange: nil) as? InlineBackground
+
+        h.editor.configuration.inlineCodeStyle = .plain
+        #expect(try h.color(line: 0, at: content) == h.theme.rgba(.codeForeground).nsColor)
+        let plainBox = try h.display(line: 0).attribute(.markdownCodeBox, at: content, effectiveRange: nil) as? InlineBackground
+        #expect(plainBox?.height == box?.height)
+        #expect(plainBox?.padX == box?.padX)
+        // 코드 블록의 글자는 어느 쪽에서도 무채색이다.
+        #expect(try h.color(line: 2, at: h.document.lines[2].start) == h.theme.rgba(.codeForeground).nsColor)
+        h.editor.configuration.inlineCodeStyle = .accent
+        #expect(try h.color(line: 2, at: h.document.lines[2].start) == h.theme.rgba(.codeForeground).nsColor)
+    }
+
+    @Test func inlineCodeInsideOtherElements() throws {
+        let h = try EditorHarness("# 제목 `a`\n[x] 끝낸 `b`\n==형광 `c` 안==")
+        func attributes(_ line: Int) throws -> [NSAttributedString.Key: Any] {
+            let span = try #require(h.document.lines[line].spans.first { $0.kind == .code })
+            return try h.display(line: line).attributes(at: span.contentRange.location - h.document.lines[line].start, effectiveRange: nil)
+        }
+        // 제목 안에서는 제목 크기에 비례해 커지고 상자도 따라 커진다.
+        let heading = try attributes(0)
+        let scale = h.theme.nsFont(.h1).pointSize / h.theme.nsFont(.body).pointSize
+        #expect((heading[.font] as? NSFont)?.pointSize == (h.theme.nsFont(.code).pointSize * scale * 2).rounded() / 2)
+        #expect((heading[.markdownCodeBox] as? InlineBackground)?.height == (h.theme.component(.codeHeight) * scale).rounded())
+        // 끝낸 투두 안에서는 흐린 색에 취소선이고 상자는 그대로다.
+        let done = try attributes(1)
+        #expect(done[.foregroundColor] as? NSColor == h.theme.rgba(.text3).nsColor)
+        #expect(done[.strikethroughStyle] as? Int == NSUnderlineStyle.single.rawValue)
+        #expect(done[.markdownCodeBox] is InlineBackground)
+        // 형광펜 안에서는 형광펜 바탕 위에 코드 상자가 함께 놓인다.
+        let highlighted = try attributes(2)
+        #expect((highlighted[.markdownHighlight] as? InlineBackground)?.kind == .highlight(1))
+        #expect((highlighted[.markdownCodeBox] as? InlineBackground)?.kind == .code)
+    }
+
+    @Test func codeBlockFencesAreAlwaysCollapsed() throws {
         let h = try EditorHarness("앞\n```swift\n// 주석\nlet x = 1\n```\n뒤")
         func lineHeight(_ line: Int) throws -> CGFloat {
             let style = try #require(try h.display(line: line).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
             return style.maximumLineHeight
         }
-        h.caret(atEndOfLine: 0)
-        #expect(try lineHeight(1) == EditorMetrics.codeBlockPadY)
-        #expect(try h.color(line: 1, at: h.document.lines[1].start) == .clear)
-        #expect(try lineHeight(3) == EditorMetrics.codeLineHeight)
-        #expect(try h.color(line: 2, at: h.document.lines[2].start) == h.theme.rgba(.text3).nsColor)
-        #expect(try h.color(line: 3, at: h.document.lines[3].start) == h.theme.rgba(.codeForeground).nsColor)
+        // 커서가 블록 밖에 있든 안에 있든 ``` 줄(언어 이름 포함)은 보이지 않고 상자의 안쪽 여백만 차지한다.
+        for line in [0, 3] {
+            h.caret(atEndOfLine: line)
+            #expect(try lineHeight(1) == h.theme.component(.codeBlockPaddingY))
+            #expect(try lineHeight(4) == h.theme.component(.codeBlockPaddingY))
+            #expect(try h.color(line: 1, at: h.document.lines[1].start) == .clear)
+            #expect(try h.fontSize(line: 1, at: h.document.lines[1].range).allSatisfy { $0 == hidden })
+            #expect(try h.color(line: 4, at: h.document.lines[4].start) == .clear)
+            #expect(try lineHeight(3) == h.theme.lineHeight(.codeBlock))
+            #expect(try h.color(line: 2, at: h.document.lines[2].start) == h.theme.rgba(.text3).nsColor)
+            #expect(try h.color(line: 3, at: h.document.lines[3].start) == h.theme.rgba(.codeForeground).nsColor)
+        }
+    }
 
-        h.caret(atEndOfLine: 3)
-        #expect(try lineHeight(1) == EditorMetrics.codeLineHeight + EditorMetrics.codeBlockPadY)
-        #expect(try h.color(line: 1, at: h.document.lines[1].start) == h.theme.rgba(.text3).nsColor)
-        #expect(try h.color(line: 4, at: h.document.lines[4].start) == h.theme.rgba(.text3).nsColor)
+    @Test func linesWithCodeFontKeepTheirExactHeight() throws {
+        // 글꼴의 leading이 줄 높이에 더해지지 않는다(D2Coding이 든 줄이 20.96, 코드 줄이 18.96이 되던 문제).
+        let h = try EditorHarness("본문\n본문 `코드` 본문\n```\nlet x = 1\nlet y = 2\n```\n뒤")
+        h.window.layoutIfNeeded()
+        h.controller.layoutManager.ensureLayout(for: h.controller.layoutManager.documentRange)
+        var heights: [CGFloat] = []
+        h.controller.layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
+            heights.append(fragment.layoutFragmentFrame.height)
+            return true
+        }
+        let body = h.theme.lineHeight(.body)
+        let code = h.theme.lineHeight(.codeBlock)
+        let pad = h.theme.component(.codeBlockPaddingY)
+        let gap = h.theme.component(.codeBlockGap)
+        #expect(heights == [body, body, pad + gap, code, code, pad + gap, body])
     }
 
     @Test func bracketCheckboxWidensTheGutter() throws {
@@ -171,7 +244,8 @@ import Theme
         h.editor.foldedLines = [5]
         // 넣을 때는 알리지 않는다.
         #expect(h.foldChanges.isEmpty)
-        #expect(abs(h.editor.contentHeight - (open - line * 4)) < 1)
+        // 접힌 줄은 높이가 0.01씩 남아, 올림한 높이가 1pt까지 어긋날 수 있다.
+        #expect(abs(h.editor.contentHeight - (open - line * 4)) <= 1)
         #expect(h.editor.text == DemoNote.text)
         let collapsed = try #require(try h.display(line: 7).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
         #expect(collapsed.maximumLineHeight == EditorMetrics.collapsedLineHeight)

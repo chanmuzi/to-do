@@ -4,8 +4,6 @@ import Foundation
 nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
     var level: Int
-    /// 커서(선택)가 있는 줄. 마크다운 기호를 보인다.
-    var isActive = false
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
     /// 접힌 토글 자신.
@@ -13,8 +11,6 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var childCount = 0
     /// 문서의 첫 줄(위 여백을 두지 않는다).
     var isFirst = false
-    /// 코드 블록에 커서가 있어 ``` 줄을 보인다.
-    var isCodeActive = false
     /// 코드 블록의 첫 줄, 마지막 줄(상자의 둥근 모서리를 그린다).
     var isCodeTop = false
     var isCodeBottom = false
@@ -26,10 +22,8 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
 }
 
 nonisolated enum LinePresentation {
-    /// - Parameter active: 선택이 걸친 줄. 편집기에 포커스가 없으면 `nil`.
     static func keys(
         for doc: MarkdownDocument,
-        active: ClosedRange<Int>?,
         folded: Set<Int>,
         hoveredLink: (line: Int, offset: Int)? = nil
     ) -> [LineRenderKey] {
@@ -40,12 +34,10 @@ nonisolated enum LinePresentation {
             let line = doc.lines[index]
             var key = LineRenderKey(kind: line.kind, level: line.level)
             key.isCollapsed = hidden.contains(index)
-            key.isActive = !key.isCollapsed && (active?.contains(index) ?? false)
             key.isFolded = folded.contains(index)
             key.childCount = line.kind == .toggle ? line.childCount : 0
             key.isFirst = index == 0
             if let block = line.codeBlock {
-                key.isCodeActive = active.map { $0.overlaps(block) } ?? false
                 key.isCodeTop = index == block.lowerBound
                 key.isCodeBottom = index == block.upperBound
             }

@@ -47,6 +47,25 @@ public final class MarkdownEditor {
         controller.appendFromOutside(suffix)
     }
 
+    /// 바깥(이 편집기가 아닌 쪽)이 원문을 `newText`로 바꿨을 때 부른다. 지금 원문과 견주어 앞뒤의 같은
+    /// 부분은 그대로 두고 달라진 가운데만 바꿔 넣는다. 통째로 넣는 것(`text`)과 달리 되돌리기 기록,
+    /// 접힘, 조합 중인 글자를 지키고, 커서는 바뀐 부분 밖이면 제자리에 둔다. `onTextChange`를 부르지 않는다.
+    ///
+    /// - 문서 끝에 붙기만 한 변경은 되돌리기에 적히지 않는다(`appendFromOutside`와 같다). 그 밖의 변경은
+    ///   되돌리기 한 단계로 적힌다(앞선 기록이 가리키는 범위가 어긋나지 않게). 사용자가 그것을 되돌리면
+    ///   사용자의 편집으로 알린다.
+    /// - 커서가 문서 끝에 있었고 바깥의 글이 그 줄에 이어 붙었으면(문서 끝에 닿는 변경이고 줄바꿈으로
+    ///   시작하지 않는다. 예: 빈 마지막 줄에 `[ ] 우유\n`) 커서는 그 글 뒤로 간다. 그 글이 줄바꿈으로
+    ///   끝나면 커서는 새 빈 마지막 줄에 놓이고, 아니면 사용자가 이어 치는 글이 새 줄에서 시작한다
+    ///   (바깥이 붙인 줄에 붙지 않는다). 바깥의 글이 줄바꿈으로 시작하면 커서의 줄은 그대로이므로 제자리다.
+    ///   커서나 선택의 끝이 바뀐 부분 안에 있었으면 바뀐 부분 뒤로 간다. 그 밖에는 제자리다.
+    /// - 한글을 조합하는 중이면 화면에 넣는 일을 조합이 끝날 때까지 미룬다. 미룬 동안에도 `text`와
+    ///   `onTextChange`로 나가는 원문에는 바깥의 변경이 들어 있다. 바뀐 부분이 조합 중인 글자에 겹치면
+    ///   미루지 않고 조합을 끝낸 뒤 넣는다.
+    public func applyOutsideChange(to newText: String) {
+        controller.applyOutsideChange(to: newText)
+    }
+
     /// 체크박스 모양 같은 설정. 바꾸면 곧바로 다시 그린다.
     public var configuration: MarkdownEditorConfiguration {
         get { controller.configuration }
@@ -117,7 +136,13 @@ public final class MarkdownEditor {
         controller.perform(action)
     }
 
-    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(커서 줄의 기호를 보이고 편집 단축키를 받는다).
+    /// 떠 있는 링크 주소 칸에 주소를 적고 Return을 누른 것과 같다(`perform(.link)` 뒤에 부른다).
+    @_spi(Verification)
+    public func commitLink(_ address: String) {
+        controller.commitLink(address)
+    }
+
+    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(편집 단축키를 받는다).
     /// 화면을 캡처해 확인할 때만 쓴다(다른 앱의 포커스를 빼앗지 않기 위해).
     @_spi(Verification)
     public var forcesActiveAppearance: Bool {

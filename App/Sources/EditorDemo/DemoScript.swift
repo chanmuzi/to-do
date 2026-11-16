@@ -11,6 +11,8 @@ import AppKit
 ///   `up`, `down`, `fold`, `unfold`, `h1`, `h2`, `h3`
 /// - `click:<줄>`: 그 줄 왼쪽 칸(체크박스, 꺾쇠)을 누름
 /// - `hover:<줄>`: 그 줄 글자 위로 마우스를 옮김(코드 블록 복사 버튼, 링크 밑줄)
+/// - `cmd:<셀렉터>`: 그 밖의 키 명령(예: `cmd:moveWordLeftAndModifySelection:`)
+/// - `link:<주소>`: 떠 있는 링크 주소 칸에 주소를 넣고 확정(`action:link` 뒤에)
 /// - `mark:<글자>`(한글 조합 중인 글자), `commit:<글자>`(조합 확정)
 /// - `undo`, `redo`
 enum DemoScript {
@@ -96,6 +98,8 @@ enum DemoScript {
             view.setMarkedText(argument, selectedRange: NSRange(location: argument.utf16.count, length: 0), replacementRange: view.markedRange().location == NSNotFound ? view.selectedRange() : view.markedRange())
         case "commit":
             view.insertText(argument, replacementRange: view.markedRange().location == NSNotFound ? view.selectedRange() : view.markedRange())
+        case "cmd": view.doCommand(by: NSSelectorFromString(argument))
+        case "link": editor.commitLink(argument)
         case "undo": editor.undoManager.undo()
         case "redo": editor.undoManager.redo()
         default: return false

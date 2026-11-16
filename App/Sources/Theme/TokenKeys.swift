@@ -23,9 +23,13 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case highlight3Foreground = "hl-3-fg"
     case highlight4Background = "hl-4-bg"
     case highlight4Foreground = "hl-4-fg"
+    /// 인라인 코드 바탕, 코드 블록 바탕. 테두리는 없다(D-035).
     case codeBackground = "code-bg"
-    case codeLine = "code-line"
+    case codeBlockBackground = "codeblock-bg"
+    /// 코드 글자(코드 블록, 그리고 인라인 코드를 "plain"으로 골랐을 때).
     case codeForeground = "code-fg"
+    /// 인라인 코드 글자의 강조색("accent", 기본). 규칙 1의 예외다(D-035).
+    case codeAccent = "code-accent"
     case link
 }
 
@@ -85,6 +89,19 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case controlHeight = "ctl-h"
     case rowHeight = "row-h"
     case caretWidth = "caret-w"
+    /// 인라인 코드 상자(spec 6): 좌우 안쪽 여백, 바깥 간격, 높이, 줄 가운데에서 아래로 내리는 양,
+    /// 글자 기준선을 올리는 양.
+    case codePaddingX = "code-pad-x"
+    case codeGap = "code-gap"
+    case codeHeight = "code-h"
+    case codeDrop = "code-drop"
+    case codeRise = "code-rise"
+    /// 코드 블록(spec 6): 좌우와 위아래 안쪽 여백, 위아래 바깥 간격.
+    case codeBlockPaddingX = "codeblock-pad-x"
+    case codeBlockPaddingY = "codeblock-pad-y"
+    case codeBlockGap = "codeblock-gap"
+    /// 링크 주소를 적는 칸의 너비(spec 6).
+    case linkFieldWidth = "link-field-w"
     case iconButton = "icon-btn"
     case menubarIcon = "menubar-icon"
     case browseWidth = "browse-w"

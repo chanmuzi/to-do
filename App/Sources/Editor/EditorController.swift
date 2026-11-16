@@ -4,7 +4,6 @@ import Theme
 /// 줄별 모양을 정하는 상태. 이 값이 같으면 모양도 같다.
 struct KeyStamp: Equatable {
     var documentVersion: Int
-    var active: ClosedRange<Int>?
     var folded: Set<Int>
     var hoveredLine: Int?
     var hoveredOffset: Int?
@@ -40,6 +39,7 @@ final class EditorController: NSObject {
     let scrollView = NSScrollView()
     let editorUndoManager = UndoManager()
     let copyButton = CodeCopyButton()
+    let linkField = LinkField()
 
     var document = MarkdownDocument("")
     var folded: Set<Int> = []
@@ -47,20 +47,21 @@ final class EditorController: NSObject {
     var appliedKeys: [LineRenderKey] = []
     var isApplyingEdit = false
     var isSettingText = false
-    /// 바깥이 끝에 덧붙인 글을 넣는 중(`appendFromOutside`).
-    var isAppendingFromOutside = false
-    /// 바깥이 덧붙였지만 아직 화면에 넣지 않은 글. 한글을 조합하는 중이면 조합이 끝날 때까지 미룬다
-    /// (`appendFromOutside`). 그동안에도 원문(`text`)과 바깥에 알리는 글에는 들어 있다.
-    var deferredAppend = ""
+    /// 바깥이 바꾼 글을 넣는 중(`applyOutsideChange`). 사용자의 편집이 아니므로 알리지 않는다.
+    var isApplyingOutsideChange = false
+    /// 바깥이 바꿨지만 아직 화면에 넣지 않은 부분. 한글을 조합하는 중이면 조합이 끝날 때까지 미룬다
+    /// (`applyOutsideChange`). 그동안에도 원문(`text`)과 바깥에 알리는 글에는 들어 있다.
+    var deferredOutsideEdit: OutsideEdit?
+    /// 바깥이 줄바꿈 없이 끝나는 글을 문서 끝에 붙였고 커서를 그 뒤로 옮겼다. 사용자가 이어 치는 글이
+    /// 그 줄에 붙지 않게, 다음에 치는 글 앞에 줄바꿈을 넣는다(그때의 커서 자리와 원문).
+    var pendingLineBreak: (location: Int, version: Int)?
     var isRestyling = false
     var hoveredLink: (line: Int, offset: Int)?
     var hoveredCodeBlock: ClosedRange<Int>?
     var lastContentHeight: CGFloat = -1
     var observers: [NSObjectProtocol] = []
-    /// 창이 키 창이 아니어도 편집 중인 것으로 본다: 커서 줄의 기호를 보이고 편집 단축키를 받는다(확인용).
-    var forcesActiveAppearance = false {
-        didSet { refreshStyling() }
-    }
+    /// 창이 키 창이 아니어도 편집 중인 것으로 본다: 편집 단축키를 받는다(확인용).
+    var forcesActiveAppearance = false
     /// 원문이 바뀔 때마다 올린다. 줄별 모양을 다시 계산할지 가리는 데 쓴다.
     var documentVersion = 0
     var keysCache: (stamp: KeyStamp, keys: [LineRenderKey])?
@@ -80,7 +81,17 @@ final class EditorController: NSObject {
     /// 원문이 바뀌었는데 아직 바깥에 알리지 않았다(조합 중인 글자는 `textDidChange`가 오지 않는다).
     var hasPendingChange = false
     var isFlushScheduled = false
-    var isHeightReportScheduled = false
+    /// 선택이 마지막으로 정해졌을 때의 `documentVersion`. 이것과 다르면 지금의 선택 변화는 편집에
+    /// 딸려 온 것이어서, 화살표로 옮긴 것처럼 다루지 않는다(`CaretSnapping`의 `textChanged`).
+    var selectionVersion = 0
+    /// 선택 없이 서식 단축키로 정해 둔 "다음에 칠 글자의 서식"과, 그때의 커서 자리와 원문.
+    var typingMarks: (location: Int, version: Int, marks: TypingMarks)?
+    /// 조합(한글 입력)을 시작하며 넣어 둔 빈 기호 쌍. 조합이 글자 없이 끝나면 지운다.
+    var pendingPair: (location: Int, before: String, after: String)?
+    /// 세 번째 백틱으로 코드 블록을 만든 바로 뒤. 습관대로 이어 누른 Return, Space 하나는 넣지 않는다.
+    var swallowsCodeTriggerKey = false
+    /// 링크 주소를 적는 중이면 그 대상과 그때의 원문.
+    var linkSession: (target: LinkTarget, version: Int)?
     /// 텍스트 뷰에 넣어 둔 문서 끝 빈 줄의 문단 모양(`updateTrailingLineStyle`).
     var appliedTrailingStyle: NSParagraphStyle?
     /// 지금 넣는 편집이 접혀서 감춘 줄까지 일부러 고치는 것인지(`TextEdit.includesHiddenLines`).
@@ -93,6 +104,8 @@ final class EditorController: NSObject {
         self.configuration = configuration
         self.style = EditorStyle(theme: theme, configuration: configuration, increaseContrast: Self.increaseContrast)
         layoutManager.textContainer = textContainer
+        // 글꼴의 leading을 줄 높이에 더하지 않는다. 더하면 D2Coding이 든 줄이 정한 줄 높이보다 0.96pt 높아진다.
+        layoutManager.usesFontLeading = false
         contentStorage.addTextLayoutManager(layoutManager)
         textView = EditorTextView(frame: .zero, textContainer: textContainer)
         super.init()
@@ -111,7 +124,7 @@ final class EditorController: NSObject {
     /// 다른 글을 넣으면 되돌리기 기록을 비우고, 커서는 가능한 한 제자리에 둔다.
     /// 새 글에서 토글이 아니게 된 줄의 접힘은 버리고 `onFoldChange`로 알린다.
     var text: String {
-        get { document.text + deferredAppend }
+        get { deferredOutsideEdit?.applied(to: document.text) ?? document.text }
         set {
             let normalized = LineEndings.normalized(newValue)
             guard normalized != text else { return }
@@ -125,54 +138,6 @@ final class EditorController: NSObject {
         let normalized = LineEndings.normalized(newText)
         if normalized != text { replaceText(normalized) }
         setFolded(foldedLines, notify: false)
-    }
-
-    /// 바깥(이 편집기가 아닌 쪽)이 원문 끝에 글을 덧붙였다. 지금 원문의 끝에 그대로 붙인다.
-    ///
-    /// 통째로 바꿔 넣는 것(`text`)과 달리 커서와 선택, 접힘, 되돌리기 기록, 조합 중인 글자를 그대로 둔다.
-    /// 끝에 붙이는 것이어서 되돌리기 기록이 가리키는 범위(모두 붙인 글보다 앞이다)가 어긋나지 않는다.
-    /// 텍스트 뷰의 편집 경로(`shouldChangeText`)를 거치지 않으므로 되돌리기에 적히지 않는다: ⌘Z는 붙인 글을
-    /// 지우지 않고 사용자가 한 편집만 되돌린다.
-    /// `onTextChange`를 부르지 않는다. 아직 알리지 않은 사용자의 변경이 있었다면 그대로 남아, 다음에 알릴 때
-    /// 붙인 글까지 든 원문이 나간다.
-    ///
-    /// 한글을 조합하는 중이면 화면에 넣는 일을 조합이 끝날 때까지 미룬다. 입력기를 거치지 않고 원문 저장소가
-    /// 바뀌면 텍스트 뷰가 조합을 끝내 버리기 때문이다(조합하는 자리가 글 끝이 아니어도 그렇다). 미룬 동안에도
-    /// `text`와 `onTextChange`로 나가는 원문에는 붙인 글이 들어 있어, 저장되는 글에서 빠지지 않는다.
-    func appendFromOutside(_ suffix: String) {
-        let appended = LineEndings.normalized(suffix)
-        guard !appended.isEmpty else { return }
-        if textView.hasMarkedText() {
-            deferredAppend += appended
-        } else {
-            insertAtEnd(appended)
-        }
-    }
-
-    /// 조합이 끝났으면 미뤄 둔 글을 넣는다. 조합이 바뀌거나 끝날 때마다 불린다(`flushPendingChange`).
-    func insertDeferredAppendIfPossible() {
-        guard !deferredAppend.isEmpty, !textView.hasMarkedText(), !isSettingText else { return }
-        let appended = deferredAppend
-        deferredAppend = ""
-        insertAtEnd(appended)
-    }
-
-    private func insertAtEnd(_ appended: String) {
-        guard let storage = textView.textStorage else { return }
-        let wasPending = hasPendingChange
-        let selection = textView.selectedRange()
-        isAppendingFromOutside = true
-        storage.replaceCharacters(
-            in: NSRange(location: storage.length, length: 0),
-            with: NSAttributedString(string: appended, attributes: baseAttributes)
-        )
-        isAppendingFromOutside = false
-        hasPendingChange = wasPending
-        // 커서가 글 끝에 있었으면 텍스트 뷰가 붙인 글 뒤로 옮긴다. 있던 자리(붙인 글 앞)에 되돌린다.
-        if textView.selectedRange() != selection { setSelection(selection) }
-        refreshStyling()
-        reportContentHeight()
-        layoutCopyButton()
     }
 
     /// 접힌 토글의 줄 번호(0부터). 원문에는 적지 않는 보기 상태다. 지금 원문에서 토글이 아닌 줄 번호는 버린다.
@@ -240,6 +205,10 @@ final class EditorController: NSObject {
 
         copyButton.onPress = { [weak self] in self?.copyHoveredCodeBlock() }
         textView.addSubview(copyButton)
+        linkField.isHidden = true
+        linkField.onCommit = { [weak self] in self?.commitLink($0) }
+        linkField.onCancel = { [weak self] in self?.cancelLinkEditing() }
+        textView.addSubview(linkField)
     }
 
     /// 글꼴, 색, 여백을 뷰에 옮긴다.
@@ -256,6 +225,7 @@ final class EditorController: NSObject {
         textView.typingAttributes = baseAttributes
         textView.selectedTextAttributes = [.backgroundColor: theme.rgba(.hover).nsColor]
         copyButton.apply(theme: theme, tint: style.text3)
+        linkField.apply(theme: theme, style: style)
     }
 
     /// 원문에 붙여 두는 기본 속성. 화면의 서식은 여기 넣지 않는다.
@@ -321,9 +291,14 @@ final class EditorController: NSObject {
         guard let storage = textView.textStorage else { return }
         let selection = textView.selectedRange()
         isSettingText = true
+        if linkSession != nil { cancelLinkEditing() }
+        typingMarks = nil
+        pendingPair = nil
+        swallowsCodeTriggerKey = false
         if textView.hasMarkedText() { textView.unmarkText() }
-        // 통째로 바꿔 넣는 글에는 미뤄 둔 덧붙임이 이미 들어 있거나, 더는 맞지 않는다.
-        deferredAppend = ""
+        // 통째로 바꿔 넣는 글에는 미뤄 둔 바깥의 변경이 이미 들어 있거나, 더는 맞지 않는다.
+        deferredOutsideEdit = nil
+        pendingLineBreak = nil
         storage.setAttributedString(NSAttributedString(string: newText, attributes: baseAttributes))
         editorUndoManager.removeAllActions()
         hasPendingChange = false
@@ -332,6 +307,7 @@ final class EditorController: NSObject {
         editSetFoldsExplicitly = false
         pendingFoldRestore = nil
         isSettingText = false
+        selectionVersion = documentVersion
         textView.setSelectedRange(clamped(selection))
         hoveredLink = nil
         setHoveredCodeBlock(nil)

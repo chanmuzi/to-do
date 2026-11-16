@@ -61,7 +61,8 @@ nonisolated enum InlineParser {
             }
             if c == leftBracket,
                let textEnd = index(of: rightBracket, in: u, from: i + 1, to: end),
-               textEnd + 1 < end, u[textEnd + 1] == leftParen,
+               // 글자가 없는 링크는 화면에 아무것도 남지 않으므로 링크로 읽지 않는다.
+               textEnd > i + 1, textEnd + 1 < end, u[textEnd + 1] == leftParen,
                let urlEnd = index(of: rightParen, in: u, from: textEnd + 2, to: end) {
                 let url = String(utf16CodeUnits: Array(u[(textEnd + 2)..<urlEnd]), count: urlEnd - textEnd - 2)
                 spans.append(InlineSpan(
