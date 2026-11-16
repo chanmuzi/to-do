@@ -9,6 +9,25 @@ struct NoteEditorOptions: Hashable {
     var checkbox: CheckboxStyle = .box
     /// 인라인 코드의 글자색(spec 6, D-035): 코드 강조색(기본) 또는 무채색.
     var inlineCode: InlineCodeStyle = .accent
+
+    init(checkbox: CheckboxStyle = .box, inlineCode: InlineCodeStyle = .accent) {
+        self.checkbox = checkbox
+        self.inlineCode = inlineCode
+    }
+
+    /// 저장된 설정에서 읽는다. 모르는 이름(더 새 버전이 적은 값, 손으로 고친 파일)은 기본값으로 둔다.
+    init(settings: AppSettings) {
+        self.init(
+            checkbox: CheckboxStyle(rawValue: settings.checkbox) ?? .box,
+            inlineCode: InlineCodeStyle(rawValue: settings.inlineCode) ?? .accent
+        )
+    }
+
+    /// 저장할 설정에 적는다.
+    func write(to settings: inout AppSettings) {
+        settings.checkbox = checkbox.rawValue
+        settings.inlineCode = inlineCode.rawValue
+    }
 }
 
 /// 노트 창마다 Markdown 편집기를 만들어 넘기는 곳(`NotePanelCoordinator`의 `makeBodyEditor`).
@@ -26,6 +45,13 @@ final class NoteEditorFactory {
 
     init(windowStates: WindowStateStore, log: @escaping (String) -> Void) {
         folds = NoteFoldStore(windowStates: windowStates, log: log)
+    }
+
+    /// 표시 방식을 저장된 설정(`app-settings.json`)에 잇는다: 지금 값으로 시작하고, 설정이 바뀔 때마다 따라가
+    /// 떠 있는 편집기에 곧바로 반영한다. 바꿀 때는 `settings.update { options.write(to: &$0) }`로 적는다.
+    func follow(_ settings: AppSettingsStore) {
+        options = NoteEditorOptions(settings: settings.settings)
+        settings.onChange = { [weak self] in self?.options = NoteEditorOptions(settings: $0) }
     }
 
     func makeEditor(_ context: NoteBodyEditorContext) -> any NoteBodyEditing {
