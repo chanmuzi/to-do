@@ -65,6 +65,13 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
+        // 캡처 바와 노트 찾기만 띄워 보는 확인용 실행 파일. 앱에는 들어가지 않는다.
+        .executableTarget(
+            name: "Stage4Demo",
+            dependencies: ["Capture", "Browse", "Theme", "Models", "Store", "Routing"],
+            swiftSettings: uiSettings
+        ),
+
         // MARK: Tests
         .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
@@ -80,6 +87,16 @@ let package = Package(
             swiftSettings: uiSettings
         ),
         .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
+        .testTarget(
+            name: "CaptureTests",
+            dependencies: ["Capture", "Theme", "Models", "Store", "Routing"],
+            swiftSettings: uiSettings
+        ),
+        .testTarget(
+            name: "BrowseTests",
+            dependencies: ["Browse", "Theme", "Models", "Store", "Routing"],
+            swiftSettings: uiSettings
+        ),
     ],
     swiftLanguageModes: [.v6]
 )
