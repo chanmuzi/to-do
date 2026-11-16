@@ -3,7 +3,7 @@ import Theme
 
 /// 상단 줄의 리마인더: 12pt 아이콘과 글자 하나(spec 5.2, 규칙 13). 누르면 리마인더 설정을 연다.
 /// 예정, 임박, 지남의 크기와 자리는 같다.
-final class ReminderBadgeView: NSView {
+final class ReminderBadgeView: ClickableView {
     var onPress: (() -> Void)?
 
     private let style: PanelStyle
@@ -18,6 +18,8 @@ final class ReminderBadgeView: NSView {
         iconView.wantsLayer = true
         iconView.imageScaling = .scaleProportionallyDown
         [iconView, label].forEach(addSubview)
+        isHidden = true
+        alphaValue = 0
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
     }
@@ -27,16 +29,27 @@ final class ReminderBadgeView: NSView {
         fatalError("코드로만 만든다")
     }
 
+    /// 리마인더가 생기거나 없어지면 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 내용만 바뀌면 그 자리에서 넘어간다.
     func apply(_ presentation: ReminderPresentation?, animated: Bool) {
         guard presentation != self.presentation else { return }
-        if animated { style.crossfade(self) }
+        let wasShown = self.presentation != nil
+        let isShown = presentation != nil
+        if wasShown, isShown, animated { style.crossfade(self) }
         self.presentation = presentation
         refresh()
+        guard wasShown != isShown else { return }
+        style.fade(self, visible: isShown, animated: animated) { [weak self] in
+            guard let self, self.presentation == nil else { return }
+            isHidden = true
+        }
     }
 
+    /// 리마인더가 없어지면 사라지는 동안 마지막 모습을 그대로 둔다.
     func refresh() {
-        isHidden = presentation == nil
-        guard let presentation else { return }
+        guard let presentation else {
+            updateRinging()
+            return
+        }
         let color = style.color(presentation.color)
         iconView.image = style.symbol(presentation.symbolName, size: .iconSmall)
         iconView.contentTintColor = color
@@ -84,7 +97,9 @@ final class ReminderBadgeView: NSView {
         if !shouldRing {
             layer.removeAnimation(forKey: BellRing.animationKey)
         } else if layer.animation(forKey: BellRing.animationKey) == nil, layer.bounds.width > 0 {
-            layer.add(BellRing.animation(for: layer), forKey: BellRing.animationKey)
+            layer.add(
+                BellRing.animation(for: layer, motion: style.theme.motion.bell), forKey: BellRing.animationKey
+            )
         }
     }
 

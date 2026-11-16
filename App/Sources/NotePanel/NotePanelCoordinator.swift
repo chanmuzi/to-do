@@ -9,6 +9,8 @@ import Theme
 /// - 노트 하나에 창 하나. 이미 떠 있는 노트를 열면 그 창을 앞으로 가져온다.
 /// - 창의 틀, 핀, 열림 상태는 `WindowStateStore`에 남기고 `restoreOpenNotes()`로 되살린다.
 /// - 노트 내용은 `NoteStoring`의 `load`, `update`, `scheduleUpdate`만 거쳐 읽고 쓴다.
+/// - "노트 모두 숨기기" 중에 노트를 열거나, 새로 만들거나, 본문에 커서를 두거나, 더 보기 메뉴를 띄우면
+///   숨김이 모두 풀린다. 한 창만 보이고 나머지는 숨은 상태는 없다(`areNotesHidden`이 참이면 보이는 노트 창이 없다).
 public final class NotePanelCoordinator {
     /// 상단 줄 표시 방식. 바꾸면 떠 있는 창에 바로 반영된다.
     public var displayOptions = NotePanelDisplayOptions() {
@@ -27,6 +29,7 @@ public final class NotePanelCoordinator {
     private var order: [NoteID] = []
     private var storeObservation: StoreObservation?
     private var observers: [any NSObjectProtocol] = []
+    private var isRefreshingStore = false
 
     /// - Parameters:
     ///   - router: 노트 창이 다른 기능을 부를 때(노트 찾기, 새 노트, AI 패널 등) 보내는 곳.
@@ -84,7 +87,7 @@ public final class NotePanelCoordinator {
     ///   - nextTo: 처음 띄우는 노트를 이 노트 옆에 둔다. 없으면 지금 쓰는 노트 옆, 그것도 없으면 화면 오른쪽 위.
     ///   - focus: 본문에 입력 커서를 둔다.
     public func open(_ id: NoteID, nextTo: NoteID? = nil, focus: Bool = true) throws {
-        if areNotesHidden { toggleAllHidden() }
+        setAllHidden(false)
         if let controller = controllers[id] {
             controller.show(focus: focus)
             return
@@ -135,8 +138,14 @@ public final class NotePanelCoordinator {
 
     /// 떠 있는 노트를 한꺼번에 감추거나 제자리에 되돌린다.
     public func toggleAllHidden() {
-        areNotesHidden.toggle()
-        order.compactMap { controllers[$0] }.forEach { $0.setHidden(areNotesHidden) }
+        setAllHidden(!areNotesHidden)
+    }
+
+    /// 되돌릴 때는 뒤에 있던 창부터 띄워 숨기기 전의 앞뒤를 지킨다.
+    private func setAllHidden(_ hidden: Bool) {
+        guard hidden != areNotesHidden else { return }
+        areNotesHidden = hidden
+        recorder.backToFront(order).compactMap { controllers[$0] }.forEach { $0.setHidden(hidden) }
     }
 
     // MARK: - 창마다
@@ -162,14 +171,18 @@ public final class NotePanelCoordinator {
         controllers[id]?.setColor(colorID?.rawValue)
     }
 
-    /// 노트 창을 키 창으로 만들고 본문에 커서를 둔다.
+    /// 노트 창을 키 창으로 만들고 본문에 커서를 둔다. 노트를 숨긴 중이면 숨김을 모두 푼다.
     public func focusBody(of id: NoteID) {
-        controllers[id]?.focusBody()
+        guard let controller = controllers[id] else { return }
+        setAllHidden(false)
+        controller.focusBody()
     }
 
-    /// 더 보기 메뉴를 띄운다(키보드로 열 때).
+    /// 더 보기 메뉴를 띄운다(키보드로 열 때). 노트를 숨긴 중이면 숨김을 모두 푼다.
     public func popUpMoreMenu(for id: NoteID) {
-        controllers[id]?.popUpMoreMenu()
+        guard let controller = controllers[id] else { return }
+        setAllHidden(false)
+        controller.popUpMoreMenu()
     }
 
     /// 확인용: 마우스 위치와 상관없이 호버 상태를 정한다. `nil`이면 마우스를 따른다.
@@ -179,10 +192,60 @@ public final class NotePanelCoordinator {
 
     // MARK: - 안쪽
 
-    /// 노트가 없어졌다(휴지통으로 갔거나 파일이 지워짐). 창을 내리고 창 상태도 지운다.
+    /// 노트가 없어졌고 창에 남길 글도 없다(휴지통으로 갔거나, 쓰지 못한 글 없이 파일이 지워짐).
+    /// 창을 내리고 창 상태도 지운다.
     func noteDisappeared(_ id: NoteID) {
         discard(id)
         recorder.forget(id)
+    }
+
+    /// 파일이 없어진 노트의 글을 새 노트로 옮긴다. 지금 제목, 본문, 스페이스, 색, 리마인더로 새 노트를 만들어
+    /// 같은 자리에 같은 핀 상태로 띄우고, 옛 창과 저장소에 남은 변경을 정리한다.
+    /// 새 노트를 만들지 못하면 옛 창과 표시를 그대로 둔다.
+    func replaceMissingNote(_ id: NoteID) {
+        guard let old = controllers[id] else { return }
+        let source = old.latestNote
+        let created: Note
+        do {
+            created = try notes.create(NoteDraft(
+                title: source.title, body: source.body, spaceID: source.spaceID, colorID: source.colorID,
+                reminder: source.reminder
+            ))
+        } catch {
+            log("없어진 노트의 글을 새 노트로 저장하지 못했습니다(\(id)): \(error)")
+            return
+        }
+        let frame = old.panel.frame
+        let isPinned = old.isPinned
+        let wasKey = old.panel.isKeyWindow
+        discardMissingNote(id)
+        recorder.recordOpened(created.id, frame: frame, isPinned: isPinned)
+        do {
+            try open(created.id, focus: wasKey)
+        } catch {
+            log("새로 저장한 노트를 띄우지 못했습니다(\(created.id)): \(error)")
+        }
+    }
+
+    /// 파일이 없어진 노트의 쓰지 못한 글을 버리고 창을 내린다.
+    func discardMissingNote(_ id: NoteID) {
+        notes.discardPendingChanges(id)
+        noteDisappeared(id)
+    }
+
+    /// 노트 창이 키 창이 되었다. 다른 프로그램이 제자리에서 고친 파일은 폴더 감시가 잡지 못하고,
+    /// 노트 창은 눌러도 앱을 앞으로 가져오지 않으므로(앱이 앞으로 올 때의 `refresh`가 돌지 않는다)
+    /// 여기서 노트 폴더를 다시 훑는다. 훑는 일은 파일마다 겉모습(수정 시각, 크기)만 보므로 매번 해도 가볍다.
+    func noteWindowDidBecomeKey() {
+        // 훑다가 창이 닫히면 다른 창이 키 창이 되어 다시 들어온다.
+        guard !isRefreshingStore else { return }
+        isRefreshingStore = true
+        defer { isRefreshingStore = false }
+        do {
+            try notes.refresh()
+        } catch {
+            log("노트 폴더를 다시 읽지 못했습니다: \(error)")
+        }
     }
 
     private func discard(_ id: NoteID) {
@@ -191,10 +254,18 @@ public final class NotePanelCoordinator {
     }
 
     private func storeDidChange(_ change: StoreChange) {
-        if change.kind == .removed {
+        guard let controller = controllers[change.id] else {
+            if change.kind == .removed { recorder.forget(change.id) }
+            return
+        }
+        switch (change.kind, change.origin) {
+        case (.removed, .local):
             noteDisappeared(change.id)
-        } else {
-            controllers[change.id]?.storeDidChange(change)
+        case (.removed, .external):
+            // 다른 프로그램이 지웠다. 쓰지 못한 글이 있는 창은 닫지 않는다.
+            controller.fileWentMissing()
+        default:
+            controller.storeDidChange(change)
         }
     }
 

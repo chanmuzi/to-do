@@ -2,6 +2,9 @@ import CoreGraphics
 
 /// 상단 줄 요소의 자리(spec 5.1, 5.2). 호버로 나타나는 것도 늘 자리를 차지하고,
 /// 좁아지면 제목이 먼저 줄어든다(spec 16). 호버와 포커스는 입력이 아니다.
+///
+/// 저장 문제 표시는 호버 아이콘 셋의 왼쪽, 제목 쪽에 놓는다. 표시가 나타나고 사라져도
+/// 자리를 미리 차지하는 것들(호버 아이콘, 리마인더, 핀)은 움직이지 않고 제목이 잘리는 자리만 달라진다(규칙 7).
 struct TopRowLayout: Hashable {
     struct Metrics: Hashable {
         var height: CGFloat
@@ -41,10 +44,10 @@ struct TopRowLayout: Hashable {
 
         pin = takeTrailing(metrics.iconButton)
         reminder = input.reminderWidth.map(takeTrailing)
-        problem = input.showsProblem ? takeTrailing(metrics.iconButton) : nil
         add = takeTrailing(metrics.iconButton)
         more = takeTrailing(metrics.iconButton)
         search = takeTrailing(metrics.iconButton)
+        problem = input.showsProblem ? takeTrailing(metrics.iconButton) : nil
 
         var leading = metrics.paddingLeading
         if let spaceWidth = input.spaceWidth {

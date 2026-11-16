@@ -20,6 +20,10 @@ enum ProblemMenuAction: Hashable {
     /// 디스크의 내용을 받아들이고 이 앱에서 고친 내용을 버린다.
     case keepDisk
     case retrySave
+    /// 파일이 없어진 노트의 글을 새 노트로 옮긴다.
+    case saveAsNewNote
+    /// 파일이 없어진 노트의 글을 버리고 창을 닫는다.
+    case discard
 }
 
 /// 노트 창의 메뉴를 만든다. 항목에 단축키를 넣지 않는다(규칙 4).
@@ -57,6 +61,12 @@ struct NoteMenuBuilder {
             menu.items = [
                 info(message),
                 row("다시 저장", symbol: nil) { handler(.retrySave) },
+            ]
+        case .fileMissing:
+            menu.items = [
+                info(problem.accessibilityLabel),
+                row("새 노트로 저장", symbol: nil) { handler(.saveAsNewNote) },
+                row("버리기", symbol: nil) { handler(.discard) },
             ]
         }
         return menu

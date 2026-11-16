@@ -13,6 +13,10 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
     )
     private var reportedHeight: CGFloat?
+    /// 이 편집기만의 실행 취소 기록. 창의 것을 함께 쓰면 본문을 비울 때 제목 칸의 기록까지 지워진다.
+    private let undoManager = UndoManager()
+    /// 밖에서 글을 넣는 중. 이때 생기는 변경 알림(조합을 끊으며 나오는 것)은 사용자가 고친 것이 아니다.
+    private var isAssigningText = false
     private var themeObservation: (any NSObjectProtocol)?
 
     public init(theme: Theme) {
@@ -36,8 +40,14 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         get { textView.string }
         set {
             guard newValue != textView.string else { return }
+            isAssigningText = true
+            defer { isAssigningText = false }
             let selection = textView.selectedRange()
+            if textView.hasMarkedText() { textView.unmarkText() }
+            textView.breakUndoCoalescing()
             textView.string = newValue
+            // 밖에서 넣은 글은 실행 취소 기록에 없다. 옛 기록을 남기면 ⌘Z가 새 글에 없는 범위를 건드린다.
+            undoManager.removeAllActions()
             applyTextAttributes()
             let length = (newValue as NSString).length
             textView.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
@@ -49,8 +59,13 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         textView.window?.makeFirstResponder(textView)
     }
 
+    public func undoManager(for view: NSTextView) -> UndoManager? {
+        undoManager
+    }
+
     public func textDidChange(_ notification: Notification) {
         measure()
+        guard !isAssigningText else { return }
         onTextChange?(textView.string)
     }
 

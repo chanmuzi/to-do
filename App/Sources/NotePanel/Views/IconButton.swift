@@ -2,8 +2,8 @@ import AppKit
 import Theme
 
 /// 테두리 없는 아이콘 버튼(규칙 9, 10). 평소에는 아이콘만 보이고, 마우스를 올리면 `hover` 색 상자가 깔린다.
-/// 마우스 모양은 바꾸지 않는다.
-final class IconButton: NSView {
+/// 마우스 모양은 바꾸지 않는다(`ClickableView`가 화살표로 밝힌다).
+final class IconButton: ClickableView {
     var onPress: (() -> Void)?
 
     private let style: PanelStyle
@@ -76,7 +76,8 @@ final class IconButton: NSView {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
         addTrackingArea(NSTrackingArea(
-            rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self
+            rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeAlways, .inVisibleRect],
+            owner: self
         ))
     }
 

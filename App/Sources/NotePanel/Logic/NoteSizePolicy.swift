@@ -2,9 +2,6 @@ import CoreGraphics
 
 /// 노트 창 크기 규칙(spec 5.6, 19). 너비는 사용자가 정하고 높이는 내용을 따른다.
 struct NoteSizePolicy: Hashable {
-    /// 화면 높이에서 노트가 차지할 수 있는 몫. 임시 값(spec 20의 2번).
-    static let provisionalMaxScreenFraction: CGFloat = 0.7
-
     var defaultWidth: CGFloat
     var minWidth: CGFloat
     var maxWidth: CGFloat
@@ -12,7 +9,8 @@ struct NoteSizePolicy: Hashable {
     var chromeHeight: CGFloat
     /// 본문 한 줄과 위아래 여백. 빈 노트의 본문 높이다.
     var minBodyHeight: CGFloat
-    var maxScreenFraction: CGFloat = NoteSizePolicy.provisionalMaxScreenFraction
+    /// 화면 높이에서 노트가 차지할 수 있는 몫(`note-h-max-screen`, spec 20의 2번 임시 값).
+    var maxScreenFraction: CGFloat
 
     var minHeight: CGFloat { chromeHeight + minBodyHeight }
 

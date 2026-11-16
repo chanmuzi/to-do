@@ -58,13 +58,22 @@ import Testing
         #expect(layout(width: 120, title: 1000).title.width == 0)
     }
 
-    @Test func problemIndicatorTakesASlotOnlyWhenShown() {
-        let without = layout()
-        let with = layout(problem: true)
+    /// 저장 문제 표시는 호버 아이콘의 왼쪽에 놓인다. 나타나도 자리를 미리 차지하는 것들은 움직이지 않고
+    /// 긴 제목이 잘리는 자리만 달라진다(규칙 7).
+    @Test func problemIndicatorTakesASlotOnlyWhenShownWithoutMovingReservedSlots() {
+        let without = layout(title: 1000)
+        let with = layout(title: 1000, problem: true)
         #expect(without.problem == nil)
-        #expect(with.problem?.maxX == (with.reminder?.minX ?? 0) - 6)
-        #expect(with.add.maxX == (with.problem?.minX ?? 0) - 6)
+        #expect(with.problem?.maxX == with.search.minX - 6)
+        #expect(with.problem?.width == 20)
+        #expect(with.search == without.search)
+        #expect(with.more == without.more)
+        #expect(with.add == without.add)
         #expect(with.pin == without.pin)
         #expect(with.reminder == without.reminder)
+        #expect(with.title.minX == without.title.minX)
+        #expect(with.title.maxX == (with.problem?.minX ?? 0) - 6)
+        // 짧은 제목은 그대로다.
+        #expect(layout(problem: true).title == layout().title)
     }
 }

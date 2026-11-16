@@ -20,6 +20,32 @@ import Testing
         try? FileManager.default.removeItem(at: root)
     }
 
+    /// 앞으로 온 차례를 적어 두고, 다시 켤 때는 뒤에 있던 것부터 돌려준다(마지막이 맨 앞).
+    @Test func openNotesComeBackInBackToFrontOrder() throws {
+        defer { cleanUp() }
+        let recorder = try recorder()
+        let ids = ["a", "b", "c"].map(NoteID.init(rawValue:))
+        for id in ids {
+            recorder.recordOpened(id, frame: frame, isPinned: true)
+            recorder.recordFronted(id)
+        }
+        #expect(recorder.openNoteIDs == ids)
+
+        recorder.recordFronted(ids[0])
+        #expect(recorder.openNoteIDs == [ids[1], ids[2], ids[0]])
+        // 이미 맨 앞이면 차례가 바뀌지 않고, 틀이나 핀을 적어도 차례는 남는다.
+        let front = recorder.state(for: ids[0]).stackOrder
+        recorder.recordFronted(ids[0])
+        recorder.recordFrame(ids[0], frame: frame.offsetBy(dx: 10, dy: 0))
+        recorder.recordPinned(ids[0], isPinned: false)
+        #expect(recorder.state(for: ids[0]).stackOrder == front)
+        recorder.recordClosed(ids[2])
+
+        let relaunched = try self.recorder()
+        #expect(relaunched.openNoteIDs == [ids[1], ids[0]])
+        #expect(relaunched.backToFront([ids[0], ids[1]]) == [ids[1], ids[0]])
+    }
+
     @Test func aNoteNeverShownStartsPinnedAndClosed() throws {
         defer { cleanUp() }
         let state = try recorder().state(for: id)

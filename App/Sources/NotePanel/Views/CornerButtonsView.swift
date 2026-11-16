@@ -12,6 +12,8 @@ final class CornerButtonsView: NSView {
         trashButton = IconButton(style: style, symbolName: "trash", iconSize: .iconLarge, label: "휴지통으로 보내기")
         closeButton = IconButton(style: style, symbolName: "xmark", iconSize: .iconMedium, label: "창 닫기")
         super.init(frame: .zero)
+        // 알파 전환을 레이어가 맡는다(호버로 나타나고 사라짐).
+        wantsLayer = true
         [trashButton, closeButton].forEach(addSubview)
     }
 

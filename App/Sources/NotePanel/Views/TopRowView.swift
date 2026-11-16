@@ -28,6 +28,8 @@ final class TopRowView: NSView {
     private let reminderBadge: ReminderBadgeView
     private let pinButton: IconButton
     private var state: TopRowState?
+    /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
+    private var holdsProblemSlot = false
     private var mouseDownEvent: NSEvent?
 
     init(style: PanelStyle) {
@@ -48,6 +50,7 @@ final class TopRowView: NSView {
         [spaceBadge, title, searchButton, moreButton, addButton, problemButton, reminderBadge, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
+        problemButton.alphaValue = 0
         connect()
     }
 
@@ -87,6 +90,7 @@ final class TopRowView: NSView {
     // MARK: - 상태
 
     func apply(_ state: TopRowState, animated: Bool) {
+        let hadProblem = self.state?.problem != nil
         self.state = state
         spaceBadge.apply(state.space, color: state.spaceColor, animated: animated)
         title.show(
@@ -96,8 +100,7 @@ final class TopRowView: NSView {
         reminderBadge.apply(state.reminder, animated: animated)
         pinButton.set(symbolName: state.pin.symbolName, tint: state.pin.color, animated: animated)
         pinButton.setAccessibilityValue(state.pin.isOn ? "켜짐" : "꺼짐")
-        problemButton.isHidden = state.problem == nil
-        problemButton.setAccessibilityLabel(state.problem?.accessibilityLabel)
+        applyProblem(state.problem, wasShown: hadProblem, animated: animated)
 
         let alphas: [(NSView, Double)] = [
             (searchButton, state.hoverControlsAlpha), (moreButton, state.hoverControlsAlpha),
@@ -109,6 +112,20 @@ final class TopRowView: NSView {
             alphas.forEach { $0.0.alphaValue = $0.1 }
         }
         needsLayout = true
+    }
+
+    /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.
+    private func applyProblem(_ problem: NoteProblem?, wasShown: Bool, animated: Bool) {
+        if let problem { problemButton.setAccessibilityLabel(problem.accessibilityLabel) }
+        let isShown = problem != nil
+        guard isShown != wasShown else { return }
+        if isShown { holdsProblemSlot = true }
+        style.fade(problemButton, visible: isShown, animated: animated) { [weak self] in
+            guard let self, self.state?.problem == nil else { return }
+            problemButton.isHidden = true
+            holdsProblemSlot = false
+            needsLayout = true
+        }
     }
 
     func refreshTheme() {
@@ -133,7 +150,7 @@ final class TopRowView: NSView {
                 // 고치는 동안에는 남는 너비를 다 쓴다.
                 titleWidth: title.isEditing ? .greatestFiniteMagnitude : title.idealWidth,
                 reminderWidth: reminderBadge.fittingWidth,
-                showsProblem: state?.problem != nil
+                showsProblem: holdsProblemSlot
             ),
             metrics: TopRowLayout.Metrics(
                 height: bounds.height,
@@ -152,8 +169,9 @@ final class TopRowView: NSView {
         searchButton.frame = frames.search
         moreButton.frame = frames.more
         addButton.frame = frames.add
-        problemButton.frame = frames.problem ?? .zero
-        reminderBadge.frame = frames.reminder ?? .zero
+        // 사라지는 중인 것은 자리가 없어져도 마지막 자리에서 사라진다.
+        if let problem = frames.problem { problemButton.frame = problem }
+        if let reminder = frames.reminder { reminderBadge.frame = reminder }
         pinButton.frame = frames.pin
     }
 

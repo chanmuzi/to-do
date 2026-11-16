@@ -52,6 +52,36 @@ import Theme
         #expect(edits.isEmpty)
     }
 
+    /// 밖에서 넣은 글은 실행 취소 기록에 없다. 옛 기록이 남으면 ⌘Z가 새 글에 없는 범위를 건드려 죽는다.
+    @Test func settingTextFromOutsideClearsTheUndoHistory() throws {
+        let (editor, _) = editor()
+        let textView = try #require(editor.view as? NSTextView)
+        textView.insertText("길게 친 글을 지우고", replacementRange: NSRange(location: 0, length: 0))
+        textView.insertText(" 더 친 글", replacementRange: NSRange(location: 10, length: 0))
+        let undoManager = try #require(textView.undoManager)
+        #expect(undoManager.canUndo)
+
+        editor.text = "밖"
+
+        #expect(!undoManager.canUndo)
+        #expect(!undoManager.canRedo)
+        undoManager.undo()
+        #expect(editor.text == "밖")
+        // 그 뒤에 친 것은 다시 되돌릴 수 있다.
+        textView.insertText("에서", replacementRange: NSRange(location: 1, length: 0))
+        #expect(undoManager.canUndo)
+        undoManager.undo()
+        #expect(editor.text == "밖")
+    }
+
+    @Test func settingTheSameTextKeepsTheUndoHistory() throws {
+        let (editor, _) = editor()
+        let textView = try #require(editor.view as? NSTextView)
+        textView.insertText("친 글", replacementRange: NSRange(location: 0, length: 0))
+        editor.text = "친 글"
+        #expect(textView.undoManager?.canUndo == true)
+    }
+
     @Test func typingReportsTheNewText() throws {
         let (editor, _) = editor()
         var edits: [String] = []

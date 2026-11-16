@@ -32,14 +32,29 @@ struct PanelStyle {
     /// 전환 시간. "동작 줄이기"가 켜져 있으면 바로 바꾼다.
     var transitionDuration: TimeInterval { reducesMotion ? 0 : theme.motion.duration }
 
-    /// 알파와 레이어 색을 `dur`, `ease`로 바꾼다(규칙 8).
-    func animate(_ changes: () -> Void) {
-        NSAnimationContext.runAnimationGroup { context in
+    /// 알파와 레이어 색, 뷰의 자리를 `dur`, `ease`로 바꾼다(규칙 8). `completion`은 움직임이 끝난 뒤에 불린다.
+    func animate(_ changes: () -> Void, completion: (@MainActor () -> Void)? = nil) {
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = transitionDuration
             context.timingFunction = theme.motion.timingFunction
             context.allowsImplicitAnimation = true
             changes()
+        }, completionHandler: completion.map { completion in
+            { @Sendable in MainActor.assumeIsolated { completion() } }
+        })
+    }
+
+    /// 나타나고 사라지는 것(규칙 8): 알파를 `dur`, `ease`로 바꾼다. 나타날 때는 먼저 숨김을 푼다.
+    /// 다 사라진 뒤에 숨기는 일은 `completion`에서 부르는 쪽이 한다(그사이 다시 나타났을 수 있다).
+    func fade(_ view: NSView, visible: Bool, animated: Bool, completion: @escaping @MainActor () -> Void) {
+        if visible { view.isHidden = false }
+        let alpha: CGFloat = visible ? 1 : 0
+        guard animated, transitionDuration > 0 else {
+            view.alphaValue = alpha
+            completion()
+            return
         }
+        animate({ view.animator().alphaValue = alpha }, completion: completion)
     }
 
     /// 글자색, 아이콘 색처럼 따로 움직일 수 없는 속성을 바꾸기 직전에 부른다. 바뀐 모습으로 `dur` 동안 넘어간다.

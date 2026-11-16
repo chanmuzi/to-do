@@ -15,6 +15,11 @@ final class NoteWindowController: NSObject {
 
     var note: Note
     var problem: NoteProblem?
+    /// 편집기와 마지막으로 주고받은 본문: 마지막으로 `editor.text`에 넣은 값 또는 `onTextChange`로 받은 값.
+    /// 저장소의 본문이 이것과 다를 때만 편집기에 넣는다(`NoteBodyEditing`의 약속).
+    var exchangedBody: String
+    /// 파일이 없어져 저장소가 받지 못한 변경이 `note`에만 들어 있다.
+    var hasUnstoredEdits = false
     private(set) var isPinned: Bool
     private(set) var isShown = false
     private var isPointerInside = false
@@ -36,6 +41,7 @@ final class NoteWindowController: NSObject {
     init(note: Note, frame: CGRect, isPinned: Bool, environment: NotePanelEnvironment) {
         self.noteID = note.id
         self.note = note
+        self.exchangedBody = note.body
         self.isPinned = isPinned
         self.environment = environment
         editor = environment.makeBodyEditor(NoteBodyEditorContext(theme: environment.theme, noteID: note.id))
@@ -71,16 +77,15 @@ final class NoteWindowController: NSObject {
 
     // MARK: - 띄우고 내리기
 
-    /// 창을 앞에 띄운다. 앱을 앞으로 가져오지 않는다.
+    /// 창을 맨 앞에 띄운다. 앱을 앞으로 가져오지 않는다.
     func show(focus: Bool) {
-        panel.orderFrontRegardless()
+        orderFront()
         if !isShown {
             isShown = true
             environment.recorder.recordOpened(noteID, frame: panel.frame, isPinned: isPinned)
         }
+        environment.recorder.recordFronted(noteID)
         if focus { focusBody() }
-        isPointerInside = root.containsPointer
-        refreshChrome(animated: false)
     }
 
     func focusBody() {
@@ -88,12 +93,20 @@ final class NoteWindowController: NSObject {
         editor.focus()
     }
 
+    /// "노트 모두 숨기기"(spec 4.3). 되돌릴 때는 겹친 차례를 바꾸지 않는다(부르는 쪽이 뒤에 있던 것부터 부른다).
     func setHidden(_ hidden: Bool) {
         if hidden {
             panel.orderOut(nil)
         } else {
-            panel.orderFrontRegardless()
+            orderFront()
         }
+    }
+
+    /// 창을 보이게 한다. 창이 뜬 직후에는 마우스가 들어왔다는 알림이 오지 않으므로 호버를 다시 잰다.
+    private func orderFront() {
+        panel.orderFrontRegardless()
+        isPointerInside = root.containsPointer
+        refreshChrome(animated: false)
     }
 
     /// 창을 없앤다. 상태를 남기는 일은 부르는 쪽이 한다.
@@ -160,6 +173,7 @@ final class NoteWindowController: NSObject {
             refreshChrome(animated: true)
         }
         editor.onTextChange = { [unowned self] text in
+            exchangedBody = text
             mutate(deferred: true) { $0.body = text }
         }
         editor.onContentHeightChange = { [unowned self] height in
