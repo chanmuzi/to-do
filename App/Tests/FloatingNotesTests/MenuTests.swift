@@ -82,6 +82,45 @@ import Theme
         #expect(chosen == [.newNote, .quit])
     }
 
+    /// 여는 화면이 아직 이어지지 않은 항목은 메뉴에 자리와 이름 그대로 있되(spec 4.3) 고를 수 없다:
+    /// 눌러도 아무 일이 없는 항목을 내놓지 않는다(D-034). 메뉴 막대 메뉴, 앱 메뉴 모두 같다.
+    @Test func entriesForUnconnectedScreensAreDisabledNotRemoved() throws {
+        defer { fixture.cleanUp() }
+        let unconnected: Set<StatusMenuAction> = [.library, .aiPanel, .settings, .shortcuts]
+        let connected: [StatusMenuAction] = [.newNote, .quickCapture, .findNote, .toggleNotesHidden, .quit]
+        #expect(connected.filter(\.isConnected) == connected)
+        #expect(unconnected.filter(\.isConnected).isEmpty)
+
+        let menu = NSMenu()
+        var chosen: [StatusMenuAction] = []
+        StatusMenuBuilder(theme: fixture.theme).fill(
+            menu, with: StatusMenuModel.entries(areNotesHidden: false)
+        ) { chosen.append($0) }
+        let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
+        #expect(disabled == ["라이브러리", "AI 패널", "설정", "단축키"])
+        for index in menu.items.indices where !menu.items[index].isSeparatorItem {
+            menu.performActionForItem(at: index)
+        }
+        #expect(chosen == [.newNote, .quickCapture, .findNote, .toggleNotesHidden, .quit])
+
+        // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
+        let main = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let items = main.items.compactMap(\.submenu).flatMap(\.items)
+        func validity(_ title: String) throws -> Bool {
+            fixture.commands.validateMenuItem(try #require(items.first { $0.title == title && !$0.isHidden }))
+        }
+        for title in ["라이브러리", "AI 패널", "설정", "단축키"] {
+            let isValid = try validity(title)
+            #expect(!isValid, "\(title)")
+        }
+        for title in ["새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "창 닫기"] {
+            let isValid = try validity(title)
+            #expect(isValid, "\(title)")
+        }
+        let hidden = items.filter(\.isHidden)
+        #expect(hidden.filter { fixture.commands.validateMenuItem($0) }.count == hidden.count)
+    }
+
     @Test func menuBarIconIsAnEighteenPointTemplateImage() throws {
         defer { fixture.cleanUp() }
         let icon = try MenuBarIcon.load()

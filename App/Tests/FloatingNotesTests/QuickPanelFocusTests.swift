@@ -9,7 +9,9 @@ import Testing
 
 /// 캡처 바, 노트 찾기와 노트 창 사이의 키 입력 규칙(D-032): 닫히면 열기 전에 키 창이던 노트에게 돌려주고,
 /// 한 번에 하나만 열린다.
-@Suite struct QuickPanelFocusTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 창을 띄우는 시험이 한꺼번에 시작하면 메인 액터가 밀려, 전환 시간을
+/// 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct QuickPanelFocusTests {
     private let fixture: WiringFixture
     private let escapeKey = #selector(NSResponder.cancelOperation(_:))
     private let returnKey = #selector(NSResponder.insertNewline(_:))

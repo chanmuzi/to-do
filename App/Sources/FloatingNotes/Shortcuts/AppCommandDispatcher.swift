@@ -14,6 +14,8 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
     var forwardUndo: (Any?) -> Void = { NSApplication.shared.sendAction(Selector(("undo:")), to: nil, from: $0) }
     /// 앱을 끝낸다. 테스트에서 바꿔 넣는다.
     var quit: () -> Void = { NSApplication.shared.terminate(nil) }
+    /// 떠 있는 캡처 바나 노트 찾기를 닫는다. 닫은 것이 있었으면 참. 조립할 때 넣는다(`QuickPanels`).
+    var closeQuickPanel: () -> Bool = { false }
     /// 아직 화면이 없어 기록만 한 동작(노트 안에서 찾기, 전체 검색).
     private(set) var unavailable: [AppCommand] = []
 
@@ -35,6 +37,9 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         case .shortcuts: router.route(.openShortcuts)
         case .nextNote: notePanels.focusNextNote()
         case .closeWindow:
+            // 캡처 바나 노트 찾기가 떠 있으면 그것을 닫는다(esc와 같다, D-032). 떠 있는 동안에는 그 화면이
+            // 키 입력을 받고 있고, 테두리 없는 창은 `performClose`를 받지 못해 경고음만 난다.
+            if closeQuickPanel() { return }
             if let note {
                 router.route(.closeNoteWindow(note))
             } else {
@@ -46,8 +51,8 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         case .togglePin:
             guard let note, let snapshot = notePanels.snapshot(of: note) else { return }
             notePanels.setPinned(!snapshot.isPinned, for: note)
-        case .setReminder: note.map { router.route(.openReminderEditor($0)) }
-        case .moveToSpace: note.map { router.route(.openSpacePicker($0)) }
+        case .setReminder: if let note { router.route(.openReminderEditor(note)) }
+        case .moveToSpace: if let note { router.route(.openSpacePicker(note)) }
         case .findInNote, .searchAll:
             unavailable.append(command)
             AppLog.warning("아직 만들지 않은 동작입니다: \(command.rawValue)")
@@ -80,11 +85,15 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
     }
 
     /// 앱 메뉴가 열릴 때 항목마다 불린다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다.
+    /// 여는 화면이 아직 이어지지 않은 동작(`AppCommand.isConnected`)의 항목은 고를 수 없게 흐려 둔다(D-034).
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.representedObject as? String == AppCommand.toggleNotesHidden.rawValue {
+        let name = menuItem.representedObject as? String
+        if name == AppCommand.toggleNotesHidden.rawValue {
             menuItem.title = notePanels.areNotesHidden ? StatusMenuModel.showAllTitle : StatusMenuModel.hideAllTitle
         }
-        return true
+        // 키만 듣는 숨은 짝 항목은 그대로 둔다(그 키가 다른 곳으로 흘러가지 않게 받아서 기록한다).
+        guard !menuItem.isHidden else { return true }
+        return name.flatMap(AppCommand.init(rawValue:))?.isConnected ?? true
     }
 
     /// ⌘Z. 방금 노트를 휴지통으로 보냈으면 그 노트와 창을 되살리고(spec 5.3), 아니면 글의 실행 취소로 넘긴다.

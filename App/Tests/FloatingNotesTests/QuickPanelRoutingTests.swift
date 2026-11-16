@@ -10,7 +10,9 @@ import Testing
 
 /// 빠른 캡처와 노트 찾기로 가는 길(spec 4.2): 요청, 단축키가 하는 동작, 메뉴 막대와 Dock과 앱 메뉴의 항목이
 /// 모두 실제 화면에 닿는지. 그리고 하지 못한 일을 사용자에게 알리는지.
-@Suite struct QuickPanelRoutingTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 창을 띄우는 시험이 한꺼번에 시작하면 메인 액터가 밀려, 전환 시간을
+/// 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct QuickPanelRoutingTests {
     private let fixture: WiringFixture
 
     init() throws {
@@ -159,7 +161,7 @@ import Testing
         #expect(try fixture.notes.list().notes.map(\.body) == ["[ ] 우유 사기\n"])
     }
 
-    /// 노트 찾기를 열 때 목록을 읽지 못하면 알린다.
+    /// 노트 찾기를 열 때 목록을 읽지 못하면 알린다. 알린 뒤에도 노트 찾기는 떠 있다.
     @Test func failedBrowseOpenIsShownToTheUser() throws {
         defer { fixture.cleanUp() }
         _ = try fixture.notes.create(NoteDraft(title: "읽지 못할 노트"))
@@ -169,9 +171,11 @@ import Testing
 
         #expect(fixture.shownFailures == [QuickPanels.browseFailureTitle])
         #expect(fixture.logLines.contains { $0.contains("노트 목록을 읽지 못했습니다") })
+        #expect(fixture.browse.isVisible)
     }
 
     /// 캡처의 ⌘↵와 노트 찾기의 "새 노트 만들기"가 보낸 새 노트 요청이 실패해도 알림이 뜬다.
+    /// 검토에서 나온 문제: 그때 캡처 바가 이미 닫혀 적은 글이 사라졌다. 만들어졌을 때만 닫는다.
     @Test func failedNewNoteFromThePanelsIsShownToTheUser() throws {
         defer { fixture.cleanUp() }
         fixture.router.route(.openCapture)
@@ -183,5 +187,28 @@ import Testing
 
         #expect(fixture.shownFailures == ["새 노트를 만들지 못했습니다"])
         #expect(fixture.notePanels.openNoteIDs.isEmpty)
+        #expect(fixture.capture.isVisible)
+        #expect(input.string == "새 노트")
+
+        // 폴더에 다시 쓸 수 있게 된 뒤 ⌘↵를 누르면 적어 둔 글로 노트가 만들어지고 바가 닫힌다.
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fixture.root.path)
+        fixture.capture.performSubmitAsNewNote()
+        #expect(fixture.shownFailures.count == 1)
+        #expect(!fixture.capture.isVisible)
+        let created = try #require(fixture.notePanels.openNoteIDs.first)
+        #expect(try fixture.notes.load(created).title == "새 노트")
+
+        // 노트 찾기의 "새 노트 만들기"가 실패하면 알린 뒤 닫히고, 쓰던 노트가 다시 키 창이 된다.
+        fixture.pretendKey(created)
+        fixture.commands.perform(.findNote)
+        fixture.pretendKey(nil)
+        try #require(fixture.browse.inputView)
+            .insertText("또 다른 노트", replacementRange: NSRange(location: NSNotFound, length: 0))
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: fixture.root.path)
+        let requests = fixture.keyRequests(created)
+        try #require(fixture.browse.inputView).doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        #expect(fixture.shownFailures.count == 2)
+        #expect(!fixture.browse.isVisible)
+        #expect(fixture.keyRequests(created) == requests + 1)
     }
 }

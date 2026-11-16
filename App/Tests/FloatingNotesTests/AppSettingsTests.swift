@@ -78,8 +78,10 @@ import Testing
         for index in menu.items.indices where !menu.items[index].isSeparatorItem {
             menu.performActionForItem(at: index)
         }
-        #expect(chosen == [
-            .newNote, .quickCapture, .findNote, .library, .aiPanel, .toggleNotesHidden, .settings, .shortcuts,
+        // 여는 화면이 아직 이어지지 않은 항목(라이브러리, AI 패널, 설정, 단축키)은 자리에 그대로 있되 고를 수 없다.
+        #expect(chosen == [.newNote, .quickCapture, .findNote, .toggleNotesHidden])
+        #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
+            "라이브러리", "AI 패널", "설정", "단축키",
         ])
     }
 

@@ -28,7 +28,17 @@ final class WiringFixture {
     let notePanels: NotePanelCoordinator
     let quickPanels: QuickPanels
     let commands: AppCommandDispatcher
-    init() throws {
+    /// 캡처 바와 노트 찾기가 듣는 알림 센터. 시험이 "키 창에서 물러났다"를 여기로 보낸다(`resignKey(_:)`).
+    let panelNotifications = NotificationCenter()
+    /// 앱이 앞에 있는 것으로 칠지.
+    var isAppActive = false
+    /// 지금 처리 중인 것으로 칠 이벤트의 종류(`beginPress()`, `releasePress()`, `endPress()`가 바꾼다).
+    var currentEventType: NSEvent.EventType?
+    /// 실패 알림이 떠 있는 동안 할 일(알림 창이 키 창을 가져가는 것을 흉내 낸다).
+    var whileFailureIsShown: (() -> Void)?
+
+    /// - Parameter makeBodyEditor: 주지 않으면 앱처럼 Markdown 편집기를 끼운다.
+    init(makeBodyEditor: NoteBodyEditorFactory? = nil) throws {
         _ = NSApplication.shared
         _ = FontRegistrar.registerBundledFonts()
         location = .isolated(notesDirectory: root)
@@ -41,7 +51,7 @@ final class WiringFixture {
         editors = NoteEditorFactory(windowStates: windowStates, log: { logBox.lines.append($0) })
         notePanels = NotePanelCoordinator(
             theme: theme, notes: notes, windowStates: windowStates, spaces: spaces, router: router,
-            makeBodyEditor: editors.makeEditor, log: { logBox.lines.append($0) }
+            makeBodyEditor: makeBodyEditor ?? editors.makeEditor, log: { logBox.lines.append($0) }
         )
         notePanels.allowsKeyWindows = false
         router.notePanels = notePanels
@@ -53,13 +63,47 @@ final class WiringFixture {
         quickPanels.capture.isShownOpaque = false
         quickPanels.browse.takesKeyOnShow = false
         quickPanels.browse.isShownOpaque = false
+        quickPanels.capture.notificationCenter = panelNotifications
+        quickPanels.browse.notificationCenter = panelNotifications
         router.quickPanels = quickPanels
         commands = AppCommandDispatcher(router: router, notePanels: notePanels)
+        commands.closeQuickPanel = { [unowned quickPanels] in quickPanels.closeVisiblePanel() }
         self.logBox = logBox
         let failureBox = FailureBox()
         self.failureBox = failureBox
-        router.presentFailure = { title, _ in failureBox.titles.append(title) }
-        quickPanels.presentFailure = { title, _ in failureBox.titles.append(title) }
+        router.presentFailure = { [unowned self] title, _ in
+            failureBox.titles.append(title)
+            whileFailureIsShown?()
+        }
+        quickPanels.presentFailure = { [unowned self] title, _ in
+            failureBox.titles.append(title)
+            whileFailureIsShown?()
+        }
+        quickPanels.isAppActive = { [unowned self] in isAppActive }
+        quickPanels.currentEventType = { [unowned self] in currentEventType }
+    }
+
+    /// 이 앱의 창에 마우스 버튼이 눌렸다(`PointerPressMonitor`가 알리는 것과 같은 차례).
+    func beginPress() {
+        currentEventType = .leftMouseDown
+        quickPanels.pointerPressBegan()
+    }
+
+    /// 버튼을 뗐다. 이제 뗀 이벤트를 처리하는 중이다(버튼의 동작이 이때 돈다).
+    func releasePress() {
+        currentEventType = .leftMouseUp
+    }
+
+    /// 뗀 이벤트의 처리가 끝났다.
+    func endPress() {
+        quickPanels.pointerPressEnded()
+        currentEventType = nil
+    }
+
+    /// 그 화면이 키 창에서 물러났다고 알린다(바깥을 누름, 다른 창이 키 창이 됨). 시험은 실제 키 창을 만들지
+    /// 않으므로 AppKit이 보내는 알림을 직접 보낸다.
+    func resignKey(_ window: NSWindow?) {
+        panelNotifications.post(name: NSWindow.didResignKeyNotification, object: window)
     }
 
     private let logBox: LogBox

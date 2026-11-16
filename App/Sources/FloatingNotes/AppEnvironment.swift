@@ -26,7 +26,11 @@ final class AppEnvironment {
             )
         )
         notes = try FileNoteStore(location: location)
-        windowStates = try WindowStateStore(location: location)
+        // 창을 띄우거나 키 창이 될 때마다 잇달아 오는 창 상태 변경은 한 번에 모아 쓴다. 끝낼 때 `flush()`한다.
+        windowStates = try WindowStateStore(
+            location: location, writeDelay: WindowStateStore.coalescingWriteDelay
+        )
+        windowStates.onWriteFailure = { AppLog.warning("창 상태를 저장하지 못했습니다: \($0)") }
         spaces = try SpaceStore(location: location)
         settings = try AppSettingsStore(stateDirectory: location.stateDirectory)
         launchWarnings = fonts.problems + theme.loadWarnings

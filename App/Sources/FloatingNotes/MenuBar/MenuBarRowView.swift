@@ -10,7 +10,8 @@ final class MenuBarRowView: NSView {
     private let label = NSTextField(labelWithString: "")
     private var isShowingHighlight = false
 
-    init(theme: Theme, title: String, symbolName: String?) {
+    /// - Parameter isEnabled: 거짓이면 고를 수 없는 줄이다. 글자와 아이콘이 `text-3`이고 `hover` 바탕이 깔리지 않는다.
+    init(theme: Theme, title: String, symbolName: String?, isEnabled: Bool = true) {
         self.theme = theme
         super.init(frame: NSRect(
             x: 0, y: 0, width: theme.component(.menuWidth), height: theme.component(.rowHeight)
@@ -23,11 +24,11 @@ final class MenuBarRowView: NSView {
                 NSImage.SymbolConfiguration(pointSize: theme.component(.iconLarge), weight: .regular)
             )
         }
-        iconView.contentTintColor = theme.nsColor(.text2)
+        iconView.contentTintColor = theme.nsColor(isEnabled ? .text2 : .text3)
         iconView.imageScaling = .scaleProportionallyDown
         label.stringValue = title
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
-        label.textColor = theme.nsColor(.text)
+        label.textColor = theme.nsColor(isEnabled ? .text : .text3)
         label.lineBreakMode = .byTruncatingTail
         [highlightView, iconView, label].forEach(addSubview)
         setAccessibilityLabel(title)
@@ -62,7 +63,7 @@ final class MenuBarRowView: NSView {
     /// 메뉴가 고른 줄을 바꾸면 다시 그리라는 요청이 온다. 그때 바탕을 `dur` 동안 바꾼다(규칙 8).
     override func updateLayer() {
         highlightView.layer?.cornerRadius = theme.shape(.chipRadius)
-        let highlighted = enclosingMenuItem?.isHighlighted == true
+        let highlighted = enclosingMenuItem.map { $0.isHighlighted && $0.isEnabled } == true
         guard highlighted != isShowingHighlight else { return }
         isShowingHighlight = highlighted
         var hover = CGColor.clear

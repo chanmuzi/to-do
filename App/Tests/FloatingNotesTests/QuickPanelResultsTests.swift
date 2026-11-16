@@ -12,7 +12,9 @@ import Testing
 
 /// 캡처 바와 노트 찾기가 한 일이 노트 창까지 닿는지: 고른 노트가 뜨고 키 창이 되는지, 새 노트가 만들어져
 /// 뜨는지, 떠 있는 오늘 노트에 캡처한 줄이 그 창에 바로 보이고 그 뒤의 입력과 함께 디스크에 남는지.
-@Suite struct QuickPanelResultsTests {
+/// 한 번에 하나씩 돈다(`.serialized`): 창을 띄우는 시험이 한꺼번에 시작하면 메인 액터가 밀려, 전환 시간을
+/// 기다리는 다른 시험이 제때 차례를 받지 못한다.
+@Suite(.serialized) struct QuickPanelResultsTests {
     private let fixture: WiringFixture
     private let returnKey = #selector(NSResponder.insertNewline(_:))
 

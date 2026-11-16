@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var fallbackNote: FallbackNotePresenter?
     private var activationFocus = ActivationFocusPolicy()
     private var hotKeys: GlobalHotKeys?
+    private var pointerPresses: PointerPressMonitor?
     #if DEBUG
     private var debugControl: DebugControl?
     #endif
@@ -63,7 +64,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.editors = editors
 
             let commands = AppCommandDispatcher(router: router, notePanels: notePanels)
+            commands.closeQuickPanel = { [unowned quickPanels] in quickPanels.closeVisiblePanel() }
             self.commands = commands
+            // 노트 찾기를 닫은 누름과 그 누름이 보낸 "노트 찾기 열기"를 한데 묶는다(`QuickPanels`).
+            pointerPresses = PointerPressMonitor(
+                began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
+                ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() }
+            )
             let shortcuts = ShortcutTable.standard
             application.mainMenu = MainMenu.make(
                 appName: ProcessInfo.processInfo.processName, table: shortcuts, dispatcher: commands
@@ -115,6 +122,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let notes = environment?.notes else { return .terminateNow }
         // 편집기가 아직 알리지 않은 글과 고치던 제목을 먼저 받는다.
         notePanels?.flushPendingEdits()
+        // 한데 모아 쓰려고 미뤄 둔 창 상태를 쓴다. 쓰지 못해도 끝내기를 막지 않는다(노트의 글이 아니다).
+        do {
+            try environment?.windowStates.flush()
+        } catch {
+            AppLog.warning("끝내기 전에 창 상태를 저장하지 못했습니다: \(error)")
+        }
         do {
             try notes.flushPendingSaves()
             return .terminateNow
