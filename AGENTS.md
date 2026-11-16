@@ -28,7 +28,7 @@ macOS 네이티브 플로팅 메모·투두 앱. SwiftUI + AppKit, 개인용, ma
 | 테마 계층, 색·글꼴·치수 | `docs/spec/03-tokens.md`, `App/Resources/tokens.json` |
 | 노트 창, 메뉴 막대 | `docs/spec/04-windows.md`, `05-note-panel.md`, `19-native-notes.md` |
 | 본문 편집기 | `docs/spec/06-editor.md`, `13-shortcuts.md`, `19-native-notes.md` |
-| 빠른 캡처, 노트 찾기 | `docs/spec/07-capture.md`, `08-browse.md` |
+| 빠른 캡처, 노트 찾기 | `docs/spec/07-capture.md`, `08-browse.md`. 날짜와 시간 읽기를 고칠 때는 `07a-datetime.md` |
 | 라이브러리, 스페이스 아이콘 | `docs/spec/09-library.md`, `10-icon-picker.md` |
 | AI 패널, 에이전트 연결 | `docs/spec/11-ai-panel.md`, `docs/decisions.md`의 에이전트 항목 |
 | 테마 설정, 단축키 표 | `docs/spec/12-settings.md`, `13-shortcuts.md` |
