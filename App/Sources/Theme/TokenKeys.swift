@@ -106,12 +106,14 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case noteWidth = "note-w"
     case noteWidthMin = "note-w-min"
     case noteWidthMax = "note-w-max"
-    /// 빠른 캡처 바(spec 7): 너비, 높이, 좌우 여백, 요소 사이, 오른쪽 표시(스페이스, 리마인더) 앞의 덧간격.
+    /// 빠른 캡처 바(spec 7): 너비, 높이, 좌우 여백, 요소 사이, 오른쪽 표시(스페이스, 리마인더) 앞의 덧간격,
+    /// 나타날 때 아래에서 올라오는 거리(사라질 때는 그만큼 내려간다).
     case captureWidth = "capture-w"
     case captureHeight = "capture-h"
     case capturePadding = "capture-pad"
     case captureGap = "capture-gap"
     case captureValueGap = "capture-val-gap"
+    case captureRise = "capture-rise"
     /// 노트 찾기(spec 8): 안쪽 여백, 모서리, 검색 칸 높이와 그 아래 틈, 줄 안의 요소 사이,
     /// 노트 상단 줄과의 틈, 노트 오른쪽 끝에서 들여 놓는 거리.
     case browsePadding = "browse-pad"
