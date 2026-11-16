@@ -18,7 +18,8 @@
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui` 400 |
 | 임박한 리마인더 | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui-strong` 700 |
 | 날짜, 보조 숫자 | D2Coding | `fs-micro` 11px / `lh-micro` 14px | `fw-ui` 400 |
-| 인라인 코드 | D2Coding | `fs-code` 12px / `lh-body` 20px | `fw-body` 400 |
+| 인라인 코드 | D2Coding | `fs-code` 11.5px / `lh-body` 20px | `fw-body` 400 |
+| 코드 블록 | D2Coding | `fs-code` 11.5px / `lh-code` 18px | `fw-body` 400 |
 | 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 20px | `fw-body` 400 |
 
 - `font-body`: Pretendard. `font-ui`, `font-micro`, `font-mono`: D2Coding.
@@ -49,9 +50,10 @@
 | `hl-3-fg` | 형광펜 3 글자 | `#000000` | `#F0F0F0` |
 | `hl-4-bg` | 형광펜 4 바탕 | `#CFE5FF` | `rgba(110,170,255,.36)` |
 | `hl-4-fg` | 형광펜 4 글자 | `#000000` | `#F0F0F0` |
-| `code-bg` | 코드 바탕 (인라인, 블록 공통) | `rgba(0,0,0,.045)` | `rgba(255,255,255,.08)` |
-| `code-line` | 코드 테두리 | `rgba(0,0,0,.10)` | `rgba(255,255,255,.14)` |
-| `code-fg` | 코드 글자 | `#000000` | `#F0F0F0` |
+| `code-bg` | 인라인 코드 바탕 (테두리 없음) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.13)` |
+| `codeblock-bg` | 코드 블록 바탕 (테두리 없음) | `rgba(0,0,0,.04)` | `rgba(255,255,255,.085)` |
+| `code-fg` | 코드 블록 글자, 인라인 코드 글자("plain") | `#000000` | `#F0F0F0` |
+| `code-accent` | 인라인 코드 글자("accent", 기본. 규칙 1의 예외) | `#C8372E` | `#F47B70` |
 | `link` | 링크 | `#000000` | `#F0F0F0` |
 | `shadow-window` | 노트 창 그림자 | `0 18px 44px -12px rgba(0,0,0,.28),0 4px 12px -2px rgba(0,0,0,.10)` | `0 20px 48px -12px rgba(0,0,0,.80),0 4px 12px -2px rgba(0,0,0,.50)` |
 | `shadow-pop` | 캡처 바, 메뉴 그림자 | `0 28px 70px -16px rgba(0,0,0,.38),0 6px 16px -4px rgba(0,0,0,.12)` | `0 30px 80px -16px rgba(0,0,0,.90),0 6px 16px -4px rgba(0,0,0,.50)` |
@@ -94,8 +96,8 @@
 | 모서리, 높이 | `r-hl` | `2px` | 형광펜 |
 | 모서리, 높이 | `bw` | `1px` | 테두리 두께 |
 | 모서리, 높이 | `chrome-h` | `28px` | 창 크롬 높이 |
-| 모서리, 높이 | `r-code` | `4px` | 인라인 코드 |
-| 모서리, 높이 | `r-codeblock` | `6px` | 코드 블록 |
+| 모서리, 높이 | `r-code` | `4.5px` | 인라인 코드 |
+| 모서리, 높이 | `r-codeblock` | `8px` | 코드 블록 |
 | 구성 요소 | `doc-pad` | `10px 14px 18px` | 노트 본문 안쪽 여백 (위 오른쪽 아래 왼쪽). 아래쪽은 오른쪽 아래 버튼 자리 |
 | 구성 요소 | `gutter` | `22px` | 체크박스, 토글, 글머리표 칸 너비 |
 | 구성 요소 | `indent` | `22px` | 하위 계층 한 단계 들여쓰기 |
@@ -105,6 +107,15 @@
 | 구성 요소 | `ctl-h` | `22px` | 버튼과 선택 칸 높이 |
 | 구성 요소 | `row-h` | `26px` | 사이드바 행 높이 |
 | 구성 요소 | `caret-w` | `1.5px` | 입력 커서 너비 (얇은 일반 커서) |
+| 구성 요소 | `code-pad-x` | `4.5px` | 인라인 코드 상자의 좌우 안쪽 여백 |
+| 구성 요소 | `code-gap` | `1.5px` | 인라인 코드 상자의 바깥 간격 |
+| 구성 요소 | `code-h` | `16px` | 인라인 코드 상자의 높이 (본문 줄 20 안에서. 제목에서는 비례해 커짐) |
+| 구성 요소 | `code-drop` | `1px` | 인라인 코드 상자를 줄 가운데에서 아래로 내리는 양 |
+| 구성 요소 | `code-rise` | `0.5px` | 인라인 코드 글자의 기준선을 올리는 양 |
+| 구성 요소 | `codeblock-pad-x` | `12px` | 코드 블록의 좌우 안쪽 여백 |
+| 구성 요소 | `codeblock-pad-y` | `9px` | 코드 블록의 위아래 안쪽 여백 |
+| 구성 요소 | `codeblock-gap` | `5px` | 코드 블록의 위아래 바깥 간격 |
+| 구성 요소 | `link-field-w` | `220px` | 링크 주소를 적는 칸의 너비 |
 | 구성 요소 | `icon-btn` | `20px` | 테두리 없는 아이콘 버튼 크기 |
 | 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 약 13pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |

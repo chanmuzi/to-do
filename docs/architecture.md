@@ -236,37 +236,42 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
     - `foldedLines`는 지금 원문에 맞춰 걸러진다(토글이 아닌 줄 번호는 버린다). 원문보다 먼저 넣으면 남지 않으므로 함께 넣을 때는 `load`를 쓴다.
     - `onFoldChange`는 값이 바깥이 아는 것과 실제로 달라졌을 때만 한 번 부른다. `text`를 넣어 접힘이 없어진 경우도 그 자리에서 알린다.
     - 편집을 되돌리면 접힘도 그 편집 전으로 돌아간다(D-020).
-  - `configuration: MarkdownEditorConfiguration`(`checkboxStyle: .box | .bracket`), `selectedRange: NSRange`, `undoManager: UndoManager`(편집기마다 따로), `onOpenLink: ((URL) -> Void)?`(없으면 기본 브라우저). 링크는 `http`, `https`, `mailto` 주소만 열고 `onOpenLink`에도 그것만 넘긴다. 복사한 HTML의 `href`도 같다(D-020).
+  - `applyOutsideChange(to:)`: 바깥이 원문을 바꿨을 때 새 글 전체를 넘긴다. 지금 원문과 견주어 앞뒤의 같은 부분은 두고 달라진 가운데만 바꿔 넣는다. 되돌리기 기록, 접힘, 조합 중인 글자를 지키고 `onTextChange`를 부르지 않는다. `appendFromOutside`는 이것의 한 경우다. 커서, 되돌리기, 조합의 규칙은 D-037에 있다(문서 끝의 커서는 바깥의 글이 그 줄에 이어 붙었을 때만 그 글 뒤로 가고, 끝에 붙기만 한 것이 아닌 변경은 되돌리기 한 단계가 된다).
+  - `configuration: MarkdownEditorConfiguration`(`checkboxStyle: .box | .bracket`, `inlineCodeStyle: .accent | .plain`. 인라인 코드의 글자색이고 기본은 `.accent`, D-035), `selectedRange: NSRange`, `undoManager: UndoManager`(편집기마다 따로), `onOpenLink: ((URL) -> Void)?`(없으면 기본 브라우저). 링크는 `http`, `https`, `mailto` 주소만 열고 `onOpenLink`에도 그것만 넘긴다. 복사한 HTML의 `href`도 같다(D-020).
   - `flushPendingChange()`: 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다(창을 닫기 직전에 바깥이 부른다).
-  - `focus()`, `perform(_ action: EditorAction)`: `EditorAction`은 spec 13 "편집" 표의 동작(`.indent .outdent .toggleTodo .toggleDone .moveLineUp .moveLineDown .fold .unfold .heading(1...3) .bold .strikethrough .highlight .inlineCode .codeBlock .link`). 단축키는 편집기가 직접 받고, 더 보기 메뉴 같은 곳에서는 이것을 부른다.
-  - `@_spi(Verification)`: `forcesActiveAppearance`(키 창이 아니어도 편집 중인 것으로 본다: 커서 줄의 기호를 보이고 편집 단축키를 받는다), `textView`, `gutterPoint(forLine:)`, `textPoint(forLine:)`. `EditorDemo`와 App의 디버그용 `DebugControl`만 쓴다.
+  - `focus()`, `perform(_ action: EditorAction)`: `EditorAction`은 spec 13 "편집" 표의 동작(`.indent .outdent .toggleTodo .toggleDone .moveLineUp .moveLineDown .fold .unfold .heading(1...3) .bold .strikethrough .highlight .inlineCode .codeBlock .link`). 단축키는 편집기가 직접 받고, 더 보기 메뉴 같은 곳에서는 이것을 부른다. 서식 동작(`.bold .strikethrough .highlight .inlineCode`)은 고른 글자가 있으면 그 글자를 고치고, 없으면 원문을 고치지 않고 다음에 칠 글자의 서식만 정한다. `.link`는 주소를 적는 칸을 띄운다(D-036).
+  - `@_spi(Verification)`: `forcesActiveAppearance`(키 창이 아니어도 편집 중인 것으로 본다: 편집 단축키를 받는다), `textView`, `gutterPoint(forLine:)`, `textPoint(forLine:)`, `commitLink(_:)`(떠 있는 주소 칸에 주소를 넣고 확정). `EditorDemo`와 App의 디버그용 `DebugControl`만 쓴다.
   - 편집 단축키(`EditorShortcuts.bindings`)는 본문에 포커스가 있고 창이 키 창일 때만 받는다. 키 창이 아닌 창의 뷰에도 `performKeyEquivalent`가 올 수 있고, 그때 받으면 사용자가 보고 있지 않은 노트의 글이 바뀐다.
 
 ### 안쪽 구조
 
-- `Model/`(AppKit 없음, 모두 `nonisolated` 값과 순수 함수): `MarkdownDocument`(원문을 줄로 풂. 줄 경계는 TextKit 문단과 같다), `InlineParser`, `EditorCommands`(명령마다 `TextEdit` 하나를 돌려줌), `FoldState`, `CaretSnapping`, `LinePresentation`(줄별 모양 `LineRenderKey`), `CopyExport`, `EditorShortcuts`, `LineEndings`(줄바꿈을 `\n`으로), `LinkPolicy`(열어도 되는 주소).
-- `View/`: `ParagraphStyler`(줄 하나를 화면 문단으로), `MarkdownLayoutFragment`(둥근 바탕, 왼쪽 칸 그림, 안내선), `EditorTextView`, `CodeCopyButton`, `EditorStyle`(테마에서 푼 값과 토큰에 없는 치수 `EditorMetrics`).
-- `EditorController`: TextKit 2 스택을 들고 위 둘을 잇는다. `MarkdownEditor`는 이것을 감싼 얇은 창구다. 확장 파일로 나뉜다: `+Commands`(입력과 편집 길목), `+Styling`(문단 만들기, 높이), `+Undo`(접힘 되돌리기), `+Mouse`, `+Pasteboard`.
+- `Model/`(AppKit 없음, 모두 `nonisolated` 값과 순수 함수): `MarkdownDocument`(원문을 줄로 풂. 줄 경계는 TextKit 문단과 같다), `InlineParser`, `InlineMarker`(줄 안의 감춘 기호와, 같은 자리에 겹쳐 보이는 원문 위치들 사이의 계산), `EditorCommands`(명령마다 `TextEdit` 하나를 돌려줌. `+Triggers` 줄 맨 앞 기호, `+Replace` 기호가 짝을 잃지 않는 지우기와 덮어쓰기 및 ``` 줄 지키기, `+Delete` ⌫와 ⌦, `+Inline` 고른 글자의 서식, `+Link`, `+CodeBlock`), `TypingMarks`(고른 것 없이 정해 둔 다음 글자의 서식), `OutsideEdit`(바깥이 바꾼 글에서 달라진 가운데), `FoldState`, `CaretSnapping`(커서와 선택이 감춘 곳에 놓이지 않게 옮기는 규칙), `LinePresentation`(줄별 모양 `LineRenderKey`), `CopyExport`, `EditorShortcuts`, `LineEndings`(줄바꿈을 `\n`으로), `LinkPolicy`(열어도 되는 주소).
+- `View/`: `ParagraphStyler`(줄 하나를 화면 문단으로), `MarkdownLayoutFragment`(둥근 바탕, 왼쪽 칸 그림, 안내선), `EditorTextView`, `CodeCopyButton`, `LinkField`(링크 주소 칸), `EditorStyle`(테마에서 푼 값과 토큰에 없는 치수 `EditorMetrics`).
+- `EditorController`: TextKit 2 스택을 들고 위 둘을 잇는다. `MarkdownEditor`는 이것을 감싼 얇은 창구다. 확장 파일로 나뉜다: `+Commands`(입력과 편집 길목), `+Styling`(문단 만들기, 높이), `+Undo`(접힘 되돌리기), `+Mouse`, `+Pasteboard`, `+Link`(주소 칸), `+Outside`(바깥이 바꾼 글 넣기).
 
 ### 동작 원리와 TextKit 2에서 확인한 것
 
-- 원문 저장소(`NSTextStorage`)에는 기본 글꼴과 글자색만 있다. 서식은 `NSTextContentStorageDelegate`의 `textParagraphWith:`에서 문단을 만들 때 얹는다. 감출 기호는 지우지 않고 글자 크기를 0.01로 해서 자리를 없앤다(문단 글자 수가 원문과 같아야 한다). 그래서 서식을 다시 입혀도 되돌리기 기록과 조합 중인 글자(한글 입력)를 건드리지 않는다.
+- 원문 저장소(`NSTextStorage`)에는 기본 글꼴과 글자색만 있다. 서식은 `NSTextContentStorageDelegate`의 `textParagraphWith:`에서 문단을 만들 때 얹는다. 감출 기호는 지우지 않고 글자 크기를 0.01로 해서 자리를 없앤다(문단 글자 수가 원문과 같아야 한다). 그래서 서식을 다시 입혀도 되돌리기 기록과 조합 중인 글자(한글 입력)를 건드리지 않는다. 기호는 커서가 있는 줄에서도 감춘다(D-036). 줄의 모양은 원문, 접힘, 마우스가 올라간 링크로만 정해지므로 커서를 옮겨도 줄을 다시 입히지 않고 높이도 바뀌지 않는다.
+- 감춘 기호는 너비가 없어서 서식 구간의 양 끝에는 같은 자리에 보이는 원문 위치가 둘씩 있다. 어느 쪽에 설지는 `CaretSnapping`이 정한다(규칙은 D-036의 6번). 텍스트 뷰가 선택을 바꾸려 할 때마다(`willChangeSelection`) 옛 선택과 새 선택을 넘겨 받아, 지나온 것이 감춘 기호뿐이면 기호를 건너뛰고 보이는 글자 하나를 지나게 하고, 그 밖에는 기본 자리로 옮긴다. 편집에 딸려 온 선택 변화(원문이 바뀐 뒤 처음 오는 변화, 되돌리기)는 화살표로 옮긴 것처럼 다루지 않고 기호 한가운데만 피한다(`selectionVersion`으로 가린다).
+- `NSTextLayoutManager.usesFontLeading`을 끈다. 켜 두면 글꼴의 leading이 고정한 줄 높이에 더해져 D2Coding이 든 줄이 0.96pt 높아진다(D-035).
+- 감춘 여는 기호의 마지막 글자에 자간을 주어 인라인 코드와 형광펜의 안쪽 여백을 만든다. 그 자간은 `locationForCharacter(at:)`가 주는 글자 위치에 절반만 잡히므로, 바탕 상자의 첫 조각은 왼쪽을 그만큼 밀어 그린다(`InlineBackground.leadShift`).
 - 모양이 달라진 줄만 다시 입힌다: `performEditingTransaction` 안에서 `textStorage.edited(.editedAttributes, …)`를 불러 그 문단을 다시 만들게 한다.
 - `.baselineOffset`은 글자를 가운데로 옮기지 못한다(양수면 줄 높이가 그만큼 줄 뿐이다). 줄 높이를 고정하면 남는 공간이 모두 글자 위에 생기므로, 문단 조각의 `draw(at:in:)`에서 글자만 위로 옮겨 그린다.
 - `usageBoundsForTextContainer`는 문단 높이가 줄어든 뒤 옛 값을 줄 때가 있다. 내용 높이는 마지막 문단 조각의 아래 끝으로 잰다.
-- 접힌 줄과 커서 밖의 ``` 줄은 문단을 없애지 않고 줄 높이를 줄여 감춘다(접힌 줄 0.01, ``` 줄은 상자 안쪽 여백 7).
-- 원문이 바뀌는 길목은 `shouldChangeTextIn` 하나다(글자 입력, 지우기, 붙여넣기, 끌어다 놓기, 조합, 편집 명령이 모두 지난다). 여기서 접혀서 감춘 줄에 닿는 편집을 막고 그 토글을 편다(D-020). 감춘 줄까지 일부러 고치는 명령(줄 옮기기, 들여쓰기, 접힌 토글 뒤에 새 토글)만 `TextEdit.includesHiddenLines`로 지나간다. 다른 줄바꿈 글자가 든 글도 여기서 `\n`으로 바꿔 넣는다.
+- 접힌 줄과 코드 블록의 ``` 줄은 문단을 없애지 않고 줄 높이를 줄여 감춘다(접힌 줄 0.01, ``` 줄은 상자 안쪽 여백 `codeblock-pad-y`).
+- 원문이 바뀌는 길목은 `shouldChangeTextIn` 하나다(글자 입력, 지우기, 붙여넣기, 끌어다 놓기, 조합, 편집 명령이 모두 지난다). 여기서 차례로: 접혀서 감춘 줄에 닿는 편집을 막고 그 토글을 편다(D-020). 감춘 줄까지 일부러 고치는 명령(줄 옮기기, 들여쓰기, 접힌 토글 뒤에 새 토글)만 `TextEdit.includesHiddenLines`로 지나간다. 보이지 않는 ``` 줄의 한쪽만 지우는 편집을 막는다. 조합 중이 아니면: 정해 둔 서식이 있으면 기호 쌍과 친 글자를 한 번에 넣고, 줄 맨 앞의 기호 뒤 Space와 세 번째 백틱은 줄의 종류를 바꾸는 편집으로 갈아 넣고, 감춘 기호가 짝을 잃는 지우기와 덮어쓰기는 고쳐 쓴 편집(`EditorCommands.replacing`)으로 갈아 넣는다. 다른 줄바꿈 글자가 든 글도 여기서 `\n`으로 바꿔 넣는다. 바깥이 바꾼 글(`applyOutsideChange`)은 막지 않고 그대로 받는다.
+- 조합(한글 입력)이 시작되면 원문을 따로 고칠 수 없다(조합이 끊긴다). 그래서 조합을 시작하기 직전(`EditorTextView.setMarkedText`)에만 자리를 만든다: 기호가 짝을 잃는 선택을 먼저 지우고, 정해 둔 서식의 빈 기호 쌍이나 바깥이 붙인 줄 뒤의 줄바꿈을 넣는다. 조합이 글자 없이 끝나면 넣어 둔 빈 쌍을 지운다.
 - 바깥에 알리는 일(`onTextChange`, 높이, 접힘)은 `didProcessEditing`에서 표시해 두고 `flushPendingChange`에서 한다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는 `setMarkedText` 바로 뒤에(이때는 `textDidChange`가 오지 않는다), 그 밖에는 다음 메인 큐 차례에 불린다.
 - 접힘의 되돌리기: 편집을 되돌렸을 때 줄 번호를 따라 옮기는 것만으로 접힘이 편집 전으로 돌아가지 않으면(토글이 사라짐, 줄 옮기기, 접힌 덩어리를 통째로 고침) 편집 전 접힘을 같은 되돌리기 묶음에 적어 두고, 되돌리기가 끝난 뒤(`NSUndoManagerDidUndoChange`)에 넣는다. 글자를 치는 편집에는 적지 않는다(연달아 친 글자가 한 번에 되돌려지는 것을 깨지 않으려고).
 - 입력 커서는 시스템의 것을 그대로 쓰고 색만 `insertionPointColor`(`accent`)로 맞춘다. 지금 macOS의 입력 커서는 텍스트 뷰가 그리지 않고 따로 놓이는 표시 뷰여서, `drawInsertionPoint`를 덮어써 너비를 `caret-w`로 줄이면 커서가 하나 더 그려지고 지워지지 않는 자국이 남는다. 기본 편집기(`PlainBodyTextView`)도 같다(D-025).
-- 줄의 모양만 바뀌어도 높이가 달라진다(커서가 들어간 줄은 링크의 주소 같은 감춘 기호가 보여 줄이 넘어가고, 커서가 나가거나 창이 키 창에서 물러나면 줄어든다). `refreshStyling()`이 줄을 다시 입히면 다음 메인 큐 차례에 높이를 다시 재어 알린다(`scheduleHeightReport`).
+- 링크 주소 칸(`LinkField`)은 본문 뷰의 하위 뷰다. 떠 있는 동안에는 칸의 아래 끝까지가 내용 높이에 들어가 창이 칸을 자르지 않는다.
 - 텍스트 뷰는 마우스가 움직일 때마다 I자 커서를 넣는다(추적 영역이 보이는 영역 전체다). 그 자리에서 마우스를 받는 뷰가 텍스트 뷰(와 그 안의 뷰)가 아니면, 곧 위에 겹쳐 뜬 다른 뷰(노트 창의 휴지통, 닫기)면 I자 커서를 넣지 않고 화살표로 둔다(`EditorTextView.isHitView(for:)`, 규칙 9).
 - 문서 끝의 빈 줄은 문단이 만들어지지 않고 앞 문단 조각에 붙은 빈 줄 조각으로 놓인다. 커서가 그 줄에 있으면 그 줄의 들여쓰기와 높이는 텍스트 뷰의 입력 속성(기본 문단 모양)을 따른다. 닫히지 않은 코드 블록이 줄바꿈으로 끝나면 `defaultParagraphStyle`에 코드 줄 모양을 넣고, 앞 문단 조각이 코드 상자를 그 줄까지 늘려 닫는다. 서식 없는 텍스트 뷰는 기본 문단 모양을 저장소의 글자에도 붙이므로 `willProcessEditing`에서 떼어 낸다(저장소에는 글꼴과 글자색만 남는다).
 
 ### 확인용 실행 파일 `EditorDemo` (`Sources/EditorDemo/`)
 
-- `swift run EditorDemo --appearance light|dark --checkbox box|bracket --sample note|elements|empty --caret-line <n> --fold <n,n> --width <pt> --script "<단계;단계>" --print-text --snapshot <png 경로>`
-- `--snapshot`은 창 내용을 프로세스 안에서 PNG로 그려 내고 끝낸다. 화면 녹화 권한이 필요 없고 다른 창이 찍히지 않는다. 창 그림자와 시스템 입력 커서는 찍히지 않는다.
+- `swift run EditorDemo --appearance light|dark --checkbox box|bracket --code-style accent|plain --sample note|elements|code|empty --caret-line <n> --fold <n,n> --width <pt> --script "<단계;단계>" --print-text --snapshot <png 경로>`
+- `--snapshot`은 창 내용을 프로세스 안에서 PNG로 그려 내고 끝낸다. 창을 화면에 올리지 않는다. 화면 녹화 권한이 필요 없고 다른 창이 찍히지 않는다. 창 그림자와 시스템 입력 커서는 찍히지 않는다.
 - `--script`는 실제 입력 경로(`insertText`, `doCommand(by:)`, 마우스 이벤트)를 차례로 부른다. 단계는 `DemoScript.swift` 머리 주석에 있다. 다른 앱의 포커스를 빼앗지 않으려고 기본으로는 키 창이 되지 않는다(`--activate`로 바꾼다).
 - 앱 묶음에는 들어가지 않는다.
 
@@ -362,8 +367,8 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 본문 편집기 (`Editor/`)
 
-- `NoteEditorFactory`: `NotePanelCoordinator`의 `makeBodyEditor`로 넘기는 곳. 노트 창마다 `MarkdownEditor`를 만들어 `MarkdownBodyEditor`로 감싼다. `options: NoteEditorOptions`(체크박스 모양, 기본 상자. `tokens.json`의 `display.defaults`와 같고 설정 화면이 생기면 여기에 넣는다)를 바꾸면 떠 있는 편집기에 바로 반영된다. `editor(for:)`로 그 노트의 편집기를 찾는다.
-- `MarkdownBodyEditor`: `NoteBodyEditing` 어댑터. 편집기의 `documentView`를 본문 자리에 넘기고, 글과 높이 알림을 그대로 잇는다. 처음 넣는 글은 `load(text:foldedLines:)`로 지난번의 접힘과 함께 넣고, 그 뒤에 통째로 들어오는 글(다른 프로그램이 고친 본문)은 접힌 줄 번호를 새 본문에 맞춰 옮긴 뒤 넣는다. 끝에 붙은 글(`appendFromOutside`)은 편집기의 같은 이름 메서드로 넘긴다.
+- `NoteEditorFactory`: `NotePanelCoordinator`의 `makeBodyEditor`로 넘기는 곳. 노트 창마다 `MarkdownEditor`를 만들어 `MarkdownBodyEditor`로 감싼다. `options: NoteEditorOptions`(체크박스 모양 `checkbox`, 기본 상자. 인라인 코드의 글자색 `inlineCode`, 기본 `accent`. `tokens.json`의 `display.defaults`와 같고 설정 화면이 생기면 여기에 넣는다. 아직 저장하지 않는다)를 바꾸면 떠 있는 편집기에 바로 반영된다. `editor(for:)`로 그 노트의 편집기를 찾는다.
+- `MarkdownBodyEditor`: `NoteBodyEditing` 어댑터. 편집기의 `documentView`를 본문 자리에 넘기고, 글과 높이 알림을 그대로 잇는다. 처음 넣는 글은 `load(text:foldedLines:)`로 지난번의 접힘과 함께 넣고, 그 뒤에 통째로 들어오는 글(다른 프로그램이 고친 본문)은 접힌 줄 번호를 새 본문에 맞춰 옮긴 뒤 넣는다. 끝에 붙은 글(`appendFromOutside`)과 이 앱의 다른 곳이 바꾼 본문(`applyOutsideChange(to:)`, D-037)은 편집기의 같은 이름 메서드로 넘긴다.
 - 접힘 저장(D-018, D-023): `NoteFoldStore`가 `WindowStateStore`의 창 상태에 `foldedLines`와 `foldedLineTexts`(줄마다 그때의 줄 글)만 고쳐 적는다(`stateDirectory/windows.json`). 창 상태와 함께 살고 함께 지워진다. 접힘이 바뀔 때와 글이 바뀔 때(접힌 토글 줄의 글이 달라질 수 있다) 적는다. `FoldPersistence`가 맡는 것: 저장 표기(`stored(_:in:)`: 오름차순, 비면 항목 없음), 다시 열 때 되살리기(`restored(lines:texts:in:)`: 적어 둔 글이 제자리에 있으면 그대로, 없으면 같은 글의 줄이 하나뿐일 때만 그리로 옮기고 없거나 여럿이면 버린다. 제자리는 앞의 접힘이 밀린 만큼 밀린 곳이다. 글 없이 적힌 예전 상태는 줄 번호를 그대로 쓴다), 떠 있는 동안의 줄 번호 옮기기(`remapped`: 앞뒤에서 그대로인 줄을 찾아 바뀐 곳 위의 접힘은 그대로, 아래의 접힘은 늘고 준 줄 수만큼 옮기고, 바뀐 줄에 걸친 접힘은 버린다). 옮긴 줄이 토글인지는 편집기가 다시 거른다.
 
 ### 단축키 (`Shortcuts/`)
