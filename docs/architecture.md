@@ -133,6 +133,43 @@ scripts/
 - `Routing` (`@MainActor` 프로토콜): `route(_: Route)`. 기능 모듈은 `any Routing`을 받아 부르기만 한다. SwiftUI는 `@Environment(\.router)`.
 - `RouteDispatcher(handler:)`: 클로저로 받는 기본 구현(테스트용으로도 쓴다).
 
+## Editor (`Sources/Editor/`)
+
+본문 편집기(spec 6). `Theme`에만 기대고 창을 모른다. App이나 노트 창이 아래 창구만 보고 붙인다.
+
+### 공개 API
+
+- `MarkdownEditor` (`@MainActor`): `init(theme: Theme, configuration: MarkdownEditorConfiguration = .init())`
+  - `view: NSView`: 세로 스크롤 뷰. 바탕은 그리지 않고 안쪽 여백(`doc-pad`)은 편집기가 둔다. 아무 뷰에나 넣는다.
+  - `text: String`: 원문(Markdown 글자 그대로). 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다(커서, 되돌리기 기록 유지). 다른 글을 넣으면 되돌리기 기록을 비운다.
+  - `onTextChange: ((String) -> Void)?`: 사용자가 고쳤을 때만. 예: `store.scheduleUpdate(id) { $0.body = text }`.
+  - `onContentHeightChange: ((CGFloat) -> Void)?`, `contentHeight: CGFloat`: 안쪽 여백을 포함한 내용 높이. 뷰에 너비가 정해진 뒤에 맞는 값이 나온다. 창 높이를 움직이는 일(`dur`, 위쪽 고정)은 받는 쪽이 한다.
+  - `foldedLines: Set<Int>`, `onFoldChange: ((Set<Int>) -> Void)?`: 접힌 토글의 줄 번호(0부터). 원문에 적지 않는 보기 상태다(D-018). 넣을 때는 알리지 않는다.
+  - `configuration: MarkdownEditorConfiguration`(`checkboxStyle: .box | .bracket`), `selectedRange: NSRange`, `undoManager: UndoManager`(편집기마다 따로), `onOpenLink: ((URL) -> Void)?`(없으면 기본 브라우저)
+  - `focus()`, `perform(_ action: EditorAction)`: `EditorAction`은 spec 13 "편집" 표의 동작(`.indent .outdent .toggleTodo .toggleDone .moveLineUp .moveLineDown .fold .unfold .heading(1...3) .bold .strikethrough .highlight .inlineCode .codeBlock .link`). 단축키는 편집기가 직접 받고, 더 보기 메뉴 같은 곳에서는 이것을 부른다.
+  - `@_spi(Verification)`: `forcesActiveAppearance`, `textView`, `gutterPoint(forLine:)`, `textPoint(forLine:)`. `EditorDemo`만 쓴다.
+
+### 안쪽 구조
+
+- `Model/`(AppKit 없음, 모두 `nonisolated` 값과 순수 함수): `MarkdownDocument`(원문을 줄로 풂. 줄 경계는 TextKit 문단과 같다), `InlineParser`, `EditorCommands`(명령마다 `TextEdit` 하나를 돌려줌), `FoldState`, `CaretSnapping`, `LinePresentation`(줄별 모양 `LineRenderKey`), `CopyExport`, `EditorShortcuts`.
+- `View/`: `ParagraphStyler`(줄 하나를 화면 문단으로), `MarkdownLayoutFragment`(둥근 바탕, 왼쪽 칸 그림, 안내선), `EditorTextView`, `CodeCopyButton`, `EditorStyle`(테마에서 푼 값과 토큰에 없는 치수 `EditorMetrics`).
+- `EditorController`: TextKit 2 스택을 들고 위 둘을 잇는다. `MarkdownEditor`는 이것을 감싼 얇은 창구다.
+
+### 동작 원리와 TextKit 2에서 확인한 것
+
+- 원문 저장소(`NSTextStorage`)에는 기본 글꼴과 글자색만 있다. 서식은 `NSTextContentStorageDelegate`의 `textParagraphWith:`에서 문단을 만들 때 얹는다. 감출 기호는 지우지 않고 글자 크기를 0.01로 해서 자리를 없앤다(문단 글자 수가 원문과 같아야 한다). 그래서 서식을 다시 입혀도 되돌리기 기록과 조합 중인 글자(한글 입력)를 건드리지 않는다.
+- 모양이 달라진 줄만 다시 입힌다: `performEditingTransaction` 안에서 `textStorage.edited(.editedAttributes, …)`를 불러 그 문단을 다시 만들게 한다.
+- `.baselineOffset`은 글자를 가운데로 옮기지 못한다(양수면 줄 높이가 그만큼 줄 뿐이다). 줄 높이를 고정하면 남는 공간이 모두 글자 위에 생기므로, 문단 조각의 `draw(at:in:)`에서 글자만 위로 옮겨 그린다.
+- `usageBoundsForTextContainer`는 문단 높이가 줄어든 뒤 옛 값을 줄 때가 있다. 내용 높이는 마지막 문단 조각의 아래 끝으로 잰다.
+- 접힌 줄과 커서 밖의 ``` 줄은 문단을 없애지 않고 줄 높이를 줄여 감춘다(접힌 줄 0.01, ``` 줄은 상자 안쪽 여백 7).
+
+### 확인용 실행 파일 `EditorDemo` (`Sources/EditorDemo/`)
+
+- `swift run EditorDemo --appearance light|dark --checkbox box|bracket --sample note|elements|empty --caret-line <n> --fold <n,n> --width <pt> --script "<단계;단계>" --print-text --snapshot <png 경로>`
+- `--snapshot`은 창 내용을 프로세스 안에서 PNG로 그려 내고 끝낸다. 화면 녹화 권한이 필요 없고 다른 창이 찍히지 않는다. 창 그림자와 시스템 입력 커서는 찍히지 않는다.
+- `--script`는 실제 입력 경로(`insertText`, `doCommand(by:)`, 마우스 이벤트)를 차례로 부른다. 단계는 `DemoScript.swift` 머리 주석에 있다. 다른 앱의 포커스를 빼앗지 않으려고 기본으로는 키 창이 되지 않는다(`--activate`로 바꾼다).
+- 앱 묶음에는 들어가지 않는다.
+
 ## App 타깃 (`Sources/FloatingNotes/`)
 
 - `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. 지금 `AppRouter`는 요청을 기록만 한다.
