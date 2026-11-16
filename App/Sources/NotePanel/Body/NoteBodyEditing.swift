@@ -33,6 +33,9 @@ import Theme
 /// - 지금 글과 같은 글을 넣으면 아무것도 하지 않는다(실행 취소 기록과 조합을 그대로 둔다).
 /// - 다른 글을 넣으면 그 글로 바꾸고 실행 취소 기록을 비운다(옛 기록은 새 글에 없는 범위를 가리킨다).
 /// - 받은 글을 제 표기로 고쳐 보이는 것만으로는 `onTextChange`를 부르지 않는다(사용자가 고친 것이 아니다).
+/// - `flushPendingChange()`가 불리면 아직 알리지 않은 변경(늦게 알리려고 미뤄 둔 것)을 그 자리에서
+///   `onTextChange`로 알린다. 알릴 것이 없으면 아무것도 하지 않는다. 노트 창은 창을 내리기 전,
+///   휴지통으로 보내기 전, 앱을 끝내기 전에 부른다. 부르지 않으면 같은 차례에 닫힌 창의 마지막 글이 사라진다.
 @MainActor
 public protocol NoteBodyEditing: AnyObject {
     var view: NSView { get }
@@ -42,6 +45,8 @@ public protocol NoteBodyEditing: AnyObject {
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
     /// 본문에 입력 커서를 둔다.
     func focus()
+    /// 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다.
+    func flushPendingChange()
 }
 
 /// 편집기를 만들 때 넘기는 것.

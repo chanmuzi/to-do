@@ -7,6 +7,7 @@ import Store
 extension NoteWindowController {
     /// 지금 값에 `change`를 적용한다. `deferred`면 자동 저장(본문, 제목 입력), 아니면 곧바로 쓴다(색).
     func mutate(deferred: Bool, _ change: (inout Note) -> Void) {
+        coordinator?.userDidEdit()
         do {
             note = deferred
                 ? try environment.notes.scheduleUpdate(noteID, change)
@@ -124,7 +125,7 @@ extension NoteWindowController {
 
     /// 창을 내리기 전에 미뤄 둔 변경을 쓴다. 이 노트를 쓰지 못했으면 `false`(창을 남겨 표시가 보이게 한다).
     func flushBeforeClosing() -> Bool {
-        root.topRow.endTitleEditing()
+        flushPendingEdits()
         // 파일이 없어진 노트는 쓸 곳이 없다. 새 노트로 저장하거나 버릴 때까지 창을 남긴다.
         guard problem != .fileMissing else { return false }
         do {
@@ -134,6 +135,13 @@ extension NoteWindowController {
             handleStoreFailure(error)
             return false
         }
+    }
+
+    /// 고치던 제목을 마무리하고, 편집기가 아직 알리지 않은 본문을 받아 저장소에 넘긴다.
+    /// 창을 내리기 전, 휴지통으로 보내기 전, 앱을 끝내기 전에 부른다.
+    func flushPendingEdits() {
+        root.topRow.endTitleEditing()
+        editor.flushPendingChange()
     }
 
     /// 저장소가 던진 오류를 상단 줄의 표시로 바꾼다. 숨기지 않고 기록도 남긴다.

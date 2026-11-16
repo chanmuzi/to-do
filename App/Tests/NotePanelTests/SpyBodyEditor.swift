@@ -12,6 +12,9 @@ final class SpyBodyEditor: NoteBodyEditing {
     /// 밖에서 `text`에 넣은 값(넣은 차례대로).
     private(set) var assignments: [String] = []
     private var shown = ""
+    /// 마지막으로 주고받은 글.
+    private var notified = ""
+    private(set) var flushCount = 0
     private let normalizesLineEndings: Bool
 
     /// - Parameter normalizesLineEndings: 받은 글의 CRLF를 LF로 고쳐 보인다(실제 편집기처럼).
@@ -24,14 +27,24 @@ final class SpyBodyEditor: NoteBodyEditing {
         set {
             assignments.append(newValue)
             shown = normalizesLineEndings ? newValue.replacingOccurrences(of: "\r\n", with: "\n") : newValue
+            notified = shown
         }
     }
 
     func focus() {}
 
+    /// 화면에만 있고 아직 알리지 않은 글(조합 중이거나 한 차례 늦게 알리려던 것)을 알린다.
+    func flushPendingChange() {
+        guard shown != notified else { return }
+        notified = shown
+        flushCount += 1
+        onTextChange?(shown)
+    }
+
     /// 사용자가 글을 쳐서 편집기가 알린다.
     func type(_ text: String) {
         shown = text
+        notified = text
         onTextChange?(text)
     }
 

@@ -12,9 +12,33 @@ import Theme
 /// - "노트 모두 숨기기" 중에 노트를 열거나, 새로 만들거나, 본문에 커서를 두거나, 더 보기 메뉴를 띄우면
 ///   숨김이 모두 풀린다. 한 창만 보이고 나머지는 숨은 상태는 없다(`areNotesHidden`이 참이면 보이는 노트 창이 없다).
 public final class NotePanelCoordinator {
+    private struct TrashedNote {
+        let id: NoteID
+        /// 휴지통으로 보내기 직전의 창 상태(틀, 핀, 열림, 접힘). 적힌 것이 없었으면 `nil`.
+        let windowState: NoteWindowState?
+    }
+
     /// 상단 줄 표시 방식. 바꾸면 떠 있는 창에 바로 반영된다.
     public var displayOptions = NotePanelDisplayOptions() {
         didSet { controllers.values.forEach { $0.refreshChrome(animated: false) } }
+    }
+
+    /// 확인용: 끄면 노트 창이 키 창이 되지 않는다. 노트 창은 앱을 앞으로 가져오지 않고도 키 창이 되므로,
+    /// 자동 확인 중에 띄운 창이 사용자가 다른 앱에 치던 글자를 받지 않게 할 때 쓴다. 기본은 켜짐.
+    public var allowsKeyWindows = true {
+        didSet {
+            controllers.values.forEach { $0.panel.allowsKey = allowsKeyWindows }
+            if !allowsKeyWindows { releaseKeyWindow() }
+        }
+    }
+
+    /// 확인용: 키 창인 노트 창을 키 창에서 물러나게 한다. 내렸다 다시 올리는데, 노트 창은 누르거나
+    /// 일부러 시킬 때만 키 창이 되므로 다시 올려도 키 창이 되지 않는다. 겹친 차례는 지킨다.
+    public func releaseKeyWindow() {
+        guard !areNotesHidden, keyNoteID != nil else { return }
+        let stacked = recorder.backToFront(order).compactMap { controllers[$0] }
+        stacked.forEach { $0.setHidden(true) }
+        stacked.forEach { $0.setHidden(false) }
     }
 
     /// "노트 모두 숨기기"가 켜져 있는지(spec 4.3).
@@ -30,6 +54,8 @@ public final class NotePanelCoordinator {
     private var storeObservation: StoreObservation?
     private var observers: [any NSObjectProtocol] = []
     private var isRefreshingStore = false
+    /// 방금 휴지통으로 보낸 노트. 그 뒤에 다른 것을 고치거나 새 노트를 만들면 비운다.
+    private var lastTrashed: TrashedNote?
 
     /// - Parameters:
     ///   - router: 노트 창이 다른 기능을 부를 때(노트 찾기, 새 노트, AI 패널 등) 보내는 곳.
@@ -100,6 +126,7 @@ public final class NotePanelCoordinator {
             environment: environment
         )
         controller.coordinator = self
+        controller.panel.allowsKey = allowsKeyWindows
         controllers[id] = controller
         order.append(id)
         controller.show(focus: focus)
@@ -108,6 +135,7 @@ public final class NotePanelCoordinator {
     /// 새 노트를 만들어 지금 노트 옆에 띄운다. 핀이 켜진 채로 뜬다(spec 4.1).
     @discardableResult
     public func createNote(_ request: NewNoteRequest = NewNoteRequest()) throws -> NoteID {
+        userDidEdit()
         let note = try notes.create(request.draft)
         try open(note.id, nextTo: request.nextTo, focus: true)
         return note.id
@@ -121,8 +149,11 @@ public final class NotePanelCoordinator {
     }
 
     /// 노트를 휴지통으로 보내고 창을 내린다. 확인 창을 띄우지 않는다(spec 5.3).
+    /// 바로 뒤라면 `undoTrash()`로 되돌린다.
     public func moveToTrash(_ id: NoteID) {
-        controllers[id]?.root.topRow.endTitleEditing()
+        // 편집기가 아직 알리지 않은 글까지 받아 둔다. 저장소가 옮기기 전에 그것을 쓴다.
+        controllers[id]?.flushPendingEdits()
+        let trashed = TrashedNote(id: id, windowState: recorder.savedState(for: id))
         do {
             try notes.moveToTrash(id)
         } catch {
@@ -134,6 +165,29 @@ public final class NotePanelCoordinator {
             return
         }
         noteDisappeared(id)
+        lastTrashed = trashed
+    }
+
+    /// 방금 휴지통으로 보낸 노트를 되돌릴 수 있는지(spec 5.3의 "바로 뒤라면 ⌘Z").
+    /// 보낸 뒤에 다른 노트를 고치거나 새 노트를 만들면 거짓이 된다.
+    public var canUndoTrash: Bool { lastTrashed != nil }
+
+    /// 방금 휴지통으로 보낸 노트를 되살려 제자리에 다시 띄운다(틀, 핀, 접힘 그대로). 되살린 노트를 돌려준다.
+    /// 되돌릴 것이 없으면 `nil`. 되살리지 못하면 던지고, 다시 시도할 수 있게 남겨 둔다.
+    @discardableResult
+    public func undoTrash() throws -> NoteID? {
+        guard let trashed = lastTrashed else { return nil }
+        try notes.restoreFromTrash(trashed.id)
+        lastTrashed = nil
+        if let state = trashed.windowState { recorder.restore(state, for: trashed.id) }
+        try open(trashed.id, focus: true)
+        return trashed.id
+    }
+
+    /// 떠 있는 모든 노트 창에서 고치던 제목을 마무리하고 편집기가 아직 알리지 않은 본문을 받는다.
+    /// App이 끝내기 전에 `flushPendingSaves()`보다 먼저 부른다.
+    public func flushPendingEdits() {
+        order.compactMap { controllers[$0] }.forEach { $0.flushPendingEdits() }
     }
 
     /// 떠 있는 노트를 한꺼번에 감추거나 제자리에 되돌린다.
@@ -156,6 +210,34 @@ public final class NotePanelCoordinator {
     /// 지금 글을 쓰고 있는 노트(키 창). 없으면 `nil`.
     public var keyNoteID: NoteID? {
         order.last { controllers[$0]?.panel.isKeyWindow == true }
+    }
+
+    /// 맨 앞에 있는 노트: 키 창인 노트, 없으면 보이는 노트 가운데 가장 앞에 겹친 것.
+    public var frontmostNoteID: NoteID? {
+        keyNoteID ?? recorder.backToFront(order).last { controllers[$0]?.panel.isVisible == true }
+    }
+
+    /// 그 노트의 창. 다른 화면을 그 노트에 붙여 띄울 때 쓴다(노트 찾기). 떠 있지 않으면 `nil`.
+    public func window(for id: NoteID) -> NSWindow? {
+        controllers[id]?.panel
+    }
+
+    /// 지금 노트의 다음 노트(띄운 순서, 끝에서 처음으로 돌아감)로 커서를 옮긴다. 옮겨 간 노트를 돌려준다.
+    @discardableResult
+    public func focusNextNote() -> NoteID? {
+        guard !order.isEmpty else { return nil }
+        let current = frontmostNoteID.flatMap(order.firstIndex(of:))
+        let next = order[current.map { ($0 + 1) % order.count } ?? 0]
+        setAllHidden(false)
+        controllers[next]?.show(focus: true)
+        return next
+    }
+
+    /// 제목을 그 자리에서 고치기 시작한다. 노트를 숨긴 중이면 숨김을 모두 푼다.
+    public func beginTitleEditing(for id: NoteID) {
+        guard let controller = controllers[id] else { return }
+        setAllHidden(false)
+        controller.beginTitleEditing()
     }
 
     public func snapshot(of id: NoteID) -> NoteWindowSnapshot? {
@@ -191,6 +273,11 @@ public final class NotePanelCoordinator {
     }
 
     // MARK: - 안쪽
+
+    /// 사용자가 노트를 고치거나 새로 만들었다. 휴지통 되돌리기는 "바로 뒤"에만 된다.
+    func userDidEdit() {
+        lastTrashed = nil
+    }
 
     /// 노트가 없어졌고 창에 남길 글도 없다(휴지통으로 갔거나, 쓰지 못한 글 없이 파일이 지워짐).
     /// 창을 내리고 창 상태도 지운다.

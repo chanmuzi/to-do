@@ -89,8 +89,14 @@ final class NoteWindowController: NSObject {
     }
 
     func focusBody() {
-        panel.makeKeyAndOrderFront(nil)
+        panel.becomeKeyByRequest()
         editor.focus()
+    }
+
+    /// 제목을 그 자리에서 고치기 시작한다(단축키로).
+    func beginTitleEditing() {
+        panel.becomeKeyByRequest()
+        root.topRow.beginTitleEditing()
     }
 
     /// "노트 모두 숨기기"(spec 4.3). 되돌릴 때는 겹친 차례를 바꾸지 않는다(부르는 쪽이 뒤에 있던 것부터 부른다).

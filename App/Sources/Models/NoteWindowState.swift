@@ -35,13 +35,17 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     /// 창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값을 받는다(클수록 앞).
     /// 앞으로 온 적이 없으면 `nil`. 앱을 다시 켤 때 이 차례대로 되살려 앞뒤를 지킨다.
     public var stackOrder: Int?
+    /// 접어 둔 토글의 줄 번호(0부터, 오름차순). 본문에 적지 않는 보기 상태다(D-018). 접힌 것이 없으면 `nil`.
+    public var foldedLines: [Int]?
 
     public init(
-        frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false, stackOrder: Int? = nil
+        frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false, stackOrder: Int? = nil,
+        foldedLines: [Int]? = nil
     ) {
         self.frame = frame
         self.isPinned = isPinned
         self.isOpen = isOpen
         self.stackOrder = stackOrder
+        self.foldedLines = foldedLines
     }
 }

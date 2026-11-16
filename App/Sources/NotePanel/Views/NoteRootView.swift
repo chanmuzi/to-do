@@ -88,10 +88,18 @@ final class NoteRootView: NSView {
 
     override func layout() {
         super.layout()
+        place()
+        let placedSize = bounds.size
+        onLayout?()
+        // `onLayout`이 창 높이를 바꿨을 수 있다(이번 배치에서 알게 된 내용 높이). 배치 도중에 생긴
+        // 다시 배치하라는 요청은 이 배치가 끝나며 지워지므로, 크기가 달라졌으면 여기서 한 번 더 놓는다.
+        if bounds.size != placedSize { place() }
+    }
+
+    private func place() {
         isLayingOut = true
         placeSubviews()
         isLayingOut = false
-        onLayout?()
     }
 
     private func placeSubviews() {
