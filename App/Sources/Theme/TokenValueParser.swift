@@ -68,6 +68,15 @@ enum TokenValueParser {
         return value.flatMap { $0 >= 0 ? $0 : nil }
     }
 
+    /// `14deg`, `-12deg` → 도. 한 바퀴(±360도) 안만 받는다.
+    static func degrees(_ raw: String) -> Double? {
+        let text = raw.trimmingCharacters(in: .whitespaces)
+        guard text.hasSuffix("deg"), let value = number(String(text.dropLast(3))),
+              (-360...360).contains(value)
+        else { return nil }
+        return value
+    }
+
     /// `-.02em` → 글자 크기에 곱할 배수.
     static func em(_ raw: String) -> Double? {
         let text = raw.trimmingCharacters(in: .whitespaces)

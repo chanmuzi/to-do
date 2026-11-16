@@ -51,12 +51,16 @@ App/
 └─ Resources/         tokens.json, Fonts/, AppIcon.appiconset, Info.plist
 scripts/
 ├─ build-app.sh       빌드해서 build/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
-└─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
+├─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
+└─ debug-send.sh      실행 중인 디버그 빌드에 확인용 명령을 보낸다 (인자: 출력 폴더, 명령)
 ```
 
 - Xcode 프로젝트 파일은 없다(D-011). `cd App && swift build`, `swift test`.
 - `Sources/Theme/Resources/`의 `tokens.json`, `Fonts`는 `App/Resources/`를 가리키는 심볼릭 링크다. 정본은 `App/Resources/` 하나다.
 - 실행 인자(확인용): `--notes-dir <경로>`(그 폴더만 읽고 씀), `--appearance light|dark`. 환경 변수 `FLOATING_NOTES_DIR`도 같은 일을 한다.
+- 확인용 실행 인자(디버그 빌드에만 있다. `#if DEBUG`로 묶여 릴리스 빌드에는 인자 해석도, 명령을 받는 코드도 들어가지 않는다): `--debug-hover <노트 id>`(그 노트를 마우스가 올라간 모습으로 띄움), `--debug-control <출력 폴더>`(다른 프로세스가 분산 알림 `local.floating-notes.debug`로 보내는 명령을 받음. 명령 목록은 `DebugControl.swift`의 주석). 마우스와 키보드를 건드리지 않고 창 상태를 바꾸고 읽을 때 쓴다.
+  - 분산 알림은 이 Mac의 어느 프로세스나 보낼 수 있으므로 두 가지로 막는다. 명령마다 이번 실행의 표가 있어야 한다(켤 때 새로 만들어 `<출력 폴더>/control-token`에 소유자만 읽게 적는다. 알림의 `object`는 `<표> <명령>`). 명령이 쓰는 파일(`snapshot`, `menu`, `dump`)은 출력 폴더 바로 아래의 파일 이름으로만 받는다(경로, `..`, 폴더 밖을 가리키는 링크는 거부).
+  - 보내기: `scripts/build-app.sh debug`로 만든 묶음을 `--notes-dir <폴더> --debug-control <출력 폴더>`로 켜고 `scripts/debug-send.sh <출력 폴더> dump state.json`처럼 보낸다.
 
 ## 빌드 설정
 
@@ -84,12 +88,14 @@ scripts/
 - `FontRegistrar.registerBundledFonts() -> FontRegistration`(`registered: [URL]`, `problems: [String]`): App이 켤 때 부른다. 던지지 않는다. 등록하지 못한 글꼴은 `problems`에 적히고 글꼴 고르기는 시스템 글꼴로 넘어간다. 기능 모듈은 부르지 않는다.
 - 글꼴 고르기: 가족 이름은 `<이름> Variable`(번들의 가변 글꼴)을 먼저 찾고 그다음 `<이름>`을 찾는다. 가변 글꼴은 굵기 축에 토큰 값을 그대로 넣고, 굵기별 파일로 된 가족은 CSS 굵기가 가장 가까운 파일을 고른다.
 - 새 토큰을 쓰려면 `tokens.json`에 값을 넣고 `TokenKeys.swift`의 enum에 case를 더한다. 테스트가 파일과 enum이 어긋나면 실패한다.
+- 노트 창 단계에서 더한 토큰(시안의 CSS에만 있던 값): `component`의 `chrome-gap`, `chrome-pad-end`, `icon-s|m|l`(12, 13, 14), `icon-btn-gap`, `swatch-size|gap|ring`, `menu-w`, `note-w`, `note-w-min`, `note-w-max`와 `type.fw-ui-strong`(`TextStyle.uiStrong`, 임박한 리마인더).
+- 치수가 아닌 값: `component.note-h-max-screen`(`70%`, 노트 높이 한도)은 `RatioToken`으로 받아 `ratio(_:)`가 0~1의 몫으로 낸다. `motion` 구역의 키는 `MotionToken`에 있고 값은 `MotionTokens`로 묶여 나온다: `duration`, `curve`와 `bell: BellMotion`(`bell-period` 1.6s, `bell-rest` 60%, `bell-angle-1|2|3` 14deg, -12deg, 6deg, `bell-pivot` 12%, `bell-ease`. `keyframes`가 주기 안의 때와 각도를 낸다).
 
 ### Models
 
 - `Note`: `id: NoteID`, `title`, `body`(Markdown 원문), `spaceID: SpaceID?`, `colorID: PaletteID?`, `reminder: Date?`, `created`, `modified`. 핀은 없다(아래).
 - `NoteDraft`: 새 노트 내용(`title`, `body`, `spaceID`, `colorID`, `reminder`).
-- `NoteWindowState`: `frame: WindowFrame?`, `isPinned`(기본 켜짐), `isOpen`. 노트 파일이 아니라 로컬 상태다(D-003).
+- `NoteWindowState`: `frame: WindowFrame?`, `isPinned`(기본 켜짐), `isOpen`, `stackOrder: Int?`(창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값, 클수록 앞). 노트 파일이 아니라 로컬 상태다(D-003).
 - `Space`(`id`, `name`, `icon: SpaceIcon`), `SpaceIcon`(`.symbol(name:colorID:)`, `.emoji`, `.image`).
 - `NoteID`, `SpaceID`, `PaletteID`: 문자열을 감싼 식별자. `PaletteID.rawValue`를 `Theme`의 `paletteID:`에 넘긴다.
 
@@ -103,6 +109,8 @@ scripts/
   - `scheduleUpdate(_ id: NoteID, _ mutate: (inout Note) -> Void) throws -> Note`: 지금 값에 적용하고 잠시 뒤에 쓴다(자동 저장). 마지막 변경 뒤 0.5초, 계속 고치는 중이어도 첫 변경 뒤 3초 안에 쓴다. 돌려주는 값은 적용한 뒤의 지금 값.
   - `flushPendingSaves() throws`: 미뤄 둔 변경을 모두 쓴다. 하나가 실패해도 나머지를 쓰고, 실패한 것은 남겨 둔 채 `StoreError.pendingSavesFailed([SaveFailure])`(`id`, `title`, `error`)를 던진다.
   - `resolveConflict(_ id: NoteID, keeping: ConflictSide) throws -> Note`: `.mine`(이 앱에서 고친 내용을 쓴다) 또는 `.disk`(디스크 내용을 받아들이고 쓰지 않은 변경을 버린다).
+  - `hasPendingChanges(_ id: NoteID) -> Bool`: 아직 디스크에 쓰지 않은 변경이 있는지(저장 실패, 충돌, 없어진 파일 때문에 남은 것 포함).
+  - `discardPendingChanges(_ id: NoteID)`: 쓰지 않은 변경을 버린다. 알리지 않는다. 파일이 없어진 노트를 정리할 때 쓴다(파일이 남아 있는 노트의 충돌은 `resolveConflict(.disk)`).
   - `moveToTrash(_ id: NoteID) throws`, `restoreFromTrash(_ id: NoteID) throws -> Note`.
   - `refresh() throws`: 폴더를 다시 훑는다. 폴더 감시는 파일이 생기고 없어지고 바꿔치기되는 것만 잡고, 제자리 수정은 이 호출이 잡는다. App이 앞으로 올 때 부른다.
   - `observe(_ handler: (StoreChange) -> Void) -> StoreObservation`: 돌려받은 값을 들고 있는 동안만 알림이 온다.
@@ -116,7 +124,11 @@ scripts/
   - 쓰기 직전에 디스크의 글이 이것과 다르면 쓰지 않는다. `update`는 `StoreError.conflict(id)`를 던지고, 자동 저장은 `StoreChange.Kind.conflict`를 알린다. 고친 내용은 저장소에 남고(`load`가 돌려준다) `resolveConflict`로 풀 때까지 그 노트는 디스크에 쓰지 않는다. 글 전체를 견주므로 수정 시각만 바뀐 파일은 충돌이 아니다.
   - 쓰지 않은 변경이 없는 노트를 다른 프로그램이 고치면 `.updated`/`.external`이 온다. 그 노트를 보여 주는 쪽은 `load`로 다시 읽는다(다시 읽으면 충돌 기준도 갱신된다). 다시 읽지 않고 고치면 `conflict`다.
   - 노트를 편집용으로 열 때는 `list()`의 값을 그대로 쓰지 말고 `load(id)`를 한 번 부른다.
-- `StoreChange`: `id`, `kind`(`.created .updated .removed .saveFailed(message:) .conflict`), `origin`(`.local` 이 앱, `.external` 다른 프로그램). `.saveFailed`와 `.conflict`는 미뤄 둔 저장에서만 오고, 고친 내용은 저장소에 남아 있다.
+- 다른 프로그램이 지운 파일:
+  - `.removed`/`.external`이 온다. 쓰지 않은 변경은 버리지 않고 저장소에 남긴다(`hasPendingChanges`, `load`가 돌려준다). 그 노트를 쓰려 하면 `noteNotFound`이고 파일을 만들지 않는다. 남은 변경은 보여 주는 쪽이 `create`로 새 노트에 옮기거나 `discardPendingChanges`로 버린다.
+  - 자동 저장을 쓰려는 때에 파일이 없으면 `.saveFailed`가 아니라 `.removed`/`.external`로 알린다(폴더를 훑다가 이미 알렸으면 다시 알리지 않는다).
+  - 같은 이름의 파일이 다시 생기면 `.created`/`.external`이 온다. 남아 있던 변경을 쓰려 할 때 내용이 예전과 다르면 `conflict`다.
+- `StoreChange`: `id`, `kind`(`.created .updated .removed .saveFailed(message:) .conflict`), `origin`(`.local` 이 앱, `.external` 다른 프로그램). `.saveFailed`와 `.conflict`는 미뤄 둔 저장에서만 오고, 고친 내용은 저장소에 남아 있다. 이 앱이 한 쓰기는 모두 `.updated`/`.local`로 알려지므로, 받는 쪽은 `origin`으로 제 저장의 메아리와 다른 프로그램의 변경을 가른다.
 - `StoreError`: `.noteNotFound(id)`, `.noteAlreadyExists(id)`, `.unreadableFile(url)`, `.conflict(id)`, `.writeFailed(id, message:)`, `.pendingSavesFailed([SaveFailure])`.
 - `StoreLocation`: `notesDirectory`, `trashDirectory`(`notes/.trash/`), `stateDirectory`. `.standard()`는 `~/Library/Application Support/FloatingNotes/{notes,state}`, `.isolated(notesDirectory:)`는 그 폴더 안만 쓴다.
 - `WindowStateStore`: `state(for:)`, `set(_:for:)`, `remove(_:)`, `all`, `loadWarning: String?` → `stateDirectory/windows.json`.
@@ -129,9 +141,66 @@ scripts/
 
 ### Routing
 
-- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAIPanel(context: NoteID?)`, `.openSettings`, `.openShortcuts`.
+- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAIPanel(context: NoteID?)`, `.openSettings`, `.openShortcuts`, `.openReminderEditor(NoteID)`, `.openSpacePicker(NoteID)`.
 - `Routing` (`@MainActor` 프로토콜): `route(_: Route)`. 기능 모듈은 `any Routing`을 받아 부르기만 한다. SwiftUI는 `@Environment(\.router)`.
 - `RouteDispatcher(handler:)`: 클로저로 받는 기본 구현(테스트용으로도 쓴다).
+
+## NotePanel 공개 API
+
+플로팅 노트 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routing`으로만 부른다.
+
+- `NotePanelCoordinator`: 떠 있는 노트 창 전부를 맡는다. App이 하나 만든다.
+  - `init(theme:notes:windowStates:spaces:router:makeBodyEditor:log:)`. `makeBodyEditor`를 주지 않으면 기본 편집기(`PlainTextBodyEditor`)를 쓴다.
+  - `restoreOpenNotes() -> [NoteID]`(지난번에 떠 있던 창을 제자리에, 겹친 앞뒤도 그대로. 뒤에 있던 것부터 띄우고 그 차례로 돌려준다), `open(_:nextTo:focus:) throws`, `createNote(_: NewNoteRequest) throws -> NoteID`(지금 노트 옆에 핀이 켜진 채), `closeWindow(_:)`(창만 내림), `moveToTrash(_:)`, `toggleAllHidden()`, `areNotesHidden`.
+  - 숨김은 전부 아니면 전무다. 숨긴 중에 `open`, `createNote`, `focusBody(of:)`, `popUpMoreMenu(for:)`를 부르면 숨김이 모두 풀린다(뒤에 있던 창부터 띄워 앞뒤를 지키고, 마우스가 올라가 있는지도 다시 잰다). `areNotesHidden`이 참이면 보이는 노트 창이 없다.
+  - 창마다: `openNoteIDs`, `keyNoteID`, `snapshot(of:) -> NoteWindowSnapshot?`(틀, 핀, 창 단계, 보임, 호버), `setPinned(_:for:)`, `setColor(_:for:)`, `focusBody(of:)`, `popUpMoreMenu(for:)`, `setHoverOverride(_:for:)`(확인용).
+  - `displayOptions: NotePanelDisplayOptions`: 스페이스 표시(아이콘, 아이콘+이름, 이름), 리마인더 표시(시간, 남은 시간, 아이콘), 시간 형식, 임박 기준. 설정 화면이 생기면 여기에 넣는다.
+- 노트 창이 하는 일과 하지 않는 일:
+  - 제목, 노트 색은 `update`/`scheduleUpdate`로 그 항목만 고친다. 핀과 창 틀, 열림 상태는 `WindowStateStore`에 둔다.
+  - 노트 찾기, 새 노트, 창 닫기, 리마인더 설정, 스페이스 옮기기, AI 패널은 `Route`를 보낸다. 직접 열지 않는다.
+  - 저장소 변경을 받는다. 이 앱이 한 쓰기(`.updated`/`.local`)로는 `note`와 상단 줄만 맞추고 본문 편집기를 건드리지 않는다. 다른 프로그램의 변경(`.updated`/`.external`)은 `load`로 다시 읽고, 본문이 편집기와 마지막으로 주고받은 것과 다를 때만 편집기에 넣는다(아래 "본문 편집기 이음매").
+  - 충돌(`.conflict`)이나 저장 실패가 나면 사용자가 쓴 글을 그대로 두고 상단 줄에 표시 하나를 띄운다. 누르면 내 내용으로 저장 / 파일의 내용으로 되돌리기(`resolveConflict`), 다시 저장을 고른다. "다시 저장"은 이 노트의 실패만 본다(다른 노트의 실패는 기록만 하고, 이 노트가 충돌이면 충돌 표시로 넘어간다). 쓰지 못한 글이 있는 창은 닫지 않는다.
+  - 노트가 없어지면(`.removed`): 이 앱이 휴지통으로 보낸 것이면 창을 내린다. 다른 프로그램이 지운 것이면 쓰지 못한 글이나 풀지 않은 표시가 없을 때만 창을 내리고, 있으면 창을 남겨 표시("노트 파일이 없어졌습니다")를 띄운다. 누르면 "새 노트로 저장"(지금 제목, 본문, 스페이스, 색, 리마인더로 `create`한 새 노트를 같은 자리와 핀으로 띄우고 옛 창을 내림) / "버리기"(`discardPendingChanges` 뒤 창을 내림)를 고른다. 고를 때까지 닫기와 휴지통으로는 창이 닫히지 않는다. 같은 이름의 파일이 돌아오면 남은 변경을 다시 쓰고, 내용이 달라져 있으면 충돌 표시로 넘어간다.
+  - 노트 창이 키 창이 될 때 `refresh()`를 부른다(노트 창은 눌러도 앱을 앞으로 가져오지 않아 App의 `refresh`가 돌지 않는다. 파일마다 수정 시각과 크기만 보므로 횟수를 줄이지 않았다).
+  - 저장 문제 표시는 호버 아이콘 셋의 왼쪽(제목 쪽)에 놓인다. 나타나고 사라져도 자리를 미리 차지하는 것들은 움직이지 않고 긴 제목이 잘리는 자리만 달라진다. 표시와 리마인더는 알파로 `dur` 동안 나타나고 사라진다. 누를 수 있는 것(`ClickableView`: 아이콘 버튼, 리마인더)은 제 영역의 커서를 화살표로 밝힌다(규칙 9).
+- 안쪽 구조: `Logic/`은 화면 없이 시험하는 값 계산(`TopRowState` 상단 줄의 내용과 색, `TopRowLayout` 요소 자리, `ReminderPresentation`, `NoteSizePolicy`, `WindowPlacement`, `HeightTransition`, `WindowStateRecorder`), `Views/`는 AppKit 뷰, `Menu/`는 더 보기 메뉴, `Body/`는 본문 이음매.
+
+### 본문 편집기 이음매
+
+노트 창은 편집기 모듈을 import하지 않는다. 아래 프로토콜의 구현을 App이 만들어 넘긴다.
+
+```swift
+@MainActor public protocol NoteBodyEditing: AnyObject {
+    var view: NSView { get }
+    var text: String { get set }
+    var onTextChange: ((String) -> Void)? { get set }
+    var onContentHeightChange: ((CGFloat) -> Void)? { get set }
+    func focus()
+}
+public struct NoteBodyEditorContext { public let theme: Theme; public let noteID: NoteID }
+public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> any NoteBodyEditing
+```
+
+- `view`는 노트 창이 가진 스크롤 뷰의 문서 뷰가 된다. 노트 창은 너비만 맞추고, 높이는 `view`가 내용에 맞춘다. 뒤집힌 좌표(`isFlipped`)여야 한다.
+- 안쪽 여백(`Theme.docPadding`)은 편집기가 넣는다.
+- `onContentHeightChange`에는 여백을 포함한 내용 높이를 넘긴다(글이나 너비가 바뀔 때마다, 처음 배치된 뒤 한 번). 노트 창이 이 값으로 창 높이를 맞춘다(위쪽 고정, 아래로, `dur` 동안).
+- `PlainTextBodyEditor(theme:)`: 서식 없는 기본 구현(TextKit 1). 제 실행 취소 기록을 따로 갖는다. Editor 모듈을 끼울 때는 이 프로토콜에 맞춘 어댑터를 App 타깃에 두고 `makeBodyEditor`로 넘긴다.
+
+글을 주고받는 약속(정본은 `NoteBodyEditing`의 문서 주석). 편집 중인 글의 주인은 편집기다. 편집기는 받은 글을 제 표기로 고쳐 보일 수 있고(CRLF를 LF로 등), 밖에서 다른 글을 넣으면 실행 취소 기록을 비우고 조합(한글 입력)을 끊어도 된다. 그래서 노트 창은 꼭 필요할 때만 `text`에 넣는다.
+
+노트 창이 지키는 것:
+
+- `text`에 넣는 때는 둘뿐이다. (1) 편집기를 만든 직후 한 번. (2) 이 편집기가 아닌 쪽이 본문을 바꿨을 때(다른 프로그램이 파일을 고침, "파일의 내용으로 되돌리기"). 그때도 저장소의 본문이 "편집기와 마지막으로 주고받은 본문"(마지막으로 `text`에 넣은 값 또는 `onTextChange`로 받은 값)과 다를 때만 넣는다.
+- 편집기가 `onTextChange`로 알려 준 글을 되돌려 넣지 않는다. 이 앱이 한 저장(자동 저장, 제목과 색 변경, 닫을 때 쓰기, "내가 고친 내용으로 저장", "다시 저장")의 알림으로는 `text`를 건드리지 않는다.
+- 저장하는 본문은 `onTextChange`로 받은 값 그대로다. 저장하려고 `text`를 읽지 않는다.
+
+편집기가 지켜야 하는 것:
+
+- 사용자가 고쳐 본문 원문이 달라질 때마다 `onTextChange`에 그때의 원문 전체를 넘긴다. 조합 중에는 메인 큐에서 한 차례 늦게 불러도 된다. 노트 창은 받은 값을 `scheduleUpdate(id) { $0.body = text }`로 넘긴다.
+- `text`를 밖에서 넣을 때는 `onTextChange`를 부르지 않는다. 넣기 전에 미뤄 둔 알림(옛 글의 것)이 있으면 버린다. 버리지 않으면 방금 받은 글을 옛 글이 덮어쓴다.
+- 지금 글과 같은 글을 넣으면 아무것도 하지 않는다(실행 취소 기록과 조합을 그대로 둔다).
+- 다른 글을 넣으면 그 글로 바꾸고 실행 취소 기록을 비운다(옛 기록은 새 글에 없는 범위를 가리킨다).
+- 받은 글을 제 표기로 고쳐 보이는 것만으로는 `onTextChange`를 부르지 않는다(사용자가 고친 것이 아니다).
 
 ## Editor (`Sources/Editor/`)
 
@@ -181,8 +250,9 @@ scripts/
 
 ## App 타깃 (`Sources/FloatingNotes/`)
 
-- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. 지금 `AppRouter`는 요청을 기록만 한다.
+- `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`, `SpaceStore`를 한 번 만들고, `AppRouter`(`Routing` 구현)가 요청을 받는다. `AppRouter`는 `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로 넘기고, 나머지는 아직 기록만 한다. 새 노트를 만들거나 노트를 열다가 실패하면(디스크가 가득 참 등) 기록과 함께 알림 창으로 까닭을 보여 준다(`RouteFailureAlert`).
 - 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일도 같은 방식으로 남기고 건너뛴다.
-- `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다. 끝낼 때(`applicationShouldTerminate`) `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
-- 지금은 `PlaceholderWindowController`가 테마 확인용 창 하나를 띄운다. 2단계에서 `AppDelegate.showInitialWindows()`를 노트 창을 되살리는 코드로 바꾸고 `Placeholder*` 두 파일을 지운다.
-- Features 타깃 `NotePanel`, `Editor`, `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`에만 의존한다. `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.
+- `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부른다(노트 창이 키 창이 될 때는 `NotePanelCoordinator`가 부른다). 끝낼 때(`applicationShouldTerminate`) `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`).
+- 켤 때 `NotePanelCoordinator.restoreOpenNotes()`로 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 가장 최근에 고친 노트를, 노트가 하나도 없으면 빈 노트를 새로 만들어 띄운다(D-021). Dock 아이콘을 눌렀을 때도 같다.
+- 앱 메뉴(`MainMenu`)에는 글을 쓰는 데 필요한 것만 있다: 편집(실행 취소, 오려두기, 복사, 붙여넣기, 모두 선택), 새 노트, 창 닫기, 종료. 메뉴 막대 아이콘과 단축키 표는 4단계에서 만든다.
+- Features 타깃 `Capture`, `Browse`는 자리표시(`<모듈>Module`)만 있다. `Editor`는 `Theme`에만 의존하고 아직 노트 창에 끼우지 않았다(노트 창은 `PlainTextBodyEditor`를 쓴다). `Library`, `Reminders`, `Settings`, `Agent`는 아직 타깃이 없다.

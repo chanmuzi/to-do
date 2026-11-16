@@ -12,6 +12,7 @@ public struct ThemeTokens: Hashable, Sendable {
     private let spaces: [SpaceToken: CGFloat]
     private let shapes: [ShapeToken: CGFloat]
     private let components: [ComponentToken: CGFloat]
+    private let ratios: [RatioToken: Double]
 
     /// 노트 본문 안쪽 여백(`doc-pad`).
     public let docPadding: ThemeInsets
@@ -77,6 +78,8 @@ public struct ThemeTokens: Hashable, Sendable {
     public func space(_ token: SpaceToken) -> CGFloat { spaces[token]! }
     public func shape(_ token: ShapeToken) -> CGFloat { shapes[token]! }
     public func component(_ token: ComponentToken) -> CGFloat { components[token]! }
+    /// 0~1 사이의 몫.
+    public func ratio(_ token: RatioToken) -> Double { ratios[token]! }
 
     public func paletteColor(id: String) -> PaletteColor? {
         palette.first { $0.id == id }
@@ -145,6 +148,7 @@ public struct ThemeTokens: Hashable, Sendable {
         self.spaces = try table("space", TokenValueParser.length)
         self.shapes = try table("shape", TokenValueParser.length)
         self.components = try table("component", TokenValueParser.length)
+        self.ratios = try table("component", TokenValueParser.fraction)
         self.docPadding = try parse("component.doc-pad", TokenValueParser.insets)
         self.material = MaterialTokens(
             opacity: try parse("material.opacity", TokenValueParser.unitNumber),
@@ -152,9 +156,21 @@ public struct ThemeTokens: Hashable, Sendable {
             tintMix: try parse("material.tint-mix", TokenValueParser.fraction),
             tintMixRow: try parse("material.tint-mix-row", TokenValueParser.fraction)
         )
+        func motion<T>(_ token: MotionToken, _ parser: (String) -> T?) throws -> T {
+            try parse("motion.\(token.rawValue)", parser)
+        }
         self.motion = MotionTokens(
-            duration: try parse("motion.dur", TokenValueParser.seconds),
-            curve: try parse("motion.ease", TokenValueParser.bezier)
+            duration: try motion(.duration, TokenValueParser.seconds),
+            curve: try motion(.ease, TokenValueParser.bezier),
+            bell: BellMotion(
+                period: try motion(.bellPeriod, TokenValueParser.seconds),
+                rest: try motion(.bellRest, TokenValueParser.fraction),
+                angles: try [MotionToken.bellAngle1, .bellAngle2, .bellAngle3].map {
+                    try motion($0, TokenValueParser.degrees)
+                },
+                pivotFromTop: try motion(.bellPivot, TokenValueParser.fraction),
+                curve: try motion(.bellEase, TokenValueParser.bezier)
+            )
         )
         self.palette = try raw.paletteOrder.map { key in
             PaletteColor(

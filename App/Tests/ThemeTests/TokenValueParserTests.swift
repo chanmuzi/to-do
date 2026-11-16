@@ -11,6 +11,10 @@ import Testing
         #expect(TokenValueParser.fraction("26%") == 0.26)
         #expect(TokenValueParser.seconds("180ms") == 0.18)
         #expect(TokenValueParser.em("-.02em") == -0.02)
+        #expect(TokenValueParser.degrees("14deg") == 14)
+        #expect(TokenValueParser.degrees("-12deg") == -12)
+        #expect(TokenValueParser.degrees("14") == nil)
+        #expect(TokenValueParser.degrees("720deg") == nil)
     }
 
     /// 수처럼 보이지만 값이 아닌 표기와 범위를 벗어난 값은 받지 않는다.

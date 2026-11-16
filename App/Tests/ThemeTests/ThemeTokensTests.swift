@@ -61,7 +61,9 @@ import Testing
         #expect(Set(try section("space").keys) == Set(SpaceToken.allCases.map(\.rawValue)))
         #expect(Set(try section("shape").keys) == Set(ShapeToken.allCases.map(\.rawValue)))
         #expect(Set(try section("component").keys)
-            == Set(ComponentToken.allCases.map(\.rawValue)).union(["doc-pad"]))
+            == Set(ComponentToken.allCases.map(\.rawValue))
+            .union(RatioToken.allCases.map(\.rawValue)).union(["doc-pad"]))
+        #expect(Set(try section("motion").keys) == Set(MotionToken.allCases.map(\.rawValue)))
         #expect(Set(try section("fonts").keys) == Set(FontRole.allCases.map(\.rawValue)))
 
         #expect(tokens.space(.sp4) == 16)
@@ -73,6 +75,23 @@ import Testing
         #expect(tokens.material == MaterialTokens(opacity: 0.92, blur: 24, tintMix: 0.26, tintMixRow: 0.18))
         #expect(tokens.motion.duration == 0.18)
         #expect(tokens.motion.curve == BezierCurve(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1))
+    }
+
+    /// 종 흔들림(spec 15)과 노트 높이 한도(spec 5.6)는 토큰에서 온다.
+    @Test func bellMotionAndHeightLimitComeFromTheFile() {
+        let bell = tokens.motion.bell
+        #expect(bell.period == 1.6)
+        #expect(bell.rest == 0.6)
+        #expect(bell.angles == [14, -12, 6])
+        #expect(bell.pivotFromTop == 0.12)
+        #expect(bell.curve == BezierCurve(x1: 0.42, y1: 0, x2: 0.58, y2: 1))
+        // 뒤 40%에서만 흔들린다: 60%까지 0도, 그 뒤 10%마다 14, -12, 6도, 끝에서 0도.
+        let frames = bell.keyframes
+        #expect(frames.map(\.degrees) == [0, 0, 14, -12, 6, 0])
+        for (time, expected) in zip(frames.map(\.time), [0, 0.6, 0.7, 0.8, 0.9, 1]) {
+            #expect(abs(time - expected) < 1e-9)
+        }
+        #expect(tokens.ratio(.noteMaxScreenHeight) == 0.7)
     }
 
     @Test func textStylesFollowTheTypeScale() {

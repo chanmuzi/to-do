@@ -25,7 +25,8 @@ public protocol NoteStoring: AnyObject {
     @discardableResult func update(_ id: NoteID, _ mutate: (inout Note) -> Void) throws -> Note
     /// 지금 값에 `mutate`를 적용하고 잠시 뒤에 쓴다(자동 저장). 돌려주는 값은 적용한 뒤의 지금 값.
     /// 마지막 호출 뒤 기본 0.5초, 계속 고치는 중이어도 첫 변경 뒤 기본 3초 안에 쓴다.
-    /// 쓰다가 실패하면 `StoreChange.Kind.saveFailed`, 충돌이면 `.conflict`로 알리고 변경은 남겨 둔다.
+    /// 쓰다가 실패하면 `StoreChange.Kind.saveFailed`, 충돌이면 `.conflict`, 그사이 파일이 없어졌으면
+    /// `.removed`(`.external`)로 알리고 변경은 남겨 둔다.
     /// - Throws: 노트 폴더에 파일이 없으면 `noteNotFound`.
     @discardableResult func scheduleUpdate(_ id: NoteID, _ mutate: (inout Note) -> Void) throws -> Note
     /// 미뤄 둔 변경을 지금 모두 쓴다. 창을 닫거나 앱을 끝낼 때 부른다.
@@ -34,6 +35,12 @@ public protocol NoteStoring: AnyObject {
     /// 충돌(`conflict`)을 푼다. `.mine`은 저장소가 들고 있는 변경을 디스크 위에 쓰고,
     /// `.disk`는 그 변경을 버리고 디스크 내용을 받아들인다. 돌려주는 값은 푼 뒤의 노트.
     @discardableResult func resolveConflict(_ id: NoteID, keeping side: ConflictSide) throws -> Note
+
+    /// 아직 디스크에 쓰지 않은 변경이 있는지. 저장 실패, 충돌, 없어진 파일 때문에 남은 것도 센다.
+    func hasPendingChanges(_ id: NoteID) -> Bool
+    /// 쓰지 않은 변경을 버린다. 알리지 않는다. 파일이 없어진 노트(`.removed`/`.external` 뒤에도
+    /// 변경은 남아 있다)를 정리할 때 쓴다. 파일이 남아 있는 노트의 충돌은 `resolveConflict(_:keeping: .disk)`로 푼다.
+    func discardPendingChanges(_ id: NoteID)
 
     /// 미뤄 둔 변경을 먼저 쓰고 휴지통으로 옮긴다. 그 쓰기가 실패하면 옮기지 않고 던진다.
     /// 휴지통에 같은 이름의 파일이 있으면 그 옛 파일을 `<id>-2.md`처럼 옆으로 옮겨 둘 다 남긴다.

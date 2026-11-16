@@ -16,6 +16,7 @@
 | 라이브러리 줄 제목 | Pretendard | `fs-row` 12.5px / `lh-row` 18px | `fw-title` 600 |
 | 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 11.5px / `lh-ui` 16px | `fw-body` 400 |
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui` 400 |
+| 임박한 리마인더 | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui-strong` 700 |
 | 날짜, 보조 숫자 | D2Coding | `fs-micro` 11px / `lh-micro` 14px | `fw-ui` 400 |
 | 인라인 코드 | D2Coding | `fs-code` 12px / `lh-body` 20px | `fw-body` 400 |
 | 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 20px | `fw-body` 400 |
@@ -107,6 +108,13 @@
 | 구성 요소 | `icon-btn` | `20px` | 테두리 없는 아이콘 버튼 크기 |
 | 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 약 13pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |
+| 구성 요소 | `chrome-gap` | `6px` | 노트 상단 줄의 요소 사이 |
+| 구성 요소 | `chrome-pad-end` | `6px` | 노트 상단 줄의 오른쪽 여백 (왼쪽은 `sp-3`) |
+| 구성 요소 | `icon-s`, `icon-m`, `icon-l` | `12px`, `13px`, `14px` | 선 아이콘 크기 (18.2의 표) |
+| 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
+| 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
+| 구성 요소 | `menu-w` | `210px` | 메뉴 최소 너비 |
+| 구성 요소 | `note-w`, `note-w-min`, `note-w-max` | `340px`, `260px`, `560px` | 노트 창 너비: 기본, 최소, 최대 (가정) |
 | 재질 | `opacity` | `.92` | 창 불투명도 (포커스와 상관없이 같음) |
 | 재질 | `blur` | `24px` | 배경 흐림 반경 |
 | 재질 | `tint-mix` | `26%` | 노트 바탕에 팔레트 색을 섞는 비율 |

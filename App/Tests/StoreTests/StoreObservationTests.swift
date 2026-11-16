@@ -102,6 +102,52 @@ import Models
         #expect(try store.load(note.id).body == "쓰지 못할 글")
     }
 
+    /// 자동 저장을 쓰려는 사이에 파일이 지워졌으면 저장 실패가 아니라 없어진 것으로 한 번만 알린다.
+    @Test func scheduledSaveOfAVanishedNoteIsReportedAsRemovedAndKeepsTheEdit() async throws {
+        defer { temporary.cleanUp() }
+        let store = try FileNoteStore(location: temporary.location, autosaveDelay: .milliseconds(20))
+        let note = try store.create(NoteDraft(title: "지워질 노트"))
+        var changes: [StoreChange] = []
+        let observation = store.observe { changes.append($0) }
+        defer { observation.cancel() }
+
+        try store.scheduleUpdate(note.id) { $0.body = "지워진 뒤에 남는 글" }
+        try FileManager.default.removeItem(at: temporary.noteFile(note.id.rawValue))
+        let removed = StoreChange(id: note.id, kind: .removed, origin: .external)
+        #expect(await wait { changes.contains(removed) })
+        try store.refresh()
+        try? await Task.sleep(for: .milliseconds(100))
+
+        #expect(changes == [removed])
+        #expect(store.hasPendingChanges(note.id))
+        #expect(try store.load(note.id).body == "지워진 뒤에 남는 글")
+    }
+
+    @Test func pendingChangesOfAVanishedNoteCanBeDiscarded() throws {
+        defer { temporary.cleanUp() }
+        let store = try FileNoteStore(location: temporary.location, autosaveDelay: .seconds(60))
+        let note = try store.create(NoteDraft(title: "지워질 노트"))
+        #expect(!store.hasPendingChanges(note.id))
+        try store.scheduleUpdate(note.id) { $0.body = "쓰지 못한 글" }
+        #expect(store.hasPendingChanges(note.id))
+        try FileManager.default.removeItem(at: temporary.noteFile(note.id.rawValue))
+        try store.refresh()
+        #expect(throws: StoreError.pendingSavesFailed([
+            SaveFailure(id: note.id, title: "지워질 노트", error: .noteNotFound(note.id)),
+        ])) { try store.flushPendingSaves() }
+
+        var changes: [StoreChange] = []
+        let observation = store.observe { changes.append($0) }
+        defer { observation.cancel() }
+        store.discardPendingChanges(note.id)
+
+        #expect(!store.hasPendingChanges(note.id))
+        #expect(changes.isEmpty)
+        try store.flushPendingSaves()
+        #expect(throws: StoreError.noteNotFound(note.id)) { try store.load(note.id) }
+        #expect(!FileManager.default.fileExists(atPath: temporary.noteFile(note.id.rawValue).path))
+    }
+
     @Test func externalChangesAreReported() async throws {
         defer { temporary.cleanUp() }
         let store = try FileNoteStore(location: temporary.location)

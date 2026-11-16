@@ -70,6 +70,15 @@ let package = Package(
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
         .testTarget(name: "StoreTests", dependencies: ["Store", "Models"]),
         .testTarget(name: "RoutingTests", dependencies: ["Routing", "Models"]),
+        .testTarget(
+            name: "NotePanelTests",
+            dependencies: ["NotePanel", "Theme", "Models", "Store", "Routing"]
+        ),
+        .testTarget(
+            name: "FloatingNotesTests",
+            dependencies: ["FloatingNotes", "NotePanel", "Theme", "Models", "Store", "Routing"],
+            swiftSettings: uiSettings
+        ),
         .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
     ],
     swiftLanguageModes: [.v6]

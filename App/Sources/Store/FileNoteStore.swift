@@ -140,6 +140,15 @@ public final class FileNoteStore: NoteStoring {
         }
     }
 
+    public func hasPendingChanges(_ id: NoteID) -> Bool {
+        pending[id] != nil
+    }
+
+    public func discardPendingChanges(_ id: NoteID) {
+        discardPending(id)
+        if !files.noteExists(id, in: location.notesDirectory) { known[id] = nil }
+    }
+
     public func moveToTrash(_ id: NoteID) throws {
         guard files.noteExists(id, in: location.notesDirectory) else { throw StoreError.noteNotFound(id) }
         // 미뤄 둔 변경을 먼저 쓴다. 못 쓰면 옮기지 않는다(휴지통의 노트가 옛 내용이 되지 않게).
@@ -265,6 +274,12 @@ public final class FileNoteStore: NoteStoring {
             try commit(id)
         } catch .conflict {
             emit(StoreChange(id: id, kind: .conflict, origin: .external))
+        } catch .noteNotFound {
+            // 쓰려는 사이에 파일이 없어졌다. 저장 실패가 아니라 없어진 것으로 알린다(변경은 남는다).
+            // 폴더를 훑다가 이미 알렸으면 다시 알리지 않는다.
+            guard snapshot[id] != nil else { return }
+            snapshot[id] = nil
+            emit(StoreChange(id: id, kind: .removed, origin: .external))
         } catch {
             emit(StoreChange(id: id, kind: .saveFailed(message: error.description), origin: .local))
         }

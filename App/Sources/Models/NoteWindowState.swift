@@ -32,10 +32,16 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     public var isPinned: Bool
     /// 지금 창이 떠 있는지. 앱을 다시 켤 때 되살릴 창을 정한다.
     public var isOpen: Bool
+    /// 창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값을 받는다(클수록 앞).
+    /// 앞으로 온 적이 없으면 `nil`. 앱을 다시 켤 때 이 차례대로 되살려 앞뒤를 지킨다.
+    public var stackOrder: Int?
 
-    public init(frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false) {
+    public init(
+        frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false, stackOrder: Int? = nil
+    ) {
         self.frame = frame
         self.isPinned = isPinned
         self.isOpen = isOpen
+        self.stackOrder = stackOrder
     }
 }
