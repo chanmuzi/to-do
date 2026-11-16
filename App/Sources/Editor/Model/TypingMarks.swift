@@ -113,8 +113,22 @@ nonisolated extension EditorCommands {
         let opens = place.opens.joined()
         let closes = place.closes.joined()
         if text.contains("\n") {
-            let wrapped = text.components(separatedBy: "\n")
-                .map { $0.trimmingCharacters(in: .whitespaces).isEmpty ? $0 : opens + $0 + closes }
+            let lines = text.components(separatedBy: "\n")
+            // 첫 줄은 커서 앞의 글에 붙는다. 거기서 기호가 읽히지 않으면(영문자 뒤의 여러 낱말) 그 줄은 감싸지 않는다.
+            let firstIsRead = lines.first.map { first in
+                marksAreRecognized(
+                    doc,
+                    .insert(opens + first + closes, replacing: NSRange(location: place.location, length: 0)),
+                    markers: [
+                        NSRange(location: 0, length: opens.utf16.count),
+                        NSRange(location: opens.utf16.count + first.utf16.count, length: closes.utf16.count),
+                    ]
+                )
+            } ?? true
+            let wrapped = lines.enumerated()
+                .map { index, line in
+                    line.trimmingCharacters(in: .whitespaces).isEmpty || (index == 0 && !firstIsRead) ? line : opens + line + closes
+                }
                 .joined(separator: "\n")
             // 커서를 안에 둔 구간은 `replacing`이 줄바꿈 앞에서 닫고 뒤에서 다시 연다.
             return insert(doc, wrapped, replacing: NSRange(location: place.location, length: 0))

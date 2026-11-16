@@ -72,8 +72,24 @@ extension EditorController {
 
     /// 원문을 바꿔 쓴다. 텍스트 뷰의 편집 경로를 거치므로 되돌리기 한 단계로 기록된다.
     /// 접혀서 감춘 줄에 닿는 편집은 `includesHiddenLines`가 없으면 막힌다(`shouldChangeTextIn`).
-    func apply(_ edit: TextEdit?) {
-        guard let edit, let storage = textView.textStorage, textView.isEditable else { return }
+    /// - Parameter isIntermediate: 곧 이어지는 편집이나 조합이 마무리하는 중간 편집(두 단계로 넣는 서식의 둘째
+    ///   단계, 조합할 자리를 만드는 편집). 그 사이에 잠깐 드러나는 기호는 가리지 않는다.
+    func apply(_ edit: TextEdit?, isIntermediate: Bool = false) {
+        guard var edit, let storage = textView.textStorage, textView.isEditable else { return }
+        // ``` 줄이 짝을 잃는 편집은 그대로 넣지 않는다(어느 길로 들어온 편집이든). 새로 생기는 ``` 를 글자로
+        // 막아 넣을 수 있으면 그렇게 하고, 아니면 넣지 않고 알린다.
+        if !EditorCommands.keepsFencesBalanced(document, edit) {
+            guard let repaired = EditorCommands.escapingNewFences(document, edit) else {
+                onRejectedEdit()
+                return
+            }
+            edit = repaired
+        }
+        // 감춰 둔 기호가 글자로 드러나는 편집도 넣지 않는다(있던 서식을 원문에 적을 수 없게 된다).
+        guard isIntermediate || !EditorCommands.exposesHiddenMarkers(document, edit) else {
+            onRejectedEdit()
+            return
+        }
         let wasApplying = isApplyingEdit
         let allowedHidden = allowsHiddenEdit
         isPlainTyping = false
@@ -85,9 +101,7 @@ extension EditorController {
             allowsHiddenEdit = allowedHidden
         }
         let foldsBefore = folded
-        // ``` 줄이 짝을 잃는 편집은 넣지 않는다(어느 길로 들어온 편집이든).
-        guard EditorCommands.keepsFencesBalanced(document, edit),
-              textView.shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
+        guard textView.shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
         storage.replaceCharacters(in: edit.range, with: NSAttributedString(string: edit.replacement, attributes: baseAttributes))
         // 줄을 옮기는 편집은 접힌 줄 번호를 스스로 정하고, 줄 머리만 바꾸는 편집은 줄 번호가 그대로다.
         if let foldedAfter = edit.foldedAfter ?? (edit.preservesLines ? foldsBefore : nil) {
@@ -140,6 +154,8 @@ extension EditorController {
     /// 원문이 바뀐 것을 바깥에 알린다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는
     /// `setMarkedText` 바로 뒤에 부르고, 그 밖의 경로는 다음 메인 큐 차례에 부른다.
     func flushPendingChange() {
+        // 쌓아 두는 중이거나 텍스트 뷰가 조합을 끝내는 중이면 끝난 뒤에 한 번만 알린다.
+        guard !holdsChangeNotification, !isEndingComposition else { return }
         applyDeferredOutsideEditIfPossible()
         selectionVersion = documentVersion
         // 바깥의 변경을 넣는 중에는 알리지 않는다. 알리지 않은 사용자의 변경은 다음 차례에 나간다.
@@ -236,7 +252,18 @@ extension EditorController: NSTextViewDelegate {
 
     private func finalized(_ outcome: KeyOutcome) -> KeyOutcome {
         guard case .edit(let edit) = outcome else { return outcome }
-        return .edit(EditorCommands.finalized(document, edit))
+        guard let finalized = finalized(edit) else { return .ignore }
+        return .edit(finalized)
+    }
+
+    /// 사용자의 편집을 다듬는다(`EditorCommands.finalized`). 있던 서식 구간을 읽히지 않게 만드는 편집
+    /// (구간 바로 앞에 영문자나 숫자가 붙는다)은 넣지 않고 알린 뒤 `nil`을 돌려준다. 서식을 말없이 풀지 않는다.
+    private func finalized(_ edit: TextEdit) -> TextEdit? {
+        guard !EditorCommands.breaksExistingRun(document, edit) else {
+            onRejectedEdit()
+            return nil
+        }
+        return EditorCommands.finalized(document, edit)
     }
 
     /// 지우려는 줄바꿈 너머가 접힌 줄이면 먼저 편다. 보이지 않는 줄과 합쳐지지 않게 한다.
@@ -284,7 +311,11 @@ extension EditorController: NSTextViewDelegate {
         }
         guard !isApplyingEdit, !isReplayingUndo else { return true }
         // 조합 중에는 원문을 따로 고치지 않는다. 보이지 않는 ``` 줄의 한쪽만 지워지는 편집만 막는다.
-        if textView.hasMarkedText() { return !EditorCommands.breaksCodeFence(document, clamped(range)) }
+        if textView.hasMarkedText() {
+            guard EditorCommands.breaksCodeFence(document, clamped(range)) else { return true }
+            onRejectedEdit()
+            return false
+        }
         let original = clamped(range)
         let text = LineEndings.normalized(replacementString)
         let swallows = swallowsCodeTriggerKey
@@ -296,7 +327,10 @@ extension EditorController: NSTextViewDelegate {
         // 편집의 경계를 감춘 글자(줄 머리, 백슬래시) 밖으로 옮긴다.
         let range = EditorCommands.normalized(document, original, replacement: text)
         // 보이지 않는 ``` 줄의 한쪽만 지워지는 편집은 넣지 않는다(편집 명령은 스스로 맞춰 쓴다).
-        if EditorCommands.breaksCodeFence(document, range) { return false }
+        if EditorCommands.breaksCodeFence(document, range) {
+            onRejectedEdit()
+            return false
+        }
 
         if range.length == 0, !text.isEmpty {
             // 바깥이 줄바꿈 없이 붙인 줄의 끝에 커서가 있다. 이어 치는 글은 새 줄에서 시작한다.
@@ -316,12 +350,12 @@ extension EditorController: NSTextViewDelegate {
                 typingMarks = nil
                 if !text.contains("\n"), text.allSatisfy(\.isWhitespace) {
                     // 공백은 서식 없이 넣고, 서식은 그다음 글자까지 살려 둔다(기호 바로 뒤는 공백일 수 없다).
-                    apply(EditorCommands.finalized(document, .insert(text, replacing: range)))
+                    apply(finalized(.insert(text, replacing: range)))
                     typingMarks = (textView.selectedRange().location, documentVersion, marks)
                     return false
                 }
                 if let edit = EditorCommands.typing(document, text, caret: range.location, marks: marks) {
-                    apply(EditorCommands.finalized(document, edit))
+                    apply(finalized(edit))
                     return false
                 }
             }
@@ -354,19 +388,37 @@ extension EditorController: NSTextViewDelegate {
             }
             // 닫는 기호를 쳐서 그 자리에서 서식이 된다. 되돌리면 친 기호가 글자로 남도록 두 단계로 넣는다.
             if let conversion = EditorCommands.conversion(document, typing: text, at: range.location) {
+                // 바깥에는 서식이 된 마지막 원문만 한 번 알린다.
+                guard let formatted = conversion.formatted else {
+                    // 영문자나 숫자 바로 뒤에서 연 기호는 글자로 친 것으로 본다. 서식으로 바꾸지 않는다.
+                    apply(conversion.literal)
+                    return false
+                }
+                holdsChangeNotification = true
                 apply(conversion.literal)
                 splitUndoRecord()
-                apply(conversion.formatted)
+                holdsChangeNotification = false
+                apply(formatted, isIntermediate: true)
                 return false
             }
         }
         // 감춘 기호가 짝을 잃지 않게 고쳐 쓴다(선택을 지우거나 덮어쓸 때, 구간 안에 여러 줄을 넣을 때).
         let wasAtRunEnd = range.length == 0 && document.line(at: range.location).marker(startingAt: range.location)?.isOpen == false
-        let edit = EditorCommands.finalized(
-            document,
-            EditorCommands.replacing(document, range, with: text) ?? .insert(text, replacing: range)
-        )
-        guard EditorCommands.keepsFencesBalanced(document, edit) else { return false }
+        guard var edit = finalized(EditorCommands.replacing(document, range, with: text) ?? .insert(text, replacing: range)) else {
+            return false
+        }
+        // 새로 생기는 ``` 줄은 글자로 막아 넣는다. 막을 수 없으면 넣지 않고 알린다.
+        if !EditorCommands.keepsFencesBalanced(document, edit) {
+            guard let repaired = EditorCommands.escapingNewFences(document, edit) else {
+                onRejectedEdit()
+                return false
+            }
+            edit = repaired
+        }
+        guard !EditorCommands.exposesHiddenMarkers(document, edit) else {
+            onRejectedEdit()
+            return false
+        }
         let isSpace = range.length == 0 && !text.isEmpty && text.allSatisfy { $0 == " " || $0 == "\t" }
         let plain = TextEdit.insert(replacementString, replacing: original)
         guard edit.range == plain.range, edit.replacement == plain.replacement, edit.selection == plain.selection else {

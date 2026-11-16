@@ -5,8 +5,12 @@ import Foundation
 ///
 /// 기호로 읽는 조건(D-036의 13번). 맞지 않는 기호는 글자 그대로 보인다.
 /// - 여는 기호 바로 뒤와 닫는 기호 바로 앞은 공백이 아니어야 한다(`a == b`, `2 ** 3`, `` ` `` 뒤의 공백).
-/// - `**`, `~~`, `==`: 여는 기호 앞과 닫는 기호 뒤가 둘 다 영문자나 숫자면 낱말 속의 글자로 본다
-///   (`x==1&y==2`, `2**3**4`). 한글은 여기의 영문자나 숫자가 아니다(`**중요**하다`는 굵게다).
+/// - `**`, `~~`, `==`: 영문자나 숫자(ASCII) 바로 뒤의 여는 기호는 글자일 수 있다(`a==b`, `2**3`). 그런 기호가
+///   구간을 여는 것은 닫는 기호 뒤가 영문자나 숫자가 아니고, 사이의 글이 글자와 숫자만으로 된 한 낱말일
+///   때뿐이다(`un**believ**`, `3**개**`). 아니면 그 여는 기호만 글자로 두고 뒤는 다시 읽는다
+///   (`a==b 인지 ==확인==`은 `a==b 인지 ` 뒤에 형광펜 `확인`, `x==1&y==2`와 `2**3**4`는 글자).
+///   여는 기호 앞이 영문자나 숫자가 아니면 닫는 기호 뒤에는 무엇이 와도 된다(`**bold**er`).
+///   한글은 여기의 영문자나 숫자가 아니다(`한글**굵은 글**`, `**중요**하다`는 굵게다).
 /// - `\` 뒤의 `*`, `=`, `~`, `` ` ``, `[`, `]`, `\`는 그 글자 그대로다. 백슬래시는 보이지 않고 원문에 남는다.
 ///   인라인 코드 안에서는 백슬래시도 글자다.
 nonisolated enum InlineParser {
@@ -107,17 +111,28 @@ nonisolated enum InlineParser {
                         kind = .highlight(1)
                     }
                 }
-                // 앞뒤가 모두 영문자나 숫자에 붙어 있으면 낱말 속의 글자다. 두 기호 모두 글자로 둔다.
-                let glued = i > lineStart && isWordCharacter(u[i - 1]) && spanEnd < end && isWordCharacter(u[spanEnd])
-                if !glued {
-                    spans.append(InlineSpan(
-                        kind: kind,
-                        range: NSRange(location: i, length: spanEnd - i),
-                        contentRange: NSRange(location: i + 2, length: close - i - 2)
-                    ))
+                // 영문자나 숫자 바로 뒤의 여는 기호는 글자일 수 있다(`a==b`, `2**3`). 구간으로 읽는 것은 닫는 기호
+                // 뒤가 영문자나 숫자가 아니고 사이의 글이 한 낱말일 때뿐이다(`un**believ**`). 아니면 여는 기호를
+                // 글자로 두고 그 뒤부터 다시 읽는다(`a==b 인지 ==확인==`의 `==확인==`은 형광펜이다).
+                if i > lineStart, isWordCharacter(u[i - 1]) {
+                    if spanEnd < end, isWordCharacter(u[spanEnd]) {
+                        // 양쪽 모두 붙었다. 두 기호 모두 글자다.
+                        scan(u, from: i + 2, to: close, lineStart: lineStart, into: &spans)
+                        i = close + 2
+                        continue
+                    }
+                    if !isSingleWord(u, from: i + 2, to: close) {
+                        i += 2
+                        continue
+                    }
                 }
+                spans.append(InlineSpan(
+                    kind: kind,
+                    range: NSRange(location: i, length: spanEnd - i),
+                    contentRange: NSRange(location: i + 2, length: close - i - 2)
+                ))
                 scan(u, from: i + 2, to: close, lineStart: lineStart, into: &spans)
-                i = glued ? close + 2 : spanEnd
+                i = spanEnd
                 continue
             }
             if c == leftBracket,
@@ -177,6 +192,17 @@ nonisolated enum InlineParser {
         return (1...4).contains(digit) ? digit : nil
     }
 
+    /// 글자와 숫자만으로 된 글인지(한글 등 다른 문자의 글자도 글자다). 공백, 문장 부호, 연산 기호가 없다.
+    /// 안에 겹친 서식의 기호(`*`, `~`, `=`, 백틱, 백슬래시)는 있어도 된다(`a==**굵게**==`).
+    private static func isSingleWord(_ u: [unichar], from start: Int, to end: Int) -> Bool {
+        start < end && !(start..<end).contains { index in
+            if u[index] == star || u[index] == tilde || u[index] == equals || u[index] == backtick || u[index] == backslash { return false }
+            guard let scalar = UnicodeScalar(u[index]) else { return true }
+            return !CharacterSet.alphanumerics.contains(scalar)
+        }
+    }
+
+    /// 영문자나 숫자(ASCII)인지.
     static func isWordCharacter(_ c: unichar) -> Bool {
         (0x30...0x39).contains(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c)
     }

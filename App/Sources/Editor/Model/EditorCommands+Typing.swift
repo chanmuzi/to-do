@@ -7,9 +7,13 @@ nonisolated extension EditorCommands {
     /// 닫는 기호의 마지막 글자를 쳐서 그 자리에서 서식이 되는 입력. 두 번의 편집으로 넣는다:
     /// 먼저 친 기호를 백슬래시로 막은 글자로(`literal`), 이어서 서식으로(`formatted`). 그래서 바로 되돌리면
     /// 친 글자가 글자 그대로 남고(다시 서식이 되지 않는다), 한 번 더 되돌리면 마지막에 친 글자가 지워진다.
+    ///
+    /// 여는 기호가 영문자나 숫자 바로 뒤에 있으면(`a==b==`, `2**3**`, `un**believ**`) 서식으로 바꾸지 않는다:
+    /// 글자로 친 기호일 수 있다. 막은 글자로만 넣어(`formatted`가 `nil`) 친 그대로 보이게 한다. 그런 자리의
+    /// 서식은 단축키로 건다.
     struct Conversion: Equatable, Sendable {
         var literal: TextEdit
-        var formatted: TextEdit
+        var formatted: TextEdit?
     }
 
     private static let closers: Set<Character> = ["*", "~", "=", "`", ")"]
@@ -49,12 +53,20 @@ nonisolated extension EditorCommands {
             replacement: literalText,
             selection: NSRange(location: start + literalText.utf16.count, length: 0)
         )
+        // 영문자나 숫자 바로 뒤에서 연 구간: 굵게, 취소선, 형광펜만 해당한다.
+        let opensAfterWord = span.kind != .code && !isLink(span.kind) && span.range.location > line.contentStart - line.start
+            && InlineParser.isWordCharacter(source.character(at: span.range.location - 1))
+        guard !opensAfterWord else { return Conversion(literal: literal, formatted: nil) }
         let formatted = TextEdit(
             range: NSRange(location: start, length: literalText.utf16.count),
             replacement: source.substring(with: span.range),
             selection: NSRange(location: start + span.range.length, length: 0)
         )
         return Conversion(literal: literal, formatted: formatted)
+    }
+
+    private static func isLink(_ kind: InlineSpan.Kind) -> Bool {
+        if case .link = kind { true } else { false }
     }
 
     private static func sameFormat(_ a: InlineSpan.Kind, _ b: InlineSpan.Kind) -> Bool {

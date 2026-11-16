@@ -122,7 +122,7 @@ import Testing
         history.undoStack = [record(2, "", "ab"), record(10, "x", "")]
         history.redoStack = [record(20, "", "z")]
         // 위치 5에 세 글자가 끼어든다.
-        history.shift(outside: NSRange(location: 5, length: 0), delta: 3)
+        history.shift(outside: NSRange(location: 5, length: 0), delta: 3, documentLength: 40)
         #expect(history.undoStack.map { $0.edits[0].location } == [2, 13])
         #expect(history.redoStack.map { $0.edits[0].location } == [23])
     }
@@ -130,7 +130,7 @@ import Testing
     @Test func overlappingRecordAndOlderOnesAreDropped() {
         var history = UndoHistory()
         history.undoStack = [record(0, "", "오래된"), record(10, "", "abcd"), record(30, "", "새")]
-        history.shift(outside: NSRange(location: 11, length: 2), delta: 0)
+        history.shift(outside: NSRange(location: 11, length: 2), delta: 0, documentLength: 40)
         #expect(history.undoStack.map { $0.edits[0].new } == ["새"])
     }
 

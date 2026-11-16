@@ -1,6 +1,6 @@
 import Foundation
 
-// 사용자의 편집이 원문에 들어가기 전에 거치는 확인과 다듬기. 감춘 글자(줄 머리, 백슬래시, ``` 줄)는
+// 사용자의 편집이 원문에 들어가기 전에 거치는 확인과 다듬기. 감춘 글자(줄 머리, 백슬래시)는
 // 화면에 보이지 않으므로, 편집의 경계가 그 한가운데에 놓이거나 한쪽만 지워지지 않게 한다.
 
 nonisolated extension EditorCommands {
@@ -55,75 +55,118 @@ nonisolated extension EditorCommands {
         return result
     }
 
-    // MARK: 코드 블록의 짝
-
-    /// 닫는 줄이 없는 코드 블록이 있는지.
-    static func hasUnterminatedFence(_ doc: MarkdownDocument) -> Bool {
-        guard let last = doc.lines.last, let block = last.codeBlock else { return false }
-        return last.kind != .fenceClose || block.lowerBound == block.upperBound
-    }
-
-    /// 그 편집을 넣어도 ``` 줄의 짝이 맞는지. 닫히지 않은 블록이 새로 생기는 편집은 넣지 않는다
-    /// (``` 줄은 보이지 않아서, 짝을 잃으면 그 아래의 글이 모두 코드로 뒤집히고 사용자는 까닭을 볼 수 없다).
-    /// 이미 닫히지 않은 블록이 있는 문서(다른 프로그램이 쓴 파일)에서는 막지 않는다.
-    static func keepsFencesBalanced(_ doc: MarkdownDocument, _ edit: TextEdit) -> Bool {
-        let lines = doc.lineIndex(at: edit.range.location)...doc.lineIndex(at: NSMaxRange(edit.range))
-        let backtick: unichar = 0x60
-        let touchesBacktick = edit.replacement.utf16.contains(backtick) || lines.contains { index in
-            let line = doc.lines[index]
-            return line.kind.isCode || (line.start..<line.end).contains { doc.units[$0] == backtick }
-        }
-        guard touchesBacktick, !hasUnterminatedFence(doc) else { return true }
-        return !hasUnterminatedFence(MarkdownDocument(edit.applied(to: doc.text)))
-    }
-
     // MARK: 편집 뒤 다듬기
 
     /// 편집의 결과를 다듬는다.
     ///
     /// - 지운 뒤에 줄 맨 앞에 남은 공백은 함께 지운다. 그대로 두면 그 공백이 감춘 들여쓰기가 된다.
     /// - 편집으로 맞붙은 같은 서식의 구간(`**ab****cd**`)은 하나로 합친다.
+    /// - 붙여 넣는 글의 서식이 그 자리에서 읽히지 않으면 기호를 벗긴다.
+    ///
+    /// 있던 구간을 읽히지 않게 만드는 편집은 다듬지 않는다. 넣기 전에 `breaksExistingRun`으로 가려 넣지 않는다.
     static func finalized(_ doc: MarkdownDocument, _ edit: TextEdit) -> TextEdit {
-        mergingAdjacentRuns(doc, unformattingBrokenRuns(doc, movingEdgeWhitespaceOut(doc, trimmingExposedIndent(doc, edit))))
+        mergingAdjacentRuns(doc, unformattingUnreadablePaste(doc, movingEdgeWhitespaceOut(doc, trimmingExposedIndent(doc, edit))))
     }
 
-    /// 편집 때문에 있던 구간의 기호가 더는 기호로 읽히지 않게 되면(구간 바로 옆에 영문자를 쳐서 낱말 속이 된
-    /// 경우 등) 그 구간의 기호를 지운다. 그대로 두면 감춰 있던 기호가 글자로 드러난다. 서식은 풀리고 글은 남는다.
-    /// 사용자가 일부러 글자로 만든 경우(백슬래시로 막거나 인라인 코드로 감쌈)는 건드리지 않는다.
-    private static func unformattingBrokenRuns(_ doc: MarkdownDocument, _ edit: TextEdit) -> TextEdit {
+    /// 편집 때문에 있던 구간의 기호가 더는 기호로 읽히지 않게 되는지: 구간 바로 앞에 영문자나 숫자가 붙는 편집
+    /// (`foo **bar**`에서 공백을 지움, `**bar**` 바로 앞에 `a`를 침). 그 구간은 원문에 적을 길이 없다(`foo**bar**`는
+    /// `a==b`와 같은 표기라 글자로 읽힌다). 기호를 지워 서식을 말없이 풀지도, 기호를 글자로 드러내지도 않고
+    /// 그 편집을 넣지 않는다(편집기가 알림음을 낸다). 사용자가 일부러 글자로 만든 경우(백슬래시로 막거나
+    /// 인라인 코드로 감쌈)는 해당하지 않는다.
+    static func breaksExistingRun(_ doc: MarkdownDocument, _ edit: TextEdit) -> Bool {
+        let shaped = movingEdgeWhitespaceOut(doc, trimmingExposedIndent(doc, edit))
+        return !(unreadableMarkers(doc, shaped, existing: true)?.markers.isEmpty ?? true)
+    }
+
+    /// 편집에 닿지 않은 감춘 기호가 편집 뒤에 글자로 드러나는지. 어느 길로 들어온 편집이든 본다: 구간 안의 글이
+    /// 바뀌어 그 구간이 읽히지 않게 되는 경우(영문자 뒤에서 연 한 낱말짜리 구간에 낱말을 더함)도 여기서 걸린다.
+    /// 그런 편집은 넣지 않는다. 코드 블록이 되는 줄의 기호는 글자로 보이는 것이 맞다.
+    static func exposesHiddenMarkers(_ doc: MarkdownDocument, _ edit: TextEdit) -> Bool {
+        let editEnd = NSMaxRange(edit.range)
+        var hidden: [Int] = []
+        for index in doc.lineIndex(at: edit.range.location)...doc.lineIndex(at: editEnd) {
+            let line = doc.lines[index]
+            guard !line.kind.isCode else { continue }
+            for span in line.markedSpans where span.kind != .escape {
+                for marker in [span.openMarker, span.closeMarker] {
+                    hidden += (marker.location..<NSMaxRange(marker)).filter { $0 < edit.range.location || $0 >= editEnd }
+                }
+            }
+        }
+        guard !hidden.isEmpty else { return false }
+        let delta = edit.replacement.utf16.count - edit.range.length
+        let result = MarkdownDocument(edit.applied(to: doc.text))
+        return hidden.contains { position in
+            let moved = position < edit.range.location ? position : position + delta
+            let line = result.line(at: moved)
+            guard !line.kind.isCode, moved >= line.contentStart else { return false }
+            return !line.markers.contains { NSLocationInRange(moved, $0.range) }
+        }
+    }
+
+    /// 붙여 넣는 글이 제 안에 가진 서식이 넣은 자리에서 읽히지 않으면(영문자 바로 뒤에 붙인 `**글**`) 그 기호를
+    /// 벗기고 글자만 넣는다. 그대로 두면 기호가 글자로 드러난다. 있던 구간은 건드리지 않는다(`breaksExistingRun`).
+    private static func unformattingUnreadablePaste(_ doc: MarkdownDocument, _ edit: TextEdit) -> TextEdit {
+        guard let found = unreadableMarkers(doc, edit, existing: false), !found.markers.isEmpty else { return edit }
+        var text = found.newText as NSString
+        var selection = edit.selection
+        for marker in found.markers.sorted(by: { $0.location > $1.location }) {
+            text = text.replacingCharacters(in: marker, with: "") as NSString
+            let at = found.lineRange.location + marker.location
+            func move(_ position: Int) -> Int {
+                position >= at + marker.length ? position - marker.length : min(position, at)
+            }
+            let start = move(selection.location)
+            selection = NSRange(location: start, length: max(0, move(NSMaxRange(selection)) - start))
+        }
+        var result = edit
+        result.range = found.lineRange
+        result.replacement = text as String
+        result.selection = selection
+        return result
+    }
+
+    /// 편집 뒤에 기호로 읽히지 않고 글자로 드러나는 기호들(편집 뒤의 줄 안 위치).
+    /// - Parameter existing: `true`면 편집에 닿지 않은 있던 구간의 기호를, `false`면 넣는 글 안의 구간의 기호를 본다.
+    private static func unreadableMarkers(
+        _ doc: MarkdownDocument, _ edit: TextEdit, existing: Bool
+    ) -> (markers: [NSRange], newText: String, lineRange: NSRange)? {
         let line = doc.line(at: edit.range.location)
         let endLine = doc.line(at: NSMaxRange(edit.range))
-        guard !line.kind.isCode, !endLine.kind.isCode, !edit.replacement.contains("\n") else { return edit }
+        guard !line.kind.isCode, !endLine.kind.isCode, !edit.replacement.contains("\n") else { return nil }
         let editEnd = NSMaxRange(edit.range)
         let delta = edit.replacement.utf16.count - edit.range.length
         // 편집 뒤에 한 줄이 되는 범위(줄을 합치는 편집이면 두 줄).
         let lineRange = NSRange(location: line.start, length: endLine.end - line.start)
-        // 편집에 닿지 않은 기호를 가진 구간들. 기호의 자리를 편집 뒤의 줄 안 위치로 옮겨 본다.
-        func mapped(_ marker: NSRange) -> NSRange? {
-            if NSMaxRange(marker) <= edit.range.location { return NSRange(location: marker.location - line.start, length: marker.length) }
-            if marker.location >= editEnd { return NSRange(location: marker.location - line.start + delta, length: marker.length) }
-            return nil
-        }
-        let spans = line.start == endLine.start ? line.markedSpans : line.markedSpans + endLine.markedSpans
-        let kept: [(open: NSRange, close: NSRange)] = spans.compactMap { span in
-            guard let open = mapped(span.openMarker), let close = mapped(span.closeMarker) else { return nil }
-            return (open, close)
-        }
         let local = NSRange(location: edit.range.location - line.start, length: edit.range.length)
-        // 넣는 글(붙여 넣은 글)이 제 안에 가진 구간들도 넣은 자리에서 기호로 읽혀야 한다.
-        let inserted: [(open: NSRange, close: NSRange)] = edit.replacement.utf16.count < 2 ? [] :
-            (MarkdownDocument("\u{200B}" + edit.replacement).lines.first?.markedSpans ?? []).map { span in
-                let shift = local.location - 1
-                return (
-                    NSRange(location: span.openMarker.location + shift, length: span.openMarker.length),
-                    NSRange(location: span.closeMarker.location + shift, length: span.closeMarker.length)
-                )
+        let expected: [(open: NSRange, close: NSRange)]
+        if existing {
+            // 편집에 닿지 않은 기호를 가진 구간들. 기호의 자리를 편집 뒤의 줄 안 위치로 옮겨 본다.
+            func mapped(_ marker: NSRange) -> NSRange? {
+                if NSMaxRange(marker) <= edit.range.location { return NSRange(location: marker.location - line.start, length: marker.length) }
+                if marker.location >= editEnd { return NSRange(location: marker.location - line.start + delta, length: marker.length) }
+                return nil
             }
-        let expected = kept + inserted
-        guard !expected.isEmpty else { return edit }
+            let spans = line.start == endLine.start ? line.markedSpans : line.markedSpans + endLine.markedSpans
+            expected = spans.compactMap { span in
+                guard let open = mapped(span.openMarker), let close = mapped(span.closeMarker) else { return nil }
+                return (open, close)
+            }
+        } else {
+            // 넣는 글(붙여 넣은 글)이 제 안에 가진 구간들도 넣은 자리에서 기호로 읽혀야 한다.
+            expected = edit.replacement.utf16.count < 2 ? [] :
+                (MarkdownDocument("\u{200B}" + edit.replacement).lines.first?.markedSpans ?? []).map { span in
+                    let shift = local.location - 1
+                    return (
+                        NSRange(location: span.openMarker.location + shift, length: span.openMarker.length),
+                        NSRange(location: span.closeMarker.location + shift, length: span.closeMarker.length)
+                    )
+                }
+        }
+        guard !expected.isEmpty else { return nil }
         let newText = (doc.string(in: lineRange) as NSString).replacingCharacters(in: local, with: edit.replacement)
         let parsed = MarkdownDocument(newText)
-        guard parsed.lines.count == 1, let newLine = parsed.lines.first, newLine.kind == line.kind else { return edit }
+        guard parsed.lines.count == 1, let newLine = parsed.lines.first, newLine.kind == line.kind else { return nil }
         let live = newLine.markedSpans
         // 기호가 아니라 글자로 보이는 자리인지: 감춘 기호도, 인라인 코드의 글도, 막은 글자도 아니다.
         func isLiteral(_ marker: NSRange) -> Bool {
@@ -134,29 +177,13 @@ nonisolated extension EditorCommands {
                 }
             }
         }
-        var removed: [NSRange] = []
+        var markers: [NSRange] = []
         for span in expected {
             if live.contains(where: { $0.openMarker == span.open && $0.closeMarker == span.close }) { continue }
             guard span.open.length > 0, span.close.length > 0, isLiteral(span.open), isLiteral(span.close) else { continue }
-            removed += [span.open, span.close]
+            markers += [span.open, span.close]
         }
-        guard !removed.isEmpty else { return edit }
-        var text = newText as NSString
-        var selection = edit.selection
-        for marker in removed.sorted(by: { $0.location > $1.location }) {
-            text = text.replacingCharacters(in: marker, with: "") as NSString
-            let at = line.start + marker.location
-            func move(_ position: Int) -> Int {
-                position >= at + marker.length ? position - marker.length : min(position, at)
-            }
-            let start = move(selection.location)
-            selection = NSRange(location: start, length: max(0, move(NSMaxRange(selection)) - start))
-        }
-        var result = edit
-        result.range = lineRange
-        result.replacement = text as String
-        result.selection = selection
-        return result
+        return (markers, newText, lineRange)
     }
 
     /// 편집으로 서식 구간의 글이 공백으로 시작하거나 끝나게 되면(`**가 **`), 그 공백을 기호 밖으로 옮긴다

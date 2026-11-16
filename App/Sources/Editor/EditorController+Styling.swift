@@ -69,7 +69,11 @@ extension EditorController: NSTextStorageDelegate {
             return
         }
         // 미뤄 둔 바깥의 변경이 가리키는 자리를 이 편집만큼 옮긴다.
-        deferredOutsideEdit?.shift(editedRange: editedRange, delta: delta)
+        // 조합 중인 글자보다 앞에 있는 변경은 조합이 바꾸는 글에 밀리지 않는다(같은 자리에 넣는 글자도 그 뒤다).
+        if let deferred = deferredOutsideEdit,
+           !(deferredEditPrecedesComposition && editedRange.location >= NSMaxRange(deferred.range) && NSMaxRange(editedRange) - delta >= NSMaxRange(deferred.range)) {
+            deferredOutsideEdit?.shift(editedRange: editedRange, delta: delta)
+        }
         if foldsBeforeEdit == nil { foldsBeforeEdit = folded }
         folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
         if isReplayingUndo {

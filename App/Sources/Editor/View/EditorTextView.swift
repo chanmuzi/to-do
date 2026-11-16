@@ -42,9 +42,28 @@ final class EditorTextView: NSTextView {
     }
 
     override func resignFirstResponder() -> Bool {
-        let accepted = super.resignFirstResponder()
+        // 조합 중에 포커스를 잃으면 텍스트 뷰가 조합을 끝낸다. `unmarkText`와 같게 다룬다.
+        let wasComposing = hasMarkedText()
+        let accepted = endingComposition { super.resignFirstResponder() }
+        if accepted, hasMarkedText() {
+            // 입력기가 끝내 주지 않았으면 조합 중인 글자를 그대로 확정한다(포커스가 없는 뷰에 조합이 남지 않게).
+            inputContext?.discardMarkedText()
+            unmarkText()
+        } else if wasComposing {
+            editor?.flushPendingChange()
+            editor?.compositionDidChange()
+        }
         if accepted { editor?.focusDidChange() }
         return accepted
+    }
+
+    /// 텍스트 뷰가 조합을 끝내는 동안에는 조합 중인 글자가 잠깐 비어 보인다(지웠다가 다시 넣는다). 그 사이에
+    /// 편집기가 "조합이 글자 없이 끝났다"로 보고 기호를 치우거나 중간 원문을 알리지 않게 한다.
+    private func endingComposition<T>(_ body: () -> T) -> T {
+        let wasEnding = editor?.isEndingComposition ?? false
+        editor?.isEndingComposition = true
+        defer { editor?.isEndingComposition = wasEnding }
+        return body()
     }
 
     override func viewDidMoveToWindow() {
@@ -101,7 +120,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func unmarkText() {
-        super.unmarkText()
+        endingComposition { super.unmarkText() }
         editor?.flushPendingChange()
         editor?.compositionDidChange()
     }

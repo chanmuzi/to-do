@@ -87,18 +87,27 @@ extension EditorController {
         guard let storage = textView.textStorage, textView.isEditable, !isReplayingUndo else { return }
         if textView.hasMarkedText() { textView.unmarkText() }
         closeUndoRecord()
-        guard var record = redo ? history.redoStack.popLast() : history.undoStack.popLast() else { return }
+        guard var record = redo ? history.redoStack.last : history.undoStack.last else { return }
+        // 적어 둔 글이 그 자리에 그대로 있을 때만 쓴다. 어긋난 단계를 쓰면 엉뚱한 글을 지우거나 엉뚱한 자리에
+        // 글을 넣는다. 있어서는 안 되는 일이므로 알리고(디버그 빌드는 멈춘다), 원문은 건드리지 않고 기록을 버린다.
+        guard UndoHistory.matches(record, in: document.text, redo: redo) else {
+            history = UndoHistory()
+            onReplayMismatch("되돌리기 기록이 원문과 어긋났다(\(redo ? "다시 하기" : "되돌리기")). 기록을 버린다")
+            return
+        }
+        if redo { history.redoStack.removeLast() } else { history.undoStack.removeLast() }
         if linkSession != nil { cancelLinkEditing() }
         typingMarks = nil
         pendingPair = nil
+        pendingAbsorb = nil
+        absorbRun = nil
         codeTag = nil
         swallowsCodeTriggerKey = false
         undoWillReplay()
         for edit in redo ? record.edits : record.edits.reversed() {
             let range = NSRange(location: edit.location, length: redo ? edit.oldLength : edit.newLength)
             let text = redo ? edit.new : edit.old
-            guard NSMaxRange(range) <= storage.length,
-                  textView.shouldChangeText(in: range, replacementString: text) else { continue }
+            guard textView.shouldChangeText(in: range, replacementString: text) else { continue }
             storage.replaceCharacters(in: range, with: NSAttributedString(string: text, attributes: baseAttributes))
         }
         if redo {
@@ -106,7 +115,7 @@ extension EditorController {
                 record.foldsBefore = foldsBeforeUndo ?? folded
                 pendingFoldRestore = target
             }
-            history.undoStack.append(record)
+            history.pushUndo(record)
         } else {
             if let target = record.foldsBefore {
                 record.foldsAfter = foldsBeforeUndo ?? folded

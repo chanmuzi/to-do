@@ -75,17 +75,21 @@ nonisolated extension EditorCommands {
         let line = doc.lines[index]
         if line.kind == .code {
             let typed = NSRange(location: line.start + line.indentLength, length: 2)
-            guard position == line.end, NSMaxRange(typed) == line.end, doc.string(in: typed) == "``" else { return nil }
+            // 백틱 둘의 앞, 사이, 뒤 어디에 쳐도 그 줄은 ``` 가 된다.
+            guard NSLocationInRange(position, NSRange(location: typed.location, length: 3)),
+                  NSMaxRange(typed) == line.end, doc.string(in: typed) == "``" else { return nil }
             // 친 백틱 둘을 지운 빈 줄에서 나간다.
             let erase = TextEdit(range: typed, replacement: "", selection: NSRange(location: typed.location, length: 0))
             let middle = MarkdownDocument(erase.applied(to: doc.text))
             guard let exit = exitingCodeLine(middle, lineIndex: index) else { return nil }
             return compose(erase, then: exit, middle: middle)
         }
-        guard !line.kind.isCode, position == line.contentStart + 2,
+        // 백틱 둘의 앞, 사이, 뒤 어디에 쳐도 줄 머리가 ``` 가 된다(세 번째 백틱).
+        guard !line.kind.isCode, line.contentStart + 2 <= line.end,
+              NSLocationInRange(position, NSRange(location: line.contentStart, length: 3)),
               doc.string(in: NSRange(location: line.contentStart, length: 2)) == "``" else { return nil }
         let indent = doc.string(in: line.indentRange)
-        let rest = doc.string(in: NSRange(location: position, length: line.end - position))
+        let rest = doc.string(in: NSRange(location: line.contentStart + 2, length: line.end - line.contentStart - 2))
         let head = indent + "```\n" + indent
         return TextEdit(
             range: line.range,
@@ -140,9 +144,10 @@ nonisolated extension EditorCommands {
 
     /// 세 번째 백틱으로 블록을 만든 바로 뒤에 낱말 하나를 치고 Return을 눌렀다. 그 낱말을 여는 줄의 언어
     /// 이름으로 옮긴다(` ```swift ` 를 치는 손의 움직임 그대로). 블록의 첫 줄이 친 낱말 그대로이고 커서가
-    /// 그 끝에 있을 때만이다. 해당하지 않으면 `nil`.
+    /// 그 끝에 있을 때만이다. 아는 언어 이름(`CodeLanguages`)만 옮긴다. 다른 낱말은 코드 줄로 남는다(`ls`,
+    /// `main` 같은 한 낱말짜리 코드가 보이지 않는 이름이 되지 않게). 해당하지 않으면 `nil`.
     static func languageTag(_ doc: MarkdownDocument, selection: NSRange, openLine: Int, typed: String) -> TextEdit? {
-        guard selection.length == 0, isLanguageTag(typed), openLine + 1 < doc.lines.count else { return nil }
+        guard selection.length == 0, isLanguageTag(typed), CodeLanguages.isKnown(typed), openLine + 1 < doc.lines.count else { return nil }
         let open = doc.lines[openLine]
         let first = doc.lines[openLine + 1]
         guard open.kind == .fenceOpen, first.kind == .code, selection.location == first.end,

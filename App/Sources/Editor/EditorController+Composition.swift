@@ -7,7 +7,7 @@ extension EditorController {
     /// 조합이 시작되기 직전. 조합 중에는 원문을 고쳐 쓸 수 없으므로(조합이 끊긴다) 그 전에 자리를 만든다:
     /// 선택을 덮어쓰는 조합이면 선택을 먼저 기호와 함께 지우고, 정해 둔 서식이 있으면 빈 기호 쌍을 넣는다.
     func prepareForComposition() {
-        guard !isApplyingEdit, !isReplayingUndo, textView.isEditable else { return }
+        guard !isApplyingEdit, !isReplayingUndo, !isEndingComposition, textView.isEditable else { return }
         swallowsCodeTriggerKey = false
         codeTag = nil
         let absorb = absorbRun
@@ -48,7 +48,7 @@ extension EditorController {
            let edit = EditorCommands.absorbingIntoRun(document, closeStart: absorb.closeStart, caret: caret.location, text: "") {
             let closes = edit.replacement.utf16.count - (edit.selection.location - edit.range.location)
             let text = edit.replacement as NSString
-            apply(edit)
+            apply(edit, isIntermediate: true)
             pendingAbsorb = (absorb.closeStart, text.substring(to: text.length - closes), text.substring(from: text.length - closes))
             return
         }
@@ -68,6 +68,8 @@ extension EditorController {
     /// 조합이 바뀌거나 끝난 뒤. 조합이 글자 없이 끝났으면 넣어 둔 빈 기호 쌍을 지운다(구간의 글자를 모두
     /// 고르고 조합하다 그만둔 경우도 같다. 다른 지우기처럼 빈 구간의 기호를 함께 지운다).
     func compositionDidChange() {
+        // 텍스트 뷰가 조합을 끝내는 중에는 조합 중인 글자가 잠깐 비어 보인다. 끝난 뒤에 다시 불린다.
+        guard !isEndingComposition else { return }
         closeUndoRecordAfterCompositionIfNeeded()
         guard !textView.hasMarkedText(), !isApplyingEdit, !isReplayingUndo else { return }
         if let absorb = pendingAbsorb {

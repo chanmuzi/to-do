@@ -52,6 +52,8 @@ final class EditorController: NSObject {
     /// 바깥이 바꿨지만 아직 화면에 넣지 않은 부분. 한글을 조합하는 중이면 조합이 끝날 때까지 미룬다
     /// (`applyOutsideChange`). 그동안에도 원문(`text`)과 바깥에 알리는 글에는 들어 있다.
     var deferredOutsideEdit: OutsideEdit?
+    /// 미뤄 둔 변경이 조합 중인 글자보다 앞에 있다. 조합이 바꾸는 글(그 자리에 넣는 글자 포함)은 모두 그 뒤다.
+    var deferredEditPrecedesComposition = false
     /// 바깥이 줄바꿈 없이 끝나는 글을 문서 끝에 붙였고 커서를 그 뒤로 옮겼다. 사용자가 이어 치는 글이
     /// 그 줄에 붙지 않게, 다음에 치는 글 앞에 줄바꿈을 넣는다(그때의 커서 자리와 원문).
     var pendingLineBreak: (location: Int, version: Int)?
@@ -75,6 +77,19 @@ final class EditorController: NSObject {
     var editSetFoldsExplicitly = false
     /// 되돌리기 기록. 텍스트 뷰의 것을 쓰지 않는다(`EditorController+Undo`).
     var history = UndoHistory()
+    /// 되돌리려는 단계가 원문과 어긋나 있을 때(있어서는 안 된다). 원문은 고치지 않고 기록을 버린 뒤에 부른다.
+    /// 디버그 빌드에서는 멈추고, 배포 빌드에서는 아무 일도 하지 않는다. 테스트가 바꿔 끼운다.
+    var onReplayMismatch: (String) -> Void = { assertionFailure($0) }
+    /// 넣을 수 없는 편집을 넣지 않았을 때 알리는 소리. 테스트가 바꿔 끼운다.
+    var onRejectedEdit: () -> Void = { NSSound.beep() }
+    /// 원문이 바뀐 것을 바깥에 알리지 않고 쌓아 둔다(한 번의 입력이 원문을 두 번 고칠 때, 조합을 끝내고
+    /// 바깥의 변경을 넣을 때). 풀린 뒤에 한 번만 알린다.
+    var holdsChangeNotification = false
+    /// 텍스트 뷰가 조합을 끝내는 중이다(`unmarkText`, 포커스를 잃을 때). 그 안에서는 조합 중인 글자가 잠깐
+    /// 비어 보이므로, "조합이 글자 없이 끝났다"로 보고 치우는 일을 하지 않는다.
+    var isEndingComposition = false
+    /// 바깥의 변경이 사용자가 고친 자리에 겹쳐 되돌리기 단계를 버린 횟수(확인용).
+    var historyDropCount = 0
     /// 열린 되돌리기 단계가 없을 때 편집 직전의 선택. 그 단계를 되돌리면 이 선택으로 돌아간다.
     var selectionBeforeEdit: NSRange?
     /// 지금 들어오는 편집이 글자를 그대로 친 것인지(이어 친 글자를 한 단계로 묶는 데 쓴다).

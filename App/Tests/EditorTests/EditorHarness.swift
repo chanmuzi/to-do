@@ -12,6 +12,11 @@ final class EditorHarness {
     private(set) var changes: [String] = []
     private(set) var heights: [CGFloat] = []
     private(set) var foldChanges: [Set<Int>] = []
+    /// 넣지 않은 편집을 알린 횟수(앱에서는 시스템의 알림음이다).
+    private(set) var beeps = 0
+    /// 되돌리려는 단계가 원문과 어긋나 기록을 버린 일. 있어서는 안 되므로 기본으로 실패로 적는다.
+    private(set) var replayMismatches: [String] = []
+    var expectsReplayMismatch = false
 
     init(_ text: String = "", width: CGFloat = 340, checkbox: CheckboxStyle = .box) throws {
         theme = try Theme.bundled()
@@ -31,6 +36,13 @@ final class EditorHarness {
         editor.onTextChange = { [weak self] in self?.changes.append($0) }
         editor.onContentHeightChange = { [weak self] in self?.heights.append($0) }
         editor.onFoldChange = { [weak self] in self?.foldChanges.append($0) }
+        // 테스트에서는 소리를 내지 않고 센다.
+        editor.controller.onRejectedEdit = { [weak self] in self?.beeps += 1 }
+        editor.controller.onReplayMismatch = { [weak self] message in
+            guard let self else { return }
+            self.replayMismatches.append(message)
+            if !self.expectsReplayMismatch { Issue.record("\(message): \(self.editor.text.debugDescription)") }
+        }
         // 테스트에서는 런 루프가 돌지 않으므로 되돌리기 묶음을 단계마다 직접 닫는다.
         editor.undoManager.groupsByEvent = false
     }
@@ -56,8 +68,12 @@ final class EditorHarness {
     var view: EditorTextView { controller.textView }
     var document: MarkdownDocument { controller.document }
 
+    /// 끄면 묶음을 직접 열지 않는다(앱에서처럼 런 루프 한 차례가 한 단계가 된다).
+    var groupsSteps = true
+
     /// 되돌리기 한 단계로 묶어 실행한다.
     func step(_ body: () -> Void) {
+        guard groupsSteps else { return body() }
         editor.undoManager.beginUndoGrouping()
         body()
         editor.undoManager.endUndoGrouping()

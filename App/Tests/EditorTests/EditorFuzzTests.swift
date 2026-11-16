@@ -62,7 +62,7 @@ import Testing
     static let wildPastes = plainPastes + ["```\n코드\n```", "```", "```js\nx", "** 떨어진 **", "a == b", "끝 ```"]
 
     /// 한 걸음. 한 일을 글자로 돌려준다(실패했을 때 되짚을 수 있게).
-    private func step(_ h: EditorHarness, _ random: inout Generator, wild: Bool) -> String {
+    static func step(_ h: EditorHarness, _ random: inout Generator, wild: Bool) -> String {
         switch random.below(100) {
         case 0..<34:
             let text = random.pick(wild ? Self.wildText : Self.plainText)
@@ -133,6 +133,10 @@ import Testing
     }
 
     private func run(seed: UInt64, sequences: Int, steps: Int, wild: Bool) throws {
+        // 더 많이 돌릴 때: EDITOR_FUZZ_SEED(씨앗에 더할 값), EDITOR_FUZZ_SEQUENCES(씨앗마다의 차례 수).
+        let environment = ProcessInfo.processInfo.environment
+        let seed = seed &+ (environment["EDITOR_FUZZ_SEED"].flatMap(UInt64.init) ?? 0)
+        let sequences = environment["EDITOR_FUZZ_SEQUENCES"].flatMap(Int.init) ?? sequences
         var random = Generator(state: seed)
         for sequence in 0..<sequences {
             let original = random.pick(Self.documents)
@@ -148,7 +152,7 @@ import Testing
             for _ in 0..<steps {
                 if h.document.line(at: h.editor.selectedRange.location).kind.isCode
                     || h.document.line(at: NSMaxRange(h.editor.selectedRange)).kind.isCode { typedInCode = true }
-                log.append(step(h, &random, wild: wild))
+                log.append(Self.step(h, &random, wild: wild))
                 if traces { print("TRACE \(log.last ?? "") → \(h.marked.debugDescription)") }
                 let context = "seed \(seed) #\(sequence) \(log.suffix(12).joined(separator: ", ")) → \(h.marked.debugDescription)"
                 let doc = h.document
