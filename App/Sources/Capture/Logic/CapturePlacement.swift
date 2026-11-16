@@ -14,4 +14,9 @@ nonisolated enum CapturePlacement {
             x: (visibleFrame.midX - width / 2).rounded(), y: y, width: width, height: size.height
         )
     }
+
+    /// 나타나기 직전과 사라진 직후의 자리: 놓일 자리에서 `rise`만큼 아래. 여기서 올라오며 나타나고, 여기로 내려가며 사라진다.
+    static func offstageFrame(for frame: CGRect, rise: CGFloat) -> CGRect {
+        frame.offsetBy(dx: 0, dy: -rise)
+    }
 }

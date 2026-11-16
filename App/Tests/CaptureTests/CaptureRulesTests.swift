@@ -83,16 +83,65 @@ import Testing
         #expect(TodoAppender.append("우유 사기", to: body) == expected)
     }
 
+    /// 닫히지 않은 코드 블록 뒤에 붙일 때는 블록을 먼저 닫는다. 붙인 줄이 코드가 되지 않는다.
+    @Test(arguments: [
+        ("```\nlet a = 1\n", "```\nlet a = 1\n```\n[ ] 우유 사기\n"),
+        ("메모\n```swift\nlet a = 1", "메모\n```swift\nlet a = 1\n```\n[ ] 우유 사기\n"),
+        ("```\n코드\n\n\n", "```\n코드\n```\n[ ] 우유 사기\n"),
+        // 들여쓴 블록은 같은 들여쓰기로 닫는다.
+        ("> 토글\n\t```\n\t코드\n", "> 토글\n\t```\n\t코드\n\t```\n[ ] 우유 사기\n"),
+        ("```\r\n코드\r\n", "```\r\n코드\r\n```\r\n[ ] 우유 사기\r\n"),
+        // 닫힌 블록은 그대로다.
+        ("```\n코드\n```\n", "```\n코드\n```\n[ ] 우유 사기\n"),
+        ("```\n코드\n```  \n", "```\n코드\n```  \n[ ] 우유 사기\n"),
+        // 닫힌 블록 다음에 다시 열린 블록.
+        ("```\na\n```\n```\nb\n", "```\na\n```\n```\nb\n```\n[ ] 우유 사기\n"),
+        // 블록 안의 ```로 시작하는 글(뒤에 글자가 더 있다)은 닫는 줄이 아니다.
+        ("```\n```swift 예시\n", "```\n```swift 예시\n```\n[ ] 우유 사기\n"),
+        // 줄 가운데의 ```는 블록이 아니다.
+        ("글 ``` 글\n", "글 ``` 글\n[ ] 우유 사기\n"),
+    ])
+    func unterminatedCodeFenceIsClosedFirst(body: String, expected: String) {
+        #expect(TodoAppender.append("우유 사기", to: body) == expected)
+    }
+
+    /// 적은 글이 이미 투두 표기로 시작하면 표기를 겹쳐 붙이지 않는다.
+    @Test(arguments: [
+        ("[ ] 우유 사기", "[ ] 우유 사기\n"),
+        ("- [ ] 우유 사기", "[ ] 우유 사기\n"),
+        ("* [ ] 우유 사기", "[ ] 우유 사기\n"),
+        ("[x] 끝난 일", "[x] 끝난 일\n"),
+        ("- [X] 끝난 일", "[x] 끝난 일\n"),
+        // 투두 표기가 아닌 대괄호는 글이다.
+        ("[회의] 자료 준비", "[ ] [회의] 자료 준비\n"),
+        ("- 장보기", "[ ] - 장보기\n"),
+        ("[ ]우유", "[ ] [ ]우유\n"),
+    ])
+    func existingTodoMarkerIsNotDoubled(text: String, expected: String) {
+        #expect(TodoAppender.append(text, to: "") == expected)
+    }
+
     // MARK: - 리마인더 (노트당 하나, 가장 이른 것)
 
     @Test func earliestReminderWins() {
+        let now = TestClock.now
         let early = TestClock.date(11, 17, 9, 0)
         let late = TestClock.date(11, 18, 9, 0)
-        #expect(ReminderRule.merged(existing: nil, new: nil) == nil)
-        #expect(ReminderRule.merged(existing: nil, new: late) == late)
-        #expect(ReminderRule.merged(existing: early, new: nil) == early)
-        #expect(ReminderRule.merged(existing: early, new: late) == early)
-        #expect(ReminderRule.merged(existing: late, new: early) == early)
+        #expect(ReminderRule.merged(existing: nil, new: nil, now: now) == nil)
+        #expect(ReminderRule.merged(existing: nil, new: late, now: now) == late)
+        #expect(ReminderRule.merged(existing: early, new: nil, now: now) == early)
+        #expect(ReminderRule.merged(existing: early, new: late, now: now) == early)
+        #expect(ReminderRule.merged(existing: late, new: early, now: now) == early)
+    }
+
+    /// 이미 지난 리마인더(지금과 같은 것 포함)는 없는 것으로 친다. 새로 걸 것이 없으면 건드리지 않는다.
+    @Test func pastExistingReminderIsIgnored() {
+        let now = TestClock.now
+        let past = TestClock.date(11, 16, 9, 0)
+        let future = TestClock.date(11, 18, 9, 0)
+        #expect(ReminderRule.merged(existing: past, new: future, now: now) == future)
+        #expect(ReminderRule.merged(existing: now, new: future, now: now) == future)
+        #expect(ReminderRule.merged(existing: past, new: nil, now: now) == past)
     }
 
     // MARK: - 자리 (spec 4.1: 580 x 42, 화면 가운데 아래쪽)
@@ -107,6 +156,11 @@ import Testing
         // Dock을 뺀 영역의 아래 끝에서 바 아래쪽까지가 영역 높이의 20%다.
         #expect(frame.minY - visible.minY == 200)
         #expect(frame.maxY < visible.midY)
+    }
+
+    @Test func offstageFrameIsTheSameSizeALittleLower() {
+        let frame = CGRect(x: 610, y: 250, width: 580, height: 42)
+        #expect(CapturePlacement.offstageFrame(for: frame, rise: 6) == CGRect(x: 610, y: 244, width: 580, height: 42))
     }
 
     @Test func barShrinksToANarrowScreenAndStaysInside() {

@@ -11,7 +11,7 @@ final class CaptureBarView: NSView {
     let textView: CaptureTextView
     private let spaceBadge: CaptureBadgeView
     private let reminderBadge: CaptureBadgeView
-    private var underlinedRange: NSRange?
+    private var underlinedRanges: [NSRange] = []
 
     static let placeholder = "메모나 할 일을 적으세요"
 
@@ -83,12 +83,12 @@ final class CaptureBarView: NSView {
     func apply(
         space: CaptureBadgeView.Content?,
         reminder: CaptureBadgeView.Content?,
-        timeRange: NSRange?,
+        timeRanges: [NSRange],
         animated: Bool
     ) {
         spaceBadge.apply(space, animated: animated)
         reminderBadge.apply(reminder, animated: animated)
-        underline(timeRange)
+        underline(timeRanges)
         setPlaceholderVisible(textView.string.isEmpty, animated: animated)
         needsLayout = true
     }
@@ -96,20 +96,22 @@ final class CaptureBarView: NSView {
     var spaceContent: CaptureBadgeView.Content? { spaceBadge.alphaValue > 0 ? spaceBadge.content : nil }
     var reminderContent: CaptureBadgeView.Content? { reminderBadge.alphaValue > 0 ? reminderBadge.content : nil }
     var isPlaceholderVisible: Bool { placeholderLabel.alphaValue > 0 }
-    var timeUnderlineRange: NSRange? { underlinedRange }
+    var timeUnderlineRanges: [NSRange] { underlinedRanges }
 
-    /// 알아들은 시간 표현에 밑줄을 긋는다. 글 저장소가 아니라 배치 쪽의 임시 속성이라 조합 중인 글자를 건드리지 않는다.
-    private func underline(_ range: NSRange?) {
+    /// 알아들은 시간 표현에 밑줄을 긋는다. 날과 시각을 떨어뜨려 적었으면 두 곳이다.
+    /// 글 저장소가 아니라 배치 쪽의 임시 속성이라 조합 중인 글자를 건드리지 않는다.
+    private func underline(_ ranges: [NSRange]) {
         guard let layoutManager = textView.layoutManager else { return }
         let whole = NSRange(location: 0, length: (textView.string as NSString).length)
         layoutManager.removeTemporaryAttribute(.underlineStyle, forCharacterRange: whole)
         layoutManager.removeTemporaryAttribute(.underlineColor, forCharacterRange: whole)
-        underlinedRange = range.flatMap { NSIntersectionRange($0, whole).length > 0 ? NSIntersectionRange($0, whole) : nil }
-        guard let underlinedRange else { return }
-        layoutManager.addTemporaryAttributes(
-            [.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: style.color(.text)],
-            forCharacterRange: underlinedRange
-        )
+        underlinedRanges = ranges.map { NSIntersectionRange($0, whole) }.filter { $0.length > 0 }
+        for range in underlinedRanges {
+            layoutManager.addTemporaryAttributes(
+                [.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: style.color(.text)],
+                forCharacterRange: range
+            )
+        }
     }
 
     /// 자리 글자는 나타날 때만 `dur` 동안 움직인다. 글자를 치기 시작하면 바로 비킨다(친 글자와 겹쳐 보이지 않게).
@@ -138,7 +140,7 @@ final class CaptureBarView: NSView {
         textView.selectedTextAttributes = [.backgroundColor: style.color(.hover)]
         spaceBadge.refresh()
         reminderBadge.refresh()
-        underline(underlinedRange)
+        underline(underlinedRanges)
         needsLayout = true
     }
 

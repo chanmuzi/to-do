@@ -7,9 +7,14 @@ import Models
 /// 오늘 만든 것이 여럿이면 가장 먼저 만든 것을 쓴다. 나중에 따로 만든 노트로 옮겨 가지 않는다.
 nonisolated enum CaptureDestination {
     static func todayNote(in notes: [Note], spaceID: SpaceID?, now: Date, calendar: Calendar) -> Note? {
+        todayNotes(in: notes, spaceID: spaceID, now: now, calendar: calendar).first
+    }
+
+    /// 오늘 노트의 후보. 먼저 만든 것이 앞이다. 앞의 노트에 넣을 수 없을 때(충돌, 없어진 파일) 다음 것을 쓴다.
+    static func todayNotes(in notes: [Note], spaceID: SpaceID?, now: Date, calendar: Calendar) -> [Note] {
         notes
             .filter { $0.spaceID == spaceID && calendar.isDate($0.created, inSameDayAs: now) }
-            .min { ($0.created, $0.id.rawValue) < ($1.created, $1.id.rawValue) }
+            .sorted { ($0.created, $0.id.rawValue) < ($1.created, $1.id.rawValue) }
     }
 
     /// 오늘 노트를 새로 만들 때의 제목. 제목 없는 노트가 날마다 쌓이지 않게 날짜를 적는다.

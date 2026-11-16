@@ -21,7 +21,7 @@ import Testing
         #expect(entry.text == "우유 사기")
         #expect(entry.spaceID == CaptureFixture.home.id)
         #expect(entry.reminder == nil)
-        #expect(entry.timeRange == nil)
+        #expect(entry.timeRanges.isEmpty)
     }
 
     /// 시간 표현은 리마인더가 되고, 넣는 글에는 적은 그대로 남는다.
@@ -29,7 +29,33 @@ import Testing
         let entry = interpret("릴리즈 노트 초안 쓰기 내일 오전 10시", selected: CaptureFixture.work.id)
         #expect(entry.text == "릴리즈 노트 초안 쓰기 내일 오전 10시")
         #expect(entry.reminder == TestClock.date(11, 17, 10, 0))
-        #expect(entry.timeRange == NSRange(location: 13, length: 9))
+        #expect(entry.timeRanges == [NSRange(location: 13, length: 9)])
+        #expect(!entry.isReminderPast)
+    }
+
+    /// 떨어뜨려 적은 날과 시각은 한 리마인더가 되고, 밑줄 자리는 두 곳이다. 글은 적은 그대로 남는다.
+    @Test func separatedDateAndTimeGiveTwoRanges() {
+        let entry = interpret("#개인 내일 회의 3시")
+        #expect(entry.text == "내일 회의 3시")
+        #expect(entry.reminder == TestClock.date(11, 17, 15, 0))
+        #expect(entry.timeRanges == [NSRange(location: 4, length: 2), NSRange(location: 10, length: 2)])
+    }
+
+    /// 지난 때로 읽힌 표현은 보여 줄 값으로는 남고, 걸 리마인더로는 없다.
+    @Test func pastExpressionIsKeptForDisplayButNotAsAReminder() {
+        let entry = interpret("오늘 09:00 스탠드업")
+        #expect(entry.resolvedReminder == TestClock.date(11, 16, 9, 0))
+        #expect(entry.isReminderPast)
+        #expect(entry.reminder == nil)
+        #expect(entry.text == "오늘 09:00 스탠드업")
+        #expect(entry.timeRanges == [NSRange(location: 0, length: 8)])
+        // 진행 중인 범위도 시작이 지났으므로 걸지 않는다.
+        let ongoing = interpret("1시~3시 워크숍")
+        #expect(ongoing.resolvedReminder == TestClock.date(11, 16, 13, 0))
+        #expect(ongoing.isReminderPast)
+        // ⌘R로 고른 값이 지금보다 앞이면 그것도 걸지 않는다.
+        #expect(interpret("메모", manual: TestClock.date(11, 16, 13, 0)).reminder == nil)
+        #expect(interpret("메모", manual: TestClock.date(11, 16, 15, 0)).reminder == TestClock.date(11, 16, 15, 0))
     }
 
     @Test(arguments: [
@@ -81,7 +107,7 @@ import Testing
         let manual = TestClock.date(11, 18, 9, 0)
         let entry = interpret("내일 10시 회의", manual: manual)
         #expect(entry.reminder == manual)
-        #expect(entry.timeRange == nil)
+        #expect(entry.timeRanges.isEmpty)
         #expect(entry.text == "내일 10시 회의")
     }
 
@@ -91,7 +117,7 @@ import Testing
         #expect(entry.text == "치과 금요일 3시")
         #expect(entry.reminder == TestClock.date(11, 20, 15, 0))
         // 밑줄 자리는 입력 칸의 글(표시를 빼기 전) 기준이다.
-        #expect(entry.timeRange == NSRange(location: 7, length: 6))
+        #expect(entry.timeRanges == [NSRange(location: 7, length: 6)])
     }
 
     @Test func whitespaceIsFlattenedAndBlankTextIsEmpty() {
@@ -152,5 +178,9 @@ import Testing
         #expect(text(TestClock.date(11, 17, 0, 0)) == "내일 12:00 AM")
         #expect(text(TestClock.date(11, 20, 15, 30)) == "금 3:30 PM")
         #expect(text(TestClock.date(12, 25, 9, 0)) == "12/25 9:00 AM")
+        // 올해가 아니면 해까지 적는다.
+        #expect(text(TestClock.date(1, 5, 9, 0, year: 2027)) == "2027/1/5 9:00 AM")
+        #expect(text(TestClock.date(11, 16, 9, 0)) == "9:00 AM")
+        #expect(text(TestClock.date(11, 15, 9, 0)) == "어제 9:00 AM")
     }
 }

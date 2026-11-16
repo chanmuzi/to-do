@@ -6,12 +6,18 @@ nonisolated struct CaptureInterpretation: Hashable, Sendable {
     /// 노트에 넣을 글. `#스페이스` 표시는 빼고, 날짜와 시간 표현(범위 포함)은 적은 그대로 둔다(D-026).
     let text: String
     let spaceID: SpaceID?
-    let reminder: Date?
+    /// 글에서 읽었거나 ⌘R로 고른 때. 지난 때여도 그대로다(바에 지난 때로 보여 준다).
+    let resolvedReminder: Date?
+    /// 읽은 때가 이미 지났다(`오늘 09:00`을 10시에 적음). 리마인더로 걸지 않는다.
+    let isReminderPast: Bool
     /// 글에서 알아들은 날짜와 시간 표현. ⌘R로 직접 골랐으면 없다.
     let expression: DateTimeExpression?
 
-    /// 밑줄을 그을 자리. 입력 칸의 글(고치기 전) 기준이다.
-    var timeRange: NSRange? { expression?.range }
+    /// 노트에 걸 리마인더. 지난 때면 없다(항목은 그대로 넣는다).
+    var reminder: Date? { isReminderPast ? nil : resolvedReminder }
+
+    /// 밑줄을 그을 자리들. 입력 칸의 글(고치기 전) 기준이다. 날과 시각을 떨어뜨려 적으면 둘이다.
+    var timeRanges: [NSRange] { expression?.ranges ?? [] }
 
     var isEmpty: Bool { text.isEmpty }
 
@@ -31,7 +37,9 @@ nonisolated struct CaptureInterpretation: Hashable, Sendable {
             ? DateTimeParser.firstExpression(in: raw, now: now, calendar: calendar) : nil
         spaceID = token?.spaceID ?? selectedSpace
         // 범위로 적었으면 리마인더는 시작에 건다. 끝은 `expression`에 남고, 적은 글도 그대로 둔다.
-        reminder = manualReminder ?? found?.start
+        let resolved = manualReminder ?? found?.start
+        resolvedReminder = resolved
+        isReminderPast = resolved.map { $0 <= now || found?.assumptions.contains(.past) == true } ?? false
         expression = found
         text = Self.clean(raw, removing: token?.range)
     }

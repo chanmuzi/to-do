@@ -28,10 +28,14 @@ struct CaptureStyle {
     /// 전환 시간. "동작 줄이기"가 켜져 있으면 바로 바꾼다.
     var transitionDuration: TimeInterval { reducesMotion ? 0 : theme.motion.duration }
 
-    /// 알파를 `dur`, `ease`로 바꾼다(규칙 8). `completion`은 움직임이 끝난 뒤에 불린다.
+    /// 알파와 자리를 `dur`, `ease`로 바꾼다(규칙 8). `completion`은 움직임이 끝난 뒤에 불린다.
     func animate(_ changes: () -> Void, completion: (@MainActor () -> Void)? = nil) {
         guard transitionDuration > 0 else {
-            changes()
+            // `animator()`로 바꾼 값이 시스템 기본 시간으로 움직이지 않게 시간을 0으로 묶는다.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                changes()
+            }
             completion?()
             return
         }

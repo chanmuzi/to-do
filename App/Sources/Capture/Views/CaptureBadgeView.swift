@@ -8,6 +8,8 @@ final class CaptureBadgeView: NSView {
         var symbolSize: ComponentToken
         var text: String
         var accessibilityLabel: String
+        /// 지난 때라 걸리지 않는 리마인더: 글자를 `text-3`로 흐리게 하고 가운데 줄을 긋는다.
+        var isStruckOut = false
     }
 
     private let style: CaptureStyle
@@ -57,9 +59,17 @@ final class CaptureBadgeView: NSView {
         iconView.image = content.symbolName.flatMap { style.symbol($0, size: content.symbolSize) }
         iconView.contentTintColor = style.color(.text3)
         iconView.isHidden = iconView.image == nil
-        label.stringValue = content.text
-        label.font = style.theme.nsFont(.ui)
-        label.textColor = style.color(.text2)
+        let font = style.theme.nsFont(.ui)
+        label.font = font
+        label.textColor = style.color(content.isStruckOut ? .text3 : .text2)
+        if content.isStruckOut {
+            label.attributedStringValue = NSAttributedString(string: content.text, attributes: [
+                .font: font, .foregroundColor: style.color(.text3),
+                .strikethroughStyle: NSUnderlineStyle.single.rawValue, .strikethroughColor: style.color(.text3),
+            ])
+        } else {
+            label.stringValue = content.text
+        }
         setAccessibilityLabel(content.accessibilityLabel)
         needsLayout = true
     }

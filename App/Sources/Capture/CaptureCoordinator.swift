@@ -23,6 +23,8 @@ public final class CaptureCoordinator {
     private var observers: [NSObjectProtocol] = []
     /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 친다.
     private var isClosing = false
+    /// 바가 놓이는 자리. 나타날 때는 이보다 조금 아래에서 올라오고, 사라질 때는 그리로 내려간다.
+    private var restingFrame: NSRect = .zero
 
     /// ⇥로 고른 스페이스. 바를 닫아도 다음에 열 때까지 기억한다.
     private var selectedSpace: SpaceID?
@@ -41,6 +43,8 @@ public final class CaptureCoordinator {
     @_spi(Verification) public var isShownOpaque = true
     /// 확인용: 띄울 화면을 정한다. 없으면 마우스가 있는 화면.
     @_spi(Verification) public var preferredScreen: NSScreen?
+    /// 확인용: 알림을 걸 곳. 처음 띄우기 전에만 바꾼다.
+    @_spi(Verification) public var notificationCenter: NotificationCenter = .default
 
     public init(
         theme: Theme,
@@ -55,6 +59,10 @@ public final class CaptureCoordinator {
         self.router = router
         self.log = log
         style = CaptureStyle(theme: theme)
+    }
+
+    isolated deinit {
+        observers.forEach(notificationCenter.removeObserver)
     }
 
     public var isVisible: Bool { panel?.isVisible == true && !isClosing }
@@ -72,12 +80,15 @@ public final class CaptureCoordinator {
         barView.textView.string = ""
         barView.textView.undoManager?.removeAllActions()
 
-        panel.setFrame(frame(on: preferredScreen ?? Self.screenWithMouse()), display: false)
+        restingFrame = frame(on: preferredScreen ?? Self.screenWithMouse())
+        // 새로 뜰 때는 조금 아래에서 시작한다. 사라지는 중에 다시 열면 지금 자리에서 되돌아온다.
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.setFrame(offstageFrame, display: false)
+        }
         refresh(animated: false)
         barView.layoutSubtreeIfNeeded()
 
-        let wasVisible = panel.isVisible
-        if !wasVisible { panel.alphaValue = 0 }
         if takesKeyOnShow {
             panel.makeKeyAndOrderFront(nil)
         } else {
@@ -85,19 +96,32 @@ public final class CaptureCoordinator {
         }
         panel.makeFirstResponder(barView.textView)
         panel.ignoresMouseEvents = !isShownOpaque
-        guard isShownOpaque else { return }
-        style.animate { panel.animator().alphaValue = 1 }
+        // 떠오르며 나타난다: 자리와 투명도가 함께 `dur`, `ease`로 바뀐다. 바 안의 요소는 창과 함께 움직일 뿐 서로의 자리는 그대로다.
+        let resting = restingFrame
+        let opaque = isShownOpaque
+        style.animate {
+            panel.animator().setFrame(resting, display: true)
+            if opaque { panel.animator().alphaValue = 1 }
+        }
     }
 
-    /// `dur` 동안 흐려진 뒤 내려간다.
+    /// `dur` 동안 조금 내려가며 흐려진 뒤 내려간다(나타날 때의 반대).
     public func hide() {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
-        style.animate({ panel.animator().alphaValue = 0 }, completion: { [weak self] in
+        let offstage = offstageFrame
+        style.animate({
+            panel.animator().alphaValue = 0
+            panel.animator().setFrame(offstage, display: true)
+        }, completion: { [weak self] in
             guard let self, self.isClosing else { return }
             self.isClosing = false
             panel.orderOut(nil)
         })
+    }
+
+    private var offstageFrame: NSRect {
+        CapturePlacement.offstageFrame(for: restingFrame, rise: theme.component(.captureRise))
     }
 
     public func toggle() {
@@ -111,7 +135,16 @@ public final class CaptureCoordinator {
     /// 오른쪽에 보이는 스페이스와 리마인더 글자, 밑줄 자리, 자리 글자가 보이는지.
     @_spi(Verification) public var displayedSpace: String? { barView?.spaceContent?.text }
     @_spi(Verification) public var displayedReminder: String? { barView?.reminderContent?.text }
-    @_spi(Verification) public var underlinedRange: NSRange? { barView?.timeUnderlineRange }
+    /// 리마인더가 지난 때의 모습(흐린 글자에 가운데 줄)으로 보이는지.
+    @_spi(Verification) public var displaysReminderAsPast: Bool { barView?.reminderContent?.isStruckOut ?? false }
+    @_spi(Verification) public var underlinedRanges: [NSRange] { barView?.timeUnderlineRanges ?? [] }
+    /// 밑줄이 한 곳일 때의 그 자리.
+    @_spi(Verification) public var underlinedRange: NSRange? {
+        underlinedRanges.count == 1 ? underlinedRanges.first : nil
+    }
+    /// 바가 놓이는 자리(움직이는 중이어도 끝의 값)와, 나타나기 전과 사라진 뒤의 자리.
+    @_spi(Verification) public var settledFrame: NSRect { restingFrame }
+    @_spi(Verification) public var entranceFrame: NSRect { offstageFrame }
     @_spi(Verification) public var showsPlaceholder: Bool { barView?.isPlaceholderVisible ?? false }
 
     // MARK: - 창
@@ -127,7 +160,7 @@ public final class CaptureCoordinator {
         barView.textView.onCommand = { [weak self] in self?.perform($0) }
         barView.textView.onTextChange = { [weak self] in self?.refresh(animated: true) }
 
-        let center = NotificationCenter.default
+        let center = notificationCenter
         observers = [
             // 바깥을 누르면 키 창에서 물러난다. 그때 닫는다.
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
@@ -145,8 +178,9 @@ public final class CaptureCoordinator {
     private func themeDidChange() {
         guard let panel, let barView else { return }
         barView.refreshTheme()
-        if panel.isVisible, let screen = panel.screen ?? NSScreen.main {
-            panel.setFrame(frame(on: screen), display: true)
+        if panel.isVisible, !isClosing, let screen = panel.screen ?? NSScreen.main {
+            restingFrame = frame(on: screen)
+            panel.setFrame(restingFrame, display: true)
         }
         refresh(animated: false)
     }
@@ -180,10 +214,14 @@ public final class CaptureCoordinator {
     private func refresh(animated: Bool) {
         guard let barView else { return }
         let entry = interpretation()
-        let reminder = entry.reminder.map { date in
+        // 읽은 때는 지났어도 보여 준다(무엇으로 읽혔는지 알 수 있게). 지난 때는 흐린 글자에 가운데 줄이고, 걸리지 않는다.
+        let reminder = entry.resolvedReminder.map { date in
             let text = CaptureReminderText.text(for: date, now: now(), calendar: calendar)
             return CaptureBadgeView.Content(
-                symbolName: "clock", symbolSize: .iconSmall, text: text, accessibilityLabel: "리마인더 \(text)"
+                symbolName: "clock", symbolSize: .iconSmall, text: text,
+                accessibilityLabel: entry.isReminderPast
+                    ? "지난 시각 \(text), 리마인더로 걸리지 않습니다" : "리마인더 \(text)",
+                isStruckOut: entry.isReminderPast
             )
         }
         // 들어갈 스페이스는 글을 적기 시작하면(또는 ⇥로 바꾸면) 보인다. 빈 바에는 자리 글자만 있다.
@@ -191,7 +229,7 @@ public final class CaptureCoordinator {
         barView.apply(
             space: showsSpace ? entry.spaceID.flatMap(spaces.space(for:)).map(Self.badge(for:)) : nil,
             reminder: reminder,
-            timeRange: entry.timeRange,
+            timeRanges: entry.timeRanges,
             animated: animated
         )
     }
@@ -244,8 +282,11 @@ public final class CaptureCoordinator {
             switch outcome {
             case .appended(let id): log("캡처: 노트 \(id)에 투두를 붙였습니다")
             case .created(let id): log("캡처: 오늘 노트 \(id)를 만들어 투두를 넣었습니다")
-            case .heldByConflict(let id):
-                log("캡처: 노트 \(id)가 다른 프로그램이 고친 파일과 충돌 중입니다. 붙인 줄은 충돌을 풀 때 함께 저장됩니다")
+            case .redirected(let id, let blocked, let reason):
+                log("캡처: 오늘 노트 \(blocked)에 풀리지 않은 문제가 있어(\(reason)) 노트 \(id)에 투두를 넣었습니다")
+            }
+            if entry.isReminderPast {
+                log("캡처: 읽은 때가 이미 지나 리마인더는 걸지 않았습니다")
             }
             rememberSpace(entry.spaceID)
             hide()
