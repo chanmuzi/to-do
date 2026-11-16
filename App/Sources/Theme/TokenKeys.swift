@@ -107,3 +107,24 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case noteWidthMin = "note-w-min"
     case noteWidthMax = "note-w-max"
 }
+
+/// 치수가 아니라 비율로 적는 구성 요소 값(`component` 구역, `%` 표기).
+public enum RatioToken: String, CaseIterable, Sendable {
+    /// 노트 창 높이 한도: 화면 높이에서 차지할 수 있는 몫(spec 5.6, 임시 값).
+    case noteMaxScreenHeight = "note-h-max-screen"
+}
+
+/// `motion` 구역의 키. 값은 `MotionTokens`로 묶여 나온다.
+public enum MotionToken: String, CaseIterable, Sendable {
+    case duration = "dur"
+    case ease
+    /// 임박한 리마인더의 종(spec 15): 주기, 가만히 있는 앞부분의 몫, 차례로 기우는 각도 셋,
+    /// 돌리는 축(위에서부터의 몫), 곡선.
+    case bellPeriod = "bell-period"
+    case bellRest = "bell-rest"
+    case bellAngle1 = "bell-angle-1"
+    case bellAngle2 = "bell-angle-2"
+    case bellAngle3 = "bell-angle-3"
+    case bellPivot = "bell-pivot"
+    case bellEase = "bell-ease"
+}

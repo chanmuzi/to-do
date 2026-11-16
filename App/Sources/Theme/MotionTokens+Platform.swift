@@ -8,9 +8,11 @@ extension MotionTokens {
     }
 
     /// Core Animation, `NSAnimationContext`용 곡선.
+    public var timingFunction: CAMediaTimingFunction { curve.timingFunction }
+}
+
+extension BezierCurve {
     public var timingFunction: CAMediaTimingFunction {
-        CAMediaTimingFunction(
-            controlPoints: Float(curve.x1), Float(curve.y1), Float(curve.x2), Float(curve.y2)
-        )
+        CAMediaTimingFunction(controlPoints: Float(x1), Float(y1), Float(x2), Float(y2))
     }
 }
