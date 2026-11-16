@@ -61,6 +61,12 @@ extension EditorController: NSTextStorageDelegate {
             folded = FoldState.sanitized(folded, in: document)
             return
         }
+        if isAppendingFromOutside {
+            // 바깥이 끝에 덧붙인 글: 접힘은 줄 번호를 따라 옮기기만 한다. 사용자의 편집이 아니므로
+            // 알리지 않고 되돌리기에도 적지 않는다.
+            folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
+            return
+        }
         if foldsBeforeEdit == nil { foldsBeforeEdit = folded }
         folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
         if isReplayingUndo {
@@ -75,7 +81,8 @@ extension EditorController: NSTextStorageDelegate {
 }
 
 extension EditorController {
-    /// 편집 중인 것으로 보는지. 본문에 포커스가 있고 창이 키 창일 때다.
+    /// 편집 중인 것으로 보는지. 본문에 포커스가 있고 창이 키 창일 때다. 커서 줄의 기호를 보일지와
+    /// 편집 단축키를 받을지를 이것으로 정한다.
     var isActive: Bool {
         guard let window = textView.window, window.firstResponder === textView else { return false }
         return window.isKeyWindow || forcesActiveAppearance
@@ -110,6 +117,20 @@ extension EditorController {
         defer { appliedKeys = keys }
         guard let changed = LinePresentation.changedLines(old: appliedKeys, new: keys) else { return }
         invalidate(lines: changed)
+        scheduleHeightReport()
+    }
+
+    /// 줄의 모양만 바뀌어도 높이가 달라질 수 있다: 커서가 들어간 줄은 감췄던 기호(링크의 주소 등)가 보여
+    /// 줄이 넘어가고, 커서가 나가거나 창이 키 창에서 물러나면 다시 줄어든다. 글이 바뀐 것이 아니어서
+    /// 따로 알려야 창 높이가 따라온다. 선택이 바뀌는 도중일 수 있으므로 다음 메인 큐 차례에 잰다.
+    func scheduleHeightReport() {
+        guard !isHeightReportScheduled else { return }
+        isHeightReportScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isHeightReportScheduled = false
+            self.reportContentHeight()
+        }
     }
 
     func restyleAll() {

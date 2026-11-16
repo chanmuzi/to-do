@@ -30,38 +30,40 @@ struct WindowStateRecorder {
 
     func recordOpened(_ id: NoteID, frame: CGRect, isPinned: Bool) {
         write(id) {
-            NoteWindowState(frame: WindowFrame(frame), isPinned: isPinned, isOpen: true, stackOrder: $0.stackOrder)
+            $0.frame = WindowFrame(frame)
+            $0.isPinned = isPinned
+            $0.isOpen = true
         }
     }
 
     func recordFrame(_ id: NoteID, frame: CGRect) {
-        write(id) {
-            NoteWindowState(
-                frame: WindowFrame(frame), isPinned: $0.isPinned, isOpen: $0.isOpen, stackOrder: $0.stackOrder
-            )
-        }
+        write(id) { $0.frame = WindowFrame(frame) }
     }
 
     func recordPinned(_ id: NoteID, isPinned: Bool) {
-        write(id) {
-            NoteWindowState(frame: $0.frame, isPinned: isPinned, isOpen: $0.isOpen, stackOrder: $0.stackOrder)
-        }
+        write(id) { $0.isPinned = isPinned }
     }
 
     /// 창이 맨 앞으로 왔다(띄움, 키 창이 됨). 이미 맨 앞이면 쓰지 않는다.
     func recordFronted(_ id: NoteID) {
         let others = store.all.filter { $0.key != id }.values.compactMap(\.stackOrder).max() ?? 0
         if let current = state(for: id).stackOrder, current > others { return }
-        write(id) {
-            NoteWindowState(frame: $0.frame, isPinned: $0.isPinned, isOpen: $0.isOpen, stackOrder: others + 1)
-        }
+        write(id) { $0.stackOrder = others + 1 }
     }
 
     /// 창만 닫았다. 틀과 핀은 다시 띄울 때를 위해 남긴다.
     func recordClosed(_ id: NoteID) {
-        write(id) {
-            NoteWindowState(frame: $0.frame, isPinned: $0.isPinned, isOpen: false, stackOrder: $0.stackOrder)
-        }
+        write(id) { $0.isOpen = false }
+    }
+
+    /// 저장된 상태 그대로. 한 번도 적은 적이 없으면 `nil`.
+    func savedState(for id: NoteID) -> NoteWindowState? {
+        store.state(for: id)
+    }
+
+    /// 지웠던 상태를 되돌려 놓는다(휴지통으로 보낸 것을 되돌릴 때).
+    func restore(_ state: NoteWindowState, for id: NoteID) {
+        write(id) { $0 = state }
     }
 
     /// 노트가 없어졌다(휴지통, 파일 삭제).
@@ -73,9 +75,12 @@ struct WindowStateRecorder {
         }
     }
 
-    private func write(_ id: NoteID, _ change: (NoteWindowState) -> NoteWindowState) {
+    /// 맡은 항목만 고친다. 다른 쪽이 적어 둔 항목(접힌 줄 등)은 그대로 남는다.
+    private func write(_ id: NoteID, _ change: (inout NoteWindowState) -> Void) {
         do {
-            try store.set(change(state(for: id)), for: id)
+            var state = state(for: id)
+            change(&state)
+            try store.set(state, for: id)
         } catch {
             log("창 상태를 저장하지 못했습니다(\(id)): \(error)")
         }

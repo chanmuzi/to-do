@@ -1,7 +1,8 @@
 import AppKit
 import Theme
 
-/// 기본 편집기의 텍스트 뷰. 위아래 여백이 다른 `doc-pad`와 얇은 커서(규칙 15)를 맞춘다.
+/// 기본 편집기의 텍스트 뷰. 위아래 여백이 다른 `doc-pad`를 맞춘다.
+/// 입력 커서는 시스템의 것을 그대로 쓴다(옛 그리기 경로를 덮어쓰면 자국이 남는다, D-025).
 final class PlainBodyTextView: NSTextView {
     var padding: ThemeInsets? {
         didSet {
@@ -12,7 +13,6 @@ final class PlainBodyTextView: NSTextView {
         }
     }
 
-    var caretWidth: CGFloat = 0
     /// 너비가 바뀌면 줄바꿈이 달라져 내용 높이도 달라진다.
     var onWidthChange: (() -> Void)?
 
@@ -25,11 +25,5 @@ final class PlainBodyTextView: NSTextView {
     override var textContainerOrigin: NSPoint {
         guard let padding else { return super.textContainerOrigin }
         return NSPoint(x: padding.leading, y: padding.top)
-    }
-
-    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
-        var caret = rect
-        if caretWidth > 0 { caret.size.width = caretWidth }
-        super.drawInsertionPoint(in: caret, color: color, turnedOn: flag)
     }
 }

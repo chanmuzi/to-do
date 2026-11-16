@@ -114,6 +114,12 @@ public enum RatioToken: String, CaseIterable, Sendable {
     case noteMaxScreenHeight = "note-h-max-screen"
 }
 
+/// 치수가 아니라 개수로 적는 구성 요소 값(`component` 구역, 단위 없는 정수).
+public enum CountToken: String, CaseIterable, Sendable {
+    /// 노트 창의 본문 영역이 적어도 보이는 본문 줄 수(D-031, 임시 값). 글이 그보다 적어도 창은 이만큼 높다.
+    case noteBodyLinesMin = "note-body-lines-min"
+}
+
 /// `motion` 구역의 키. 값은 `MotionTokens`로 묶여 나온다.
 public enum MotionToken: String, CaseIterable, Sendable {
     case duration = "dur"

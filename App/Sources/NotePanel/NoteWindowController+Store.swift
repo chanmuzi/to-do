@@ -7,6 +7,7 @@ import Store
 extension NoteWindowController {
     /// 지금 값에 `change`를 적용한다. `deferred`면 자동 저장(본문, 제목 입력), 아니면 곧바로 쓴다(색).
     func mutate(deferred: Bool, _ change: (inout Note) -> Void) {
+        coordinator?.endTrashUndo()
         do {
             note = deferred
                 ? try environment.notes.scheduleUpdate(noteID, change)
@@ -28,11 +29,12 @@ extension NoteWindowController {
     func storeDidChange(_ change: StoreChange) {
         switch (change.kind, change.origin) {
         case (.updated, .local):
-            // 이 앱이 디스크에 썼다. 본문은 편집기가 가진 것이 더 새로우므로 편집기를 건드리지 않는다.
-            // 저장 실패는 풀린 것이고, 충돌은 사용자가 고를 때까지 남긴다.
+            // 이 앱이 디스크에 썼다. 저장 실패는 풀린 것이고, 충돌은 사용자가 고를 때까지 남긴다.
             if case .saveFailed = problem { problem = nil }
             if problem == .fileMissing, !hasUnstoredEdits { problem = nil }
-            refreshNote()
+            // 이 창이 한 저장이면 본문이 편집기와 주고받은 것과 같아 편집기를 건드리지 않는다. 이 앱의 다른 곳이
+            // 쓴 것(빠른 캡처가 덧붙인 줄)이면 달라져 있고, 그때는 편집기에도 넣는다(`syncEditorBody`).
+            adoptStoreNote()
         case (.updated, .external):
             adoptStoreNote()
         case (.created, _):
@@ -48,19 +50,8 @@ extension NoteWindowController {
         }
     }
 
-    /// 저장소의 지금 값으로 `note`와 상단 줄만 맞춘다. 편집기는 건드리지 않는다.
-    private func refreshNote() {
-        do {
-            note = try environment.notes.load(noteID)
-        } catch {
-            handleStoreFailure(error)
-            return
-        }
-        refreshChrome(animated: true)
-    }
-
-    /// 이 편집기가 아닌 쪽이 바꾼 내용을 받아들인다(다른 프로그램이 고친 파일, 파일의 내용으로 되돌리기).
-    /// 다시 읽으면 저장소의 충돌 기준도 갱신된다.
+    /// 저장소의 지금 값을 받아들인다(이 앱의 저장, 다른 프로그램이 고친 파일, 파일의 내용으로 되돌리기).
+    /// 본문은 편집기와 주고받은 것과 다를 때만 편집기에 넣는다. 다시 읽으면 저장소의 충돌 기준도 갱신된다.
     private func adoptStoreNote() {
         do {
             note = try environment.notes.load(noteID)
@@ -73,10 +64,19 @@ extension NoteWindowController {
     }
 
     /// 저장소의 본문이 편집기와 마지막으로 주고받은 본문과 다를 때만 편집기에 넣는다.
+    /// 끝에 글이 붙은 것이면 붙은 글만 넘겨 편집기가 실행 취소 기록과 조합 중인 글자를 지키게 한다.
     private func syncEditorBody() {
         guard note.body != exchangedBody else { return }
+        let old = exchangedBody.unicodeScalars
+        let new = note.body.unicodeScalars
         exchangedBody = note.body
-        editor.text = note.body
+        if !old.isEmpty, new.count > old.count, new.starts(with: old) {
+            var suffix = String.UnicodeScalarView()
+            suffix.append(contentsOf: new.dropFirst(old.count))
+            editor.appendFromOutside(String(suffix))
+        } else {
+            editor.text = note.body
+        }
     }
 
     func resolveProblem(_ action: ProblemMenuAction) {
@@ -124,7 +124,7 @@ extension NoteWindowController {
 
     /// 창을 내리기 전에 미뤄 둔 변경을 쓴다. 이 노트를 쓰지 못했으면 `false`(창을 남겨 표시가 보이게 한다).
     func flushBeforeClosing() -> Bool {
-        root.topRow.endTitleEditing()
+        flushPendingEdits()
         // 파일이 없어진 노트는 쓸 곳이 없다. 새 노트로 저장하거나 버릴 때까지 창을 남긴다.
         guard problem != .fileMissing else { return false }
         do {
@@ -134,6 +134,13 @@ extension NoteWindowController {
             handleStoreFailure(error)
             return false
         }
+    }
+
+    /// 고치던 제목을 마무리하고, 편집기가 아직 알리지 않은 본문을 받아 저장소에 넘긴다.
+    /// 창을 내리기 전, 휴지통으로 보내기 전, 앱을 끝내기 전에 부른다.
+    func flushPendingEdits() {
+        root.topRow.endTitleEditing()
+        editor.flushPendingChange()
     }
 
     /// 저장소가 던진 오류를 상단 줄의 표시로 바꾼다. 숨기지 않고 기록도 남긴다.
@@ -160,7 +167,9 @@ extension NoteWindowController {
 
     /// 쓰지 못한 변경까지 든 이 노트의 지금 값.
     var latestNote: Note {
-        guard environment.notes.hasPendingChanges(noteID), let pending = try? environment.notes.load(noteID)
+        // 저장소가 받지 못한 변경은 창만 들고 있고, 그때의 `note`가 가장 새 값이다.
+        guard !hasUnstoredEdits, environment.notes.hasPendingChanges(noteID),
+              let pending = try? environment.notes.load(noteID)
         else { return note }
         return pending
     }

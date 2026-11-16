@@ -63,6 +63,18 @@ final class NoteWindowController: NSObject {
     isolated deinit {
         reminderRefresh?.cancel()
         heightAnimation?.cancel()
+        disconnect()
+    }
+
+    /// 뷰와 편집기가 이 창으로 보내는 알림을 끊는다. 편집기는 이 창보다 오래 살 수 있고(App이 들고 있다),
+    /// 창이 없어지는 도중에도 알린다(텍스트 뷰가 창에서 빠지며 높이를 다시 잰다). 없어진 창으로 알림이 오면 안 된다.
+    /// 아직 알리지 않은 글은 창을 내리는 쪽이 먼저 받는다(`flushPendingEdits()`).
+    private func disconnect() {
+        editor.onTextChange = nil
+        editor.onContentHeightChange = nil
+        panel.onMouseDown = nil
+        root.onHoverChange = nil
+        root.onLayout = nil
     }
 
     var isHovered: Bool { hoverOverride ?? isPointerInside }
@@ -89,8 +101,21 @@ final class NoteWindowController: NSObject {
     }
 
     func focusBody() {
-        panel.makeKeyAndOrderFront(nil)
+        panel.becomeKeyByRequest()
         editor.focus()
+    }
+
+    /// 키 창이 된다(키 창이던 노트가 내려갔거나, 사용자가 앱을 앞으로 가져왔다). 제목을 고치던 중이 아니면
+    /// 본문이 입력을 받는다. 커서 자리는 그대로다.
+    func takeKey() {
+        panel.becomeKeyByRequest()
+        if !root.topRow.isEditingTitle { editor.focus() }
+    }
+
+    /// 제목을 그 자리에서 고치기 시작한다(단축키로).
+    func beginTitleEditing() {
+        panel.becomeKeyByRequest()
+        root.topRow.beginTitleEditing()
     }
 
     /// "노트 모두 숨기기"(spec 4.3). 되돌릴 때는 겹친 차례를 바꾸지 않는다(부르는 쪽이 뒤에 있던 것부터 부른다).
@@ -114,6 +139,7 @@ final class NoteWindowController: NSObject {
         reminderRefresh?.cancel()
         heightAnimation?.cancel()
         isShown = false
+        disconnect()
         panel.delegate = nil
         panel.close()
     }
@@ -168,6 +194,7 @@ final class NoteWindowController: NSObject {
     // MARK: - 동작
 
     private func connect() {
+        panel.onMouseDown = { [unowned self] in coordinator?.endTrashUndo() }
         root.onHoverChange = { [unowned self] inside in
             isPointerInside = inside
             refreshChrome(animated: true)

@@ -15,7 +15,13 @@ public final class MarkdownEditor {
     }
 
     /// 편집기 뷰(세로 스크롤 뷰). 바탕은 그리지 않는다. 안쪽 여백(`doc-pad`)은 편집기가 둔다.
+    /// 바깥의 스크롤 뷰가 따로 있으면 이것 대신 `documentView`를 쓴다.
     public var view: NSView { controller.scrollView }
+
+    /// 스크롤 뷰 없이 본문만 든 뷰(뒤집힌 좌표). 바깥이 가진 스크롤 뷰의 문서 뷰로 넣을 때 쓴다(노트 창).
+    /// 바깥은 너비만 맞추고, 높이는 이 뷰가 내용에 맞춘다. 안쪽 여백은 여기에도 들어 있다.
+    /// 이것을 다른 곳에 넣으면 `view`(편집기의 스크롤 뷰)는 비게 되므로 둘 중 하나만 쓴다.
+    public var documentView: NSView { controller.textView }
 
     /// 원문. 줄바꿈은 언제나 `\n`이다: 넣을 때 `\r\n`, `\r`, U+2028, U+2029를 `\n`으로 바꾸므로
     /// 그런 글을 넣으면 읽은 값이 넣은 값과 다르다.
@@ -32,6 +38,13 @@ public final class MarkdownEditor {
     /// `onTextChange`, `onFoldChange`를 부르지 않는다. 원문이 달라지면 되돌리기 기록을 비운다.
     public func load(text: String, foldedLines: Set<Int> = []) {
         controller.load(text: text, foldedLines: foldedLines)
+    }
+
+    /// 바깥(이 편집기가 아닌 쪽)이 원문 끝에 글을 덧붙였을 때 그 글만 넘긴다(빠른 캡처가 떠 있는 노트에
+    /// 한 줄을 덧붙임). 커서와 선택, 접힘, 되돌리기 기록, 조합 중인 글자를 그대로 둔다. 되돌리기에 적히지
+    /// 않으므로 ⌘Z는 붙인 글을 지우지 않는다. `onTextChange`를 부르지 않는다.
+    public func appendFromOutside(_ suffix: String) {
+        controller.appendFromOutside(suffix)
     }
 
     /// 체크박스 모양 같은 설정. 바꾸면 곧바로 다시 그린다.
@@ -92,12 +105,19 @@ public final class MarkdownEditor {
         controller.focus()
     }
 
+    /// 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다(접힘, 높이도 함께).
+    /// 편집기는 글자 입력이 아닌 편집을 다음 메인 큐 차례에 알릴 때가 있다. 그 전에 창을 닫거나
+    /// 앱을 끝내는 쪽이 부른다. 알릴 것이 없으면 아무것도 하지 않는다.
+    public func flushPendingChange() {
+        controller.flushPendingChangeNow()
+    }
+
     /// 편집 동작을 실행한다(단축키와 같은 일).
     public func perform(_ action: EditorAction) {
         controller.perform(action)
     }
 
-    /// 창이 키 창이 아니어도 편집 중인 것처럼 커서 줄의 기호를 보인다.
+    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(커서 줄의 기호를 보이고 편집 단축키를 받는다).
     /// 화면을 캡처해 확인할 때만 쓴다(다른 앱의 포커스를 빼앗지 않기 위해).
     @_spi(Verification)
     public var forcesActiveAppearance: Bool {

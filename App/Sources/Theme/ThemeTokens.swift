@@ -13,6 +13,7 @@ public struct ThemeTokens: Hashable, Sendable {
     private let shapes: [ShapeToken: CGFloat]
     private let components: [ComponentToken: CGFloat]
     private let ratios: [RatioToken: Double]
+    private let counts: [CountToken: Int]
 
     /// 노트 본문 안쪽 여백(`doc-pad`).
     public let docPadding: ThemeInsets
@@ -80,6 +81,8 @@ public struct ThemeTokens: Hashable, Sendable {
     public func component(_ token: ComponentToken) -> CGFloat { components[token]! }
     /// 0~1 사이의 몫.
     public func ratio(_ token: RatioToken) -> Double { ratios[token]! }
+    /// 1 이상의 개수.
+    public func count(_ token: CountToken) -> Int { counts[token]! }
 
     public func paletteColor(id: String) -> PaletteColor? {
         palette.first { $0.id == id }
@@ -149,6 +152,7 @@ public struct ThemeTokens: Hashable, Sendable {
         self.shapes = try table("shape", TokenValueParser.length)
         self.components = try table("component", TokenValueParser.length)
         self.ratios = try table("component", TokenValueParser.fraction)
+        self.counts = try table("component", TokenValueParser.count)
         self.docPadding = try parse("component.doc-pad", TokenValueParser.insets)
         self.material = MaterialTokens(
             opacity: try parse("material.opacity", TokenValueParser.unitNumber),

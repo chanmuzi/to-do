@@ -4,7 +4,7 @@ import Models
 import Routing
 import Store
 import Theme
-@testable import NotePanel
+@_spi(Verification) @testable import NotePanel
 
 /// 임시 폴더의 저장소와 테마로 노트 창을 실제로 만들어 보는 시험용 조립.
 @MainActor
@@ -28,14 +28,17 @@ final class NotePanelFixture {
 
     /// 앱을 다시 켠 것처럼 상태 파일을 새로 읽는 노트 창 묶음.
     /// - Parameter makeBodyEditor: 주지 않으면 기본 편집기를 쓴다.
+    /// 시험 중에 뜨는 창이 키 창이 되어 사용자가 다른 앱에 치던 글자를 받지 않게 한다.
     func makeCoordinator(makeBodyEditor: NoteBodyEditorFactory? = nil) throws -> NotePanelCoordinator {
-        NotePanelCoordinator(
+        let coordinator = NotePanelCoordinator(
             theme: theme, notes: notes, windowStates: try WindowStateStore(location: location),
             spaces: try SpaceStore(location: location),
             router: RouteDispatcher { [unowned self] in routes.append($0) },
             makeBodyEditor: makeBodyEditor ?? { PlainTextBodyEditor(theme: $0.theme) },
             log: { [unowned self] in logs.append($0) }
         )
+        coordinator.allowsKeyWindows = false
+        return coordinator
     }
 
     /// "동작 줄이기"가 켜져 있으면 전환이 바로 끝난다.

@@ -17,6 +17,8 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
     private let undoManager = UndoManager()
     /// 밖에서 글을 넣는 중. 이때 생기는 변경 알림(조합을 끊으며 나오는 것)은 사용자가 고친 것이 아니다.
     private var isAssigningText = false
+    /// 마지막으로 주고받은 글. 조합 중인 글자는 `textDidChange`가 오지 않아 이것과 달라질 수 있다.
+    private var exchangedText = ""
     private var themeObservation: (any NSObjectProtocol)?
 
     public init(theme: Theme) {
@@ -46,6 +48,7 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
             if textView.hasMarkedText() { textView.unmarkText() }
             textView.breakUndoCoalescing()
             textView.string = newValue
+            exchangedText = newValue
             // 밖에서 넣은 글은 실행 취소 기록에 없다. 옛 기록을 남기면 ⌘Z가 새 글에 없는 범위를 건드린다.
             undoManager.removeAllActions()
             applyTextAttributes()
@@ -66,6 +69,13 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
     public func textDidChange(_ notification: Notification) {
         measure()
         guard !isAssigningText else { return }
+        exchangedText = textView.string
+        onTextChange?(textView.string)
+    }
+
+    public func flushPendingChange() {
+        guard !isAssigningText, textView.string != exchangedText else { return }
+        exchangedText = textView.string
         onTextChange?(textView.string)
     }
 
@@ -119,7 +129,6 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
 
     private func applyTheme() {
         textView.padding = theme.docPadding
-        textView.caretWidth = theme.component(.caretWidth)
         textView.insertionPointColor = theme.nsColor(.accent)
         textView.textColor = theme.nsColor(.text)
         textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.hover)]

@@ -95,10 +95,14 @@ import Theme
         let theme = fixture.theme
         let empty = controller.panel.frame
         let chrome = theme.shape(.chromeHeight) + theme.shape(.borderWidth)
-        #expect(empty.height == chrome + theme.lineHeight(.body) + theme.docPadding.top + theme.docPadding.bottom)
+        // 빈 노트도 본문 네 줄만큼의 높이다(`note-body-lines-min`, D-031).
+        let minLines = CGFloat(theme.count(.noteBodyLinesMin))
+        #expect(minLines == 4)
+        #expect(empty.height
+            == chrome + theme.lineHeight(.body) * minLines + theme.docPadding.top + theme.docPadding.bottom)
         #expect(empty.width == theme.component(.noteWidth))
 
-        try typeText("첫 줄\n둘째 줄\n셋째 줄", into: controller)
+        try typeText("첫 줄\n둘째 줄\n셋째 줄\n넷째 줄\n다섯째 줄\n여섯째 줄", into: controller)
         // 높이가 움직이는 동안에도 위쪽 가장자리는 제자리다.
         var tops: Set<CGFloat> = [controller.panel.frame.maxY]
         #expect(await fixture.wait {
@@ -125,7 +129,7 @@ import Theme
         let controller = try #require(coordinator.controllers[note.id])
         let empty = controller.panel.frame
 
-        try typeText("첫 줄\n둘째 줄\n셋째 줄", into: controller)
+        try typeText("첫 줄\n둘째 줄\n셋째 줄\n넷째 줄\n다섯째 줄\n여섯째 줄", into: controller)
         let target = try #require(fixture.windowState(for: note.id)?.frame?.cgRect)
         #expect(target.height > empty.height)
         // 움직임이 실제로 시작됐다: 창은 아직 처음 높이이고, 목표를 향해 가는 중이다.
@@ -169,7 +173,7 @@ import Theme
 
     @Test func staleSavedHeightIsReplacedByTheContentHeightFromTheSameTopEdge() throws {
         defer { fixture.cleanUp() }
-        let note = try fixture.notes.create(NoteDraft(title: "키 큰 틀", body: "한 줄\n두 줄"))
+        let note = try fixture.notes.create(NoteDraft(title: "키 큰 틀", body: "하나\n둘\n셋\n넷\n다섯\n여섯"))
         let saved = CGRect(x: 200, y: 300, width: 400, height: 300)
         try WindowStateStore(location: fixture.location).set(
             NoteWindowState(frame: WindowFrame(saved), isPinned: true, isOpen: true), for: note.id
@@ -184,7 +188,7 @@ import Theme
         #expect(controller.panel.frame.maxY == saved.maxY)
         #expect(controller.panel.frame.width == saved.width)
         #expect(controller.panel.frame.height == theme.shape(.chromeHeight) + theme.shape(.borderWidth)
-            + theme.lineHeight(.body) * 2 + theme.docPadding.top + theme.docPadding.bottom)
+            + theme.lineHeight(.body) * 6 + theme.docPadding.top + theme.docPadding.bottom)
         controller.root.layoutSubtreeIfNeeded()
         #expect(controller.editor.view.frame.origin == .zero)
         let clip = try #require(controller.editor.view.enclosingScrollView?.contentView)
