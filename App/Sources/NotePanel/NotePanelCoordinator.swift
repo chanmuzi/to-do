@@ -43,6 +43,9 @@ public final class NotePanelCoordinator {
         stacked.forEach { $0.setHidden(false) }
     }
 
+    /// 확인용: 지금 시각을 바꿔 끼운다(마지막으로 연 때를 적는 데 쓴다).
+    @_spi(Verification) public var now: () -> Date = { Date() }
+
     /// "노트 모두 숨기기"가 켜져 있는지(spec 4.3).
     public private(set) var areNotesHidden = false
 
@@ -56,6 +59,8 @@ public final class NotePanelCoordinator {
     private var storeObservation: StoreObservation?
     private var observers: [any NSObjectProtocol] = []
     private var isRefreshingStore = false
+    /// 켤 때 지난번의 창을 되살리는 중이다. 사용자가 연 것이 아니므로 "마지막으로 연 때"를 적지 않는다.
+    private var isRestoring = false
     /// 방금 휴지통으로 보낸 노트. "바로 뒤"가 끝나면 비운다(`endTrashUndo()`를 부르는 곳들, D-024).
     private var lastTrashed: TrashedNote?
     /// 지금 휴지통으로 보내는 중인 노트. 그 창이 내려갈 때 키 입력을 어디에 둘지 정하는 데 쓴다.
@@ -84,7 +89,7 @@ public final class NotePanelCoordinator {
         environment = NotePanelEnvironment(
             style: PanelStyle(theme: theme), notes: notes, spaces: spaces, router: router,
             recorder: recorder, makeBodyEditor: makeBodyEditor,
-            options: { [unowned self] in displayOptions }, log: log
+            options: { [unowned self] in displayOptions }, now: { [unowned self] in now() }, log: log
         )
         storeObservation = notes.observe { [weak self] in self?.storeDidChange($0) }
         observeAppearance(of: theme)
@@ -101,7 +106,9 @@ public final class NotePanelCoordinator {
     /// 그사이 없어진 노트는 상태에서 지우고 넘어간다.
     @discardableResult
     public func restoreOpenNotes() -> [NoteID] {
-        recorder.openNoteIDs.filter { id in
+        isRestoring = true
+        defer { isRestoring = false }
+        return recorder.openNoteIDs.filter { id in
             do {
                 try open(id, focus: false)
                 return true
@@ -123,7 +130,7 @@ public final class NotePanelCoordinator {
     public func open(_ id: NoteID, nextTo: NoteID? = nil, focus: Bool = true) throws {
         setAllHidden(false)
         if let controller = controllers[id] {
-            controller.show(focus: focus)
+            controller.show(focus: focus, recordsOpening: !isRestoring)
             return
         }
         // 편집용으로 열 때는 목록의 값이 아니라 load의 값을 쓴다(충돌 기준이 여기서 잡힌다).
@@ -137,7 +144,7 @@ public final class NotePanelCoordinator {
         controller.panel.allowsKey = allowsKeyWindows
         controllers[id] = controller
         order.append(id)
-        controller.show(focus: focus)
+        controller.show(focus: focus, recordsOpening: !isRestoring)
     }
 
     /// 새 노트를 만들어 지금 노트 옆에 띄운다. 핀이 켜진 채로 뜬다(spec 4.1).
@@ -249,6 +256,19 @@ public final class NotePanelCoordinator {
         guard let front = frontmostNoteID else { return nil }
         controllers[front]?.takeKey()
         return front
+    }
+
+    /// 키 창을 잠깐 가져갔던 다른 화면(빠른 캡처, 노트 찾기)이 닫힐 때 App이 부른다: 그 전에 키 창이던
+    /// 노트가 다시 키 창이 된다. 제목을 고치던 중이 아니면 본문이 입력을 받고, 커서 자리는 그대로다.
+    /// 사용자가 다른 노트로 옮겨 간 것이 아니므로 휴지통 되돌리기(`canUndoTrash`)는 끝나지 않는다.
+    /// - Returns: 돌려주었으면 참. 그 노트가 떠 있지 않거나 숨겨져 있으면 아무것도 하지 않고 거짓.
+    @discardableResult
+    public func returnKey(to id: NoteID) -> Bool {
+        guard !areNotesHidden, let controller = controllers[id], controller.panel.isVisible else { return false }
+        let trashed = lastTrashed
+        controller.takeKey()
+        lastTrashed = trashed
+        return true
     }
 
     /// 맨 앞에 있는 노트: 키 창인 노트, 없으면 보이는 노트 가운데 가장 앞에 겹친 것.

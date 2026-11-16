@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Models
 import Store
 
@@ -44,11 +45,17 @@ struct WindowStateRecorder {
         write(id) { $0.isPinned = isPinned }
     }
 
-    /// 창이 맨 앞으로 왔다(띄움, 키 창이 됨). 이미 맨 앞이면 쓰지 않는다.
-    func recordFronted(_ id: NoteID) {
+    /// 창이 맨 앞으로 왔다(띄움, 키 창이 됨). 이미 맨 앞이고 적을 때도 없으면 쓰지 않는다.
+    /// - Parameter openedAt: 사용자가 이 노트를 열었거나 키 창으로 만든 때. 노트 찾기의 "최근에 연 노트" 차례에
+    ///   쓰인다(D-033). 켤 때 되살린 창처럼 사용자가 연 것이 아니면 주지 않는다. 겹친 차례와 한 번에 쓴다.
+    func recordFronted(_ id: NoteID, openedAt: Date? = nil) {
         let others = store.all.filter { $0.key != id }.values.compactMap(\.stackOrder).max() ?? 0
-        if let current = state(for: id).stackOrder, current > others { return }
-        write(id) { $0.stackOrder = others + 1 }
+        let isFront = state(for: id).stackOrder.map { $0 > others } ?? false
+        guard !isFront || openedAt != nil else { return }
+        write(id) {
+            if !isFront { $0.stackOrder = others + 1 }
+            if let openedAt { $0.lastOpened = openedAt }
+        }
     }
 
     /// 창만 닫았다. 틀과 핀은 다시 띄울 때를 위해 남긴다.
