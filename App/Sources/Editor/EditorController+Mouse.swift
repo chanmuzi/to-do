@@ -1,0 +1,177 @@
+import AppKit
+
+extension EditorController {
+    /// 마우스 아래에 있는 누를 수 있는 것.
+    enum Hit: Equatable {
+        case checkbox(line: Int)
+        case chevron(line: Int)
+        case link(line: Int, offset: Int, url: String)
+    }
+
+    /// 그 점(텍스트 뷰 좌표)의 문단 조각과 줄 번호.
+    private func fragment(at point: CGPoint) -> (fragment: MarkdownLayoutFragment, line: Int, local: CGPoint)? {
+        let origin = textView.textContainerOrigin
+        let containerPoint = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        guard let fragment = layoutManager.textLayoutFragment(for: containerPoint) as? MarkdownLayoutFragment else { return nil }
+        let frame = fragment.layoutFragmentFrame
+        guard containerPoint.y >= frame.minY, containerPoint.y < frame.maxY else { return nil }
+        let offset = contentStorage.offset(from: contentStorage.documentRange.location, to: fragment.rangeInElement.location)
+        guard offset >= 0, offset <= document.length else { return nil }
+        let local = CGPoint(x: containerPoint.x - frame.minX, y: containerPoint.y - frame.minY)
+        return (fragment, document.lineIndex(at: offset), local)
+    }
+
+    func hit(at point: CGPoint) -> Hit? {
+        guard let found = fragment(at: point) else { return nil }
+        let line = document.lines[found.line]
+        if let gutter = found.fragment.gutterRect, gutter.contains(found.local) {
+            switch line.kind {
+            case .todo: return .checkbox(line: found.line)
+            case .toggle: return .chevron(line: found.line)
+            default: return nil
+            }
+        }
+        if let link = found.fragment.link(at: found.local) {
+            // 링크 구간의 시작(기호 포함)을 줄 안 위치로 적어 둔다.
+            let span = line.spans.first { span in
+                if case .link = span.kind { span.contentRange.location - line.start == link.location } else { false }
+            }
+            return .link(line: found.line, offset: (span?.range.location ?? line.start + link.location) - line.start, url: link.url)
+        }
+        return nil
+    }
+
+    /// 그 줄 왼쪽 칸 그림(체크박스, 꺾쇠)의 가운데. 텍스트 뷰 좌표.
+    func gutterPoint(forLine line: Int) -> CGPoint? {
+        guard document.lines.indices.contains(line) else { return nil }
+        layoutManager.ensureLayout(for: layoutManager.documentRange)
+        guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[line].start),
+              let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment,
+              let gutter = fragment.gutterRect else { return nil }
+        let origin = textView.textContainerOrigin
+        let frame = fragment.layoutFragmentFrame
+        return CGPoint(
+            x: origin.x + frame.minX + gutter.minX + style.checkSize / 2,
+            y: origin.y + frame.minY + gutter.midY
+        )
+    }
+
+    /// 그 줄 글자 영역 안의 한 점(첫 줄 조각의 가운데 높이, 글자 시작 바로 뒤). 텍스트 뷰 좌표.
+    func textPoint(forLine line: Int) -> CGPoint? {
+        guard document.lines.indices.contains(line) else { return nil }
+        layoutManager.ensureLayout(for: layoutManager.documentRange)
+        guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[line].start),
+              let fragment = layoutManager.textLayoutFragment(for: location),
+              let first = fragment.textLineFragments.first else { return nil }
+        let origin = textView.textContainerOrigin
+        let frame = fragment.layoutFragmentFrame
+        let bounds = first.typographicBounds
+        return CGPoint(x: origin.x + frame.minX + bounds.minX + 1, y: origin.y + frame.minY + bounds.midY)
+    }
+
+    func isInteractive(at point: CGPoint) -> Bool {
+        hit(at: point) != nil
+    }
+
+    /// - Returns: 눌린 것을 처리했으면 `true`(텍스트 뷰는 커서를 옮기지 않는다).
+    func handleMouseDown(at point: CGPoint) -> Bool {
+        guard let hit = hit(at: point) else { return false }
+        switch hit {
+        case .checkbox(let line):
+            guard !textView.hasMarkedText() else { return true }
+            apply(EditorCommands.toggleDone(document, lines: line...line, selection: clamped(textView.selectedRange())))
+        case .chevron(let line):
+            toggleFold(line: line)
+        case .link(_, _, let url):
+            guard let target = URL(string: url.trimmingCharacters(in: .whitespaces)) else { return true }
+            if let onOpenLink { onOpenLink(target) } else { NSWorkspace.shared.open(target) }
+        }
+        return true
+    }
+
+    func toggleFold(line: Int) {
+        guard document.lines.indices.contains(line), document.lines[line].kind == .toggle else { return }
+        if folded.contains(line) {
+            setFolded(folded.subtracting([line]), notify: true)
+        } else {
+            // 커서가 접히는 줄 안에 있으면 토글 제목 끝으로 옮긴다.
+            let selection = clamped(textView.selectedRange())
+            let title = document.lines[line]
+            let subtreeEnd = title.subtreeEnd < document.lines.count ? document.lines[title.subtreeEnd].start : document.length + 1
+            if NSMaxRange(selection) > title.end, selection.location < subtreeEnd {
+                setSelection(NSRange(location: title.end, length: 0))
+            }
+            setFolded(folded.union([line]), notify: true)
+        }
+    }
+
+    /// - Returns: 누를 수 있는 것 위면 `true`(화살표 커서).
+    func handleMouseMoved(at point: CGPoint) -> Bool {
+        let hit = hit(at: point)
+        var link: (line: Int, offset: Int)?
+        if case .link(let line, let offset, _) = hit { link = (line, offset) }
+        if link?.line != hoveredLink?.line || link?.offset != hoveredLink?.offset {
+            hoveredLink = link
+            refreshStyling()
+        }
+        var block: ClosedRange<Int>?
+        if let found = fragment(at: point) { block = document.lines[found.line].codeBlock }
+        // 복사 버튼 위에 있는 동안에는 그 블록을 유지한다.
+        if block == nil, hoveredCodeBlock != nil, copyButton.frame.contains(point) { block = hoveredCodeBlock }
+        setHoveredCodeBlock(block)
+        return hit != nil
+    }
+
+    func handleMouseExited() {
+        if hoveredLink != nil {
+            hoveredLink = nil
+            refreshStyling()
+        }
+        setHoveredCodeBlock(nil)
+    }
+
+    // MARK: 코드 블록 복사 버튼
+
+    func setHoveredCodeBlock(_ block: ClosedRange<Int>?) {
+        guard block != hoveredCodeBlock else { return }
+        hoveredCodeBlock = block
+        layoutCopyButton()
+        copyButton.setVisible(block != nil, duration: Self.reduceMotion ? 0 : theme.motion.duration, timing: theme.motion.timingFunction)
+    }
+
+    /// 버튼을 블록의 오른쪽 위에 놓는다.
+    func layoutCopyButton() {
+        guard let block = hoveredCodeBlock, block.upperBound < document.lines.count else { return }
+        let location = document.lines[block.lowerBound].start
+        guard let textLocation = contentStorage.location(contentStorage.documentRange.location, offsetBy: location),
+              let fragment = layoutManager.textLayoutFragment(for: textLocation) else { return }
+        let origin = textView.textContainerOrigin
+        let frame = fragment.layoutFragmentFrame
+        let top = frame.minY + (fragment.textLineFragments.first?.typographicBounds.minY ?? 0)
+        let size = theme.component(.iconButton)
+        copyButton.frame = CGRect(
+            x: origin.x + textContainer.size.width - EditorMetrics.copyButtonInset - size,
+            y: origin.y + top + EditorMetrics.copyButtonInset,
+            width: size,
+            height: size
+        )
+    }
+
+    /// 블록 안의 코드(``` 줄 제외)를 클립보드에 올린다.
+    func copyHoveredCodeBlock() {
+        guard let block = hoveredCodeBlock else { return }
+        let code = codeText(in: block)
+        let pasteboard = codePasteboard
+        pasteboard.clearContents()
+        pasteboard.setString(code, forType: .string)
+    }
+
+    func codeText(in block: ClosedRange<Int>) -> String {
+        block.filter { document.lines[$0].kind == .code }
+            .map { index in
+                let line = document.lines[index]
+                return document.string(in: NSRange(location: line.start + line.indentLength, length: line.end - line.start - line.indentLength))
+            }
+            .joined(separator: "\n")
+    }
+}

@@ -58,11 +58,19 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
+        // 편집기만 띄워 보는 확인용 실행 파일. 앱에는 들어가지 않는다.
+        .executableTarget(
+            name: "EditorDemo",
+            dependencies: ["Editor", "Theme"],
+            swiftSettings: uiSettings
+        ),
+
         // MARK: Tests
         .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
         .testTarget(name: "StoreTests", dependencies: ["Store", "Models"]),
         .testTarget(name: "RoutingTests", dependencies: ["Routing", "Models"]),
+        .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
     ],
     swiftLanguageModes: [.v6]
 )
