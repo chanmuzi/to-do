@@ -15,7 +15,13 @@ public final class MarkdownEditor {
     }
 
     /// 편집기 뷰(세로 스크롤 뷰). 바탕은 그리지 않는다. 안쪽 여백(`doc-pad`)은 편집기가 둔다.
+    /// 바깥의 스크롤 뷰가 따로 있으면 이것 대신 `documentView`를 쓴다.
     public var view: NSView { controller.scrollView }
+
+    /// 스크롤 뷰 없이 본문만 든 뷰(뒤집힌 좌표). 바깥이 가진 스크롤 뷰의 문서 뷰로 넣을 때 쓴다(노트 창).
+    /// 바깥은 너비만 맞추고, 높이는 이 뷰가 내용에 맞춘다. 안쪽 여백은 여기에도 들어 있다.
+    /// 이것을 다른 곳에 넣으면 `view`(편집기의 스크롤 뷰)는 비게 되므로 둘 중 하나만 쓴다.
+    public var documentView: NSView { controller.textView }
 
     /// 원문. 줄바꿈은 언제나 `\n`이다: 넣을 때 `\r\n`, `\r`, U+2028, U+2029를 `\n`으로 바꾸므로
     /// 그런 글을 넣으면 읽은 값이 넣은 값과 다르다.
@@ -90,6 +96,13 @@ public final class MarkdownEditor {
     /// 본문에 포커스를 준다.
     public func focus() {
         controller.focus()
+    }
+
+    /// 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다(접힘, 높이도 함께).
+    /// 편집기는 글자 입력이 아닌 편집을 다음 메인 큐 차례에 알릴 때가 있다. 그 전에 창을 닫거나
+    /// 앱을 끝내는 쪽이 부른다. 알릴 것이 없으면 아무것도 하지 않는다.
+    public func flushPendingChange() {
+        controller.flushPendingChangeNow()
     }
 
     /// 편집 동작을 실행한다(단축키와 같은 일).

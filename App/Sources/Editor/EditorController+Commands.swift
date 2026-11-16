@@ -89,6 +89,12 @@ extension EditorController {
         layoutCopyButton()
     }
 
+    /// 바깥이 지금 알려 달라고 했다(창을 닫기 직전 등). 편집이나 되돌리기가 진행 중이면 그것이 끝나며 알린다.
+    func flushPendingChangeNow() {
+        guard !isApplyingEdit, !isReplayingUndo else { return }
+        flushPendingChange()
+    }
+
     /// 원문이 바뀌었다고 적어 두고, 아무도 알리지 않으면 다음 메인 큐 차례에 알리게 한다.
     func markTextChanged() {
         hasPendingChange = true

@@ -5,22 +5,12 @@ final class EditorTextView: NSTextView {
     weak var editor: EditorController?
     /// 본문 안쪽 여백의 왼쪽 위(위와 아래 여백이 달라 직접 정한다).
     var containerOrigin: NSPoint = .zero
-    var caretWidth: CGFloat = 1
 
     override var textContainerOrigin: NSPoint { containerOrigin }
 
-    // MARK: 커서
-
-    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
-        var thin = rect
-        thin.size.width = caretWidth
-        super.drawInsertionPoint(in: thin, color: color, turnedOn: flag)
-    }
-
-    override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
-        // 커서를 지울 때 원래 너비만큼만 다시 그리면 잔상이 남을 수 있어 조금 넓힌다.
-        super.setNeedsDisplay(rect.insetBy(dx: -caretWidth, dy: 0), avoidAdditionalLayout: flag)
-    }
+    // 입력 커서는 시스템의 것을 그대로 쓰고 색만 `insertionPointColor`로 맞춘다. 지금 macOS의 커서는
+    // 텍스트 뷰가 그리는 것이 아니라 따로 놓이는 표시 뷰여서, 옛 그리기 경로(`drawInsertionPoint`)를
+    // 덮어써 너비를 줄이면 두 번째 커서가 그려지고 지워지지 않는 자국이 남는다(D-025).
 
     // MARK: 포커스
 
@@ -90,6 +80,13 @@ final class EditorTextView: NSTextView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        // 이 뷰 위에 겹쳐 뜬 다른 뷰(노트 창의 휴지통, 닫기)가 마우스를 받는 자리에서는 글자 칸이 아니다.
+        // I자 커서를 넣지 않고 화살표로 둔다(규칙 9).
+        guard isHitView(for: event) else {
+            editor?.handleMouseExited()
+            NSCursor.arrow.set()
+            return
+        }
         // 누를 수 있는 곳(체크박스, 꺾쇠, 링크) 위에서는 화살표, 글자 위에서만 I자 커서(규칙 9).
         if editor?.handleMouseMoved(at: convert(event.locationInWindow, from: nil)) == true {
             NSCursor.arrow.set()
@@ -98,7 +95,20 @@ final class EditorTextView: NSTextView {
         }
     }
 
+    /// 그 자리에서 마우스를 받는 뷰가 이 뷰(또는 그 안의 뷰)인지.
+    func isHitView(for event: NSEvent) -> Bool {
+        guard let root = window?.contentView else { return true }
+        // `hitTest`는 받는 뷰의 상위 뷰 좌표로 받는다.
+        let point = root.superview?.convert(event.locationInWindow, from: nil) ?? event.locationInWindow
+        guard let hit = root.hitTest(point) else { return false }
+        return hit === self || hit.isDescendant(of: self)
+    }
+
     override func cursorUpdate(with event: NSEvent) {
+        guard isHitView(for: event) else {
+            NSCursor.arrow.set()
+            return
+        }
         if editor?.isInteractive(at: convert(event.locationInWindow, from: nil)) == true {
             NSCursor.arrow.set()
         } else {

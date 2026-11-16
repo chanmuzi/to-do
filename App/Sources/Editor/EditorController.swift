@@ -75,6 +75,7 @@ final class EditorController: NSObject {
     /// 원문이 바뀌었는데 아직 바깥에 알리지 않았다(조합 중인 글자는 `textDidChange`가 오지 않는다).
     var hasPendingChange = false
     var isFlushScheduled = false
+    var isHeightReportScheduled = false
     /// 텍스트 뷰에 넣어 둔 문서 끝 빈 줄의 문단 모양(`updateTrailingLineStyle`).
     var appliedTrailingStyle: NSParagraphStyle?
     /// 지금 넣는 편집이 접혀서 감춘 줄까지 일부러 고치는 것인지(`TextEdit.includesHiddenLines`).
@@ -196,7 +197,6 @@ final class EditorController: NSObject {
             height: (padding.top + padding.bottom) / 2
         )
         textView.containerOrigin = NSPoint(x: padding.leading, y: padding.top)
-        textView.caretWidth = theme.component(.caretWidth)
         textView.insertionPointColor = style.accent
         textView.font = style.body.font
         textView.textColor = style.text

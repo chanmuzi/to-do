@@ -110,6 +110,20 @@ extension EditorController {
         defer { appliedKeys = keys }
         guard let changed = LinePresentation.changedLines(old: appliedKeys, new: keys) else { return }
         invalidate(lines: changed)
+        scheduleHeightReport()
+    }
+
+    /// 줄의 모양만 바뀌어도 높이가 달라질 수 있다: 커서가 들어간 줄은 감췄던 기호(링크의 주소 등)가 보여
+    /// 줄이 넘어가고, 커서가 나가거나 창이 키 창에서 물러나면 다시 줄어든다. 글이 바뀐 것이 아니어서
+    /// 따로 알려야 창 높이가 따라온다. 선택이 바뀌는 도중일 수 있으므로 다음 메인 큐 차례에 잰다.
+    func scheduleHeightReport() {
+        guard !isHeightReportScheduled else { return }
+        isHeightReportScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isHeightReportScheduled = false
+            self.reportContentHeight()
+        }
     }
 
     func restyleAll() {
