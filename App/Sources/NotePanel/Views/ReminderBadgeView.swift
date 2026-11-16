@@ -10,6 +10,8 @@ final class ReminderBadgeView: ClickableView {
     private let iconView = NSImageView()
     private let label = InfoLabel()
     private var presentation: ReminderPresentation?
+    /// 다 사라진 뒤 숨기는 일(`dur` 뒤). 그사이 다시 나타나면 취소한다.
+    private var fadeSettle: Task<Void, Never>?
 
     init(style: PanelStyle) {
         self.style = style
@@ -38,8 +40,13 @@ final class ReminderBadgeView: ClickableView {
         self.presentation = presentation
         refresh()
         guard wasShown != isShown else { return }
-        style.fade(self, visible: isShown, animated: animated) { [weak self] in
-            guard let self, self.presentation == nil else { return }
+        fadeSettle?.cancel()
+        fadeSettle = style.fade(self, visible: isShown, animated: animated) { [weak self] in
+            guard let self else { return }
+            fadeSettle = nil
+            // 다 사라졌으면 숨긴다. 움직임이 어디까지 갔든 끝의 값으로 놓는다.
+            guard self.presentation == nil else { return }
+            alphaValue = 0
             isHidden = true
         }
     }

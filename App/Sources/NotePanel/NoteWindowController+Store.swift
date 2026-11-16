@@ -63,8 +63,9 @@ extension NoteWindowController {
         refreshChrome(animated: true)
     }
 
-    /// 저장소의 본문이 편집기와 마지막으로 주고받은 본문과 다를 때만 편집기에 넣는다.
-    /// 끝에 글이 붙은 것이면 붙은 글만 넘겨 편집기가 실행 취소 기록과 조합 중인 글자를 지키게 한다.
+    /// 저장소의 본문이 편집기와 마지막으로 주고받은 본문과 다를 때만 편집기에 넘긴다. `text`에 넣지 않는다:
+    /// 끝에 글이 붙은 것이면 붙은 글만(`appendFromOutside`), 아니면 새 본문을(`applyOutsideChange`) 넘겨
+    /// 편집기가 달라진 곳만 바꾸고 커서, 접힘, 실행 취소 기록, 조합 중인 글자를 지키게 한다.
     private func syncEditorBody() {
         guard note.body != exchangedBody else { return }
         let old = exchangedBody.unicodeScalars
@@ -75,7 +76,7 @@ extension NoteWindowController {
             suffix.append(contentsOf: new.dropFirst(old.count))
             editor.appendFromOutside(String(suffix))
         } else {
-            editor.text = note.body
+            editor.applyOutsideChange(to: note.body)
         }
     }
 

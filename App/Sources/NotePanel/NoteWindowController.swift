@@ -254,7 +254,15 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         let menu = NoteMenuBuilder(style: environment.style).moreMenu(
-            isPinned: isPinned, selectedPaletteID: note.colorID?.rawValue
+            isPinned: isPinned, selectedPaletteID: note.colorID?.rawValue,
+            isAvailable: { action in
+                switch action {
+                case .setReminder: router.isConnected(.openReminderEditor(id))
+                case .moveToSpace: router.isConnected(.openSpacePicker(id))
+                case .openAIPanel: router.isConnected(.openAIPanel(context: id))
+                case .togglePin, .setColor, .closeWindow, .moveToTrash: true
+                }
+            }
         ) { [weak self] action in
             switch action {
             case .setReminder: router.route(.openReminderEditor(id))

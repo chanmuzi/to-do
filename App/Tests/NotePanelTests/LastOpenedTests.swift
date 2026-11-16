@@ -100,4 +100,36 @@ import Testing
         recorder.recordFronted(id)
         #expect(writes == 1)
     }
+
+    /// 검토에서 나온 문제: 키 창이 될 때마다, 그리고 창 하나를 띄울 때 세 번씩 `windows.json` 전체를 다시 썼다.
+    /// 앱이 쓰는 저장소(쓰기를 한데 모음)에서는 창을 띄우고 키 창이 다섯 번 되어도 파일은 한 번만 쓰이고,
+    /// 그사이에도 읽는 쪽(노트 찾기)은 지금 값을 본다.
+    @Test func openingAndRepeatedKeyChangesRewriteTheStateFileOnce() throws {
+        let states = try WindowStateStore(location: fixture.location, writeDelay: .seconds(60))
+        let coordinator = try fixture.makeCoordinator(windowStates: states)
+        defer { fixture.cleanUp(coordinator) }
+        var clock = date(0)
+        coordinator.now = { clock }
+        let id = try fixture.notes.create(NoteDraft(title: "하나")).id
+
+        try coordinator.open(id, focus: false)
+        let controller = try #require(coordinator.controllers[id])
+        for step in 1...5 {
+            clock = date(Double(step) * 60)
+            controller.windowDidBecomeKey(
+                Notification(name: NSWindow.didBecomeKeyNotification, object: controller.panel)
+            )
+        }
+
+        #expect(states.writeCount == 0)
+        #expect(states.state(for: id)?.lastOpened == date(300))
+        #expect(states.state(for: id)?.isOpen == true)
+        // 끝낼 때(또는 미루는 시간이 지나면) 한 번에 쓴다.
+        try states.flush()
+        #expect(states.writeCount == 1)
+        let saved = try #require(try fixture.windowState(for: id))
+        #expect(saved.lastOpened == date(300))
+        #expect(saved.isOpen)
+        #expect(saved.frame != nil)
+    }
 }

@@ -30,6 +30,8 @@ final class TopRowView: NSView {
     private var state: TopRowState?
     /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
     private var holdsProblemSlot = false
+    /// 표시가 다 사라진 뒤 자리를 비우는 일(`dur` 뒤). 그사이 다시 바뀌면 취소한다.
+    private var problemFade: Task<Void, Never>?
     private var mouseDownEvent: NSEvent?
 
     init(style: PanelStyle) {
@@ -120,8 +122,13 @@ final class TopRowView: NSView {
         let isShown = problem != nil
         guard isShown != wasShown else { return }
         if isShown { holdsProblemSlot = true }
-        style.fade(problemButton, visible: isShown, animated: animated) { [weak self] in
-            guard let self, self.state?.problem == nil else { return }
+        problemFade?.cancel()
+        problemFade = style.fade(problemButton, visible: isShown, animated: animated) { [weak self] in
+            guard let self else { return }
+            problemFade = nil
+            // 다 사라졌으면 자리를 비운다. 움직임이 어디까지 갔든 끝의 값으로 놓는다.
+            guard self.state?.problem == nil else { return }
+            problemButton.alphaValue = 0
             problemButton.isHidden = true
             holdsProblemSlot = false
             needsLayout = true
