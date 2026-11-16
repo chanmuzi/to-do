@@ -1,0 +1,17 @@
+# 로컬 전용 참고 자료 (시안 원본, 캡처, 웹 글꼴). 필요한 파일만 골라 App/ 로 복사해 커밋한다
+/design/
+*.zip
+
+# 로컬 전용 규칙·메모 (git 히스토리에 남기지 않는다)
+CLAUDE.local.md
+AGENTS.local.md
+*.local.md
+/local/
+
+# macOS / Xcode / SwiftPM
+.DS_Store
+.build/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
