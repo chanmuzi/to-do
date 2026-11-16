@@ -128,4 +128,49 @@ import Testing
         #expect(shown == ["노트를 되살리지 못했습니다"])
         #expect(fixture.notePanels.openNoteIDs.isEmpty)
     }
+
+    /// 검토에서 나온 문제: 되살릴 수 없는 노트(휴지통의 파일이 없어짐)가 남아 ⌘Z를 계속 삼켰다.
+    /// 한 번 알린 뒤에는 ⌘Z가 글의 실행 취소로 간다.
+    @Test func undoGoesBackToTheTextAfterARestoreThatCanNeverSucceed() throws {
+        defer { fixture.cleanUp() }
+        var shown: [String] = []
+        var forwarded = 0
+        fixture.commands.presentFailure = { title, _ in shown.append(title) }
+        fixture.commands.forwardUndo = { _ in forwarded += 1 }
+        let (id, _) = try fixture.open(NoteDraft(title: "사라질 노트"))
+        fixture.notePanels.moveToTrash(id)
+        try FileManager.default.removeItem(
+            at: fixture.location.trashDirectory.appendingPathComponent("\(id.rawValue).md")
+        )
+
+        fixture.commands.undoOrRestoreTrash(nil)
+        fixture.commands.undoOrRestoreTrash(nil)
+        fixture.commands.undoOrRestoreTrash(nil)
+
+        #expect(shown == ["노트를 되살리지 못했습니다"])
+        #expect(forwarded == 2)
+        #expect(!fixture.notePanels.canUndoTrash)
+    }
+
+    /// 검토에서 나온 문제: B에 글을 쓰고, A를 휴지통으로 보내고, B로 돌아가 ⌘Z를 누르면 A가 되살아났다.
+    /// B가 키 창이 되면 ⌘Z는 B의 글을 되돌린다.
+    @Test func undoAfterMovingToAnotherNoteGoesToThatNotesText() throws {
+        defer { fixture.cleanUp() }
+        var forwarded = 0
+        fixture.commands.forwardUndo = { _ in forwarded += 1 }
+        let (_, other) = try fixture.open(NoteDraft(title: "B", body: "처음"))
+        other.editor.textView.insertText("!", replacementRange: NSRange(location: 0, length: 0))
+        let (trashed, _) = try fixture.open(NoteDraft(title: "A"))
+        fixture.notePanels.moveToTrash(trashed)
+        #expect(fixture.notePanels.canUndoTrash)
+
+        // 사용자가 B를 눌러 B가 키 창이 되었다.
+        let window = try #require(other.view.window)
+        window.delegate?.windowDidBecomeKey?(Notification(name: NSWindow.didBecomeKeyNotification, object: window))
+        fixture.commands.undoOrRestoreTrash(nil)
+
+        #expect(forwarded == 1)
+        #expect(fixture.notePanels.openNoteIDs.count == 1)
+        #expect(!FileManager.default.fileExists(atPath: fixture.noteFile(trashed).path))
+    }
 }

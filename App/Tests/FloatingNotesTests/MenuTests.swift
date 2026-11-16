@@ -176,4 +176,35 @@ import Theme
         #expect(edit.items.filter { $0.title == "이모지 및 기호" }.count == 2)
         #expect(added.isHidden && added.allowsKeyEquivalentWhenHidden && added.keyEquivalent == "e")
     }
+
+    /// 한글 입력 소스에서 이벤트에 라틴 글자가 아닌 글자(두벌식의 자모)가 실려 와도 표에 적힌 자리의 키가 듣는다.
+    /// AppKit이 글자로 맞는 항목을 찾지 못하면 앱 메뉴가 키 자리로 한 번 더 찾는다(`KeyCodeMenu`).
+    @Test func mainMenuHearsShortcutsByKeyPositionUnderAKoreanInputSource() throws {
+        defer { fixture.cleanUp() }
+        var forwardedUndo = 0
+        fixture.commands.forwardUndo = { _ in forwardedUndo += 1 }
+        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        func press(_ chord: KeyChord, characters: String) throws -> Bool {
+            let event = try #require(NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: chord.modifiers.eventFlags, timestamp: 0,
+                windowNumber: 0, context: nil, characters: characters, charactersIgnoringModifiers: characters,
+                isARepeat: false, keyCode: chord.key.keyCode
+            ))
+            return menu.performKeyEquivalent(with: event)
+        }
+
+        // 두벌식에서 N 자리는 "ㅜ", P 자리는 "ㅔ", Z 자리는 "ㅋ"다.
+        #expect(try press(KeyChord(.n, .command), characters: "ㅜ"))
+        #expect(try press(KeyChord(.p, .command), characters: "ㅔ"))
+        #expect(try press(KeyChord(.t, [.shift, .command]), characters: "ㅆ"))
+        #expect(try press(KeyChord(.z, .command), characters: "ㅋ"))
+        #expect(fixture.receivedRoutes == [.newNote(NewNoteRequest()), .openBrowse(anchor: nil)])
+        #expect(forwardedUndo == 1)
+        // 보조 키가 다르면 듣지 않는다. 표에 없는 자리도 듣지 않는다.
+        #expect(try !press(KeyChord(.n, [.option, .command]), characters: "ㅜ"))
+        #expect(try !press(KeyChord(.k, [.control, .command]), characters: "ㅏ"))
+        // 라틴 글자로 오는 보통의 경우는 한 번만 한다(글자로 맞은 뒤 자리로 또 하지 않는다).
+        #expect(try press(KeyChord(.comma, .command), characters: ","))
+        #expect(fixture.receivedRoutes.count == 3)
+    }
 }

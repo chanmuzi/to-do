@@ -1,3 +1,4 @@
+import Routing
 import Testing
 @testable import FloatingNotes
 
@@ -37,10 +38,46 @@ import Testing
         }
     }
 
-    @Test func registersTheFourGlobalRowsAndDispatchesTheirCommands() {
+    /// 여는 화면이 아직 이어지지 않은 동작의 키는 등록하지 않는다. 등록하면 그 키가 시스템 전체에서
+    /// 다른 앱에 가지 않는데 이 앱은 기록만 한다.
+    @Test func onlyCommandsWithAConnectedScreenAreRegistered() {
         let registrar = FakeRegistrar()
         var performed: [AppCommand] = []
         let hotKeys = GlobalHotKeys(registrar: registrar) { performed.append($0) }
+
+        let failures = hotKeys.register(.standard)
+
+        #expect(failures.isEmpty)
+        // 지금 이어진 것은 "노트 모두 숨기기"뿐이다. 빠른 캡처, 라이브러리, AI 패널은 화면이 없다.
+        #expect(hotKeys.registered == [.toggleNotesHidden: KeyChord(.h, [.control, .option])])
+        #expect(hotKeys.skipped == [.quickCapture, .library, .aiPanel])
+        #expect(Set(registrar.chords.values) == [KeyChord(.h, [.control, .option])])
+        registrar.press(KeyChord(.n, [.control, .option]))
+        registrar.press(KeyChord(.h, [.control, .option]))
+        #expect(performed == [.toggleNotesHidden])
+    }
+
+    /// 등록할지는 요청이 이어져 있는지 하나로 정해진다(`Route.isConnected`). 그 값을 바꾸면 따라온다.
+    @Test func availabilityFollowsTheConnectedRoutes() {
+        #expect(Route.toggleAllNotesHidden.isConnected && AppCommand.toggleNotesHidden.isConnected)
+        #expect(AppCommand.quickCapture.isConnected == Route.openCapture.isConnected)
+        #expect(AppCommand.library.isConnected == Route.openLibrary.isConnected)
+        #expect(AppCommand.aiPanel.isConnected == Route.openAIPanel(context: nil).isConnected)
+        #expect(AppCommand.findNote.isConnected == Route.openBrowse(anchor: nil).isConnected)
+        #expect(!AppCommand.quickCapture.isConnected)
+
+        // 화면이 이어진 뒤처럼 넘기면 그 키도 등록된다.
+        let registrar = FakeRegistrar()
+        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { $0 != .aiPanel }) { _ in }
+        hotKeys.register(.standard)
+        #expect(Set(hotKeys.registered.keys) == [.quickCapture, .toggleNotesHidden, .library])
+        #expect(hotKeys.skipped == [.aiPanel])
+    }
+
+    @Test func registersTheFourGlobalRowsAndDispatchesTheirCommands() {
+        let registrar = FakeRegistrar()
+        var performed: [AppCommand] = []
+        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { _ in true }) { performed.append($0) }
 
         let failures = hotKeys.register(.standard)
 
@@ -61,7 +98,7 @@ import Testing
         let registrar = FakeRegistrar()
         registrar.taken = [KeyChord(.n, [.control, .option])]
         registrar.failingStatus = [KeyChord(.a, [.control, .option]): -50]
-        let hotKeys = GlobalHotKeys(registrar: registrar) { _ in }
+        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { _ in true }) { _ in }
 
         let failures = hotKeys.register(.standard)
 
@@ -79,7 +116,7 @@ import Testing
         let registrar = FakeRegistrar()
         registrar.taken = [KeyChord(.n, [.control, .option])]
         var performed: [AppCommand] = []
-        let hotKeys = GlobalHotKeys(registrar: registrar) { performed.append($0) }
+        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { _ in true }) { performed.append($0) }
         hotKeys.register(.standard)
         let replacement = KeyChord(.k, [.control, .option])
 

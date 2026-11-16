@@ -3,9 +3,21 @@ import Carbon.HIToolbox
 /// Carbon `RegisterEventHotKey`로 전역 단축키를 등록한다(D-011). 손쉬운 사용 권한이 필요 없다.
 /// 누른 키는 앱의 이벤트 대상으로 오고, 메인 런 루프에서 `handler`를 부른다.
 ///
-/// 독점(`kEventHotKeyExclusive`)으로 등록한다. 보통 등록은 다른 앱이 같은 키를 이미 등록했어도 받아들여져
-/// 겹친 것을 알 수 없다. 독점 등록은 같은 키가 이미 등록돼 있으면 `eventHotKeyExistsErr`로 실패하므로,
-/// 그것으로 "다른 앱이 쓰는 키"를 안다(spec 13, 19).
+/// 독점(`kEventHotKeyExclusive`)으로 등록한다. 까닭은 SDK의 `CarbonEvents.h`(HIToolbox)에 적힌 동작이다(D-024).
+/// - 보통 등록(`kEventHotKeyNoOptions`)은 겹쳐도 받아들여진다: "Hot keys are normally non-exclusive: when the
+///   key is pressed, notification events are sent to all registrants for that hotkey." 그래서 보통 등록으로는
+///   다른 앱이 쓰는 키인지 알 수 없다.
+/// - 독점 등록은 겹치면 실패한다: "An error is returned when an attempt is made to register an exclusive key
+///   while another hot key is already registered for that key code and modifiers." 그것으로 "다른 앱이 쓰는
+///   키"를 안다(spec 13, 19).
+/// - 독점 등록이 살아 있는 동안 뒤에 온 보통 등록은 받아들여지지만 키를 받지 못한다: "non-exclusive
+///   registrations are accepted as normal, but will not receive notification events until the exclusive hot key
+///   is disabled, removed, or the owning app goes away."
+///
+/// 실패 값은 헤더 안에서도 설명이 둘로 갈린다. 위 옵션 설명은 "이미 등록된 다른 단축키"가 있으면 실패한다고
+/// 하고, `RegisterEventHotKey`의 Result는 `eventHotKeyExistsErr`가 "another process has already registered the
+/// same hotkey using the kEventHotKeyExclusive option"일 때 돌아온다고만 한다. 그래서 다른 앱이 보통으로 등록해
+/// 둔 키에서 어떤 값이 오는지는 헤더만으로는 정해지지 않는다. 등록기는 받은 `OSStatus`를 그대로 던진다.
 final class CarbonHotKeyRegistrar: HotKeyRegistering {
     /// 이 앱의 단축키를 가리는 표시("FNhk").
     private static let signature: OSType = 0x464E_686B

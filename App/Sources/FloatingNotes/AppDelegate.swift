@@ -11,8 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notePanels: NotePanelCoordinator?
     private var editors: NoteEditorFactory?
     private var commands: AppCommandDispatcher?
-    private var statusItem: StatusItemController?
-    private var menuBarIcon: NSImage?
+    private var menuBarIcon: MenuBarIconSwitch<StatusItemController>?
+    private var fallbackNote: FallbackNotePresenter?
+    private var activationFocus = ActivationFocusPolicy()
     private var hotKeys: GlobalHotKeys?
     #if DEBUG
     private var debugControl: DebugControl?
@@ -42,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 log: AppLog.warning
             )
             #if DEBUG
-            if options.debugIsPassive { notePanels.allowsKeyWindows = false }
+            if options.debugIsPassive { notePanels.refuseKeyWindowsForVerification() }
             #endif
             router.notePanels = notePanels
             self.router = router
@@ -55,15 +56,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             application.mainMenu = MainMenu.make(
                 appName: ProcessInfo.processInfo.processName, table: shortcuts, dispatcher: commands
             )
-            menuBarIcon = try MenuBarIcon.load()
-            applyMenuBarIcon(
+            menuBarIcon = makeMenuBarIconSwitch(environment, notePanels, commands)
+            // 꺼 두었으면 아이콘 파일을 읽지 않는다. 켰는데 읽지 못하면 경고만 남기고 아이콘 없이 간다.
+            menuBarIcon?.apply(
                 shown: options.menuBarIconOverride ?? environment.settings.settings.showsMenuBarIcon
             )
             registerGlobalHotKeys(shortcuts, commands)
-            try showInitialWindows(environment, notePanels)
+            let fallbackNote = FallbackNotePresenter(
+                notes: environment.notes, notePanels: notePanels, warn: AppLog.warning,
+                presentFailure: { RouteFailureAlert.present(title: $0, error: $1) }
+            )
+            self.fallbackNote = fallbackNote
+            // 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 하나를 띄운다.
+            if notePanels.restoreOpenNotes().isEmpty { try fallbackNote.showFallbackNote() }
             #if DEBUG
             try startDebugging(router: router, notePanels: notePanels)
             #endif
+            activationFocus.launchFinished(at: ProcessInfo.processInfo.systemUptime)
         } catch {
             presentLaunchFailure(error)
         }
@@ -71,11 +80,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 다른 프로그램이 제자리에서 고친 노트 파일은 폴더 감시가 잡지 못한다. 앱이 앞으로 올 때 다시 훑는다.
     /// 노트 창은 눌러도 앱을 앞으로 가져오지 않으므로, 노트 창이 키 창이 될 때는 `NotePanelCoordinator`가 훑는다.
+    ///
+    /// 사용자가 앱을 앞으로 가져온 것이면(⌘Tab, Dock) 맨 앞 노트가 키 창이 된다. 노트 창은 저절로 키 창이 되지
+    /// 않으므로 여기서 시키지 않으면 앱이 앞에 있어도 키를 받을 창이 없다. 켜면서 오는 활성화는 뺀다(D-025).
     func applicationDidBecomeActive(_ notification: Notification) {
         do {
             try environment?.notes.refresh()
         } catch {
             AppLog.warning("노트 폴더를 다시 읽지 못했습니다: \(error)")
+        }
+        if activationFocus.shouldFocusNote(activatedAt: ProcessInfo.processInfo.systemUptime) {
+            notePanels?.focusFrontmostNote()
         }
     }
 
@@ -97,18 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// Dock 아이콘을 눌렀을 때: 숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄운다.
+    /// Dock 아이콘을 눌렀을 때: 숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄우고, 맨 앞 노트가
+    /// 키 창이 된다. 띄우지 못하면 알림 창으로 까닭을 보여 준다(`FallbackNotePresenter`).
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        guard let environment, let notePanels else { return false }
-        if notePanels.areNotesHidden {
-            notePanels.toggleAllHidden()
-        } else if notePanels.openNoteIDs.isEmpty {
-            do {
-                try showFallbackNote(environment, notePanels)
-            } catch {
-                AppLog.warning("노트를 띄우지 못했습니다: \(error)")
-            }
-        }
+        fallbackNote?.handleReopen()
         return false
     }
 
@@ -122,19 +129,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             AppLog.warning("메뉴 막대 아이콘 설정을 저장하지 못했습니다: \(error)")
         }
-        applyMenuBarIcon(shown: shown)
+        menuBarIcon?.apply(shown: shown)
     }
 
-    private func applyMenuBarIcon(shown: Bool) {
-        guard shown else {
-            statusItem = nil
-            return
-        }
-        guard statusItem == nil, let environment, let notePanels, let commands, let menuBarIcon else { return }
-        statusItem = StatusItemController(
-            theme: environment.theme, icon: menuBarIcon,
-            areNotesHidden: { [unowned notePanels] in notePanels.areNotesHidden },
-            perform: { [unowned commands] in commands.performStatusMenu($0) }
+    private func makeMenuBarIconSwitch(
+        _ environment: AppEnvironment, _ notePanels: NotePanelCoordinator, _ commands: AppCommandDispatcher
+    ) -> MenuBarIconSwitch<StatusItemController> {
+        MenuBarIconSwitch(
+            loadIcon: MenuBarIcon.load,
+            makeItem: { [unowned notePanels, unowned commands] icon in
+                StatusItemController(
+                    theme: environment.theme, icon: icon,
+                    areNotesHidden: { notePanels.areNotesHidden },
+                    perform: { commands.performStatusMenu($0) }
+                )
+            },
+            warn: AppLog.warning
         )
     }
 
@@ -148,7 +158,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 켤 때
 
-    /// "어디서나" 쓰는 단축키를 등록한다. 다른 앱이 쓰는 키는 등록되지 않는다. 숨기지 않고 경고로 남긴다
+    /// "어디서나" 쓰는 단축키를 등록한다. 여는 화면이 아직 없는 동작의 키는 등록하지 않는다
+    /// (`AppCommand.isConnected`). 다른 앱이 쓰는 키는 등록되지 않는다. 숨기지 않고 경고로 남긴다
     /// (설정 화면이 생기면 `GlobalHotKeys.failures`로 그 자리에서 알린다).
     private func registerGlobalHotKeys(_ table: ShortcutTable, _ commands: AppCommandDispatcher) {
         #if DEBUG
@@ -161,27 +172,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.hotKeys = hotKeys
     }
 
-    /// 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 하나를 띄운다.
-    private func showInitialWindows(_ environment: AppEnvironment, _ notePanels: NotePanelCoordinator) throws {
-        if notePanels.restoreOpenNotes().isEmpty {
-            try showFallbackNote(environment, notePanels)
-        }
-    }
-
-    /// 떠 있는 노트가 없을 때 띄울 것. 노트가 하나도 없으면 빈 노트를 새로 만든다
-    /// (안내 문구 없이 커서만 있는 노트, spec 16과 규칙 3). 있으면 가장 최근에 고친 노트를 띄운다.
-    private func showFallbackNote(_ environment: AppEnvironment, _ notePanels: NotePanelCoordinator) throws {
-        let listing = try environment.notes.list()
-        for failure in listing.failures {
-            AppLog.warning("노트 파일을 읽지 못해 건너뜁니다: \(failure.error)")
-        }
-        if let recent = listing.notes.first {
-            try notePanels.open(recent.id)
-        } else {
-            try notePanels.createNote()
-        }
-    }
-
     #if DEBUG
     private func startDebugging(router: AppRouter, notePanels: NotePanelCoordinator) throws {
         options.debugHover.forEach { notePanels.setHoverOverride(true, for: $0) }
@@ -190,7 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let control = DebugControl(
             session: try DebugControlSession.start(in: directory), router: router, notePanels: notePanels,
             editors: editors, commands: commands, hotKeys: hotKeys, isPassive: options.debugIsPassive,
-            statusItem: { [unowned self] in statusItem },
+            statusItem: { [unowned self] in menuBarIcon?.item },
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )

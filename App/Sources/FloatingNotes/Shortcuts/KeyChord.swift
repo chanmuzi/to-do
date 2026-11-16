@@ -1,6 +1,11 @@
 import AppKit
 
 /// 단축키에 쓰는 키. 자판 배열과 입력 소스(한글)에 상관없이 같게 동작하도록 키 자리(가상 키 코드)로 적는다.
+///
+/// 듣는 곳마다 견주는 방식:
+/// - 전역 단축키(`CarbonHotKeyRegistrar`)와 편집기(`EditorShortcuts`)는 키 자리(`keyCode`)로 견준다.
+/// - 앱 메뉴(`MainMenu`)의 항목은 AppKit이 글자(`menuKeyEquivalent`)로 견준다. 글자가 맞지 않으면
+///   (`KeyCodeMenu`) 키 자리로 한 번 더 찾으므로, 이벤트에 한글 자모가 실려 와도 같은 자리의 키가 듣는다.
 nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
     case a, b, c, e, f, h, k, l, m, n, p, q, r, t, v, w, x, z
     case one, two, three, nine

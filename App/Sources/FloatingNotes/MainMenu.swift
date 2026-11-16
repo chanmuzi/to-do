@@ -6,6 +6,10 @@ import AppKit
 /// `allowsKeyEquivalentWhenHidden`을 켠 항목이다. 메뉴에는 나타나지 않고 키만 듣는다.
 /// 노트 창의 단축키(spec 13 "노트 창")는 `ShortcutTable`에서 읽어 모두 이렇게 넣는다. 편집기의 단축키는
 /// 편집기가 먼저 받고(뷰가 메뉴보다 앞선다), 표에 없는 표준 편집 키(⌘Z, ⌘C 등)는 여기에 적혀 있다.
+///
+/// 키를 견주는 방식: AppKit은 메뉴 항목의 `keyEquivalent`를 이벤트의 글자와 견준다. 그것으로 맞는 항목이
+/// 없으면 `KeyCodeMenu`가 키 자리(가상 키 코드)와 보조 키로 숨긴 짝 항목을 한 번 더 찾는다. 그래서 이벤트에
+/// 라틴 글자가 아닌 글자(한글 자모 등)가 실려 와도 표에 적힌 자리의 키가 듣는다(`ShortcutKey`).
 enum MainMenu {
     /// - Parameter dispatcher: 노트 창 동작과 실행 취소를 받는 쪽.
     static func make(appName: String, table: ShortcutTable, dispatcher: AppCommandDispatcher) -> NSMenu {
@@ -21,7 +25,7 @@ enum MainMenu {
         let unlisted = table.entries(in: .noteWindow).compactMap(\.command).filter { !listed.contains($0) }
         let undo = #selector(AppCommandDispatcher.undoOrRestoreTrash(_:))
 
-        let menu = NSMenu()
+        let menu = KeyCodeMenu(title: "")
         // 메뉴 막대 메뉴의 항목은 여기에도 모두 있다. 메뉴 막대 아이콘을 꺼 두어도 같은 기능을 쓸 수 있다.
         menu.addItem(submenu(
             title: appName,
@@ -80,6 +84,7 @@ enum MainMenu {
     ) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: chord.key.menuKeyEquivalent)
         item.keyEquivalentModifierMask = chord.modifiers.eventFlags
+        item.tag = KeyCodeMenu.tag(for: chord)
         item.target = target
         item.isHidden = true
         item.allowsKeyEquivalentWhenHidden = true

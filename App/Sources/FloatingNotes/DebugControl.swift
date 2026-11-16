@@ -2,8 +2,15 @@
 import AppKit
 @_spi(Verification) import Editor
 import Models
-import NotePanel
+@_spi(Verification) import NotePanel
 import Routing
+
+extension NotePanelCoordinator {
+    /// `--debug-passive`: 노트 창이 키 창이 되지 않게 한다(확인용 실행이 사용자의 키 입력을 가져오지 않게).
+    func refuseKeyWindowsForVerification() {
+        allowsKeyWindows = false
+    }
+}
 
 /// 확인용 명령을 받는 곳. 디버그 빌드에서 `--debug-control <출력 폴더>`로 켰을 때만 듣는다.
 /// 마우스와 키보드를 건드리지 않고 실행 중인 앱의 상태를 바꾸고 읽기 위한 것이다. 릴리스 빌드에는 없다.

@@ -1,5 +1,5 @@
 import AppKit
-import Editor
+@testable import Editor
 import Foundation
 import Testing
 import Theme
@@ -119,5 +119,56 @@ import Theme
 
         #expect(NoteEditorOptions().checkbox.rawValue == defaults["checkbox"])
         #expect(CheckboxStyle.allCases.map(\.rawValue) == all)
+    }
+
+    // MARK: - 편집기의 키와 견주는 것
+
+    /// "편집" 줄은 두 곳에 있다: 보여 주는 표(`ShortcutTable`)와 편집기가 실제로 듣는 키(`EditorShortcuts`).
+    /// 한쪽만 고치면 표에 적힌 키가 듣지 않거나 표에 없는 키가 듣는다. 줄마다 키 자리, 보조 키, 동작이 같아야 한다.
+    @Test func editingRowsMatchTheKeysTheEditorActuallyHears() throws {
+        let expected: [String: [EditorAction]] = [
+            "투두로 바꾸기": [.toggleTodo],
+            "완료 표시": [.toggleDone],
+            "줄 위로, 아래로 옮기기": [.moveLineUp, .moveLineDown],
+            "접기, 펼치기": [.fold, .unfold],
+            "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],
+            "굵게": [.bold],
+            "취소선": [.strikethrough],
+            "형광펜 (다시 누르면 다음 색)": [.highlight],
+            "인라인 코드": [.inlineCode],
+            "코드 블록": [.codeBlock],
+            "링크": [.link],
+        ]
+        func modifiers(_ chord: KeyChord) -> EditorShortcuts.Modifiers {
+            var result: EditorShortcuts.Modifiers = []
+            if chord.modifiers.contains(.command) { result.insert(.command) }
+            if chord.modifiers.contains(.shift) { result.insert(.shift) }
+            if chord.modifiers.contains(.option) { result.insert(.option) }
+            if chord.modifiers.contains(.control) { result.insert(.control) }
+            return result
+        }
+        // Tab, ⇧Tab은 편집기가 글자 입력 경로에서 받는다(단축키 목록에 없다).
+        let typed: Set<String> = ["들여쓰기 (하위 계층으로)", "내어쓰기"]
+        let rows = ShortcutTable.standard.entries(in: .editing).filter { !typed.contains($0.action) }
+        #expect(ShortcutTable.standard.entries(in: .editing).count == rows.count + typed.count)
+        #expect(Set(rows.map(\.action)) == Set(expected.keys))
+
+        var fromTable: Set<EditorShortcuts.Binding> = []
+        for row in rows {
+            let actions = try #require(expected[row.action], "\(row.action)")
+            #expect(row.chords.count == actions.count, "\(row.action)")
+            for (chord, action) in zip(row.chords, actions) {
+                #expect(
+                    EditorShortcuts.action(keyCode: chord.key.keyCode, modifiers: modifiers(chord)) == action,
+                    "\(row.action) \(chord.labels.joined())"
+                )
+                fromTable.insert(EditorShortcuts.Binding(
+                    modifiers: modifiers(chord), keyCode: chord.key.keyCode, action: action
+                ))
+            }
+        }
+        // 편집기가 듣는 키 가운데 표에 없는 것도 없다.
+        #expect(fromTable == Set(EditorShortcuts.bindings))
+        #expect(EditorShortcuts.bindings.count == fromTable.count)
     }
 }

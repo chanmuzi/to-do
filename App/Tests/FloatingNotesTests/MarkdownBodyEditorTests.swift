@@ -28,7 +28,7 @@ import Theme
 
     @Test func documentViewSitsInThePanelsScrollViewAndTheWindowFollowsItsHeight() throws {
         defer { fixture.cleanUp() }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "높이", body: "한 줄\n두 줄\n세 줄"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "높이", body: "한 줄\n두 줄\n세 줄\n네 줄\n다섯 줄"))
         let window = try #require(fixture.notePanels.window(for: id))
         let theme = fixture.theme
         let chrome = theme.shape(.chromeHeight) + theme.shape(.borderWidth)
@@ -37,8 +37,8 @@ import Theme
         #expect(adapter.view.isFlipped)
         let scrollView = try #require(adapter.view.enclosingScrollView)
         #expect(scrollView.documentView === adapter.view)
-        // 안쪽 여백은 편집기가 넣는다: 내용 높이는 줄 셋과 위아래 여백이다.
-        #expect(adapter.editor.contentHeight == theme.lineHeight(.body) * 3 + padding.top + padding.bottom)
+        // 안쪽 여백은 편집기가 넣는다: 내용 높이는 줄 다섯과 위아래 여백이다.
+        #expect(adapter.editor.contentHeight == theme.lineHeight(.body) * 5 + padding.top + padding.bottom)
         #expect(window.frame.height == chrome + adapter.editor.contentHeight)
 
         window.contentView?.layoutSubtreeIfNeeded()
@@ -52,12 +52,12 @@ import Theme
 
     @Test func typingGrowsTheWindowFromTheSameTopEdge() async throws {
         defer { fixture.cleanUp() }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "늘어남", body: "한 줄"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "늘어남", body: "하나\n둘\n셋\n넷"))
         let window = try #require(fixture.notePanels.window(for: id))
         let top = window.frame.maxY
         let before = window.frame.height
 
-        type("\n둘\n셋", into: adapter)
+        type("\n다섯\n여섯", into: adapter)
         let target = before + fixture.theme.lineHeight(.body) * 2
         let deadline = Date().addingTimeInterval(3)
         while window.frame.height != target, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
@@ -70,7 +70,8 @@ import Theme
     /// 창 높이가 내용을 끝까지 따라간다. 본문이 스크롤되지 않는다.
     @Test func windowFollowsHeightChangesOfARevealedWrappedLine() async throws {
         defer { fixture.cleanUp() }
-        let body = "## 아이디어\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
+        // 본문 영역의 가장 낮은 높이(네 줄)보다 길어야 창 높이가 내용을 그대로 따른다.
+        let body = "## 아이디어\n하나\n둘\n셋\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         let (id, adapter) = try fixture.open(NoteDraft(title: "링크", body: body))
         let window = try #require(fixture.notePanels.window(for: id))
         let chrome = fixture.theme.shape(.chromeHeight) + fixture.theme.shape(.borderWidth)
@@ -153,7 +154,7 @@ import Theme
         #expect(try fixture.fileText(id).hasSuffix("A\r\nB"))
     }
 
-    /// 밖에서 다른 글이 들어오면 그 글로 바꾸고 되돌리기 기록을 비운다. 알리지 않는다.
+    /// 밖에서 다른 글이 들어오면(끝에 덧붙인 것이 아닌 바꿈) 그 글로 바꾸고 되돌리기 기록을 비운다. 알리지 않는다.
     @Test func externalEditReplacesTheTextClearsUndoAndIsNotReported() throws {
         defer { fixture.cleanUp() }
         let (id, adapter) = try fixture.open(NoteDraft(title: "바깥", body: "처음"))
@@ -163,10 +164,10 @@ import Theme
         var notified: [String] = []
         adapter.onTextChange = { notified.append($0) }
 
-        try fixture.rewriteOutside(id) { $0 + "\n다른 프로그램이 쓴 줄" }
+        try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "처음!", with: "다른 프로그램이 고친 글") }
         try fixture.notes.refresh()
 
-        #expect(adapter.text == "처음!\n다른 프로그램이 쓴 줄")
+        #expect(adapter.text == "다른 프로그램이 고친 글")
         #expect(!adapter.editor.undoManager.canUndo)
         #expect(notified.isEmpty)
     }
@@ -252,6 +253,12 @@ import Theme
             return window.performKeyEquivalent(with: event)
         }
 
+        // 키 창이 아닌 노트의 편집기는 키를 받지 않는다(보고 있지 않은 노트의 글이 바뀌지 않게).
+        #expect(!window.isKeyWindow)
+        #expect(try !press(KeyChord(.b, .command)))
+        #expect(adapter.text == "굵게")
+        // 시험에서는 실제 키 창을 만들지 않는다. 편집 중인 것으로 보게 하고 같은 길로 넣는다.
+        adapter.editor.forcesActiveAppearance = true
         #expect(try press(KeyChord(.b, .command)))
         #expect(adapter.text == "**굵게**")
         #expect(try press(KeyChord(.nine, [.shift, .command])))
@@ -355,5 +362,162 @@ import Theme
         #expect(adapter.editor.configuration.checkboxStyle == .bracket)
         let (_, later) = try fixture.open(NoteDraft(title: "나중", body: "[ ] 할 일"))
         #expect(later.editor.configuration.checkboxStyle == .bracket)
+    }
+
+    // MARK: - 창 높이(D-031)
+
+    /// 사용자가 본 문제: 여러 줄인 노트가 두 줄쯤의 높이에 머물고 그 안에서 스크롤됐다. Markdown 편집기를
+    /// 끼운 창이 열두 줄 노트를 처음부터 내용 높이로 띄우고, 스크롤할 것이 없는지 본다.
+    @Test func aTwelveLineNoteOpensAtItsFullHeightWithNothingToScroll() throws {
+        defer { fixture.cleanUp() }
+        let body = (1...12).map { "\($0)번째 줄" }.joined(separator: "\n")
+        let (id, adapter) = try fixture.open(NoteDraft(title: "열두 줄", body: body))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let theme = fixture.theme
+        let chrome = theme.shape(.chromeHeight) + theme.shape(.borderWidth)
+        let content = theme.lineHeight(.body) * 12 + theme.docPadding.top + theme.docPadding.bottom
+        window.contentView?.layoutSubtreeIfNeeded()
+        let scrollView = try #require(adapter.view.enclosingScrollView)
+
+        #expect(adapter.editor.contentHeight == content)
+        #expect(window.frame.height == chrome + content)
+        // 본문 영역이 창을 따라 커졌고, 문서 높이가 보이는 높이와 같다.
+        #expect(scrollView.frame.height == content)
+        #expect(adapter.view.frame.height == scrollView.documentVisibleRect.height)
+        #expect(scrollView.documentVisibleRect.origin == .zero)
+        // 스크롤 막대가 보이지 않는다.
+        #expect(scrollView.verticalScroller?.isHidden != false)
+    }
+
+    /// 한두 줄 노트와 빈 노트는 본문 네 줄만큼의 높이로 뜨고, 본문 뷰가 그 영역을 채운다.
+    @Test(arguments: ["", "한 줄", "한 줄\n두 줄"])
+    func shortNotesOpenFourBodyLinesTall(body: String) throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "짧은 노트", body: body))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let theme = fixture.theme
+        let chrome = theme.shape(.chromeHeight) + theme.shape(.borderWidth)
+        let minimum = theme.lineHeight(.body) * 4 + theme.docPadding.top + theme.docPadding.bottom
+        window.contentView?.layoutSubtreeIfNeeded()
+        let scrollView = try #require(adapter.view.enclosingScrollView)
+
+        #expect(window.frame.height == chrome + minimum)
+        #expect(scrollView.frame.height == minimum)
+        // 글 아래의 빈 자리를 눌러도 본문이 받는다.
+        #expect(adapter.view.frame.height == scrollView.contentSize.height)
+        #expect(scrollView.contentView.bounds.origin == .zero)
+    }
+
+    // MARK: - 창이 닫힌 사이에 바뀐 파일과 접힘
+
+    /// 검토에서 나온 문제: 둘째 줄의 토글을 접고 창을 닫은 뒤 다른 프로그램이 맨 위에 두 줄을 넣으면,
+    /// 다시 열 때 줄 번호만 보고 엉뚱한 토글을 접었다.
+    @Test func foldsFollowTheirToggleWhenTheFileChangedWhileTheWindowWasClosed() throws {
+        defer { fixture.cleanUp() }
+        let body = "머리말\n> 첫 토글\n\t안\n> 접어 둔 토글\n\t안\n> 셋째 토글\n\t안"
+        let (id, adapter) = try fixture.open(NoteDraft(title: "닫힌 사이", body: body))
+        adapter.editor.selectedRange = NSRange(location: (body as NSString).range(of: "접어 둔").location, length: 0)
+        adapter.editor.perform(.fold)
+        #expect(adapter.editor.foldedLines == [3])
+        fixture.notePanels.closeWindow(id)
+        #expect(try fixture.storedFolds(for: id) == [3])
+
+        try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "머리말\n", with: "새 줄 하나\n새 줄 둘\n머리말\n") }
+        try fixture.notes.refresh()
+        try fixture.notePanels.open(id, focus: false)
+
+        let reopened = try #require(fixture.editors.editor(for: id))
+        #expect(reopened.text.hasPrefix("새 줄 하나\n새 줄 둘\n머리말\n"))
+        // 같은 토글("접어 둔 토글")이 접혀 있다. 줄 번호 3의 토글("첫 토글")이 아니다.
+        #expect(reopened.editor.foldedLines == [5])
+        #expect(try fixture.storedFolds(for: id) == [5])
+    }
+
+    /// 닫힌 노트의 끝에 줄이 붙어도(빠른 캡처) 접힘은 그대로다. 접힌 토글이 없어졌으면 접힘도 버린다.
+    @Test func foldsSurviveLinesAppendedWhileClosedAndAreDroppedWhenTheirToggleIsGone() throws {
+        defer { fixture.cleanUp() }
+        let body = "> 토글\n\t안\n끝"
+        let (id, adapter) = try fixture.open(NoteDraft(title: "덧붙임", body: body))
+        adapter.editor.selectedRange = NSRange(location: 1, length: 0)
+        adapter.editor.perform(.fold)
+        fixture.notePanels.closeWindow(id)
+
+        try fixture.notes.update(id) { $0.body += "\n- [ ] 캡처한 줄\n> 새 토글\n\t안" }
+        try fixture.notePanels.open(id, focus: false)
+        #expect(fixture.editors.editor(for: id)?.editor.foldedLines == [0])
+        fixture.notePanels.closeWindow(id)
+
+        try fixture.notes.update(id) { $0.body = "다른 줄\n> 새 토글\n\t안" }
+        try fixture.notePanels.open(id, focus: false)
+        #expect(fixture.editors.editor(for: id)?.editor.foldedLines.isEmpty == true)
+        #expect(try fixture.storedFolds(for: id) == nil)
+    }
+
+    /// 접힌 토글 줄의 글을 고치면 적어 둔 글도 따라 바뀐다. 낡은 글이 남으면 다시 열 때 접힘을 잃는다.
+    @Test func editingAFoldedToggleLineKeepsItsFoldAcrossReopen() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "토글 고침", body: "> 토글\n\t안\n끝"))
+        adapter.editor.selectedRange = NSRange(location: 1, length: 0)
+        adapter.editor.perform(.fold)
+        let view = adapter.editor.textView
+        view.insertText(" 고친 이름", replacementRange: NSRange(location: 4, length: 0))
+        #expect(adapter.text == "> 토글 고친 이름\n\t안\n끝")
+        #expect(adapter.editor.foldedLines == [0])
+
+        fixture.notePanels.closeWindow(id)
+        try fixture.notePanels.open(id, focus: false)
+
+        #expect(fixture.editors.editor(for: id)?.editor.foldedLines == [0])
+    }
+
+    // MARK: - 이 앱의 다른 곳이 덧붙인 글(빠른 캡처)
+
+    /// 떠 있는 노트에 다른 곳이 한 줄을 덧붙이면 편집기가 그 줄을 받고, 커서와 되돌리기 기록과 접힘이
+    /// 그대로다. 이어서 친 글과 덧붙인 줄이 모두 파일에 남는다.
+    @Test func lineAppendedByAnotherWriterKeepsCaretUndoAndFoldsAndSurvivesTyping() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "캡처", body: "> 토글\n\t안\n끝"))
+        adapter.editor.selectedRange = NSRange(location: 1, length: 0)
+        adapter.editor.perform(.fold)
+        type("!", into: adapter)
+        try fixture.notes.flushPendingSaves()
+        let caret = adapter.editor.selectedRange
+        var notified: [String] = []
+        let forward = adapter.onTextChange
+        adapter.onTextChange = { notified.append($0); forward?($0) }
+
+        try fixture.notes.update(id) { $0.body += "\n- [ ] 캡처한 줄" }
+
+        #expect(adapter.text == "> 토글\n\t안\n끝!\n- [ ] 캡처한 줄")
+        #expect(adapter.editor.selectedRange == caret)
+        #expect(adapter.editor.undoManager.canUndo)
+        #expect(adapter.editor.foldedLines == [0])
+        #expect(notified.isEmpty)
+
+        let view = adapter.editor.textView
+        view.insertText("?", replacementRange: view.selectedRange())
+        try fixture.notes.flushPendingSaves()
+        #expect(try fixture.fileText(id).hasSuffix("> 토글\n\t안\n끝!?\n- [ ] 캡처한 줄"))
+        #expect(try fixture.storedFolds(for: id) == [0])
+    }
+
+    /// 한글을 조합하는 중에 덧붙여도 조합이 끊기지 않고, 조합한 글자와 덧붙인 줄이 모두 저장된다.
+    @Test func appendWhileComposingKeepsTheCompositionAndSavesBoth() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "조합", body: "처음"))
+        let view = adapter.editor.textView
+        view.setSelectedRange(NSRange(location: 2, length: 0))
+        view.setMarkedText("ㅎ", selectedRange: NSRange(location: 1, length: 0), replacementRange: view.selectedRange())
+        #expect(view.hasMarkedText())
+
+        try fixture.notes.update(id) { $0.body += "\n캡처" }
+
+        #expect(view.hasMarkedText())
+        #expect(adapter.text == "처음ㅎ\n캡처")
+        view.insertText("한", replacementRange: view.markedRange())
+        #expect(!view.hasMarkedText())
+        try fixture.notes.flushPendingSaves()
+        #expect(try fixture.fileText(id).hasSuffix("처음한\n캡처"))
+        #expect(view.string == "처음한\n캡처")
     }
 }

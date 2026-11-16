@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Models
-import NotePanel
+@_spi(Verification) import NotePanel
 import Routing
 import Store
 import Theme
