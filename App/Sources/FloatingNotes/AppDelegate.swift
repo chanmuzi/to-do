@@ -9,7 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var environment: AppEnvironment?
     private var router: AppRouter?
     private var notePanels: NotePanelCoordinator?
+    #if DEBUG
     private var debugControl: DebugControl?
+    #endif
 
     init(options: LaunchOptions) {
         self.options = options
@@ -38,13 +40,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             application.mainMenu = MainMenu.make(appName: ProcessInfo.processInfo.processName, target: self)
             try showInitialWindows(environment, notePanels)
-            startDebugging(router: router, notePanels: notePanels)
+            #if DEBUG
+            try startDebugging(router: router, notePanels: notePanels)
+            #endif
         } catch {
             presentLaunchFailure(error)
         }
     }
 
     /// 다른 프로그램이 제자리에서 고친 노트 파일은 폴더 감시가 잡지 못한다. 앱이 앞으로 올 때 다시 훑는다.
+    /// 노트 창은 눌러도 앱을 앞으로 가져오지 않으므로, 노트 창이 키 창이 될 때는 `NotePanelCoordinator`가 훑는다.
     func applicationDidBecomeActive(_ notification: Notification) {
         do {
             try environment?.notes.refresh()
@@ -118,13 +123,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func startDebugging(router: AppRouter, notePanels: NotePanelCoordinator) {
+    #if DEBUG
+    private func startDebugging(router: AppRouter, notePanels: NotePanelCoordinator) throws {
         options.debugHover.forEach { notePanels.setHoverOverride(true, for: $0) }
-        guard options.debugControl else { return }
-        let control = DebugControl(router: router, notePanels: notePanels)
+        guard let directory = options.debugControlDirectory else { return }
+        let control = DebugControl(
+            session: try DebugControlSession.start(in: directory), router: router, notePanels: notePanels
+        )
         control.start()
         debugControl = control
     }
+    #endif
 
     private func presentLaunchFailure(_ error: Error) {
         AppLog.warning("앱을 시작하지 못했습니다: \(error)")

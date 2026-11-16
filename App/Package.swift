@@ -67,6 +67,11 @@ let package = Package(
             name: "NotePanelTests",
             dependencies: ["NotePanel", "Theme", "Models", "Store", "Routing"]
         ),
+        .testTarget(
+            name: "FloatingNotesTests",
+            dependencies: ["FloatingNotes", "NotePanel", "Theme", "Models", "Store", "Routing"],
+            swiftSettings: uiSettings
+        ),
     ],
     swiftLanguageModes: [.v6]
 )

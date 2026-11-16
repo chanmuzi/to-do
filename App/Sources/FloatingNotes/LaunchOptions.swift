@@ -6,13 +6,19 @@ import Theme
 ///
 /// - `--notes-dir <경로>`: 그 폴더만 읽고 쓴다(상태도 그 안의 `.state/`). 실제 노트를 건드리지 않는다.
 /// - `--appearance light|dark`: 시스템 설정과 상관없이 모양을 고정한다.
+///
+/// 디버그 빌드에만 있는 것(릴리스 빌드는 이 인자를 모른다):
 /// - `--debug-hover <노트 id>`: 그 노트를 마우스가 올라간 모습으로 띄운다. 여러 번 쓸 수 있다.
-/// - `--debug-control`: 다른 프로세스가 보내는 확인용 명령을 받는다(`DebugControl`).
+/// - `--debug-control <출력 폴더>`: 다른 프로세스가 보내는 확인용 명령을 받는다(`DebugControl`).
+///   명령이 쓰는 파일은 이 폴더 안에만 생긴다.
 struct LaunchOptions: Equatable {
     var notesDirectory: URL?
     var appearance: ThemeAppearance?
+    #if DEBUG
     var debugHover: [NoteID] = []
-    var debugControl = false
+    /// 확인용 명령을 받을 때 그 명령이 파일을 쓸 수 있는 하나뿐인 폴더. 없으면 명령을 받지 않는다.
+    var debugControlDirectory: URL?
+    #endif
 
     enum ParseError: Error, Equatable, CustomStringConvertible {
         case missingValue(String)
@@ -43,10 +49,12 @@ struct LaunchOptions: Equatable {
                     throw ParseError.invalidAppearance(raw)
                 }
                 appearance = parsed
+            #if DEBUG
             case "--debug-hover":
                 debugHover.append(NoteID(rawValue: try value(after: flag)))
             case "--debug-control":
-                debugControl = true
+                debugControlDirectory = URL(fileURLWithPath: try value(after: flag), isDirectory: true)
+            #endif
             default:
                 continue
             }
