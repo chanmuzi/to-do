@@ -2,7 +2,7 @@ import AppKit
 import Models
 import Store
 import Testing
-@testable import NotePanel
+@_spi(Verification) @testable import NotePanel
 
 /// 휴지통으로 보낸 바로 뒤의 되돌리기(spec 5.3)와, App이 다른 화면을 붙일 때 쓰는 창 조회.
 @Suite @MainActor struct TrashUndoTests {

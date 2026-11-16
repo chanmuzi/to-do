@@ -4,7 +4,7 @@ import Models
 import Routing
 import Store
 import Theme
-@testable import NotePanel
+@_spi(Verification) @testable import NotePanel
 
 /// 임시 폴더의 저장소와 테마로 노트 창을 실제로 만들어 보는 시험용 조립.
 @MainActor

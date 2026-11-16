@@ -14,6 +14,8 @@ final class SpyBodyEditor: NoteBodyEditing {
     private var shown = ""
     /// 마지막으로 주고받은 글.
     private var notified = ""
+    /// 밖에서 끝에 덧붙인 글(붙인 차례대로).
+    private(set) var appended: [String] = []
     private(set) var flushCount = 0
     private let normalizesLineEndings: Bool
 
@@ -31,7 +33,19 @@ final class SpyBodyEditor: NoteBodyEditing {
         }
     }
 
-    func focus() {}
+    private(set) var focusCount = 0
+
+    func focus() {
+        focusCount += 1
+    }
+
+    /// 실제 편집기처럼 지금 보이는 글(조합 중인 글자 포함) 끝에 붙이고, 조합과 알리지 않은 변경은 그대로 둔다.
+    func appendFromOutside(_ suffix: String) {
+        appended.append(suffix)
+        let hadUnnotified = shown != notified
+        shown += suffix
+        if !hadUnnotified { notified = shown }
+    }
 
     /// 화면에만 있고 아직 알리지 않은 글(조합 중이거나 한 차례 늦게 알리려던 것)을 알린다.
     func flushPendingChange() {
