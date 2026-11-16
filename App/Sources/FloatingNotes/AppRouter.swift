@@ -4,6 +4,10 @@ import Routing
 
 /// 기능 모듈이 보낸 요청을 받아 그 일을 하는 모듈을 부르는 곳.
 /// 노트 창 요청은 `NotePanelCoordinator`로 넘긴다. 아직 화면이 없는 요청은 기록만 한다.
+///
+/// 빠른 캡처와 노트 찾기는 아래 `INTEGRATION` 표시 두 곳에서 잇는다. 그때 쓸 것:
+/// - `notePanels.window(for:)`: 그 노트의 `NSWindow`(노트 찾기를 상단 줄 아래에 붙일 때).
+/// - `notePanels.frontmostNoteID`: 맨 앞 노트(키 창인 노트, 없으면 보이는 것 가운데 가장 앞). `keyNoteID`는 키 창인 노트만.
 final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
@@ -23,8 +27,14 @@ final class AppRouter: Routing {
             case .newNote(let request): try notePanels.createNote(request)
             case .closeNoteWindow(let id): notePanels.closeWindow(id)
             case .toggleAllNotesHidden: notePanels.toggleAllHidden()
-            case .openCapture, .openBrowse, .openLibrary, .openAIPanel, .openSettings, .openShortcuts,
-                 .openReminderEditor, .openSpacePicker:
+            case .openCapture:
+                // INTEGRATION(Capture): 빠른 캡처 바를 여기서 띄운다(화면 가운데 위쪽, spec 4.1).
+                logUnhandled(route)
+            case .openBrowse:
+                // INTEGRATION(Browse): 노트 찾기를 여기서 띄운다. `anchor`가 있으면
+                // `notePanels.window(for: anchor)`의 상단 줄 아래에, 없으면 캡처 바 자리에(spec 4.1).
+                logUnhandled(route)
+            case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker:
                 logUnhandled(route)
             }
         } catch {

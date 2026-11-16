@@ -22,6 +22,8 @@ import Theme
             spaces: try SpaceStore(location: location), router: router, log: { _ in }
         )
         router.notePanels = coordinator
+        // 시험 중에 뜨는 창이 키 창이 되어 사용자가 다른 앱에 치던 글자를 받지 않게 한다.
+        coordinator.allowsKeyWindows = false
         return (router, coordinator, notes)
     }
 

@@ -18,6 +18,7 @@ cp "$BINARY" "$APP/Contents/MacOS/FloatingNotes"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
 cp "$RESOURCES/tokens.json" "$APP/Contents/Resources/tokens.json"
 cp -R "$RESOURCES/Fonts" "$APP/Contents/Resources/Fonts"
+cp "$RESOURCES/menubar-icon.pdf" "$APP/Contents/Resources/menubar-icon.pdf"
 
 # 앱 아이콘: appiconset의 PNG를 iconutil이 받는 이름으로 옮겨 .icns로 만든다.
 ICONSET="$(mktemp -d)/AppIcon.iconset"

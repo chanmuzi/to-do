@@ -1,0 +1,179 @@
+import AppKit
+import Models
+import Routing
+import Testing
+import Theme
+@testable import FloatingNotes
+
+/// 메뉴 막대 메뉴(spec 4.3)와 앱 메뉴: 단축키를 보이지 않으면서(규칙 4) 키는 듣는지.
+@Suite struct MenuTests {
+    private let fixture: AppFixture
+
+    init() throws {
+        fixture = try AppFixture()
+    }
+
+    private func visibleItems(of menu: NSMenu) -> [NSMenuItem] {
+        menu.items.flatMap { item -> [NSMenuItem] in
+            (item.isHidden ? [] : [item]) + (item.submenu.map(visibleItems(of:)) ?? [])
+        }
+    }
+
+    private func press(_ chord: KeyChord, in menu: NSMenu) throws -> Bool {
+        let characters = chord.key.menuKeyEquivalent
+        let event = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: chord.modifiers.eventFlags, timestamp: 0,
+            windowNumber: 0, context: nil, characters: characters,
+            charactersIgnoringModifiers: chord.modifiers.contains(.shift) ? characters.uppercased() : characters,
+            isARepeat: false, keyCode: chord.key.keyCode
+        ))
+        return menu.performKeyEquivalent(with: event)
+    }
+
+    // MARK: - 메뉴 막대
+
+    @Test func statusMenuHasTheSpecifiedOrderIconsAndSeparators() {
+        let entries = StatusMenuModel.entries(areNotesHidden: false)
+        let layout = entries.map { $0.title ?? "-" }
+        #expect(layout == [
+            "새 노트", "빠른 캡처", "-", "노트 찾기", "라이브러리", "AI 패널", "-", "노트 모두 숨기기", "-",
+            "설정", "단축키", "-", "종료",
+        ])
+        // 종료를 뺀 항목에는 아이콘이 있다.
+        for entry in entries {
+            guard case .item(let title, let symbol, _) = entry else { continue }
+            #expect((symbol == nil) == (title == "종료"), "\(title)")
+            if let symbol { #expect(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil, "\(symbol)") }
+        }
+    }
+
+    @Test func hideAllTitleFlipsWithTheHiddenState() throws {
+        defer { fixture.cleanUp() }
+        _ = try fixture.open(NoteDraft(title: "숨길 노트"))
+        func toggleTitle() -> String? {
+            StatusMenuModel.entries(areNotesHidden: fixture.notePanels.areNotesHidden).first {
+                if case .item(_, _, .toggleNotesHidden) = $0 { true } else { false }
+            }?.title
+        }
+
+        #expect(toggleTitle() == "노트 모두 숨기기")
+        fixture.commands.performStatusMenu(.toggleNotesHidden)
+        #expect(fixture.notePanels.areNotesHidden)
+        #expect(toggleTitle() == "노트 모두 보이기")
+        fixture.commands.performStatusMenu(.toggleNotesHidden)
+        #expect(toggleTitle() == "노트 모두 숨기기")
+    }
+
+    @Test func builtStatusMenuShowsNoKeyEquivalentsAndReportsTheChosenAction() {
+        defer { fixture.cleanUp() }
+        let menu = NSMenu()
+        var chosen: [StatusMenuAction] = []
+        StatusMenuBuilder(theme: fixture.theme).fill(
+            menu, with: StatusMenuModel.entries(areNotesHidden: true)
+        ) { chosen.append($0) }
+
+        #expect(menu.items.count == 13)
+        #expect(menu.items.allSatisfy { $0.keyEquivalent.isEmpty })
+        #expect(menu.items.filter(\.isSeparatorItem).count == 4)
+        #expect(menu.items[7].title == "노트 모두 보이기")
+        #expect(menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.view is MenuBarRowView })
+        menu.performActionForItem(at: 0)
+        menu.performActionForItem(at: 12)
+        #expect(chosen == [.newNote, .quit])
+    }
+
+    @Test func menuBarIconIsAnEighteenPointTemplateImage() throws {
+        defer { fixture.cleanUp() }
+        let icon = try MenuBarIcon.load()
+        #expect(icon.isTemplate)
+        #expect(icon.size == NSSize(width: 18, height: 18))
+    }
+
+    @Test func statusMenuActionsGoThroughRouting() {
+        defer { fixture.cleanUp() }
+        var didQuit = false
+        fixture.commands.quit = { didQuit = true }
+
+        for action: StatusMenuAction in [.quickCapture, .findNote, .library, .aiPanel, .settings, .shortcuts] {
+            fixture.commands.performStatusMenu(action)
+        }
+        fixture.commands.performStatusMenu(.quit)
+
+        // 메뉴 막대에서 연 노트 찾기는 노트에 붙지 않는다(spec 4.1).
+        #expect(fixture.receivedRoutes == [
+            .openCapture, .openBrowse(anchor: nil), .openLibrary, .openAIPanel(context: nil), .openSettings,
+            .openShortcuts,
+        ])
+        #expect(didQuit)
+    }
+
+    // MARK: - 앱 메뉴
+
+    @Test func mainMenuShowsNoKeyEquivalentsButStillHearsThem() throws {
+        defer { fixture.cleanUp() }
+        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+
+        let visible = visibleItems(of: menu)
+        #expect(visible.allSatisfy { $0.keyEquivalent.isEmpty })
+        #expect(visible.map(\.title).contains("새 노트"))
+        #expect(visible.map(\.title).contains("실행 취소"))
+
+        #expect(try press(KeyChord(.comma, .command), in: menu))
+        #expect(try press(KeyChord(.slash, .command), in: menu))
+        #expect(try press(KeyChord(.p, .command), in: menu))
+        #expect(try press(KeyChord(.n, .command), in: menu))
+        #expect(fixture.receivedRoutes == [
+            .openSettings, .openShortcuts, .openBrowse(anchor: nil), .newNote(NewNoteRequest()),
+        ])
+        #expect(fixture.notePanels.openNoteIDs.count == 1)
+        // 표에 없는 키는 듣지 않는다.
+        #expect(try !press(KeyChord(.k, [.control, .option, .command]), in: menu))
+    }
+
+    @Test func everyNoteWindowRowHasAHiddenKeyItem() {
+        defer { fixture.cleanUp() }
+        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        func hidden(in menu: NSMenu) -> [NSMenuItem] {
+            menu.items.flatMap { ($0.isHidden ? [$0] : []) + ($0.submenu.map(hidden(in:)) ?? []) }
+        }
+        let keyOnly = hidden(in: menu)
+
+        #expect(keyOnly.allSatisfy { $0.allowsKeyEquivalentWhenHidden && !$0.keyEquivalent.isEmpty })
+        let commands = Set(keyOnly.compactMap { $0.representedObject as? String }.compactMap(AppCommand.init(rawValue:)))
+        #expect(commands == Set(ShortcutTable.standard.entries(in: .noteWindow).compactMap(\.command)))
+        for entry in ShortcutTable.standard.entries(in: .noteWindow) {
+            let chord = entry.chords[0]
+            let item = keyOnly.first { $0.representedObject as? String == entry.command?.rawValue }
+            #expect(item?.keyEquivalent == chord.key.menuKeyEquivalent, "\(entry.action)")
+            #expect(item?.keyEquivalentModifierMask == chord.modifiers.eventFlags, "\(entry.action)")
+        }
+    }
+
+    /// 키를 바꾼 표로 메뉴를 다시 만들면 새 키를 듣는다.
+    @Test func mainMenuFollowsAReboundTable() throws {
+        defer { fixture.cleanUp() }
+        let table = ShortcutTable.standard.replacing(.settings, with: KeyChord(.k, [.option, .command]))
+        let menu = MainMenu.make(appName: "플로팅 노트", table: table, dispatcher: fixture.commands)
+
+        #expect(try !press(KeyChord(.comma, .command), in: menu))
+        #expect(try press(KeyChord(.k, [.option, .command]), in: menu))
+        #expect(fixture.receivedRoutes == [.openSettings])
+    }
+
+    /// 시스템이 "편집" 메뉴에 끼워 넣는 항목(이모지 및 기호)의 단축키도 보이지 않게 한다.
+    @Test func keyEquivalentsOfItemsAddedLaterAreConcealedWhenTheMenuOpens() throws {
+        defer { fixture.cleanUp() }
+        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let edit = try #require(menu.items.compactMap(\.submenu).first { $0.title == "편집" })
+        let added = NSMenuItem(title: "이모지 및 기호", action: #selector(NSApplication.orderFrontCharacterPalette(_:)), keyEquivalent: "e")
+        added.keyEquivalentModifierMask = [.function]
+        edit.addItem(added)
+
+        edit.delegate?.menuNeedsUpdate?(edit)
+        edit.delegate?.menuNeedsUpdate?(edit)
+
+        #expect(visibleItems(of: menu).allSatisfy { $0.keyEquivalent.isEmpty })
+        #expect(edit.items.filter { $0.title == "이모지 및 기호" }.count == 2)
+        #expect(added.isHidden && added.allowsKeyEquivalentWhenHidden && added.keyEquivalent == "e")
+    }
+}
