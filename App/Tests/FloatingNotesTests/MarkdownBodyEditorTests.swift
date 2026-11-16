@@ -66,9 +66,9 @@ import Theme
         #expect(window.frame.maxY == top)
     }
 
-    /// 커서가 들어간 줄에서 감췄던 주소가 보여 줄이 넘어가고, 그 줄에 글자를 쳐 줄이 더 높아져도
-    /// 창 높이가 내용을 끝까지 따라간다. 본문이 스크롤되지 않는다.
-    @Test func windowFollowsHeightChangesOfARevealedWrappedLine() async throws {
+    /// 기호는 커서가 있는 줄에서도 보이지 않으므로(D-036) 커서가 링크 줄에 들어가도 창 높이는 그대로다.
+    /// 그 줄에 글자를 쳐 줄이 넘어가면 창 높이가 내용을 끝까지 따라간다. 본문이 스크롤되지 않는다.
+    @Test func windowKeepsItsHeightUnderTheCaretAndFollowsTypingOnALinkLine() async throws {
         defer { fixture.cleanUp() }
         // 본문 영역의 가장 낮은 높이(네 줄)보다 길어야 창 높이가 내용을 그대로 따른다.
         let body = "## 아이디어\n하나\n둘\n셋\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
@@ -91,11 +91,12 @@ import Theme
 
         adapter.editor.selectedRange = NSRange(location: (body as NSString).length, length: 0)
         try await settle()
-        #expect(window.frame.height > closed)
+        #expect(window.frame.height == closed)
         #expect(window.frame.height == chrome + adapter.editor.contentHeight)
 
-        type("가나", into: adapter)
+        type(String(repeating: "가나다라마바사 ", count: 6), into: adapter)
         try await settle()
+        #expect(window.frame.height > closed)
         #expect(window.frame.height == chrome + adapter.editor.contentHeight)
         #expect(scrollView.contentView.bounds.origin == .zero)
         #expect(scrollView.frame.height == adapter.editor.contentHeight)
@@ -364,6 +365,26 @@ import Theme
         #expect(later.editor.configuration.checkboxStyle == .bracket)
     }
 
+    @Test func inlineCodeStyleComesFromTheDisplayOptionAndUpdatesLiveEditors() throws {
+        defer { fixture.cleanUp() }
+        let (_, adapter) = try fixture.open(NoteDraft(title: "코드", body: "앞 `코드` 뒤"))
+        // 기본값은 `tokens.json`의 `display.defaults`와 같다.
+        let tokens = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: ThemeResources.tokensURL())) as? [String: Any])
+        let display = try #require(tokens["display"] as? [String: Any])
+        #expect(NoteEditorOptions().inlineCode.rawValue == (display["defaults"] as? [String: String])?["inline-code"])
+        #expect(InlineCodeStyle.allCases.map(\.rawValue) == display["inline-code"] as? [String])
+        #expect(adapter.editor.configuration.inlineCodeStyle == .accent)
+
+        fixture.editors.options.inlineCode = .plain
+
+        #expect(adapter.editor.configuration.inlineCodeStyle == .plain)
+        let (_, later) = try fixture.open(NoteDraft(title: "나중", body: "`코드`"))
+        #expect(later.editor.configuration.inlineCodeStyle == .plain)
+        fixture.editors.options.inlineCode = .accent
+        #expect(adapter.editor.configuration.inlineCodeStyle == .accent)
+        #expect(later.editor.configuration.inlineCodeStyle == .accent)
+    }
+
     // MARK: - 창 높이(D-031)
 
     /// 사용자가 본 문제: 여러 줄인 노트가 두 줄쯤의 높이에 머물고 그 안에서 스크롤됐다. Markdown 편집기를
@@ -499,6 +520,29 @@ import Theme
         try fixture.notes.flushPendingSaves()
         #expect(try fixture.fileText(id).hasSuffix("> 토글\n\t안\n끝!?\n- [ ] 캡처한 줄"))
         #expect(try fixture.storedFolds(for: id) == [0])
+    }
+
+    /// 끝에 붙기만 한 것이 아닌 변경(끝의 빈 줄을 다듬고 붙임)도 달라진 부분만 넣는다: 되돌리기 기록이 남고,
+    /// 빈 마지막 줄의 커서는 바깥이 쓴 줄 속이 아니라 그 뒤에 놓여, 이어 친 글이 그 줄에 끼어들지 않는다.
+    @Test func outsideChangeThatIsNotAnAppendKeepsUndoAndTheCaretOutOfTheForeignLine() throws {
+        defer { fixture.cleanUp() }
+        let (_, adapter) = try fixture.open(NoteDraft(title: "캡처", body: "첫 줄\n둘째 줄\n\n"))
+        let view = adapter.editor.textView
+        adapter.editor.selectedRange = NSRange(location: 3, length: 0)
+        view.insertText("!", replacementRange: view.selectedRange())
+        adapter.editor.selectedRange = NSRange(location: (adapter.text as NSString).length, length: 0)
+        var notified: [String] = []
+        let forward = adapter.onTextChange
+        adapter.onTextChange = { notified.append($0); forward?($0) }
+
+        adapter.applyOutsideChange(to: "첫 줄!\n둘째 줄\n[ ] 우유\n")
+
+        #expect(adapter.text == "첫 줄!\n둘째 줄\n[ ] 우유\n")
+        #expect(adapter.editor.selectedRange == NSRange(location: (adapter.text as NSString).length, length: 0))
+        #expect(adapter.editor.undoManager.canUndo)
+        #expect(notified.isEmpty)
+        view.insertText("이어서", replacementRange: view.selectedRange())
+        #expect(adapter.text == "첫 줄!\n둘째 줄\n[ ] 우유\n이어서")
     }
 
     /// 한글을 조합하는 중에 덧붙여도 조합이 끊기지 않고, 조합한 글자와 덧붙인 줄이 모두 저장된다.

@@ -7,6 +7,8 @@ import Store
 struct NoteEditorOptions: Hashable {
     /// 체크박스 모양(spec 6): 상자(기본) 또는 대괄호.
     var checkbox: CheckboxStyle = .box
+    /// 인라인 코드의 글자색(spec 6, D-035): 코드 강조색(기본) 또는 무채색.
+    var inlineCode: InlineCodeStyle = .accent
 }
 
 /// 노트 창마다 Markdown 편집기를 만들어 넘기는 곳(`NotePanelCoordinator`의 `makeBodyEditor`).
@@ -42,7 +44,7 @@ final class NoteEditorFactory {
     }
 
     private var configuration: MarkdownEditorConfiguration {
-        MarkdownEditorConfiguration(checkboxStyle: options.checkbox)
+        MarkdownEditorConfiguration(checkboxStyle: options.checkbox, inlineCodeStyle: options.inlineCode)
     }
 
     private var liveEditors: [MarkdownBodyEditor] {
