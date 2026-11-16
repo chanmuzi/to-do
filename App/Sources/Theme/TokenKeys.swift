@@ -106,12 +106,35 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case noteWidth = "note-w"
     case noteWidthMin = "note-w-min"
     case noteWidthMax = "note-w-max"
+    /// 빠른 캡처 바(spec 7): 너비, 높이, 좌우 여백, 요소 사이, 오른쪽 표시(스페이스, 리마인더) 앞의 덧간격,
+    /// 나타날 때 아래에서 올라오는 거리(사라질 때는 그만큼 내려간다).
+    case captureWidth = "capture-w"
+    case captureHeight = "capture-h"
+    case capturePadding = "capture-pad"
+    case captureGap = "capture-gap"
+    case captureValueGap = "capture-val-gap"
+    case captureRise = "capture-rise"
+    /// 노트 찾기(spec 8): 안쪽 여백, 모서리, 검색 칸 높이와 그 아래 틈, 줄 안의 요소 사이,
+    /// 노트 상단 줄과의 틈, 노트 오른쪽 끝에서 들여 놓는 거리.
+    case browsePadding = "browse-pad"
+    case browseRadius = "browse-r"
+    case browseFindHeight = "browse-find-h"
+    case browseFindGap = "browse-find-gap"
+    case browseGap = "browse-gap"
+    case browseAnchorGap = "browse-anchor-gap"
+    case browseAnchorInset = "browse-anchor-inset"
 }
 
 /// 치수가 아니라 비율로 적는 구성 요소 값(`component` 구역, `%` 표기).
 public enum RatioToken: String, CaseIterable, Sendable {
     /// 노트 창 높이 한도: 화면 높이에서 차지할 수 있는 몫(spec 5.6, 임시 값).
     case noteMaxScreenHeight = "note-h-max-screen"
+    /// 캡처 바가 뜨는 높이: 화면(메뉴 막대와 Dock을 뺀 영역) 아래 끝에서 바 아래쪽까지의 몫(spec 4.1 "화면 가운데 아래쪽", 임시 값).
+    case captureBottomScreen = "capture-bottom-screen"
+    /// 앵커 없이 여는 노트 찾기가 뜨는 높이: 화면 위 끝에서 목록 위쪽까지의 몫(임시 값). 목록이 아래로 자라므로 위쪽에 둔다.
+    case browseTopScreen = "browse-top-screen"
+    /// 노트 찾기 높이 한도: 화면 높이에서 차지할 수 있는 몫(임시 값). 넘으면 목록이 스크롤된다.
+    case browseMaxScreenHeight = "browse-h-max-screen"
 }
 
 /// 치수가 아니라 개수로 적는 구성 요소 값(`component` 구역, 단위 없는 정수).

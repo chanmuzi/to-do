@@ -91,6 +91,7 @@ scripts/
 - 글꼴 고르기: 가족 이름은 `<이름> Variable`(번들의 가변 글꼴)을 먼저 찾고 그다음 `<이름>`을 찾는다. 가변 글꼴은 굵기 축에 토큰 값을 그대로 넣고, 굵기별 파일로 된 가족은 CSS 굵기가 가장 가까운 파일을 고른다.
 - 새 토큰을 쓰려면 `tokens.json`에 값을 넣고 `TokenKeys.swift`의 enum에 case를 더한다. 테스트가 파일과 enum이 어긋나면 실패한다.
 - 노트 창 단계에서 더한 토큰(시안의 CSS에만 있던 값): `component`의 `chrome-gap`, `chrome-pad-end`, `icon-s|m|l`(12, 13, 14), `icon-btn-gap`, `swatch-size|gap|ring`, `menu-w`, `note-w`, `note-w-min`, `note-w-max`와 `type.fw-ui-strong`(`TextStyle.uiStrong`, 임박한 리마인더).
+- 캡처 바와 노트 찾기 단계에서 더한 토큰(D-028): `component`의 `capture-w|h|pad|gap|val-gap|rise`, `browse-pad|r|find-h|find-gap|gap|anchor-gap|anchor-inset`과 몫으로 적는 `capture-bottom-screen`, `browse-top-screen`, `browse-h-max-screen`(`RatioToken`).
 - 치수가 아닌 값: `component.note-h-max-screen`(`70%`, 노트 높이 한도)은 `RatioToken`으로 받아 `ratio(_:)`가 0~1의 몫으로 낸다. `component.note-body-lines-min`(`4`, 노트 본문 영역이 적어도 보이는 줄 수, D-031)은 `CountToken`으로 받아 `count(_:)`가 1 이상의 정수로 낸다(단위 없는 정수만 받는다). `motion` 구역의 키는 `MotionToken`에 있고 값은 `MotionTokens`로 묶여 나온다: `duration`, `curve`와 `bell: BellMotion`(`bell-period` 1.6s, `bell-rest` 60%, `bell-angle-1|2|3` 14deg, -12deg, 6deg, `bell-pivot` 12%, `bell-ease`. `keyframes`가 주기 안의 때와 각도를 낸다).
 
 ### Models
@@ -267,6 +268,84 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - `swift run EditorDemo --appearance light|dark --checkbox box|bracket --sample note|elements|empty --caret-line <n> --fold <n,n> --width <pt> --script "<단계;단계>" --print-text --snapshot <png 경로>`
 - `--snapshot`은 창 내용을 프로세스 안에서 PNG로 그려 내고 끝낸다. 화면 녹화 권한이 필요 없고 다른 창이 찍히지 않는다. 창 그림자와 시스템 입력 커서는 찍히지 않는다.
 - `--script`는 실제 입력 경로(`insertText`, `doCommand(by:)`, 마우스 이벤트)를 차례로 부른다. 단계는 `DemoScript.swift` 머리 주석에 있다. 다른 앱의 포커스를 빼앗지 않으려고 기본으로는 키 창이 되지 않는다(`--activate`로 바꾼다).
+- 앱 묶음에는 들어가지 않는다.
+
+## Capture (`Sources/Capture/`)
+
+빠른 캡처 바(spec 7, 화면 3). Core 모듈만 import한다. 임시 값은 D-026, D-028.
+
+### 공개 API
+
+```swift
+@MainActor public final class CaptureCoordinator {
+    public init(theme: Theme, notes: any NoteStoring, spaces: SpaceStore, router: any Routing,
+                log: @escaping @MainActor (String) -> Void)
+    public var isVisible: Bool { get }
+    public func show()      // 마우스가 있는 화면(없으면 주 화면)의 가운데 아래쪽(D-030)
+    public func hide()
+    public func toggle()
+}
+```
+
+- App이 하나 만들어 `.openCapture`와 어디서나 쓰는 단축키에 `toggle()`을 잇는다. 창은 처음 띄울 때 만든다.
+- ↵: 적은 글을 고른 스페이스의 오늘 노트에 투두로 붙이고 닫는다(없으면 `create`). 쓰는 길은 `NoteStoring.update` 하나라서 편집기가 미뤄 둔 본문 뒤에 붙는다. 넣지 못하면 `log`에 까닭을 적고 글을 그대로 둔 채 열어 둔다.
+- 줄은 언제나 디스크에 쓰인 노트에 들어간다. 오늘 노트가 충돌 중이거나 파일이 없어졌으면(`StoreError.conflict`, `.noteNotFound`) 줄을 올리기 전에 알아내고(`CaptureWriter`가 미뤄 둔 변경을 먼저 써 본다) 오늘의 다음 노트나 새 노트에 넣은 뒤 `log`로 까닭을 남긴다. 그 밖의 쓰기 실패는 그대로 던진다.
+- 읽은 때가 이미 지났으면(`CaptureInterpretation.isReminderPast`) 바에 지난 모습으로 보이고 리마인더는 걸지 않는다. 있던 리마인더와 합칠 때(`ReminderRule`)는 "지금"을 받아 이미 지난 값을 없는 것으로 친다.
+- ⌘↵: `Route.newNote`(적은 글이 제목, 고른 스페이스와 리마인더)를 보내고 닫는다. 노트를 만들고 띄우는 일은 App이 한다.
+- ⇥, ⇧⇥: 스페이스 바꾸기. ⌘R: 리마인더 직접 고르기. esc, 바깥 클릭(키 창에서 물러남): 닫기. 나타날 때는 `capture-rise`만큼 아래에서 올라오며 알파가 함께 `dur`, `ease`로 바뀌고, 사라질 때는 그 반대다. 걸어 둔 알림(`NotificationCenter`)은 `deinit`에서 푼다.
+- 노트 창이 떠 있는 노트에 붙이면 그 창의 편집기에는 보이지 않는다: 노트 창은 이 앱이 한 쓰기(`.updated`/`.local`)로는 편집기에 글을 넣지 않는다(D-022). 그 뒤에 편집기에서 글을 고치면 편집기의 본문이 저장되어 붙인 줄이 지워진다. 캡처가 붙인 줄을 편집기가 받게 하는 일은 App이나 노트 창 쪽에서 풀어야 한다(아직 안 됨).
+- `@_spi(Verification)`: `now`, `calendar`, `takesKeyOnShow`, `window`, `inputView`, `displayedSpace`, `displayedReminder`, `displaysReminderAsPast`, `underlinedRanges`, `settledFrame`, `entranceFrame`, `notificationCenter`, `showsPlaceholder`, `performSubmit()` 등. 테스트와 `Stage4Demo`만 쓴다.
+
+### 안쪽 구조
+
+- `DateTime/`(화면도 저장소도 모르는 순수 모듈, D-029): 글에서 날짜와 시간 표현을 읽는다. `DateTimeParser.firstExpression(in:now:calendar:) -> DateTimeExpression?`가 창구이고, 결과는 `start`, `end`(범위일 때), `ranges`(차지한 글자들. 받은 글의 UTF-16 자리이고, 날과 시각을 떨어뜨려 적으면 두 곳), `assumptions`(`meridiem`, `timeOfDay`, `looseDate`, `past`, `recurring`, `unknownTimeZone`. 하나라도 있으면 `isAmbiguous`)다.
+  - 차례: `NormalizedText`(NFC, 전각을 반각으로, 받은 글의 자리로 되돌리는 표) → `DateTimeLexer`(조각 찾기. 무늬는 `+Time`, `+Relative`, `+Date`에 나눠 둠) → `DateTimeParser`(조각을 시점과 범위로 잇기) → `DateTimeResolver`(지금 시각과 달력으로 날짜 정하기). 값 타입은 `DateTimePieces`, 기본 시각은 `DateTimeDefaults` 한 곳, 한글로 적은 수는 `KoreanNumeral`.
+  - 규칙 요약(전체 표는 spec 7a): 앞에 0을 붙인 `HH:mm`과 0시, 13~23시는 24시간제. 오전과 오후가 없는 1~7시는 오후, 8~11시는 오전, 12시는 정오이고, 날이 없으면 오늘 남았을 때 오늘, 지났으면 같은 시각의 내일. 때를 가리키는 말은 시각 바로 앞이나 `N시 저녁에` 꼴일 때만 시각에 붙는다. 날만 적으면 09:00(때를 가리키는 말이 있으면 그 기본 시각). 오늘을 가리키는 날은 언제나 오늘이고 지났으면 `past`. 범위는 양 끝을 서로 맞게 읽는다(`9-6시`는 09:00~18:00). 날과 시각은 붙어 있으면 어느 쪽이 먼저든 한 표현이고, 떨어져 있어도 맨 앞이 날뿐이고 시각이 하나면 합친다. 지난 때와 되풀이, 기간, 분수, 비율은 읽지 않는다.
+  - 규칙을 고칠 때는 `DateTime*Tests`의 표에 줄을 먼저 더한다.
+- `Logic/`(화면 없음, `nonisolated` 값과 순수 함수): `CaptureSpaceToken`(`#이름`), `CaptureInterpretation`(글 한 줄에서 넣을 글, 스페이스, 읽은 때와 걸 리마인더, 밑줄 자리들), `CaptureDestination`(오늘 노트), `TodoAppender`, `ReminderRule`, `CaptureSpaceCycle`, `CaptureReminderPresets`, `CaptureReminderText`, `CapturePlacement`. `CaptureWriter`가 이것들로 저장소에 쓴다.
+- `Views/`: `CapturePanel`(테두리 없는 `NSPanel`, 앱을 앞으로 가져오지 않고 키 창이 됨), `CaptureBarView`(한 줄 배치), `CaptureTextView`(한 줄 입력, 명령 키), `CaptureBadgeView`(스페이스와 리마인더 표시), `CaptureBackgroundView`(흐림 위에 `surface`를 `opacity`로), `CaptureStyle`.
+- 입력 칸은 `NSTextView`다. 시간 표현의 밑줄은 글 저장소가 아니라 배치 쪽의 임시 속성(`addTemporaryAttributes`)이라 한글 조합을 끊지 않는다. 조합 중인 글자가 바뀔 때(`setMarkedText`)도 다시 읽는다.
+- 조합 중의 ↵(D-028의 4번): 키를 누른 순간의 조합 여부는 보지 않는다. `insertNewline:` 명령이 왔을 때 조합 중인 글자가 남아 있는 경우에만 조합을 끝내고 멈춘다. 한글 두벌식은 입력기가 글자를 확정한 뒤 같은 키 입력에서 명령을 보내므로 ↵ 한 번에 들어간다. 테스트는 `inputContextOverride`에 입력기 흉내(`FakeInputContext`)를 끼워 `keyDown`부터 지나간다. 노트 찾기의 `BrowseTextView`도 같다.
+- 편집 단축키(⌘A, ⌘C, ⌘X, ⌘V, ⌘Z)는 입력 칸이 직접 받는다. 이 창은 다른 앱이 앞에 있을 때도 떠서 앱 메뉴에 기대지 않는다.
+
+## Browse (`Sources/Browse/`)
+
+노트 찾기(spec 8, 화면 9). Core 모듈만 import한다. 임시 값은 D-027, D-028.
+
+### 공개 API
+
+```swift
+@MainActor public final class BrowseCoordinator {
+    public init(theme: Theme, notes: any NoteStoring, spaces: SpaceStore, router: any Routing,
+                windowStates: WindowStateStore? = nil, log: @escaping @MainActor (String) -> Void)
+    public var isVisible: Bool { get }
+    public func show(anchoredTo window: NSWindow?, excluding current: NoteID?)   // 창이 없으면 화면 가운데 위쪽
+    public func hide()
+}
+```
+
+- `windowStates`는 떠 있는 노트(열려 있는 창, 앞에 있는 것이 먼저)를 알아내는 데 쓴다. 주지 않으면 "떠 있는 노트" 구획과 핀이 보이지 않고 모든 노트가 "최근에 연 노트"로 간다. App은 노트 창에 넘긴 것과 같은 객체를 넘긴다.
+- App은 `.openBrowse(anchor:)`를 받아 그 노트의 창과 id로 `show`를 부른다. 메뉴 막대에서 열 때는 둘 다 `nil`이다.
+- 줄을 고르면(↵, 클릭) 먼저 닫고 요청을 보낸다: 노트는 `.openNote(id)`, "새 노트 만들기"는 `.newNote`(검색어가 제목, `nextTo`는 `current`), "라이브러리 열기"는 `.openLibrary`. 떠 있는 노트로 포커스를 옮기거나 닫혀 있던 노트를 지금 노트 옆에 띄우는 일은 App이 한다.
+- esc와 `hide()`로 닫으면 열었던 노트 창을 다시 키 창으로 만든다(spec 17). 바깥 클릭으로 닫히면 포커스를 누른 곳에 둔다.
+- 열려 있는 동안 저장소 변경을 받아 목록을 다시 만든다. 노트를 고치거나 만들지 않는다. 변경이 잇달아 와도 노트 파일은 다음 차례(메인 큐)에 한 번만 다시 읽고, 고른 줄은 노트 id로 견주어 그대로 둔다(`BrowseSelection.index(keeping:in:)`). `WindowStateStore`와 `SpaceStore`는 바뀐 것을 알려 주지 않으므로 목록을 다시 읽을 때 함께 다시 본다(둘만 바뀌면 열려 있는 목록은 따라가지 않는다).
+- 노트 목록을 읽지 못하면 `log`로 까닭을 알리고, 보이던 목록이 있으면 그대로 둔다. 처음부터 읽지 못했으면 "새 노트 만들기"(글자를 치면)와 "라이브러리 열기"만 보인다. 걸어 둔 알림은 `deinit`에서 푼다.
+- `@_spi(Verification)`: `now`, `calendar`, `takesKeyOnShow`, `window`, `inputView`, `rowDescriptions`, `settledFrame`, `drawnRowCount`, `listReadCount`, `notificationCenter` 등. 테스트와 `Stage4Demo`만 쓴다.
+
+### 안쪽 구조
+
+- `Logic/`(화면 없음): `BrowseMatcher`(소문자와 자모 단위로 견줌, 조합 중인 글자 처리), `BrowsePreview`(본문 첫머리), `BrowseContent`(목록의 줄과 차례: `BrowseEntry`), `BrowseSelection`(↑↓, 줄마다 보낼 `Route`), `BrowseFloating`, `BrowseReminder`, `BrowsePlacement`.
+- `Views/`: `BrowsePanel`, `BrowseRootView`(바탕, 검색 칸, 스크롤되는 목록), `BrowseSearchField`와 `BrowseTextView`, `BrowseListView`(줄 쌓기, 고른 줄, 마우스), `BrowseEntryView`와 줄 뷰들, `BrowseStyle`.
+- 글자를 칠 때마다 줄 뷰를 새로 만들어 바꾼다. 옛 줄은 바로 떼어 내고, 목록 전체를 겹쳐 넘기는 전환은 쓰지 않는다(옛 줄과 새 줄이 겹쳐 잔상으로 보인다).
+- 창 높이는 위쪽을 고정한 채 `dur` 동안 내용을 따라간다. 움직이는 중에 내용이 또 바뀌면 마지막으로 정한 틀(`targetFrame`)과 견주어 새로 움직인다(움직이는 중의 `NSWindow.frame`은 가는 길의 값이라 견주면 안 된다). 높이가 바뀐 뒤 `invalidateShadow()`를 부른다. 스크롤 막대는 내용이 높이 한도를 넘을 때만 둔다. 창 높이는 언제나 줄 수에 맞고, 한도(`browse-h-max-screen`)를 넘을 때만 스크롤된다. 띄울 때 아래로 그 한도만큼의 자리를 남기므로(`BrowsePlacement`) 화면 아래쪽의 노트에서 열어도 목록이 눌리지 않는다.
+
+### 확인용 실행 파일 `Stage4Demo` (`Sources/Stage4Demo/`)
+
+- `swift run Stage4Demo --notes-dir <폴더> --appearance light|dark --script "<단계;단계>" --snapshot <png 경로> --hold <초> --activate`
+- `--notes-dir`는 꼭 줘야 하고 그 폴더 안만 읽고 쓴다. 비어 있으면 두 스페이스에 견본 노트 여덟 개를 채운다(만든 날짜와 고친 시각을 정해 적어 실행마다 차례가 같다).
+- `--script`의 단계(`show:capture`, `show:browse`, `show:browse-anchored`, `type:`, `mark:`, `return`, `tab`, `up`, `down`, `esc`, `cmd-return`, `cmd-r`, `dump`, `snapshot:`, `screencap:` 등)는 `DemoScript.swift` 머리 주석에 있다. 실제 입력 경로(`insertText`, `setMarkedText`, `doCommand(by:)`)를 부르고 시스템에 키나 마우스 이벤트를 보내지 않는다. 받은 `Route`와 기록, 줄의 내용을 표준 출력에 적는다.
+- `snapshot:`은 창의 레이어를 프로세스 안에서 그린다(그림자, 뒤 배경 흐림, 입력 커서는 찍히지 않음). `screencap:`은 `screencapture -l <창 번호>`로 그 창만 화면에서 찍는다(화면이 잠겨 있으면 안 된다).
+- 기본으로는 키 창이 되지 않아 다른 앱의 입력을 빼앗지 않는다. `--activate`는 키 창 동작과 입력 커서를 볼 때만 짧게 쓴다.
 - 앱 묶음에는 들어가지 않는다.
 
 ## App 타깃 (`Sources/FloatingNotes/`)
