@@ -40,6 +40,13 @@ public final class MarkdownEditor {
         controller.load(text: text, foldedLines: foldedLines)
     }
 
+    /// 바깥(이 편집기가 아닌 쪽)이 원문 끝에 글을 덧붙였을 때 그 글만 넘긴다(빠른 캡처가 떠 있는 노트에
+    /// 한 줄을 덧붙임). 커서와 선택, 접힘, 되돌리기 기록, 조합 중인 글자를 그대로 둔다. 되돌리기에 적히지
+    /// 않으므로 ⌘Z는 붙인 글을 지우지 않는다. `onTextChange`를 부르지 않는다.
+    public func appendFromOutside(_ suffix: String) {
+        controller.appendFromOutside(suffix)
+    }
+
     /// 체크박스 모양 같은 설정. 바꾸면 곧바로 다시 그린다.
     public var configuration: MarkdownEditorConfiguration {
         get { controller.configuration }
@@ -110,7 +117,7 @@ public final class MarkdownEditor {
         controller.perform(action)
     }
 
-    /// 창이 키 창이 아니어도 편집 중인 것처럼 커서 줄의 기호를 보인다.
+    /// 창이 키 창이 아니어도 편집 중인 것으로 본다(커서 줄의 기호를 보이고 편집 단축키를 받는다).
     /// 화면을 캡처해 확인할 때만 쓴다(다른 앱의 포커스를 빼앗지 않기 위해).
     @_spi(Verification)
     public var forcesActiveAppearance: Bool {

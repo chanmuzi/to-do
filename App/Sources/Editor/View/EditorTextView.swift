@@ -39,8 +39,11 @@ final class EditorTextView: NSTextView {
 
     // MARK: 키
 
+    /// 편집 단축키는 이 편집기에서 글을 쓰는 중일 때만 받는다: 본문에 포커스가 있고 창이 키 창이다.
+    /// 키 창이 아닌 창의 뷰에도 `performKeyEquivalent`가 올 수 있다(다른 창이 넘긴 키, 창을 가리지 않고
+    /// 부르는 쪽). 그때 받으면 사용자가 보고 있지 않은 노트의 글이 바뀐다.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if window?.firstResponder === self, !hasMarkedText(),
+        if editor?.isActive == true, !hasMarkedText(),
            let action = EditorShortcuts.action(keyCode: event.keyCode, modifiers: Self.modifiers(of: event)) {
             editor?.perform(action)
             return true

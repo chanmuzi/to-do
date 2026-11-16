@@ -79,12 +79,14 @@ extension EditorController {
     /// 원문이 바뀐 것을 바깥에 알린다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는
     /// `setMarkedText` 바로 뒤에 부르고, 그 밖의 경로는 다음 메인 큐 차례에 부른다.
     func flushPendingChange() {
+        insertDeferredAppendIfPossible()
         guard hasPendingChange, !isSettingText else { return }
         hasPendingChange = false
         refreshStyling()
         recordFoldChangeForUndo()
         notifyFoldChangeIfNeeded()
-        onTextChange?(document.text)
+        // 미뤄 둔 덧붙임(글 끝에서 조합 중)이 있으면 그것까지가 원문이다.
+        onTextChange?(text)
         reportContentHeight()
         layoutCopyButton()
     }
