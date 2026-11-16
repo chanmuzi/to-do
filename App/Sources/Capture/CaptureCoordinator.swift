@@ -7,7 +7,7 @@ import Theme
 /// 빠른 캡처 바(spec 7, 화면 3). App이 하나 만들어 `.openCapture`와 어디서나 쓰는 단축키에 잇는다.
 ///
 /// - ↵: 고른 스페이스의 오늘 노트 맨 아래에 투두 한 줄로 넣고 닫는다(없으면 만든다).
-/// - ⌘↵: 새 노트를 만들어 띄우도록 `Route.newNote`를 보내고 닫는다.
+/// - ⌘↵: 새 노트를 만들어 띄우도록 `Route.newNote`를 보내고, 만들어졌으면 닫는다.
 /// - ⇥: 스페이스를 차례로 바꾼다. ⌘R: 리마인더를 직접 고른다. esc, 바깥 클릭: 닫는다.
 @MainActor
 public final class CaptureCoordinator {
@@ -21,8 +21,12 @@ public final class CaptureCoordinator {
     private var panel: CapturePanel?
     private var barView: CaptureBarView?
     private var observers: [NSObjectProtocol] = []
-    /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 친다.
+    /// 사라지는 중(알파가 0으로 가는 중)이다. 이때는 보이지 않는 것으로 치고 명령도 받지 않는다.
     private var isClosing = false
+    /// 나타나는 전환이 끝날 때 제자리와 끝의 알파로 놓는 일. 움직임이 끝났는지에 기대지 않고 `dur` 뒤에 한다.
+    private var entranceSettle: Task<Void, Never>?
+    /// 사라지는 전환이 끝날 때 창을 내리는 일. 그사이 다시 띄우면 취소한다.
+    private var closingSettle: Task<Void, Never>?
     /// 바가 놓이는 자리. 나타날 때는 이보다 조금 아래에서 올라오고, 사라질 때는 그리로 내려간다.
     private var restingFrame: NSRect = .zero
 
@@ -33,6 +37,17 @@ public final class CaptureCoordinator {
     private var manualReminder: Date?
     /// 이번에 연 뒤로 ⇥를 눌렀는지. 빈 바에는 스페이스를 보이지 않지만(화면 3), 바꾸는 중에는 보여야 한다.
     private var hasCycledSpace = false
+
+    /// 닫히기 시작할 때 불린다. 인자가 참이면 열기 전에 키 입력을 받던 곳으로 포커스를 돌려줄 때다
+    /// (esc, ⌘W, ↵로 넣음, `hide()`). 거짓이면 포커스가 갈 곳이 따로 있다(바깥을 누름, ⌘↵로 새 노트를 띄움).
+    /// 키 창을 누구에게 돌려줄지는 App이 정한다.
+    public var onDismiss: (@MainActor (_ returnsFocus: Bool) -> Void)?
+    /// ↵로 넣지 못했을 때 불린다(`log`에도 남는다). App이 사용자에게 알린다. 알리는 동안 바가 키 창에서
+    /// 물러나도(알림 창) 닫히지 않고, 돌아오면 적은 글을 그대로 둔 채 다시 입력을 받는다.
+    public var onFailure: (@MainActor (Error) -> Void)?
+    /// 넣지 못한 것을 알리는 중이거나 ⌘↵의 요청이 돌아오기를 기다리는 중이다. 이때는 키 창에서 물러나도
+    /// (알림 창, 새로 뜬 노트) 닫지 않는다. 닫을지는 그 일이 끝난 뒤에 정한다.
+    private var staysOpenWithoutKey = false
 
     /// 확인용: 지금 시각과 달력을 바꿔 끼운다.
     @_spi(Verification) public var now: @MainActor () -> Date = { Date() }
@@ -71,7 +86,10 @@ public final class CaptureCoordinator {
     public func show() {
         let panel = preparedPanel()
         guard let barView else { return }
+        closingSettle?.cancel()
+        closingSettle = nil
         isClosing = false
+        barView.textView.isEditable = true
         manualReminder = nil
         hasCycledSpace = false
         selectedSpace = CaptureSpaceCycle.initial(
@@ -103,21 +121,57 @@ public final class CaptureCoordinator {
             panel.animator().setFrame(resting, display: true)
             if opaque { panel.animator().alphaValue = 1 }
         }
+        // 움직임은 꾸밈이다. 제자리에 놓는 일은 `dur` 뒤에 따로 한다(화면이 꺼져 있으면 움직임이 나아가지 않는다).
+        entranceSettle?.cancel()
+        entranceSettle = style.afterTransition { [weak self] in self?.finishShowing() }
+    }
+
+    private func finishShowing() {
+        entranceSettle = nil
+        guard let panel, panel.isVisible, !isClosing else { return }
+        land(panel, frame: restingFrame, alpha: isShownOpaque ? 1 : 0)
+    }
+
+    private func finishClosing() {
+        closingSettle = nil
+        guard let panel, isClosing else { return }
+        isClosing = false
+        panel.orderOut(nil)
+        land(panel, frame: offstageFrame, alpha: 0)
+    }
+
+    /// 가던 움직임을 멈추고 끝의 값으로 놓는다.
+    private func land(_ panel: NSPanel, frame: NSRect, alpha: CGFloat) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            panel.animator().setFrame(frame, display: true)
+            panel.animator().alphaValue = alpha
+        }
+        panel.setFrame(frame, display: true)
+        panel.alphaValue = alpha
     }
 
     /// `dur` 동안 조금 내려가며 흐려진 뒤 내려간다(나타날 때의 반대).
+    /// 포커스를 열기 전의 자리로 돌려줄 때라고 `onDismiss`로 알린다.
     public func hide() {
+        dismiss(returningFocus: true)
+    }
+
+    private func dismiss(returningFocus: Bool) {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
+        entranceSettle?.cancel()
+        entranceSettle = nil
+        // 사라지는 동안에는 글도 명령도 받지 않는다(보이지 않게 된 바가 키 입력을 먹지 않게).
+        barView?.textView.isEditable = false
         let offstage = offstageFrame
-        style.animate({
+        style.animate {
             panel.animator().alphaValue = 0
             panel.animator().setFrame(offstage, display: true)
-        }, completion: { [weak self] in
-            guard let self, self.isClosing else { return }
-            self.isClosing = false
-            panel.orderOut(nil)
-        })
+        }
+        // 창을 내리는 일은 움직임이 끝났다는 알림이 아니라 `dur` 뒤의 시계가 한다("동작 줄이기"면 바로).
+        closingSettle = style.afterTransition { [weak self] in self?.finishClosing() }
+        onDismiss?(returningFocus)
     }
 
     private var offstageFrame: NSRect {
@@ -164,7 +218,7 @@ public final class CaptureCoordinator {
         observers = [
             // 바깥을 누르면 키 창에서 물러난다. 그때 닫는다.
             center.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.hide() }
+                MainActor.assumeIsolated { self?.resignedKey() }
             },
             center.addObserver(forName: Theme.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.themeDidChange() }
@@ -173,6 +227,13 @@ public final class CaptureCoordinator {
         self.panel = panel
         self.barView = barView
         return panel
+    }
+
+    /// 바깥을 눌렀다. 포커스는 누른 곳에 둔다. 넣지 못한 것을 알리는 중이거나(알림 창이 키 창이 됨)
+    /// ⌘↵의 답을 기다리는 중이면 닫지 않는다.
+    private func resignedKey() {
+        guard !staysOpenWithoutKey else { return }
+        dismiss(returningFocus: false)
     }
 
     private func themeDidChange() {
@@ -254,6 +315,8 @@ public final class CaptureCoordinator {
     @_spi(Verification) public func performCycleReminder() { perform(.cycleReminder) }
 
     private func perform(_ command: CaptureCommand) {
+        // 닫히는 중의 키 입력은 버린다: ↵를 잇달아 두 번 눌러도 한 번만 들어간다.
+        guard !isClosing else { return }
         switch command {
         case .submit: submit()
         case .submitAsNewNote: submitAsNewNote()
@@ -262,7 +325,7 @@ public final class CaptureCoordinator {
         case .cycleReminder:
             manualReminder = CaptureReminderPresets.next(after: manualReminder, now: now(), calendar: calendar)
             refresh(animated: true)
-        case .cancel: hide()
+        case .cancel: dismiss(returningFocus: true)
         }
     }
 
@@ -292,18 +355,49 @@ public final class CaptureCoordinator {
             hide()
         } catch {
             log("캡처: 넣지 못했습니다: \(error)")
+            reportFailure(error)
         }
     }
 
+    /// 넣지 못한 것을 App에 알린다. 알림 창이 떠 있는 동안 바는 그대로 있고, 닫히면 다시 입력을 받는다.
+    private func reportFailure(_ error: Error) {
+        guard let onFailure else { return }
+        staysOpenWithoutKey = true
+        onFailure(error)
+        staysOpenWithoutKey = false
+        reclaimKey()
+    }
+
+    /// 알림 창이 가져갔던 키 입력을 바로 되찾는다. 적은 글은 그대로다.
+    private func reclaimKey() {
+        guard let panel, let barView, panel.isVisible, !isClosing, takesKeyOnShow else { return }
+        panel.makeKeyAndOrderFront(nil)
+        panel.makeFirstResponder(barView.textView)
+    }
+
     /// ⌘↵: 적은 글을 제목으로 한 새 노트를 띄운다(임시, D-026). 만들고 띄우는 일은 App이 한다.
+    /// 요청을 먼저 보내고, 만들어졌을 때만 닫는다. 만들지 못했으면(알리는 일은 받은 쪽이 했다) 적은 글을
+    /// 그대로 둔 채 다시 입력을 받는다.
     private func submitAsNewNote() {
         let entry = interpretation()
         guard !entry.isEmpty else { return }
-        rememberSpace(entry.spaceID)
-        hide()
-        router.route(.newNote(NewNoteRequest(
+        staysOpenWithoutKey = true
+        let result = router.route(.newNote(NewNoteRequest(
             draft: NoteDraft(title: entry.text, spaceID: entry.spaceID, reminder: entry.reminder)
         )))
+        staysOpenWithoutKey = false
+        switch result {
+        case .handled:
+            rememberSpace(entry.spaceID)
+            // 새 노트가 키 창이 되었다. 열기 전의 자리로 포커스를 돌려주지 않는다.
+            dismiss(returningFocus: false)
+        case .failed:
+            log("캡처: 새 노트를 만들지 못해 적은 글을 그대로 둡니다")
+            reclaimKey()
+        case .unconnected:
+            log("캡처: 새 노트를 만드는 곳이 이어져 있지 않아 적은 글을 그대로 둡니다")
+            reclaimKey()
+        }
     }
 
     private func rememberSpace(_ id: SpaceID?) {

@@ -19,7 +19,11 @@ struct StatusMenuBuilder {
                 item.target = target
                 // 항목은 target을 붙잡지 않는다. 메뉴가 살아 있는 동안 함께 살도록 여기 맡긴다.
                 item.representedObject = target
-                item.view = MenuBarRowView(theme: theme, title: title, symbolName: symbol)
+                // 아직 이어지지 않은 화면의 항목은 고를 수 없다(눌러도 아무 일이 없는 것을 내놓지 않는다).
+                item.isEnabled = action.isConnected
+                item.view = MenuBarRowView(
+                    theme: theme, title: title, symbolName: symbol, isEnabled: action.isConnected
+                )
                 return item
             }
         }

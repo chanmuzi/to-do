@@ -32,29 +32,35 @@ struct PanelStyle {
     /// 전환 시간. "동작 줄이기"가 켜져 있으면 바로 바꾼다.
     var transitionDuration: TimeInterval { reducesMotion ? 0 : theme.motion.duration }
 
-    /// 알파와 레이어 색, 뷰의 자리를 `dur`, `ease`로 바꾼다(규칙 8). `completion`은 움직임이 끝난 뒤에 불린다.
-    func animate(_ changes: () -> Void, completion: (@MainActor () -> Void)? = nil) {
-        NSAnimationContext.runAnimationGroup({ context in
+    /// 알파와 레이어 색, 뷰의 자리를 `dur`, `ease`로 바꾼다(규칙 8).
+    ///
+    /// 움직임이 끝났을 때를 알려 주지 않는다. 끝난 뒤에 할 일은 `TransitionTimer`로 잡는다(`fade`가 그렇게 한다):
+    /// 화면이 꺼져 있으면 움직임이 나아가지 않을 수 있고, 그때는 끝났다는 알림도 오지 않는다.
+    func animate(_ changes: () -> Void) {
+        NSAnimationContext.runAnimationGroup { context in
             context.duration = transitionDuration
             context.timingFunction = theme.motion.timingFunction
             context.allowsImplicitAnimation = true
             changes()
-        }, completionHandler: completion.map { completion in
-            { @Sendable in MainActor.assumeIsolated { completion() } }
-        })
+        }
     }
 
     /// 나타나고 사라지는 것(규칙 8): 알파를 `dur`, `ease`로 바꾼다. 나타날 때는 먼저 숨김을 푼다.
-    /// 다 사라진 뒤에 숨기는 일은 `completion`에서 부르는 쪽이 한다(그사이 다시 나타났을 수 있다).
-    func fade(_ view: NSView, visible: Bool, animated: Bool, completion: @escaping @MainActor () -> Void) {
+    /// 다 사라진 뒤에 숨기는 일은 `settled`에서 부르는 쪽이 한다(그사이 다시 나타났을 수 있다).
+    /// - Parameter settled: 전환 시간이 지난 뒤에 불린다. 움직이지 않을 때는 그 자리에서 불린다.
+    /// - Returns: `settled`를 잡아 둔 것. 다음 전환을 시작할 때 취소한다. 그 자리에서 불렀으면 `nil`.
+    func fade(
+        _ view: NSView, visible: Bool, animated: Bool, settled: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never>? {
         if visible { view.isHidden = false }
         let alpha: CGFloat = visible ? 1 : 0
         guard animated, transitionDuration > 0 else {
             view.alphaValue = alpha
-            completion()
-            return
+            settled()
+            return nil
         }
-        animate({ view.animator().alphaValue = alpha }, completion: completion)
+        animate { view.animator().alphaValue = alpha }
+        return TransitionTimer.after(transitionDuration, settled)
     }
 
     /// 글자색, 아이콘 색처럼 따로 움직일 수 없는 속성을 바꾸기 직전에 부른다. 바뀐 모습으로 `dur` 동안 넘어간다.

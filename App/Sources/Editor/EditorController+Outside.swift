@@ -18,6 +18,12 @@ extension EditorController {
         // 화면의 원문과 견준다. 미뤄 둔 변경이 있었다면 새 글에 이미 들어 있으므로 갈아 치운다.
         deferredOutsideEdit = nil
         guard let edit = OutsideEdit(from: document.text, to: target) else { return }
+        // 앞뒤로 같은 부분이 하나도 없으면 다른 글이다. 지킬 자리가 없으므로 통째로 넣는다(되돌리기 기록을 비운다).
+        if edit.range.location == 0, edit.range.length == document.length, document.length > 0,
+           editorUndoManager.groupsByEvent || editorUndoManager.groupingLevel == 0 {
+            text = target
+            return
+        }
         guard textView.hasMarkedText() else {
             perform(edit)
             return

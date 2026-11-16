@@ -12,6 +12,8 @@ struct NotePanelEnvironment {
     let recorder: WindowStateRecorder
     let makeBodyEditor: NoteBodyEditorFactory
     let options: () -> NotePanelDisplayOptions
+    /// 지금 시각(마지막으로 연 때를 적을 때 쓴다).
+    let now: () -> Date
     let log: (String) -> Void
 
     var theme: Theme { style.theme }

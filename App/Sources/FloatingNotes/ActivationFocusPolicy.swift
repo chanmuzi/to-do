@@ -21,8 +21,12 @@ struct ActivationFocusPolicy {
     }
 
     /// 앱이 앞으로 왔다. 맨 앞 노트를 키 창으로 만들어도 되면 참.
-    mutating func shouldFocusNote(activatedAt time: TimeInterval) -> Bool {
+    /// - Parameter isKeyHeldElsewhere: 키 입력을 받아야 하는 다른 화면이 떠 있다(알림 창, 캡처 바, 노트 찾기).
+    ///   그때 노트를 키 창으로 만들면 그 화면이 입력을 잃는다. 실패를 알리는 알림 창은 스스로 앱을 앞으로
+    ///   가져오므로 이 경우가 실제로 생긴다.
+    mutating func shouldFocusNote(activatedAt time: TimeInterval, isKeyHeldElsewhere: Bool = false) -> Bool {
         defer { hasSeenActivation = true }
+        guard !isKeyHeldElsewhere else { return false }
         // 아직 켜는 중이다.
         guard let launchFinishedAt else { return false }
         if !hasSeenActivation, time - launchFinishedAt < Self.launchGrace { return false }

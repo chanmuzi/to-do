@@ -91,7 +91,8 @@ import Testing
         #expect(try String(contentsOf: fixture.noteFile(id), encoding: .utf8).hasSuffix("A\r\nB"))
     }
 
-    @Test func externalBodyChangeIsAssignedExactlyOnce() throws {
+    /// 다른 프로그램이 고친 본문은 `text`에 넣지 않고 `applyOutsideChange(to:)`로 한 번만 넘긴다.
+    @Test func externalBodyChangeIsAppliedExactlyOnce() throws {
         let (coordinator, controller, editor) = try open(NoteDraft(title: "바깥", body: "처음"))
         defer { fixture.cleanUp(coordinator) }
         let id = controller.noteID
@@ -99,17 +100,19 @@ import Testing
         try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "처음", with: "다른 프로그램이 고친 글") }
         try fixture.notes.refresh()
         try fixture.notes.refresh()
-        #expect(editor.assignments == ["처음", "다른 프로그램이 고친 글"])
+        #expect(editor.assignments == ["처음"])
+        #expect(editor.applied == ["다른 프로그램이 고친 글"])
         #expect(editor.appended.isEmpty)
 
         // 받은 글 위에서 고친 것은 충돌이 아니고, 그 저장의 알림으로도 다시 넣지 않는다.
         editor.type("다른 프로그램이 고친 글!")
         try fixture.notes.flushPendingSaves()
         #expect(controller.problem == nil)
-        #expect(editor.assignments.count == 2)
+        #expect(editor.assignments.count == 1)
+        #expect(editor.applied.count == 1)
     }
 
-    @Test func revertingToTheFileAssignsTheFilesBody() throws {
+    @Test func revertingToTheFileAppliesTheFilesBody() throws {
         let (coordinator, controller, editor) = try open(NoteDraft(body: "처음"))
         defer { fixture.cleanUp(coordinator) }
 
@@ -117,10 +120,12 @@ import Testing
         try fixture.appendOutside("\n파일 쪽", to: controller.noteID)
         try fixture.notes.refresh()
         #expect(editor.assignments == ["처음"])
+        #expect(editor.applied.isEmpty)
         controller.resolveProblem(.keepDisk)
 
         #expect(controller.problem == nil)
-        #expect(editor.assignments == ["처음", "처음\n파일 쪽"])
+        #expect(editor.assignments == ["처음"])
+        #expect(editor.applied == ["처음\n파일 쪽"])
     }
 
     // MARK: - 이 앱의 다른 곳이 쓴 본문(빠른 캡처가 떠 있는 노트에 덧붙임)
@@ -189,16 +194,59 @@ import Testing
         #expect(try fixture.notes.load(id).body == "처음 글ㅎ\n캡처")
     }
 
-    /// 끝에 붙인 것이 아닌 바꿈(다른 곳이 본문을 고쳐 씀)은 통째로 넣는다.
-    @Test func bodyRewrittenByAnotherInAppWriterIsAssigned() throws {
+    /// 끝에 붙인 것이 아닌 바꿈(다른 곳이 본문을 고쳐 씀)은 `text`에 넣지 않고 `applyOutsideChange(to:)`로 넘긴다.
+    @Test func bodyRewrittenByAnotherInAppWriterIsAppliedNotAssigned() throws {
         let (coordinator, controller, editor) = try open(NoteDraft(body: "- [ ] 할 일"))
         defer { fixture.cleanUp(coordinator) }
 
         try fixture.notes.update(controller.noteID) { $0.body = "- [x] 할 일" }
 
-        #expect(editor.assignments == ["- [ ] 할 일", "- [x] 할 일"])
+        #expect(editor.assignments == ["- [ ] 할 일"])
+        #expect(editor.applied == ["- [x] 할 일"])
         #expect(editor.appended.isEmpty)
         #expect(controller.exchangedBody == "- [x] 할 일")
+    }
+
+    /// 빠른 캡처는 본문 끝의 빈 줄을 걷어 내고 줄을 붙인다. 끝에 붙인 것이 아니므로 `applyOutsideChange(to:)`로
+    /// 넘기고(`text`에 넣지 않는다), 주고받은 본문을 새 본문으로 맞춰 그 뒤의 저장 알림과 입력이 어긋나지 않는다.
+    @Test func lineAddedAfterTrimmingTrailingBlankLinesIsAppliedAndSurvivesTyping() throws {
+        let (coordinator, controller, editor) = try open(NoteDraft(title: "오늘", body: "쓰던 줄\n\n\n"))
+        defer { fixture.cleanUp(coordinator) }
+        let id = controller.noteID
+        // 아직 저장되지 않은 입력이 있는 채로 다른 곳이 본문을 고쳐 쓴다.
+        editor.type("쓰던 줄!\n\n\n")
+
+        try fixture.notes.update(id) { $0.body = "쓰던 줄!\n[ ] 우유 사기\n" }
+
+        #expect(editor.assignments == ["쓰던 줄\n\n\n"])
+        #expect(editor.appended.isEmpty)
+        #expect(editor.applied == ["쓰던 줄!\n[ ] 우유 사기\n"])
+        #expect(controller.exchangedBody == "쓰던 줄!\n[ ] 우유 사기\n")
+
+        // 그 뒤의 입력은 받은 글 위에서 저장되고, 그 저장의 알림은 편집기로 돌아오지 않는다.
+        editor.type("쓰던 줄!\n[ ] 우유 사기\n이어서 친 글")
+        try fixture.notes.flushPendingSaves()
+        #expect(try fixture.notes.load(id).body == "쓰던 줄!\n[ ] 우유 사기\n이어서 친 글")
+        #expect(editor.applied.count == 1)
+        #expect(editor.assignments.count == 1)
+        #expect(controller.problem == nil)
+    }
+
+    /// `applyOutsideChange(to:)`를 따로 구현하지 않은 편집기(기본 편집기)는 통째로 넣는 길로 넘어간다. 글은 남는다.
+    @Test func rewriteReachesAnEditorThatOnlyTakesWholeText() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let note = try fixture.notes.create(NoteDraft(body: "쓰던 줄\n\n"))
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        let textView = try #require(controller.editor.view as? NSTextView)
+
+        try fixture.notes.update(note.id) { $0.body = "쓰던 줄\n[ ] 우유 사기\n" }
+        #expect(textView.string == "쓰던 줄\n[ ] 우유 사기\n")
+        textView.insertText("끝", replacementRange: NSRange(location: (textView.string as NSString).length, length: 0))
+        try fixture.notes.flushPendingSaves()
+
+        #expect(try fixture.notes.load(note.id).body == "쓰던 줄\n[ ] 우유 사기\n끝")
     }
 
     /// 더 나쁜 경우: 다른 프로그램이 파일을 제자리에서 고쳤고(아직 알아채지 못함), 그 뒤에 캡처가 덧붙였다.

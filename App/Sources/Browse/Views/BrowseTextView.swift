@@ -53,9 +53,23 @@ final class BrowseTextView: NSTextView {
         }
     }
 
+    /// 닫히는 중(글을 받지 않게 해 둔 동안)의 키는 삼킨다. 보이지 않게 된 칸에 글자가 들어가지도, 경고음이 나지도 않는다.
+    override func keyDown(with event: NSEvent) {
+        guard isEditable else { return }
+        super.keyDown(with: event)
+    }
+
+    /// W 키의 자리(가상 키 코드). 한글 입력 상태에서는 글자가 자모로 오므로 자리로 견준다.
+    private static let closeKeyCode: UInt16 = 13
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
         guard window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
+        // ⌘W: 노트 찾기를 닫는다(esc와 같다). 테두리 없는 창은 `performClose`를 받지 못해 경고음만 난다.
+        if event.keyCode == Self.closeKeyCode, flags == .command {
+            onCommand?(.cancel)
+            return true
+        }
         return performEditShortcut(event.charactersIgnoringModifiers, flags: flags)
             || super.performKeyEquivalent(with: event)
     }

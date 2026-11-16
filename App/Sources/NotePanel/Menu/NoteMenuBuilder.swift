@@ -30,17 +30,23 @@ enum ProblemMenuAction: Hashable {
 struct NoteMenuBuilder {
     let style: PanelStyle
 
+    /// - Parameter isAvailable: 그 항목을 고르면 일어나는 일이 있는지. 여는 화면이 아직 이어지지 않은 항목은
+    ///   자리를 그대로 둔 채 고를 수 없게 흐려 둔다(눌러도 아무 일이 없는 것을 내놓지 않는다).
     func moreMenu(
-        isPinned: Bool, selectedPaletteID: String?, handler: @escaping (MoreMenuAction) -> Void
+        isPinned: Bool, selectedPaletteID: String?,
+        isAvailable: (MoreMenuAction) -> Bool = { _ in true },
+        handler: @escaping (MoreMenuAction) -> Void
     ) -> NSMenu {
         let menu = makeMenu()
         menu.items = [
-            row("리마인더 설정", symbol: "bell") { handler(.setReminder) },
-            row("스페이스 옮기기", symbol: "briefcase") { handler(.moveToSpace) },
+            row("리마인더 설정", symbol: "bell", isEnabled: isAvailable(.setReminder)) { handler(.setReminder) },
+            row("스페이스 옮기기", symbol: "briefcase", isEnabled: isAvailable(.moveToSpace)) {
+                handler(.moveToSpace)
+            },
             row("항상 위에 고정", symbol: "pin", isOn: isPinned) { handler(.togglePin) },
             colorRow(selectedPaletteID: selectedPaletteID) { handler(.setColor($0)) },
             .separator(),
-            row("AI 패널 열기", symbol: "sparkle") { handler(.openAIPanel) },
+            row("AI 패널 열기", symbol: "sparkle", isEnabled: isAvailable(.openAIPanel)) { handler(.openAIPanel) },
             .separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
             row("휴지통으로 보내기", symbol: "trash") { handler(.moveToTrash) },
@@ -80,14 +86,16 @@ struct NoteMenuBuilder {
     }
 
     private func row(
-        _ title: String, symbol: String?, isOn: Bool = false, action: @escaping () -> Void
+        _ title: String, symbol: String?, isOn: Bool = false, isEnabled: Bool = true,
+        action: @escaping () -> Void
     ) -> NSMenuItem {
         let target = MenuActionTarget(action)
         let item = NSMenuItem(title: title, action: #selector(MenuActionTarget.fire), keyEquivalent: "")
         item.target = target
         // 항목은 target을 붙잡지 않는다. 메뉴가 살아 있는 동안 함께 살도록 여기 맡긴다.
         item.representedObject = target
-        item.view = MenuRowView(style: style, title: title, symbolName: symbol, isOn: isOn)
+        item.isEnabled = isEnabled
+        item.view = MenuRowView(style: style, title: title, symbolName: symbol, isOn: isOn, isDimmed: !isEnabled)
         return item
     }
 

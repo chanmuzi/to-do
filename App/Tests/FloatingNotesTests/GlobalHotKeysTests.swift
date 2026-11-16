@@ -48,13 +48,17 @@ import Testing
         let failures = hotKeys.register(.standard)
 
         #expect(failures.isEmpty)
-        // 지금 이어진 것은 "노트 모두 숨기기"뿐이다. 빠른 캡처, 라이브러리, AI 패널은 화면이 없다.
-        #expect(hotKeys.registered == [.toggleNotesHidden: KeyChord(.h, [.control, .option])])
-        #expect(hotKeys.skipped == [.quickCapture, .library, .aiPanel])
-        #expect(Set(registrar.chords.values) == [KeyChord(.h, [.control, .option])])
+        // 지금 이어진 것은 "빠른 캡처"(⌃⌥N)와 "노트 모두 숨기기"(⌃⌥H)다. 라이브러리, AI 패널은 화면이 없다.
+        #expect(hotKeys.registered == [
+            .quickCapture: KeyChord(.n, [.control, .option]),
+            .toggleNotesHidden: KeyChord(.h, [.control, .option]),
+        ])
+        #expect(hotKeys.skipped == [.library, .aiPanel])
+        #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option])])
         registrar.press(KeyChord(.n, [.control, .option]))
+        registrar.press(KeyChord(.l, [.control, .option]))
         registrar.press(KeyChord(.h, [.control, .option]))
-        #expect(performed == [.toggleNotesHidden])
+        #expect(performed == [.quickCapture, .toggleNotesHidden])
     }
 
     /// 등록할지는 요청이 이어져 있는지 하나로 정해진다(`Route.isConnected`). 그 값을 바꾸면 따라온다.
@@ -64,7 +68,9 @@ import Testing
         #expect(AppCommand.library.isConnected == Route.openLibrary.isConnected)
         #expect(AppCommand.aiPanel.isConnected == Route.openAIPanel(context: nil).isConnected)
         #expect(AppCommand.findNote.isConnected == Route.openBrowse(anchor: nil).isConnected)
-        #expect(!AppCommand.quickCapture.isConnected)
+        // 빠른 캡처와 노트 찾기는 이어졌다(4단계). 라이브러리와 AI 패널은 아직이다.
+        #expect(AppCommand.quickCapture.isConnected && AppCommand.findNote.isConnected)
+        #expect(!AppCommand.library.isConnected && !AppCommand.aiPanel.isConnected)
 
         // 화면이 이어진 뒤처럼 넘기면 그 키도 등록된다.
         let registrar = FakeRegistrar()
