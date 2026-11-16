@@ -45,6 +45,7 @@ UI를 새로 만들거나 고칠 때는 `docs/spec/02-rules.md`(21줄)를 함께
 - 명세: `docs/spec/` (장별 파일, 목차는 `index.md`)
 - 결정 기록: `docs/decisions.md`
 - 모듈 구조: `docs/architecture.md`
+- 손으로 확인할 목록(자동 확인이 보지 못한 것): `docs/verification-checklist.md`
 - 디자인 토큰: `App/Resources/tokens.json`
 - 시안·캡처·에셋 원본: `design/handoff/` (로컬 전용, gitignore)
 - 이 Mac에만 해당하는 메모: `CLAUDE.local.md` (gitignore)
