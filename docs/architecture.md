@@ -83,6 +83,8 @@ scripts/
 
 ### Theme
 
+- `NoteDisplayOptions`, `ReminderPresentation`, `BellRing`: 노트 상단과 라이브러리가 공유하는 리마인더 표시 설정·포맷·상태·움직임. `NotePanelDisplayOptions`는 호환 타입 별칭이다(D-066). 기능 모듈 간 참조는 추가하지 않는다.
+
 - `Theme` (`@MainActor @Observable`): `Theme.bundled(overrideStore:appearance:)`로 만든다. App이 하나 만들어 넘긴다. SwiftUI는 `@Environment(\.theme)`로도 받는다.
   - 색: `color(_: ColorToken) -> Color`, `nsColor(_:) -> NSColor`(둘 다 뷰의 라이트·다크를 스스로 따라감), `rgba(_:) -> RGBA`(지금 모양의 값), `noteBackgroundColor(paletteID:)` / `noteBackgroundNSColor(paletteID:)`, `shadow(_: ShadowToken) -> [ShadowLayer]`
   - 글꼴: `font(_: TextStyle, size:weight:) -> Font`, `nsFont(_:size:weight:) -> NSFont`, `lineHeight(_:)`, `tracking(_:)`. `TextStyle`은 spec 3.1 표의 줄(`.title .h1 .h2 .h3 .body .strong .paneTitle .row .rowSub .ui .micro .code .capture`)

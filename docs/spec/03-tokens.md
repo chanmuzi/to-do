@@ -142,6 +142,6 @@
 
 - `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
 - `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
-- `library-reminder-w/progress-w`: 110/28. 값이 없는 줄도 정보 열의 자리를 유지한다.
+- `library-reminder-w/progress-w`: 110/46(D-066, 체크 아이콘 포함). 값이 없는 줄도 정보 열의 자리를 유지한다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
