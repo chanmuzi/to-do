@@ -4,6 +4,7 @@ import AppKit
 import Models
 @_spi(Verification) import NotePanel
 import Routing
+import Library
 
 extension NotePanelCoordinator {
     /// `--debug-passive`: 노트 창이 키 창이 되지 않게 한다(확인용 실행이 사용자의 키 입력을 가져오지 않게).
@@ -63,6 +64,8 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var library: LibraryCoordinator?
+    var reopen: () -> Void = {}
     var toastWindow: () -> NSWindow? = { nil }
     var toastAction: () -> Void = {}
     private var statusItem: StatusItemController? { currentStatusItem() }
@@ -115,6 +118,51 @@ final class DebugControl {
         let id = words.count > 1 ? NoteID(rawValue: words[1]) : nil
         let argument = words.count > 2 ? words[2] : nil
         switch (words.first, id, argument) {
+        case ("library", _, _): router.route(.openLibrary)
+        case ("library-close", _, _): library?.close()
+        case ("reopen", _, _): reopen()
+        case ("library-select", let target?, _):
+            let value = target.rawValue
+            switch value {
+            case "today": library?.model.select(.today)
+            case "all": library?.model.select(.all)
+            case "floating": library?.model.select(.floating)
+            case "trash": library?.model.select(.trash)
+            case "reminders": library?.model.select(.reminders)
+            default:
+                if value.hasPrefix("archive:") { library?.model.select(.archive(String(value.dropFirst(8)))) }
+                else { library?.model.select(.space(SpaceID(rawValue: value))) }
+            }
+        case ("library-open", let id?, _):
+            if let note = library?.model.rows.first(where: { $0.id == id }) { library?.model.open(note) }
+        case ("library-snapshot", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            write(library?.window, to: url)
+        case ("library-dump", let name?, _):
+            guard let url = output(named: name.rawValue), let library else { return }
+            let state: [String: Any] = ["visible": library.window?.isVisible == true,
+                "rows": library.model.rows.map { $0.id.rawValue },
+                "spaces": library.model.spaceList.map { $0.name },
+                "archiveMonths": library.model.index.archiveMonths,
+                "upcoming": library.model.index.upcoming.count,
+                "error": library.model.error ?? "", "keyWindow": library.window?.isKeyWindow == true,
+                "pid": ProcessInfo.processInfo.processIdentifier]
+            do { try JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]).write(to: url) }
+            catch { AppLog.warning("라이브러리 확인 상태 저장 실패: \(error)") }
+        case ("library-import", let id?, let name?):
+            guard let url = output(named: name) else { return }
+            library?.importImageForVerification(url, space: SpaceID(rawValue: id.rawValue))
+        case ("library-icon", let id?, let name?):
+            library?.model.setIcon(.image(name), for: SpaceID(rawValue: id.rawValue))
+        case ("icon-symbol-snapshot", let id?, let name?), ("icon-emoji-snapshot", let id?, let name?):
+            guard let url = output(named: name), let library else { return }
+            do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), tab: words[0] == "icon-symbol-snapshot" ? 0 : 1, to: url) }
+            catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
+        case ("library-expand", let id?, _): library?.expandSpaceForVerification(SpaceID(rawValue: id.rawValue))
+        case ("icon-snapshot", let id?, let name?):
+            guard let url = output(named: name), let library else { return }
+            do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), to: url) }
+            catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
         case ("open", let id?, _): router.route(.openNote(id))
         case ("close", let id?, _): router.route(.closeNoteWindow(id))
         case ("new", _, _): router.route(.newNote(NewNoteRequest(nextTo: id)))

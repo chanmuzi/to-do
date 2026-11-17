@@ -23,13 +23,15 @@ let package = Package(
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
         ),
         .target(name: "Models"),
+        .target(name: "SpaceIcons", dependencies: ["Models", "Theme"],
+                resources: [.copy("Resources/SpaceImages")], swiftSettings: uiSettings),
         .target(name: "Store", dependencies: ["Models"]),
         .target(name: "Routing", dependencies: ["Models"]),
 
         // MARK: Features (서로 의존하지 않는다)
         .target(
             name: "NotePanel",
-            dependencies: ["Theme", "Models", "Store", "Routing"],
+            dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
             swiftSettings: uiSettings
         ),
         .target(
@@ -48,12 +50,15 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
+        .target(name: "Library", dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
+                swiftSettings: uiSettings),
+
         // MARK: App
         .executableTarget(
             name: "FloatingNotes",
             dependencies: [
                 "Theme", "Models", "Store", "Routing",
-                "NotePanel", "Editor", "Capture", "Browse",
+                "NotePanel", "Editor", "Capture", "Browse", "Library",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/menubar-icon.pdf")],
@@ -75,6 +80,7 @@ let package = Package(
         ),
 
         // MARK: Tests
+        .testTarget(name: "LibraryTests", dependencies: ["Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
         .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
         .testTarget(name: "StoreTests", dependencies: ["Store", "Models"]),

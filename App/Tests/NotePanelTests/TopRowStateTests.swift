@@ -76,17 +76,17 @@ import Theme
 
     @Test func spaceDisplayModes() {
         typealias Badge = TopRowState.SpaceBadge
-        #expect(state(note(), space: work).space == Badge(symbolName: "briefcase"))
+        #expect(state(note(), space: work).space == Badge(icon: work.icon))
         #expect(state(note(), space: work, options: .init(space: .iconAndName)).space
-            == Badge(symbolName: "briefcase", name: "회사"))
+            == Badge(name: "회사", icon: work.icon))
         #expect(state(note(), space: work, options: .init(space: .name)).space == Badge(name: "회사"))
         let emoji = Space(id: SpaceID(rawValue: "home"), name: "개인", icon: .emoji("🏠"))
-        #expect(state(note(), space: emoji).space == Badge(emoji: "🏠"))
+        #expect(state(note(), space: emoji).space == Badge(icon: emoji.icon))
     }
 
-    @Test func imageIconsFallBackToTheSpaceName() {
+    @Test func imageIconsAreCarriedToTheSharedRenderer() {
         let pixel = Space(id: SpaceID(rawValue: "dev"), name: "개발", icon: .image("terminal"))
-        #expect(state(note(), space: pixel).space == TopRowState.SpaceBadge(name: "개발"))
+        #expect(state(note(), space: pixel).space == TopRowState.SpaceBadge(icon: .image("terminal")))
     }
 
     @Test func problemIsCarriedThrough() {

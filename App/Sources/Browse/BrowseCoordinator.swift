@@ -399,7 +399,8 @@ public final class BrowseCoordinator {
         switch space?.icon {
         case .symbol(let name, _): model.spaceSymbol = name
         case .emoji(let emoji): model.spaceEmoji = emoji
-        case .image, nil: break
+        case .customSymbol(let name, _): model.spaceSymbol = name
+        case .some(.none), .image, nil: break
         }
         return model
     }

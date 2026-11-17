@@ -1,5 +1,6 @@
 import Foundation
 import NotePanel
+import Library
 import Routing
 
 extension Route {
@@ -10,8 +11,8 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse: true
-        case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker: false
+        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker: true
+        case .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor: false
         }
     }
 }
@@ -27,6 +28,7 @@ final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
     /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
+    weak var library: LibraryCoordinator?
     weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
@@ -61,7 +63,14 @@ final class AppRouter: Routing {
             case .openBrowse(let anchor):
                 guard let quickPanels else { return logUnhandled(route) }
                 quickPanels.toggleBrowse(anchor: anchor)
-            case .openLibrary, .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor, .openSpacePicker:
+            case .openLibrary:
+                guard let library else { return logUnhandled(route) }
+                library.show()
+                activateApp()
+            case .openSpacePicker(let id):
+                guard let library else { return logUnhandled(route) }
+                library.showSpacePicker(for: id, anchor: notePanels.window(for: id)?.contentView)
+            case .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor:
                 return logUnhandled(route)
             }
             return .handled
