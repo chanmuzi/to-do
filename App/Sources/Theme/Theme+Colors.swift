@@ -7,7 +7,7 @@ extension Theme {
         tokens.color(token, appearance)
     }
 
-    /// 그리는 뷰의 라이트·다크를 따라가는 색.
+    /// 그리는 뷰의 라이트, 다크를 따라가는 색.
     public func nsColor(_ token: ColorToken) -> NSColor {
         Self.dynamicColor(light: tokens.color(token, .light), dark: tokens.color(token, .dark))
     }

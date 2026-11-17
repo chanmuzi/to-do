@@ -196,7 +196,7 @@ import Models
         #expect(h.beeps == 1)
     }
     @Test func acceptUndoOutsideFuzz() throws {
-        // 고정 씨앗으로 날짜 종류/서식/바깥 덧붙임/입력/undo·redo의 순서를 섞는다.
+        // 고정 씨앗으로 날짜 종류/서식/바깥 덧붙임/입력/undo, redo의 순서를 섞는다.
         var seed: UInt64 = 0xDA7E
         for _ in 0..<120 {
             seed = seed &* 6364136223846793005 &+ 1

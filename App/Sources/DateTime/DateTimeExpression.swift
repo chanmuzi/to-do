@@ -7,7 +7,7 @@ public nonisolated struct DateTimeExpression: Hashable, Sendable {
         public let rawValue: Int
         public init(rawValue: Int) { self.rawValue = rawValue }
 
-        /// 오전·오후를 적지 않아 흔한 쓰임으로 골랐다(`3시`는 오후, `9시`는 오전).
+        /// 오전, 오후를 적지 않아 흔한 쓰임으로 골랐다(`3시`는 오후, `9시`는 오전).
         public static let meridiem = Assumptions(rawValue: 1 << 0)
         /// 날만 적어 시각을 기본값으로 두었다(`내일`은 오전 9시, `내일 저녁`은 오후 7시).
         public static let timeOfDay = Assumptions(rawValue: 1 << 1)

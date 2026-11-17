@@ -1,7 +1,7 @@
 import Foundation
 import Models
 
-/// 노트 창의 위치·크기·핀·열림 상태. 노트 파일과 따로 `stateDirectory/windows.json`에 둔다(D-003).
+/// 노트 창의 위치, 크기, 핀, 열림 상태. 노트 파일과 따로 `stateDirectory/windows.json`에 둔다(D-003).
 ///
 /// 값은 메모리에서 곧바로 바뀌고(`state(for:)`, `all`, `observe`가 그것을 본다), 파일에는 `writeDelay`가 지난 뒤
 /// 한 번에 쓴다: 창 하나를 띄우거나 키 창이 될 때마다 잇달아 오는 변경(틀, 겹친 차례, 연 때)이 파일 전체를

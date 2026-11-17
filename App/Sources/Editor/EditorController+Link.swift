@@ -55,7 +55,7 @@ extension EditorController {
         let x = min(max(anchor.minX, origin.x), origin.x + textContainer.size.width - width)
         linkField.frame = CGRect(
             x: x.rounded(),
-            y: (anchor.maxY + EditorMetrics.linkFieldGap).rounded(),
+            y: (anchor.maxY + style.metrics.linkFieldGap).rounded(),
             width: width,
             height: theme.component(.controlHeight)
         )

@@ -1,21 +1,21 @@
 import AppKit
 import Observation
 
-/// 앱이 쓰는 테마. 토큰(+사용자 덮어쓰기)과 지금의 라이트·다크를 들고 있다.
+/// 앱이 쓰는 테마. 토큰(+사용자 덮어쓰기)과 지금의 라이트, 다크를 들고 있다.
 ///
 /// - SwiftUI 뷰는 이 객체를 읽기만 하면 덮어쓰기나 모양이 바뀔 때 다시 그려진다(`@Observable`).
 /// - AppKit 코드는 `Theme.didChangeNotification`을 받는다.
-/// - `nsColor(_:)`, `color(_:)`가 주는 색은 뷰의 라이트·다크를 스스로 따라간다.
+/// - `nsColor(_:)`, `color(_:)`가 주는 색은 뷰의 라이트, 다크를 스스로 따라간다.
 @MainActor
 @Observable
 public final class Theme {
-    /// 덮어쓰기나 라이트·다크가 바뀐 뒤에 보낸다. `object`는 이 테마.
+    /// 덮어쓰기나 라이트, 다크가 바뀐 뒤에 보낸다. `object`는 이 테마.
     public static let didChangeNotification = Notification.Name("FloatingNotes.Theme.didChange")
 
     /// 덮어쓰기를 얹은 지금의 토큰.
     public private(set) var tokens: ThemeTokens
     public private(set) var overrides: ThemeOverrides
-    /// 지금의 라이트·다크. `followAppearance(of:)`를 부른 뒤로는 앱 모양을 따라간다.
+    /// 지금의 라이트, 다크. `followAppearance(of:)`를 부른 뒤로는 앱 모양을 따라간다.
     public private(set) var appearance: ThemeAppearance
 
     /// 저장된 덮어쓰기를 읽으면서 버린 것(없어진 키, 잘못된 값, 망가진 파일)의 설명.

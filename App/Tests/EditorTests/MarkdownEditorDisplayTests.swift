@@ -211,7 +211,7 @@ import Theme
         func headIndent() throws -> CGFloat {
             try #require(try h.display(line: 0).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle).headIndent
         }
-        #expect(try headIndent() == EditorMetrics.bracketGutter)
+        #expect(try headIndent() == h.controller.style.metrics.bracketGutter)
         h.editor.configuration.checkboxStyle = .box
         #expect(try headIndent() == h.theme.component(.gutter))
     }

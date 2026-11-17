@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Theme
 
-/// SwiftUI의 검색 바인딩을 유지하면서 필드 편집기의 조합·자동 입력 정책을 직접 정한다.
+/// SwiftUI의 검색 바인딩을 유지하면서 필드 편집기의 조합, 자동 입력 정책을 직접 정한다.
 struct LibrarySearchField: NSViewRepresentable {
     @Binding var text: String
     let theme: Theme

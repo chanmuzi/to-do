@@ -3,7 +3,7 @@ import Foundation
 
 /// `tokens.json`의 CSS식 문자열을 값으로 바꾼다. 해석하지 못하면 `nil`.
 enum TokenValueParser {
-    /// `13px`, `1.5px`, `-12px`, `0`. 음수도 받는다(그림자 위치·번짐 줄임).
+    /// `13px`, `1.5px`, `-12px`, `0`. 음수도 받는다(그림자 위치, 번짐 줄임).
     static func points(_ raw: String) -> CGFloat? {
         let text = raw.trimmingCharacters(in: .whitespaces)
         let digits = text.hasSuffix("px") ? String(text.dropLast(2)) : text

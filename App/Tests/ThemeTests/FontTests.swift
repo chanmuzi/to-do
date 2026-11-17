@@ -62,7 +62,7 @@ import Testing
         #expect(weightAxisValue(font) == 500)
     }
 
-    /// 굵기별 파일이 여럿인 가족은 보통·굵게 둘만이 아니라 가장 가까운 굵기를 고른다.
+    /// 굵기별 파일이 여럿인 가족은 보통, 굵게 둘만이 아니라 가장 가까운 굵기를 고른다.
     @Test func staticFamiliesResolveTheClosestWeight() throws {
         try #require(NSFontManager.shared.availableMembers(ofFontFamily: "Helvetica Neue") != nil)
         func name(_ weight: CGFloat) -> String {

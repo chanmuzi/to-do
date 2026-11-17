@@ -1,6 +1,6 @@
 import AppKit
 
-/// 라이트·다크. `tokens.json`의 `color.light`, `color.dark`에 대응한다.
+/// 라이트, 다크. `tokens.json`의 `color.light`, `color.dark`에 대응한다.
 public enum ThemeAppearance: String, CaseIterable, Sendable {
     case light
     case dark

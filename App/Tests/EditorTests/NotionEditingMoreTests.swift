@@ -470,8 +470,8 @@ private typealias Key = EditorShortcuts.Key
     @Test func highlightBoxHasEqualPaddingOnBothSides() throws {
         let h = try EditorHarness("가 ==형광== 나")
         let measured = try paddings(h, key: .markdownHighlight)
-        #expect(abs(measured.left - EditorMetrics.highlightPadX) < 0.25, "왼쪽 \(measured.left)")
-        #expect(abs(measured.right - EditorMetrics.highlightPadX) < 0.25, "오른쪽 \(measured.right)")
+        #expect(abs(measured.left - h.controller.style.metrics.highlightPadX) < 0.25, "왼쪽 \(measured.left)")
+        #expect(abs(measured.right - h.controller.style.metrics.highlightPadX) < 0.25, "오른쪽 \(measured.right)")
     }
 
     @Test func copyButtonSitsInsideTheBlockCorner() throws {
@@ -486,8 +486,8 @@ private typealias Key = EditorShortcuts.Key
         let right = origin.x + h.controller.textContainer.size.width
         let button = h.controller.copyButton.frame
         // 버튼은 상자 안, 오른쪽 위 모서리에서 같은 만큼 들어와 있고 둥근 모서리에 걸리지 않는다.
-        #expect(button.minY - top == EditorMetrics.copyButtonInset)
-        #expect(right - button.maxX == EditorMetrics.copyButtonInset)
+        #expect(button.minY - top == h.controller.style.metrics.copyButtonInset)
+        #expect(right - button.maxX == h.controller.style.metrics.copyButtonInset)
         #expect(button.width == h.theme.component(.iconButton))
         let radius = h.theme.shape(.codeBlockRadius)
         let corner = CGPoint(x: right - radius, y: top + radius)

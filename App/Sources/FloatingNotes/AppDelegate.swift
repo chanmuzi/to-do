@@ -272,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 켤 때
 
     /// 메뉴에 쓰는 지역화된 앱 이름(`InfoPlist.strings`의 "Float").
-    /// object(forInfoDictionaryKey:)는 지역화 값을 우선한다. SwiftPM 실행·테스트에는 Float를 쓴다.
+    /// object(forInfoDictionaryKey:)는 지역화 값을 우선한다. SwiftPM 실행, 테스트에는 Float를 쓴다.
     static var displayName: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? "Float"

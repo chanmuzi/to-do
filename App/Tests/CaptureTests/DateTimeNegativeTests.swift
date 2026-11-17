@@ -96,7 +96,7 @@ import Testing
         #expect(try !#require(parse("2026-11-20T15:00:00+09:00")).assumptions.contains(.unknownTimeZone))
     }
 
-    /// 오전·오후를 적지 않은 시각은 언제나 짐작했다고 알린다. 적었으면 알리지 않는다.
+    /// 오전, 오후를 적지 않은 시각은 언제나 짐작했다고 알린다. 적었으면 알리지 않는다.
     @Test(arguments: [
         ("3시", true), ("9시", true), ("12시", true), ("3:30", true), ("내일 3시", true), ("세 시", true),
         ("3-5시", true), ("next monday at 10", true),

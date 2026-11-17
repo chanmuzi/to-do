@@ -200,7 +200,7 @@ import Testing
         #expect(!capture.displaysReminderAsPast)
     }
 
-    /// 오전·오후를 적지 않아 고른 시각도 오전·오후를 붙여 보여 준다. 내일로 넘어갔으면 날도 보인다.
+    /// 오전, 오후를 적지 않아 고른 시각도 오전, 오후를 붙여 보여 준다. 내일로 넘어갔으면 날도 보인다.
     @Test func resolvedReadingIsShownWithDayAndMeridiem() throws {
         defer { fixture.cleanUp() }
         capture.now = { TestClock.now }

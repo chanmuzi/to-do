@@ -206,7 +206,7 @@ extension NoteWindowController {
         // 저장소가 받지 못한 변경만 창에 남아 있으면 돌아온 파일을 덮어쓰지 않는다. 표시를 그대로 두고 고르게 한다.
     }
 
-    private func setProblem(_ newProblem: NoteProblem) {
+    func setProblem(_ newProblem: NoteProblem) {
         problem = newProblem
         refreshChrome(animated: true)
     }

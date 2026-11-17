@@ -25,7 +25,7 @@ public enum CalendarBridgeError: Error, LocalizedError {
     }
 }
 
-/// 실제 계정·권한 API를 호출하지 않는 확인용 양방향 저장소.
+/// 실제 계정, 권한 API를 호출하지 않는 확인용 양방향 저장소.
 @MainActor
 public final class FakeCalendarBridge: CalendarBridge {
     public var onChange: (@MainActor () -> Void)?

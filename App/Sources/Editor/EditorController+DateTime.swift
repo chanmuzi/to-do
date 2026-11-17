@@ -65,7 +65,7 @@ extension EditorController {
         dismissedDateDocument = document
     }
 
-    /// 앞줄의 삽입·삭제는 닫아 둔 줄의 내용 변경이 아니다. 원문 위치를 따라 옮긴다.
+    /// 앞줄의 삽입, 삭제는 닫아 둔 줄의 내용 변경이 아니다. 원문 위치를 따라 옮긴다.
     private func moveDateDismissals() {
         if let previous = dismissedDateDocument,
            let edit = OutsideEdit(from: previous.text, to: document.text) {
@@ -107,7 +107,7 @@ extension EditorController {
             }
             caret = InlineDateProposal.caret(caret, replacing: edit.range, withLength: edit.replacement.utf16.count)
             planned = MarkdownDocument(edit.applied(to: planned.text))
-            // 삭제 접점의 공백만 정리한다. 다른 곳의 정렬용 공백·인라인 코드는 보존한다.
+            // 삭제 접점의 공백만 정리한다. 다른 곳의 정렬용 공백, 인라인 코드는 보존한다.
             let currentLine = planned.lines[index]
             var lower = min(max(edit.selection.location, currentLine.contentStart), currentLine.end)
             var upper = lower

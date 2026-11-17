@@ -70,7 +70,7 @@ public nonisolated enum DateTimeParser {
     private static let bareRangeStart = regex(
         #"(?:(오전|오후|아침|낮|점심|저녁|밤|새벽|AM|PM)\s*)?(?<![\d.:/A-Za-z])(\d{1,2})\s*(?:~|-|부터|에서)\s*$"#
     )
-    /// 오전·오후가 붙은 시각 뒤에 수만 적은 범위의 끝(`2pm-4`).
+    /// 오전, 오후가 붙은 시각 뒤에 수만 적은 범위의 끝(`2pm-4`).
     private static let bareRangeEnd = regex(#"^\s*(?:~|-|[tT][oO]\s)\s*(\d{1,2})(?![\d:.,/%가-힣A-Za-z])"#)
 
     private static func candidates(in text: String) -> [Candidate] {
@@ -239,7 +239,7 @@ public nonisolated enum DateTimeParser {
         return matches(connector, between: start.range, and: end.range, source: source)
     }
 
-    /// `2pm-4`의 `-4`: 오전·오후를 적은 시각 뒤에 이음표와 수만 있을 때의 끝.
+    /// `2pm-4`의 `-4`: 오전, 오후를 적은 시각 뒤에 이음표와 수만 있을 때의 끝.
     private static func bareEnd(after start: Located, source: NSString) -> Located? {
         guard start.point.time?.part != nil, start.point.fromNow == nil, !start.point.isDaily else { return nil }
         let rest = NSRange(location: NSMaxRange(start.range), length: source.length - NSMaxRange(start.range))

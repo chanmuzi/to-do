@@ -185,7 +185,7 @@ extension EditorController {
         }
         let text = ceil(max(used, style.body.lineHeight)) + padding.top + padding.bottom
         // 링크 주소 칸이 떠 있으면 그 아래 끝까지 보이게 한다.
-        return linkSession == nil ? text : max(text, ceil(linkField.frame.maxY + EditorMetrics.linkFieldGap))
+        return linkSession == nil ? text : max(text, ceil(linkField.frame.maxY + style.metrics.linkFieldGap))
     }
 
     func reportContentHeight() {
