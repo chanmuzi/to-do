@@ -1,7 +1,7 @@
 import AppKit
 import Theme
 
-/// 상단 줄의 리마인더: 12pt 아이콘과 글자 하나(spec 5.2, 규칙 13). 누르면 리마인더 설정을 연다.
+/// 상단 줄의 리마인더: 다른 상단 버튼과 같은 크기의 아이콘 하나(spec 5.2, 규칙 13). 누르면 리마인더 설정을 연다.
 /// 예정, 임박, 지남의 크기와 자리는 같다.
 final class ReminderBadgeView: ClickableView {
     var onPress: (() -> Void)?
@@ -9,7 +9,6 @@ final class ReminderBadgeView: ClickableView {
     private let style: PanelStyle
     private let iconView = NSImageView()
     private let failureView = NSImageView()
-    private let label = InfoLabel()
     private var presentation: ReminderPresentation?
     /// 다 사라진 뒤 숨기는 일(`dur` 뒤). 그사이 다시 나타나면 취소한다.
     private var fadeSettle: Task<Void, Never>?
@@ -20,7 +19,7 @@ final class ReminderBadgeView: ClickableView {
         wantsLayer = true
         iconView.wantsLayer = true
         iconView.imageScaling = .scaleNone
-        [iconView, label, failureView].forEach(addSubview)
+        [iconView, failureView].forEach(addSubview)
         failureView.imageScaling = .scaleNone
         isHidden = true
         alphaValue = 0
@@ -60,46 +59,35 @@ final class ReminderBadgeView: ClickableView {
             return
         }
         let color = style.color(presentation.color)
-        iconView.image = style.symbol(presentation.symbolName, size: .iconSmall)
+        iconView.image = style.symbol(presentation.symbolName, size: .iconLarge)
         iconView.contentTintColor = color
-        label.isHidden = presentation.text == nil
-        label.set(text: presentation.text ?? "", font: style.theme.nsFont(presentation.textStyle), color: color)
         setAccessibilityLabel(presentation.accessibilityLabel)
         failureView.isHidden = !presentation.syncFailed
         failureView.image = style.symbol("exclamationmark.circle", size: .iconSmall)
         failureView.contentTintColor = style.color(.text3)
-        toolTip = presentation.syncFailed ? "연동 실패, 앱에 저장됨" : nil
+        toolTip = presentation.accessibilityLabel
         needsLayout = true
         updateRinging()
     }
 
-    /// 자리 너비. 리마인더가 없으면 `nil`. 상태가 바뀌어도 같도록 보통 굵기와 굵은 글자 가운데 넓은 쪽으로 잰다.
+    /// 시간 글자 없이 고정된 버튼 칸만 차지한다.
     var fittingWidth: CGFloat? {
         guard let presentation else { return nil }
-        let icon = style.theme.component(.iconSmall)
-        let failure = presentation.syncFailed ? icon + style.theme.component(.iconGap) : 0
-        guard let text = presentation.text else { return icon + failure }
-        return icon + style.theme.component(.iconGap) + textWidth(text) + failure
-    }
-
-    private func textWidth(_ text: String) -> CGFloat {
-        [TextStyle.ui, .uiStrong]
-            .map { (text as NSString).size(withAttributes: [.font: style.theme.nsFont($0)]).width }
-            .max()?.rounded(.up) ?? 0
+        return style.theme.component(.iconButton) + (presentation.syncFailed
+            ? style.theme.component(.iconSmall) + style.theme.component(.iconGap) : 0)
     }
 
     override var isFlipped: Bool { true }
 
     override func layout() {
         super.layout()
-        let icon = style.theme.component(.iconSmall)
+        let icon = style.theme.component(.iconLarge)
+        let button = style.theme.component(.iconButton)
         iconView.frame = style.theme.symbolFrame(
-            NSRect(x: 0, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+            NSRect(x: (button - icon) / 2, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
         )
-        let labelX = icon + style.theme.component(.iconGap)
-        let failure = presentation?.syncFailed == true ? icon + style.theme.component(.iconGap) : 0
-        label.frame = NSRect(x: labelX, y: 0, width: max(0, bounds.width - labelX - failure), height: bounds.height)
-        failureView.frame = NSRect(x: bounds.width - icon, y: (bounds.height - icon) / 2, width: icon, height: icon)
+        let failure = style.theme.component(.iconSmall)
+        failureView.frame = NSRect(x: bounds.width - failure, y: (bounds.height - failure) / 2, width: failure, height: failure)
         updateRinging()
     }
 
