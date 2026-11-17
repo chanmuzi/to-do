@@ -24,8 +24,10 @@ public final class SpaceIconNSView: NSView {
     }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
-    public func apply(_ icon: SpaceIcon, directory: URL, theme: Theme, size: CGFloat, color: NSColor? = nil) {
+    public func apply(_ icon: SpaceIcon, directory: URL, theme: Theme, size: CGFloat, color: NSColor? = nil,
+                      symbolSize: ComponentToken? = nil) {
         imageView.isHidden = false; label.isHidden = true
+        imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.contentTintColor = color ?? theme.nsColor(.text2)
         var url: URL?
         switch icon {
@@ -35,12 +37,16 @@ public final class SpaceIconNSView: NSView {
             label.font = NSFont.systemFont(ofSize: size)
             label.isHidden = false; imageView.isHidden = true
         case .symbol(let name, let colorID):
-            imageView.image = NSImage(systemSymbolName: name, accessibilityDescription: name)
+            imageView.image = symbolSize.flatMap { theme.symbolImage(name, size: $0) }
+                ?? NSImage(systemSymbolName: name, accessibilityDescription: name)
+            if symbolSize != nil { imageView.imageScaling = .scaleNone }
             if let colorID, let tint = theme.palette.first(where: { $0.id == colorID.rawValue }) {
                 imageView.contentTintColor = tint.color.nsColor
             }
         case .customSymbol(let name, let hex):
-            imageView.image = NSImage(systemSymbolName: name, accessibilityDescription: name)
+            imageView.image = symbolSize.flatMap { theme.symbolImage(name, size: $0) }
+                ?? NSImage(systemSymbolName: name, accessibilityDescription: name)
+            if symbolSize != nil { imageView.imageScaling = .scaleNone }
             if let rgb = UInt32(hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")), radix: 16) {
                 imageView.contentTintColor = NSColor(srgbRed: Double((rgb >> 16) & 255) / 255,
                     green: Double((rgb >> 8) & 255) / 255, blue: Double(rgb & 255) / 255, alpha: 1)

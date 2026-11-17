@@ -16,7 +16,7 @@ public enum TextInputPolicy {
         view.inlinePredictionType = .no
         view.mathExpressionCompletionType = .no
         view.smartInsertDeleteEnabled = false
-        // 밑줄을 그리지 않는다. marked range와 입력기의 조합·후보 선택 자체는 건드리지 않는다.
+        // 밑줄을 그리지 않는다. marked range와 입력기의 조합, 후보 선택 자체는 건드리지 않는다.
         view.markedTextAttributes = [.underlineStyle: 0]
     }
 }

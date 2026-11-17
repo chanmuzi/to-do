@@ -1,7 +1,7 @@
 import Foundation
 
 /// 노트 하나. 노트 파일(Markdown + frontmatter)에 담기는 내용 전부다.
-/// 창 위치·핀·열림 상태는 여기 없고 `NoteWindowState`에 있다(D-003).
+/// 창 위치, 핀, 열림 상태는 여기 없고 `NoteWindowState`에 있다(D-003).
 public struct Note: Identifiable, Hashable, Codable, Sendable {
     public let id: NoteID
     /// 상단 줄에 보이는 제목. 본문과 별개다.
@@ -14,7 +14,7 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
     /// 노트 색. `nil`이면 색 없음(기본).
     public var colorID: PaletteID?
     public var schedules: [ScheduleItem]
-    /// 옛 호출자·파일을 위한 투영. 화면에서는 displayedSchedule(at:)을 쓴다.
+    /// 옛 호출자, 파일을 위한 투영. 화면에서는 displayedSchedule(at:)을 쓴다.
     public var reminder: Date? {
         get { schedules.filter { !$0.isCompleted && !$0.isDeleted }.map(\.start).min() }
         set {

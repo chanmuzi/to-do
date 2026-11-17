@@ -18,7 +18,7 @@ struct BrowseStyle {
         }
     }
 
-    /// 레이어에 넣을 색. 그 뷰의 라이트·다크로 푼다.
+    /// 레이어에 넣을 색. 그 뷰의 라이트, 다크로 푼다.
     func cgColor(_ color: NSColor, in view: NSView) -> CGColor {
         var resolved = CGColor.clear
         view.effectiveAppearance.performAsCurrentDrawingAppearance { resolved = color.cgColor }

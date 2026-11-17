@@ -278,6 +278,7 @@ final class NoteWindowController: NSObject {
                 case .setReminder: router.isConnected(.openReminderEditor(id))
                 case .moveToSpace: router.isConnected(.openSpacePicker(id))
                 case .openAIPanel: router.isConnected(.openAIPanel(context: id))
+                case .openLibrary: router.isConnected(.openLibrary)
                 case .findNote: router.isConnected(.openBrowse(anchor: id))
                 case .togglePin, .setColor, .closeWindow, .moveToTrash: true
                 }
@@ -288,6 +289,7 @@ final class NoteWindowController: NSObject {
             case .moveToSpace: router.route(.openSpacePicker(id))
             case .togglePin: self?.setPinned(self?.isPinned == false)
             case .setColor(let paletteID): self?.setColor(paletteID)
+            case .openLibrary: router.route(.openLibrary)
             case .findNote: router.route(.openBrowse(anchor: id))
             case .openAIPanel: router.route(.openAIPanel(context: id))
             case .closeWindow: router.route(.closeNoteWindow(id))
@@ -295,6 +297,11 @@ final class NoteWindowController: NSObject {
             }
         }
         return menu
+    }
+
+    func problemMenuForVerification() -> NSMenu {
+        setProblem(.conflict)
+        return NoteMenuBuilder(style: environment.style).problemMenu(for: .conflict) { _ in }
     }
 
     private func popUpProblemMenu(from anchor: NSView) {

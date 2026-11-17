@@ -3,7 +3,7 @@ import SwiftUI
 import Models
 import Theme
 
-/// 노트 상단과 같은 포맷터·상태·표시 옵션을 쓴다. 시간과 남은 시간을 함께 표시하지 않는다.
+/// 노트 상단과 같은 포맷터, 상태, 표시 옵션을 쓴다. 시간과 남은 시간을 함께 표시하지 않는다.
 struct LibraryReminder: View {
     let note: Note
     let model: LibraryModel

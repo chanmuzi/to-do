@@ -20,7 +20,7 @@ let path = URL(fileURLWithPath: CommandLine.arguments[1]).resolvingSymlinksInPat
 let environment = ProcessInfo.processInfo.environment
 let testPassword = environment["FLOATING_NOTES_KEYCHAIN_PASSWORD"]
 if testPassword != nil {
-    // 로그인·시스템 키체인과 이를 가리키는 심볼릭 링크에는 자동 암호를 쓰지 않는다.
+    // 로그인, 시스템 키체인과 이를 가리키는 심볼릭 링크에는 자동 암호를 쓰지 않는다.
     let temporaryRoots = ["/private/tmp", "/private/var/folders"].map {
         URL(fileURLWithPath: $0).resolvingSymlinksInPath().path + "/"
     }

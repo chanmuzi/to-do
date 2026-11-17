@@ -113,7 +113,7 @@ nonisolated enum ParagraphStyler {
             if case .heading(let level) = key.kind {
                 font = style.heading(level)
                 tracking = style.headingTracking[level - 1]
-                spacing = EditorMetrics.headingSpacing[level - 1]
+                spacing = style.metrics.headingSpacing[level - 1]
                 if key.isFirst { spacing.before = 0 }
             } else {
                 font = style.body
@@ -195,12 +195,12 @@ nonisolated enum ParagraphStyler {
                 if !isDone { out.addAttribute(.foregroundColor, value: style.highlightForeground(number), range: content) }
                 out.addAttribute(.markdownHighlight, value: InlineBackground(
                     kind: .highlight(number),
-                    padX: EditorMetrics.highlightPadX,
-                    height: min(lineFont.lineHeight, lineFont.glyphHeight + EditorMetrics.highlightPadY * 2),
-                    leadShift: EditorMetrics.highlightPadX / 2
+                    padX: style.metrics.highlightPadX,
+                    height: min(lineFont.lineHeight, lineFont.glyphHeight + style.metrics.highlightPadY * 2),
+                    leadShift: style.metrics.highlightPadX / 2
                 ), range: content)
-                marker(span.openMarker, kernAfter: EditorMetrics.highlightPadX)
-                marker(span.closeMarker, kernAfter: EditorMetrics.highlightPadX)
+                marker(span.openMarker, kernAfter: style.metrics.highlightPadX)
+                marker(span.closeMarker, kernAfter: style.metrics.highlightPadX)
 
             case .code:
                 // 글자는 줄 글꼴에 맞춘 고정폭, 상자는 높이를 정해 두고 글자 위아래가 같게 놓는다.

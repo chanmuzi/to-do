@@ -2,7 +2,7 @@ import Foundation
 
 /// 캡처 바 오른쪽에 보이는 리마인더 글자: "내일 10:00 AM"(화면 3). 시간 형식은 `tokens.json`의 기본값(12시간제)이다.
 ///
-/// 읽은 때가 다르게 읽힐 틈이 없게 적는다: 오전·오후는 언제나 붙이고, 오늘이 아니면 날을, 올해가 아니면 해까지 적는다.
+/// 읽은 때가 다르게 읽힐 틈이 없게 적는다: 오전, 오후는 언제나 붙이고, 오늘이 아니면 날을, 올해가 아니면 해까지 적는다.
 nonisolated enum CaptureReminderText {
     static func text(for reminder: Date, now: Date, calendar: Calendar) -> String {
         dayPrefix(reminder: reminder, now: now, calendar: calendar) + clock(reminder, calendar: calendar)

@@ -1,44 +1,15 @@
 import AppKit
 import Theme
 
-/// 토큰에 없는 편집기 치수. spec 6장의 표와 시안의 본문 규칙에 적힌 값을 한곳에 모았다.
+/// 화면에 표시하지 않는 글자와 접힌 줄을 TextKit에 남겨 두기 위한 계산 정밀도.
 nonisolated enum EditorMetrics {
-    /// 체크박스 테두리, 빈 원 글머리표의 선 굵기.
-    static let glyphStroke: CGFloat = 1.25
-    /// 체크 표시 그림의 크기와 선 굵기.
-    static let checkmarkSize: CGFloat = 9
-    static let checkmarkStroke: CGFloat = 1
-    /// 대괄호 체크박스일 때의 왼쪽 칸 너비.
-    static let bracketGutter: CGFloat = 28
-    /// 글머리표: 원 지름, 사각 한 변, 칸 안에서의 왼쪽 여백.
-    static let bulletDot: CGFloat = 5
-    static let bulletSquare: CGFloat = 4
-    static let bulletInset: CGFloat = 4
-    /// 토글 꺾쇠의 크기와 선 굵기, 줄 수 앞의 간격.
-    static let chevronSize: CGFloat = 12
-    static let chevronStroke: CGFloat = 0.875
-    static let countGap: CGFloat = 8
-    /// 안내선이 놓이는 곳(부모 글머리 중심).
-    static let guideOffset: CGFloat = 6
-    /// 형광펜 좌우와 위아래 여백.
-    static let highlightPadX: CGFloat = 2
-    static let highlightPadY: CGFloat = 1
-    /// 링크 주소 칸: 고른 글자와의 틈, 칸 안의 좌우 여백.
-    static let linkFieldGap: CGFloat = 3
-    static let linkFieldPadX: CGFloat = 6
-    /// 코드 블록 복사 버튼과 블록 모서리 사이.
-    static let copyButtonInset: CGFloat = 4
-    static let copyIconSize: CGFloat = 13
-    /// 제목 위아래 여백(1, 2, 3).
-    static let headingSpacing: [(before: CGFloat, after: CGFloat)] = [(4, 4), (6, 2), (6, 0)]
-    /// 감춘 글자의 크기. 자리를 거의 차지하지 않게 한다.
     static let hiddenFontSize: CGFloat = 0.01
-    /// 접힌 줄의 높이.
     static let collapsedLineHeight: CGFloat = 0.01
 }
 
 /// 테마에서 풀어 온 편집기의 글꼴, 색, 치수. 테마나 설정이 바뀌면 다시 만든다.
 nonisolated struct EditorStyle {
+    let metrics: EditorVisualMetrics
     struct TextFont {
         let font: NSFont
         let lineHeight: CGFloat
@@ -105,6 +76,7 @@ nonisolated struct EditorStyle {
 
     @MainActor
     init(theme: Theme, configuration: MarkdownEditorConfiguration, increaseContrast: Bool) {
+        metrics = EditorVisualMetrics(theme: theme)
         func color(_ token: ColorToken) -> NSColor { theme.rgba(token).nsColor }
         body = TextFont(theme.nsFont(.body), lineHeight: theme.lineHeight(.body))
         strong = theme.nsFont(.strong)
@@ -133,7 +105,7 @@ nonisolated struct EditorStyle {
         highlightForegrounds = HighlightColor.allCases.map { color($0.foreground) }
 
         checkboxStyle = configuration.checkboxStyle
-        gutter = checkboxStyle == .bracket ? EditorMetrics.bracketGutter : theme.component(.gutter)
+        gutter = checkboxStyle == .bracket ? metrics.bracketGutter : theme.component(.gutter)
         indent = theme.component(.indent)
         checkSize = theme.component(.checkSize)
         checkRadius = theme.shape(.checkRadius)

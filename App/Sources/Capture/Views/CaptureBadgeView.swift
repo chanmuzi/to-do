@@ -105,7 +105,7 @@ final class CaptureBadgeView: NSView {
         super.layout()
         let side = iconSide
         iconView.frame = style.theme.symbolFrame(
-            NSRect(x: 0, y: ((bounds.height - side) / 2).rounded(), width: side, height: side)
+            NSRect(x: 0, y: (bounds.height - side) / 2, width: side, height: side)
         )
         let labelX = side > 0 ? side + style.theme.component(.iconGap) : 0
         label.frame = style.labelFrame(

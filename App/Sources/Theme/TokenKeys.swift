@@ -81,6 +81,29 @@ public enum ShapeToken: String, CaseIterable, Sendable {
 
 /// 구성 요소 치수. `doc-pad`는 네 변 값이라 `ThemeTokens.docPadding`으로 따로 낸다.
 public enum ComponentToken: String, CaseIterable, Sendable {
+    case editorGlyphStroke = "editor-glyph-stroke"
+    case editorCheckmarkSize = "editor-checkmark-size"
+    case editorCheckmarkStroke = "editor-checkmark-stroke"
+    case editorBracketGutter = "editor-bracket-gutter"
+    case editorBulletDot = "editor-bullet-dot"
+    case editorBulletSquare = "editor-bullet-square"
+    case editorBulletInset = "editor-bullet-inset"
+    case editorChevronSize = "editor-chevron-size"
+    case editorChevronStroke = "editor-chevron-stroke"
+    case editorCountGap = "editor-count-gap"
+    case editorGuideOffset = "editor-guide-offset"
+    case editorHighlightPadX = "editor-highlight-pad-x"
+    case editorHighlightPadY = "editor-highlight-pad-y"
+    case editorLinkFieldGap = "editor-link-field-gap"
+    case editorLinkFieldPadX = "editor-link-field-pad-x"
+    case editorCopyButtonInset = "editor-copy-button-inset"
+    case editorHeading1Before = "editor-heading1-before"
+    case editorHeading1After = "editor-heading1-after"
+    case editorHeading2Before = "editor-heading2-before"
+    case editorHeading2After = "editor-heading2-after"
+    case editorHeading3Before = "editor-heading3-before"
+    case editorHeading3After = "editor-heading3-after"
+
     case reminderEditorWidth = "reminder-editor-w"
     case gutter
     case indent

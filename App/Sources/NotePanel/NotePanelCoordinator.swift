@@ -381,6 +381,12 @@ public final class NotePanelCoordinator {
         controllers[id]?.makeMoreMenu()
     }
 
+    @_spi(Verification)
+    public func problemMenuForVerification(for id: NoteID) -> NSMenu? {
+        guard let controller = controllers[id] else { return nil }
+        return controller.problemMenuForVerification()
+    }
+
     /// 확인용: 마우스 위치와 상관없이 호버 상태를 정한다. `nil`이면 마우스를 따른다.
     public func setHoverOverride(_ hovered: Bool?, for id: NoteID) {
         controllers[id]?.hoverOverride = hovered

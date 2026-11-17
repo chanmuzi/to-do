@@ -67,7 +67,7 @@ nonisolated enum DateTimeDefaults {
 nonisolated struct TimeSpec: Hashable, Sendable {
     var hour: Int
     var minute = 0
-    /// 앞에 붙은 오전·오후(또는 뒤의 am·pm, `7시 저녁에`).
+    /// 앞에 붙은 오전, 오후(또는 뒤의 am, pm, `7시 저녁에`).
     var part: DayPart?
     /// 24시간제로 적었다: 앞에 0을 붙인 `09:00`, 0시, 13~23시, `24:00`.
     var isClock24 = false
@@ -76,7 +76,7 @@ nonisolated struct TimeSpec: Hashable, Sendable {
     /// 뒤에 붙은 시간대 이름(`PST`, ISO 표기의 `Z`, `+09:00`).
     var zone: String?
 
-    /// 오전·오후를 적지 않고 1~12시만 적었다. 어느 쪽인지 골라야 한다.
+    /// 오전, 오후를 적지 않고 1~12시만 적었다. 어느 쪽인지 골라야 한다.
     var isBare: Bool { part == nil && !isClock24 }
 
     /// 고를 필요가 없는 시각의 시(0시부터, 24 이상은 다음 날).
@@ -85,7 +85,7 @@ nonisolated struct TimeSpec: Hashable, Sendable {
         return isClock24 ? hour : nil
     }
 
-    /// 오전·오후를 적지 않았을 때 고르는 쪽: 1~7시는 오후, 8~11시는 오전, 12시는 정오(자정이 아니다).
+    /// 오전, 오후를 적지 않았을 때 고르는 쪽: 1~7시는 오후, 8~11시는 오전, 12시는 정오(자정이 아니다).
     var preferredHour: Int {
         (1...7).contains(hour) ? hour + 12 : hour
     }

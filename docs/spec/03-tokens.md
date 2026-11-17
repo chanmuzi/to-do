@@ -118,13 +118,13 @@
 | 구성 요소 | `codeblock-pad-y` | `9px` | 코드 블록의 위아래 안쪽 여백 |
 | 구성 요소 | `codeblock-gap` | `5px` | 코드 블록의 위아래 바깥 간격 |
 | 구성 요소 | `link-field-w` | `220px` | 링크 주소를 적는 칸의 너비 |
-| 구성 요소 | `icon-btn` | `20px` | 테두리 없는 아이콘 버튼 크기 |
+| 구성 요소 | `icon-btn` | `18px` | 테두리 없는 아이콘 버튼 크기 |
 | 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 약 13pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |
 | 구성 요소 | `chrome-gap` | `6px` | 노트 상단 줄의 요소 사이 |
 | 구성 요소 | `chrome-pad-end` | `6px` | 노트 상단 줄의 오른쪽 여백 (왼쪽은 `sp-3`) |
 | 구성 요소 | `icon-s`, `icon-m`, `icon-l` | `12px`, `13px`, `14px` | 선 아이콘 크기 (18.2의 표) |
-| 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
+| 구성 요소 | `icon-btn-gap` | `0px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
 | 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
 | 구성 요소 | `menu-icon` | `12px` | 노트 메뉴 그림 크기(정렬 칸은 `icon-l` 14, D-058) |
 | 구성 요소 | `menu-w` | `210px` | 메뉴 최소 너비 |
@@ -140,9 +140,11 @@
 
 ### 3.5 라이브러리와 아이콘 선택 (D-051)
 
+편집기 장식은 `component.editor-*` 토큰으로 관리한다. 기존 값은 유지한다: 체크 테두리 1.25, 체크 그림 9와 선 1, 대괄호 칸 28, 글머리 원 5와 사각 4와 왼쪽 여백 4, 꺾쇠 12와 선 0.875, 줄 수 간격 8, 안내선 위치 6, 형광펜 여백 2/1, 링크 칸 간격 3과 안쪽 여백 6, 복사 버튼 여백 4. 제목 1/2/3의 전후 여백은 4/4, 6/2, 6/0이다. 복사 아이콘은 기존 `icon-m`과 공용 광학 보정을 쓴다(D-085).
+
 - `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
 - `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
-- `library-reminder-w/progress-w`: 110/46(D-066, 체크 아이콘 포함). 값이 없는 줄도 정보 열의 자리를 유지한다.
+- `library-reminder-w/progress-w`: 200/46(D-066과 6단계, 체크 아이콘 포함). 값이 없는 줄도 정보 열의 자리를 유지한다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
 

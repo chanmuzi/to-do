@@ -190,4 +190,6 @@ public final class MarkdownEditor {
     /// 편집기의 텍스트 뷰. 확인용 실행 파일이 입력을 흉내 낼 때만 쓴다.
     @_spi(Verification)
     public var textView: NSTextView { controller.textView }
+
+    @_spi(Verification) public var selectionFrames: [CGRect] { controller.selectionRects() }
 }

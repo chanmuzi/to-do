@@ -33,14 +33,14 @@ nonisolated enum GutterGlyph {
             context.setFillColor(style.text3.cgColor)
             context.fillPath()
             // 24 단위 캔버스의 체크 그림(M5 12.5 l4.5 4.5 L19 7)을 줄여 상자 가운데에 놓는다.
-            let scale = EditorMetrics.checkmarkSize / 24
-            let origin = CGPoint(x: box.midX - EditorMetrics.checkmarkSize / 2, y: box.midY - EditorMetrics.checkmarkSize / 2)
+            let scale = style.metrics.checkmarkSize / 24
+            let origin = CGPoint(x: box.midX - style.metrics.checkmarkSize / 2, y: box.midY - style.metrics.checkmarkSize / 2)
             strokePolyline(
                 [CGPoint(x: 5, y: 12.5), CGPoint(x: 9.5, y: 17), CGPoint(x: 19, y: 7)],
-                scale: scale, origin: origin, width: EditorMetrics.checkmarkStroke, color: style.surface, context: context
+                scale: scale, origin: origin, width: style.metrics.checkmarkStroke, color: style.surface, context: context
             )
         } else {
-            let stroke = EditorMetrics.glyphStroke
+            let stroke = style.metrics.glyphStroke
             let inset = box.insetBy(dx: stroke / 2, dy: stroke / 2)
             let radius = max(0, style.checkRadius - stroke / 2)
             context.addPath(CGPath(roundedRect: inset, cornerWidth: radius, cornerHeight: radius, transform: nil))
@@ -59,20 +59,20 @@ nonisolated enum GutterGlyph {
     }
 
     private static func drawBullet(_ shape: Int, in gutter: CGRect, style: EditorStyle, context: CGContext) {
-        let x = gutter.minX + EditorMetrics.bulletInset
+        let x = gutter.minX + style.metrics.bulletInset
         switch shape {
         case 0:
-            let d = EditorMetrics.bulletDot
+            let d = style.metrics.bulletDot
             context.setFillColor(style.text.cgColor)
             context.fillEllipse(in: CGRect(x: x, y: gutter.midY - d / 2, width: d, height: d))
         case 1:
-            let d = EditorMetrics.bulletDot
-            let stroke = EditorMetrics.glyphStroke
+            let d = style.metrics.bulletDot
+            let stroke = style.metrics.glyphStroke
             context.setStrokeColor(style.text.cgColor)
             context.setLineWidth(stroke)
             context.strokeEllipse(in: CGRect(x: x, y: gutter.midY - d / 2, width: d, height: d).insetBy(dx: stroke / 2, dy: stroke / 2))
         default:
-            let s = EditorMetrics.bulletSquare
+            let s = style.metrics.bulletSquare
             context.setFillColor(style.text2.cgColor)
             context.fill(CGRect(x: x, y: gutter.midY - s / 2, width: s, height: s))
         }
@@ -83,10 +83,10 @@ nonisolated enum GutterGlyph {
         let points = open
             ? [CGPoint(x: 6, y: 9.5), CGPoint(x: 12, y: 15.5), CGPoint(x: 18, y: 9.5)]
             : [CGPoint(x: 9.5, y: 6), CGPoint(x: 15.5, y: 12), CGPoint(x: 9.5, y: 18)]
-        let size = EditorMetrics.chevronSize
+        let size = style.metrics.chevronSize
         // 꺾쇠는 체크박스와 같은 크기의 자리 가운데에 놓인다.
         let origin = CGPoint(x: gutter.minX + (style.checkSize - size) / 2, y: gutter.midY - size / 2)
-        strokePolyline(points, scale: size / 24, origin: origin, width: EditorMetrics.chevronStroke, color: style.text2, context: context)
+        strokePolyline(points, scale: size / 24, origin: origin, width: style.metrics.chevronStroke, color: style.text2, context: context)
     }
 
     private static func strokePolyline(

@@ -26,7 +26,7 @@ import Theme
         var chosen: [MoreMenuAction] = []
         let menu = NoteMenuBuilder(style: style).moreMenu(isPinned: true, selectedPaletteID: nil) { chosen.append($0) }
         let rows = menu.items.compactMap { $0.view as? MenuRowView }
-        #expect(rows.count == 7)
+        #expect(rows.count == 8)
         for row in rows {
             row.layoutSubtreeIfNeeded()
             for x in stride(from: 1.0, through: row.bounds.width - 1, by: 7) {
@@ -39,7 +39,7 @@ import Theme
             #expect(chosen.count == before + 1, "\(row)")
         }
         #expect(chosen == [
-            .setReminder, .moveToSpace, .togglePin, .findNote, .openAIPanel, .closeWindow, .moveToTrash,
+            .setReminder, .moveToSpace, .togglePin, .findNote, .openLibrary, .openAIPanel, .closeWindow, .moveToTrash,
         ])
     }
 

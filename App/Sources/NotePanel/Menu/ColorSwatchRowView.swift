@@ -59,7 +59,7 @@ final class ColorSwatchRowView: NSView {
         for (index, swatch) in swatches.enumerated() {
             swatch.frame = NSRect(
                 x: firstX + CGFloat(index) * (size + theme.component(.swatchGap)),
-                y: ((bounds.height - size) / 2).rounded(), width: size, height: size
+                y: (bounds.height - size) / 2, width: size, height: size
             ).insetBy(dx: -outset, dy: -outset)
         }
     }

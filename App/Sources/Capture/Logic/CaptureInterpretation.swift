@@ -4,7 +4,7 @@ import Models
 
 /// 캡처 바에 적은 글 한 줄을 읽은 결과(spec 7).
 nonisolated struct CaptureInterpretation: Hashable, Sendable {
-    /// 노트에 넣을 글. `#스페이스` 표시는 빼고, 단일 날짜·시각은 남기고 일정 범위는 제거한다(D-067).
+    /// 노트에 넣을 글. `#스페이스` 표시는 빼고, 단일 날짜, 시각은 남기고 일정 범위는 제거한다(D-067).
     let text: String
     let spaceID: SpaceID?
     /// 글에서 읽었거나 ⌘R로 고른 때. 지난 때여도 그대로다(바에 지난 때로 보여 준다).
@@ -49,7 +49,7 @@ nonisolated struct CaptureInterpretation: Hashable, Sendable {
         let found = manualReminder == nil
             ? DateTimeParser.firstExpression(in: raw, now: now, calendar: calendar) : nil
         spaceID = token?.spaceID ?? selectedSpace
-        // 시작·끝은 예정에 함께 전달한다. 지난 범위만 원문에 남긴다.
+        // 시작, 끝은 예정에 함께 전달한다. 지난 범위만 원문에 남긴다.
         let resolved = manualReminder ?? found?.start
         resolvedReminder = resolved
         isReminderPast = resolved.map {

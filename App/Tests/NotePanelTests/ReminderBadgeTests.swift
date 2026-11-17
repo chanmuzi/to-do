@@ -20,7 +20,7 @@ import Theme
         #expect(badge.toolTip == presentation.accessibilityLabel)
         #expect(badge.accessibilityLabel()?.contains(presentation.text!) == true)
         let icon = try #require(badge.subviews.compactMap { $0 as? NSImageView }.first)
-        #expect(icon.frame.width == theme.symbolFrame(NSRect(x: 0, y: 0, width: theme.component(.iconLarge), height: theme.component(.iconLarge))).width)
+        #expect(icon.frame.width == theme.symbolFrame(NSRect(x: 0, y: 0, width: theme.component(.iconMedium), height: theme.component(.iconMedium))).width)
         #expect(icon.contentTintColor?.usingColorSpace(.deviceRGB) == theme.nsColor(seconds == 300 ? .warn : .text2).usingColorSpace(.deviceRGB))
         #expect(presentation.symbolName == (event ? "calendar" : seconds == 300 ? "bell" : "clock"))
         var presses = 0

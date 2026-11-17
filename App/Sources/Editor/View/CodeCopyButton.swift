@@ -6,6 +6,8 @@ import Theme
 final class CodeCopyButton: NSView {
     var onPress: (() -> Void)?
     private let icon = NSImageView()
+    private var iconSide: CGFloat = 0
+    private var iconMargin: CGFloat = 0
     private var hoverColor: NSColor = .clear
     private var duration: TimeInterval = 0
     private var timing: CAMediaTimingFunction?
@@ -15,9 +17,7 @@ final class CodeCopyButton: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         alphaValue = 0
-        icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: EditorMetrics.copyIconSize, weight: .regular))
+        icon.imageScaling = .scaleNone
         addSubview(icon)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
@@ -30,6 +30,10 @@ final class CodeCopyButton: NSView {
     }
 
     func apply(theme: Theme, tint: NSColor) {
+        iconSide = theme.component(.iconMedium)
+        iconMargin = theme.space(.sp1)
+        icon.image = theme.symbolImage("doc.on.doc", size: .iconMedium)
+        needsLayout = true
         icon.contentTintColor = tint
         hoverColor = theme.rgba(.hover).nsColor
         layer?.cornerRadius = theme.shape(.chipRadius)
@@ -53,7 +57,7 @@ final class CodeCopyButton: NSView {
 
     override func layout() {
         super.layout()
-        let size = EditorMetrics.copyIconSize
+        let size = iconSide + iconMargin * 2
         icon.frame = CGRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size)
     }
 

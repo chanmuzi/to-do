@@ -45,7 +45,7 @@ extension EditorController {
             case .code:
                 return (style.inlineCode(in: lineFont), style.codeRise, atStart ? (style.codePadX + style.codeGap) / 2 : 0)
             case .highlight:
-                if atStart { return (lineFont.font, 0, EditorMetrics.highlightPadX / 2) }
+                if atStart { return (lineFont.font, 0, style.metrics.highlightPadX / 2) }
             default:
                 continue
             }

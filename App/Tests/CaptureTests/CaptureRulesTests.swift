@@ -4,7 +4,7 @@ import Models
 import Testing
 @testable import Capture
 
-/// 갈 노트 고르기, 투두로 붙이기, 리마인더 규칙, 놓이는 자리(spec 7, 20의 5·6·8번).
+/// 갈 노트 고르기, 투두로 붙이기, 리마인더 규칙, 놓이는 자리(spec 7, 20의 5, 6, 8번).
 @Suite struct CaptureRulesTests {
     private func note(
         _ id: String, space: SpaceID?, created: Date, body: String = ""

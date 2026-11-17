@@ -157,8 +157,8 @@ extension EditorController {
         let top = frame.minY + (fragment.textLineFragments.first?.typographicBounds.minY ?? 0)
         let size = theme.component(.iconButton)
         copyButton.frame = CGRect(
-            x: origin.x + textContainer.size.width - EditorMetrics.copyButtonInset - size,
-            y: origin.y + top + EditorMetrics.copyButtonInset,
+            x: origin.x + textContainer.size.width - style.metrics.copyButtonInset - size,
+            y: origin.y + top + style.metrics.copyButtonInset,
             width: size,
             height: size
         )

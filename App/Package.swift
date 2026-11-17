@@ -5,7 +5,7 @@ import PackageDescription
 // Features 타깃끼리는 서로 의존하지 않는다. 구조 설명은 docs/architecture.md.
 
 /// 화면을 다루는 타깃(Features, App)은 기본 격리를 MainActor로 둔다.
-/// AppKit·SwiftUI 코드가 대부분 메인 스레드 전용이라 타입마다 @MainActor를 붙이지 않아도 된다.
+/// AppKit, SwiftUI 코드가 대부분 메인 스레드 전용이라 타입마다 @MainActor를 붙이지 않아도 된다.
 let uiSettings: [SwiftSetting] = [.defaultIsolation(MainActor.self)]
 
 let package = Package(

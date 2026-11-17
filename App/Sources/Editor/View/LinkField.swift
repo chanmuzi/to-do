@@ -35,7 +35,7 @@ final class LinkField: NSView, NSTextFieldDelegate {
     }
 
     func apply(theme: Theme, style: EditorStyle) {
-        padX = EditorMetrics.linkFieldPadX
+        padX = style.metrics.linkFieldPadX
         layer?.backgroundColor = style.surface2.cgColor
         layer?.borderColor = style.line.cgColor
         layer?.borderWidth = style.borderWidth

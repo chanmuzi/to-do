@@ -1,7 +1,7 @@
 import Foundation
 
 /// 번들에 든 테마 리소스의 위치.
-/// `.app`으로 묶였을 때는 `Contents/Resources/`에서, `swift run`·`swift test`에서는 SwiftPM 리소스 번들에서 찾는다.
+/// `.app`으로 묶였을 때는 `Contents/Resources/`에서, `swift run`, `swift test`에서는 SwiftPM 리소스 번들에서 찾는다.
 public enum ThemeResources {
     public static func tokensURL() throws -> URL {
         try locate("tokens.json")
