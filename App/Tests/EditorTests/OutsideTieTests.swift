@@ -45,6 +45,7 @@ import Testing
         h.caret(at: h.document.length)
         h.type("!")
         h.undo()
+        #expect(h.editor.text == "가\n나")
         h.editor.appendFromOutside("\n[ ] 우유\n")
         h.redo()
         #expect(h.editor.text == "가\n나!\n[ ] 우유\n")
