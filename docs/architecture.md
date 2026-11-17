@@ -25,7 +25,7 @@ Core         모든 기능이 공유하는 바탕
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
 | Core | `Store` | 노트 파일 읽기·쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `Routing` | 기능 사이 요청을 전달하는 프로토콜 | 04 |
-| Features | `NotePanel` | 플로팅 노트 창, 상단 줄, 호버 동작 | 05 |
+| Features | `NotePanel` | Float 창, 상단 줄, 호버 동작 | 05 |
 | Features | `Editor` | TextKit 2 마크다운 편집기. 창과 무관하게 단독으로 쓸 수 있어야 한다 | 06 |
 | Features | `Capture` | 빠른 캡처 바 | 07 |
 | Features | `Browse` | 노트 찾기 | 08 |
@@ -53,7 +53,7 @@ App/
 scripts/
 ├─ build-app.sh       빌드해서 ${FLOATING_NOTES_APP_DIR:-build}/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
 ├─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
-├─ install-app.sh     릴리스로 빌드해 /Applications(쓸 수 없으면 ~/Applications)에 "플로팅 노트.app"으로 넣는다. sudo를 쓰지 않고, 실행 중이면 먼저 정상 종료를 요청해 끝날 때까지 기다린다. FLOATING_NOTES_INSTALL_DIR로 넣을 폴더를 바꾼다
+├─ install-app.sh     릴리스로 빌드해 /Applications(쓸 수 없으면 ~/Applications)에 "FloatingNotes.app"으로 넣는다. sudo를 쓰지 않고, 실행 중이면 먼저 정상 종료를 요청해 끝날 때까지 기다린다. FLOATING_NOTES_INSTALL_DIR로 넣을 폴더를 바꾼다
 └─ debug-send.sh      실행 중인 디버그 빌드에 확인용 명령을 보낸다 (인자: 출력 폴더, 명령)
 ```
 
@@ -163,7 +163,7 @@ scripts/
 
 ## NotePanel 공개 API
 
-플로팅 노트 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routing`으로만 부른다.
+Float 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routing`으로만 부른다.
 
 - `NotePanelCoordinator`: 떠 있는 노트 창 전부를 맡는다. App이 하나 만든다.
   - `init(theme:notes:windowStates:spaces:router:makeBodyEditor:log:)`. `makeBodyEditor`를 주지 않으면 기본 편집기(`PlainTextBodyEditor`)를 쓴다.
@@ -394,7 +394,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 앱 메뉴와 활성화
 
-- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: 플로팅 노트(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 이름은 `CFBundleDisplayName`(`Info.plist`의 `CFBundleName`도 "플로팅 노트")이다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
+- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: Float(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 이름은 지역화된 `CFBundleDisplayName`이다. 원본 Info.plist의 DisplayName은 파일명과 같은 FloatingNotes, CFBundleName은 Float이며 ko/en InfoPlist.strings의 두 이름은 Float다(D-062). SwiftPM 실행·테스트에서는 Float를 기본값으로 쓴다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
 - `AppRouter.activateApp`: `.openNote`, `.newNote`를 해낸 뒤 부른다(기본은 아무것도 하지 않고 `AppDelegate`가 넣는다. 확인용 실행 `--debug-passive`에서는 넣지 않는다).
 - `applicationDidBecomeActive`: 키 창인 노트가 없을 때만 맨 앞 노트를 키 창으로 만들고, 노트를 눌러 앞으로 온 경우 그 누름이 먼저 처리되도록 한 차례 미룬다.
 

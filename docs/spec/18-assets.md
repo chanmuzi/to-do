@@ -1,14 +1,19 @@
 ## 18. 에셋
 
-### 18.1 앱 아이콘 (`assets/app-icon/`)
+### 18.1 Float 앱 아이콘 (`App/Resources/`, D-062)
+
+흑백 C2 체크 카드: 진한 바탕 위 밝은 카드에 체크한 투두 한 줄과 글 두 줄.
 
 | 파일 | 쓰임 |
 | --- | --- |
-| `mark.svg` | 겹친 노트 그림 원본. 24 단위 캔버스, 선 굵기 1.7, 색은 `currentColor` |
-| `menubar-icon.svg`, `.pdf` | 메뉴 막대용 18pt 템플릿. 둘 중 하나를 에셋 카탈로그에 넣고 템플릿으로 표시 |
-| `menubar-icon.png`, `@2x`, `@3x` | 벡터를 쓸 수 없을 때의 대안 |
-| `app-icon-1024.svg` | Dock 아이콘 원본. 흰 타일에 검정 그림 |
-| `AppIcon.appiconset/` | Xcode 에셋 카탈로그에 그대로 넣는 Dock 아이콘 세트 |
+| `app-icon-1024.svg` | 1024px 원본. 본체 824px(80.46875%), 사방 여백 100px, 둥근 모서리와 그림자 |
+| `AppIcon.appiconset/` | 16·32·64·128·256·512·1024px PNG. 빌드 시 iconutil로 ICNS 생성 |
+| `menubar-icon.svg`, `.pdf` | 18pt C2 템플릿. 15×13pt 카드에서 체크·글 줄을 투명하게 뚫은 벡터. 앱은 PDF 사용 |
+
+- `swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 같은 도형 정의에서 SVG·PNG·PDF를 만든다. 외부 패키지는 필요 없다.
+- 본체 비율 근거: 이 Mac의 `/System/Applications/Notes.app/Contents/Resources/AppIcon.icns`를 iconutil로 추출한 256px 이미지에서, 중앙 행·열의 알파 128 이상 범위가 25..<231(206px)이다. 그림자를 제외한 본체 206/256을 1024에 적용했다.
+- 메뉴 막대 PDF의 구멍은 흰 칠이 아니라 even-odd 벡터 채움으로 투명하다. `isTemplate = true`로 시스템이 색을 입힌다.
+- D-054의 투명한 좌우 열 자르기를 유지한다. 배율과 18pt 세로 캔버스는 바꾸지 않는다. 알파를 읽는 렌더 배율에 따라 폭은 15~16pt이고, 반투명 가장자리는 보존한다. 이 Mac의 AppKit 경로에서는 15×18pt로 읽혔다.
 
 ### 18.2 화면 아이콘 (`assets/symbols/`)
 

@@ -1,6 +1,6 @@
 import AppKit
 
-/// 플로팅 노트 창(spec 4.1, 19). 보통 앱 창처럼 누르면 앱이 앞으로 오고 키 창이 된다(D-025).
+/// Float 창(spec 4.1, 19). 보통 앱 창처럼 누르면 앱이 앞으로 오고 키 창이 된다(D-025).
 /// 모든 Spaces와 전체 화면 앱 위에 보이고, 앱이 뒤로 가도 숨지 않는다.
 final class NotePanelWindow: NSPanel {
     init(contentRect: NSRect) {

@@ -70,13 +70,15 @@ import Testing
     }
 
     @Test func mainMenuFollowsTheDesktopScreenOrder() {
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
-        #expect(menu.items.map(\.title) == ["플로팅 노트", "파일", "편집", "보기", "창", "도움말"])
+        let appName = AppDelegate.displayName
+        #expect(appName == "Float")
+        let menu = MainMenu.make(appName: appName, table: .standard, dispatcher: fixture.commands)
+        #expect(menu.items.map(\.title) == ["Float", "파일", "편집", "보기", "창", "도움말"])
         func visible(_ title: String) -> [String] {
             menu.items.first { $0.title == title }?.submenu?.items
                 .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? []
         }
-        #expect(visible("플로팅 노트") == ["플로팅 노트에 관하여", "설정", "플로팅 노트 종료"])
+        #expect(visible("Float") == ["Float에 관하여", "설정", "Float 종료"])
         #expect(visible("보기") == ["노트 모두 숨기기"])
         #expect(visible("창") == ["다음 노트로"])
         #expect(visible("도움말") == ["단축키"])

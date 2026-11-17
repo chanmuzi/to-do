@@ -7,7 +7,8 @@ import Theme
 @testable import NotePanel
 
 /// 노트 창을 실제로 만들어 크기, 상태 저장, 저장소 연동을 본다.
-@Suite @MainActor struct NoteWindowTests {
+// AppKit 전환의 MainActor 작업이 다른 창 시험에 밀려 대기 제한을 넘지 않도록 순차 실행한다.
+@Suite(.serialized) @MainActor struct NoteWindowTests {
     private let fixture: NotePanelFixture
 
     init() throws {

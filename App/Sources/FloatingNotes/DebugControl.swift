@@ -603,6 +603,10 @@ final class DebugControl {
         let document: [String: Any] = [
             "hidden": notePanels.areNotesHidden,
             "appActive": NSApplication.shared.isActive,
+            "appDisplayName": AppDelegate.displayName,
+            "mainMenuTitles": NSApplication.shared.mainMenu?.items.map(\.title) ?? [],
+            "applicationMenuTitles": NSApplication.shared.mainMenu?.items.first?.submenu?.items
+                .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? [],
             "keyWindowNumber": NSApplication.shared.keyWindow?.windowNumber ?? 0,
             "firstResponder": NSApplication.shared.keyWindow?.firstResponder.map { "\(type(of: $0))" } ?? "",
             "windows": windows,

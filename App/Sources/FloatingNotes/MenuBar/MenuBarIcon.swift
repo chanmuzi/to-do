@@ -1,8 +1,8 @@
 import AppKit
 import Theme
 
-/// 메뉴 막대 아이콘(spec 4.3, 18.1): 겹친 노트 그림을 18pt 템플릿 이미지로 읽는다.
-/// 파일은 `App/Resources/menubar-icon.pdf`(시안 묶음에서 복사한 것).
+/// 메뉴 막대 아이콘(spec 4.3, 18.1): C2 체크 카드 그림을 18pt 템플릿 이미지로 읽는다.
+/// 파일은 `App/Resources/menubar-icon.pdf`(generate-brand-icons.swift로 생성).
 enum MenuBarIcon {
     nonisolated static let fileName = "menubar-icon.pdf"
     /// 캔버스 크기(pt). 그림 자체는 그 안에서 약 13pt 높이다.

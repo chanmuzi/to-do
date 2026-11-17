@@ -1,5 +1,5 @@
 #!/bin/bash
-# 릴리스 빌드를 만들어 응용 프로그램 폴더에 "플로팅 노트.app"으로 넣는다. sudo를 쓰지 않는다.
+# 릴리스 빌드를 만들어 응용 프로그램 폴더에 "FloatingNotes.app"으로 넣는다. sudo를 쓰지 않는다.
 # 사용: scripts/install-app.sh
 #   넣을 폴더: /Applications. 쓸 수 없으면 ~/Applications.
 #   FLOATING_NOTES_INSTALL_DIR=<폴더> 로 넣을 폴더를 바꾼다(확인용으로 임시 폴더에 넣을 때).
@@ -7,7 +7,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="플로팅 노트.app"
+APP_NAME="FloatingNotes.app"
 # 끝낼 앱의 번들 ID. 확인용으로 다른 값을 주면 실행 중인 앱을 건드리지 않는다.
 BUNDLE_ID="${FLOATING_NOTES_BUNDLE_ID:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$ROOT/App/Resources/Info.plist")}"
 QUIT_TIMEOUT="${FLOATING_NOTES_QUIT_TIMEOUT:-30}"
@@ -46,15 +46,15 @@ running() {
 }
 
 if running; then
-  echo "실행 중인 플로팅 노트를 종료합니다"
+  echo "실행 중인 Float를 종료합니다"
   if ! osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1; then
-    echo "플로팅 노트가 종료를 거절했습니다(저장하지 못한 노트가 있을 수 있습니다). 설치하지 않았습니다." >&2
+    echo "Float가 종료를 거절했습니다(저장하지 못한 노트가 있을 수 있습니다). 설치하지 않았습니다." >&2
     exit 75
   fi
   waited=0
   while running; do
     if [ "$waited" -ge "$QUIT_TIMEOUT" ]; then
-      echo "플로팅 노트가 ${QUIT_TIMEOUT}초 안에 끝나지 않았습니다(저장 확인 창이 떠 있을 수 있습니다). 설치하지 않았습니다." >&2
+      echo "Float가 ${QUIT_TIMEOUT}초 안에 끝나지 않았습니다(저장 확인 창이 떠 있을 수 있습니다). 설치하지 않았습니다." >&2
       exit 75
     fi
     sleep 1

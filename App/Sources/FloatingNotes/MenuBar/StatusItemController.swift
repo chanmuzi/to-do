@@ -22,7 +22,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         super.init()
         statusItem.button?.image = icon
         statusItem.button?.imagePosition = .imageOnly
-        statusItem.button?.setAccessibilityLabel("플로팅 노트")
+        statusItem.button?.setAccessibilityLabel("Float")
         menu.delegate = self
         statusItem.menu = menu
         refill()

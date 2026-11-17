@@ -1,0 +1,3 @@
+/* 파일명은 유지하고 Finder·Spotlight 및 앱 메뉴에는 Float를 표시한다. */
+"CFBundleName" = "Float";
+"CFBundleDisplayName" = "Float";
