@@ -145,3 +145,5 @@
 - `library-reminder-w/progress-w`: 110/46(D-066, 체크 아이콘 포함). 값이 없는 줄도 정보 열의 자리를 유지한다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
+
+- 6단계: `component.reminder-editor-w` 320px(설정 팝오버), `component.library-reminder-w` 200px(범위를 담는 예정 열).

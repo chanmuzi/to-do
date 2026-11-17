@@ -47,6 +47,7 @@ public final class CaptureCoordinator {
     public var onFailure: (@MainActor (Error) -> Void)?
     /// ↵로 넣은 줄이 들어간 노트. 바가 닫히기 시작한 뒤에 한 번 불린다(App이 짧은 알림을 띄운다, D-041).
     public var onCaptured: (@MainActor (NoteID) -> Void)?
+    public var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?
     /// 넣지 못한 것을 알리는 중이거나 ⌘↵의 요청이 돌아오기를 기다리는 중이다. 이때는 키 창에서 물러나도
     /// (알림 창, 새로 뜬 노트) 닫지 않는다. 닫을지는 그 일이 끝난 뒤에 정한다.
     private var staysOpenWithoutKey = false
@@ -279,9 +280,11 @@ public final class CaptureCoordinator {
         let entry = interpretation()
         // 읽은 때는 지났어도 보여 준다(무엇으로 읽혔는지 알 수 있게). 지난 때는 흐린 글자에 가운데 줄이고, 걸리지 않는다.
         let reminder = entry.resolvedReminder.map { date in
-            let text = CaptureReminderText.text(for: date, now: now(), calendar: calendar)
+            let item = (entry.expression?.end != nil || entry.expression?.isDateOnly == true) ? entry.schedule(now: now(), calendar: calendar) : nil
+            let text = item.map { ReminderPresentation(item: $0, now: now(), options: NoteDisplayOptions(), calendar: calendar).text ?? "" }
+                ?? CaptureReminderText.text(for: date, now: now(), calendar: calendar)
             return CaptureBadgeView.Content(
-                symbolName: "clock", symbolSize: .iconSmall, text: text,
+                symbolName: entry.expression?.end != nil ? "calendar" : "clock", symbolSize: .iconSmall, text: text,
                 accessibilityLabel: entry.isReminderPast
                     ? "지난 시각 \(text), 리마인더로 걸리지 않습니다" : "리마인더 \(text)",
                 isStruckOut: entry.isReminderPast
@@ -344,7 +347,7 @@ public final class CaptureCoordinator {
         let entry = interpretation()
         guard !entry.isEmpty else { return }
         do {
-            let outcome = try CaptureWriter(notes: notes, calendar: calendar).add(entry, now: now())
+            let outcome = try CaptureWriter(notes: notes, calendar: calendar, onScheduleCreated: onScheduleCreated).add(entry, now: now())
             switch outcome {
             case .appended(let id): log("캡처: 노트 \(id)에 투두를 붙였습니다")
             case .created(let id): log("캡처: 오늘 노트 \(id)를 만들어 투두를 넣었습니다")
@@ -387,7 +390,7 @@ public final class CaptureCoordinator {
         guard !entry.isEmpty else { return }
         staysOpenWithoutKey = true
         let result = router.route(.newNote(NewNoteRequest(
-            draft: NoteDraft(title: entry.text, spaceID: entry.spaceID, reminder: entry.reminder)
+            draft: NoteDraft(title: entry.text, spaceID: entry.spaceID, schedules: entry.schedule(now: now(), calendar: calendar).map { [$0] })
         )))
         staysOpenWithoutKey = false
         switch result {

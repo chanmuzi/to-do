@@ -41,3 +41,13 @@ import Testing
     }
     #endif
 }
+
+extension LaunchOptionsTests {
+    @Test func verificationAlwaysUsesFakeCalendarAndNotifications() throws {
+        #expect(try LaunchOptions(arguments: ["Float", "--calendar", "fake"]).usesFakeCalendar)
+        #if DEBUG
+        #expect(try LaunchOptions(arguments: ["Float", "--debug-passive"]).usesFakeCalendar)
+        #endif
+        #expect(try !LaunchOptions(arguments: ["Float"]).usesFakeCalendar)
+    }
+}

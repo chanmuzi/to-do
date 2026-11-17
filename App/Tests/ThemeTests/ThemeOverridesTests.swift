@@ -4,7 +4,7 @@ import Testing
 
 @Suite @MainActor struct ThemeOverridesTests {
     private func temporaryFile() -> URL {
-        FileManager.default.temporaryDirectory
+        URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("theme-tests-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("theme-overrides.json")
     }

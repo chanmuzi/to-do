@@ -322,6 +322,8 @@ public final class NotePanelCoordinator {
     }
 
     /// 그 노트의 창. 다른 화면을 그 노트에 붙여 띄울 때 쓴다(노트 찾기). 떠 있지 않으면 `nil`.
+    public func reminderAnchor(for id: NoteID) -> NSView? { controllers[id]?.reminderAnchor }
+
     public func window(for id: NoteID) -> NSWindow? {
         controllers[id]?.panel
     }
@@ -416,7 +418,11 @@ public final class NotePanelCoordinator {
         do {
             created = try notes.create(NoteDraft(
                 title: source.title, body: source.body, spaceID: source.spaceID, colorID: source.colorID,
-                reminder: source.reminder
+                schedules: source.schedules.map { item in
+                    var copy = item
+                    copy.id = (item.id.hasPrefix("legacy-") ? "legacy-" : "") + UUID().uuidString
+                    return copy
+                }
             ))
         } catch {
             log("없어진 노트의 글을 새 노트로 저장하지 못했습니다(\(id)): \(error)")

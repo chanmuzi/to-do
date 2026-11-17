@@ -104,7 +104,7 @@ struct NoteFiles {
         let creation = (try? fileManager.attributesOfItem(atPath: url.path))?[.creationDate] as? Date
         let note = Note(
             id: id, title: content.title, body: content.body, spaceID: content.spaceID,
-            colorID: content.colorID, reminder: content.reminder,
+            colorID: content.colorID, reminder: content.reminder, schedules: content.schedules,
             // 머리에 만든 날짜가 없으면 파일의 날짜를 쓴다. 머리에 적을 때와 같게 초 아래를 버린다.
             created: content.created ?? NoteFileCodec.truncatedToSeconds(creation ?? stamp.modified),
             modified: stamp.modified

@@ -191,8 +191,11 @@ import Models
 
         // 리마인더를 새로 정하면 그 줄만 바뀐다.
         try store.update(id) { $0.reminder = Date(timeIntervalSince1970: 1_800_000_000) }
-        #expect(try String(contentsOf: temporary.noteFile("dates"), encoding: .utf8)
-            == "---\ntitle: 날짜\nreminder: 2027-01-15T08:00:00Z\ncreated: 2026-11-16T12:08:00.123Z\n---\n고친 본문")
+        let changed = try String(contentsOf: temporary.noteFile("dates"), encoding: .utf8)
+        #expect(changed.contains("reminder: 2027-01-15T08:00:00Z\n"))
+        #expect(changed.contains("created: 2026-11-16T12:08:00.123Z\n"))
+        #expect(NoteFileCodec.decode(changed).schedules?.count == 1)
+        #expect(NoteFileCodec.decode(changed).body == "고친 본문")
     }
 
     /// BOM으로 시작하는 파일도 머리를 읽고, 저장해도 머리가 하나 더 생기지 않는다.

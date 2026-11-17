@@ -92,7 +92,7 @@ import Testing
 
     /// 접힘은 창 상태의 다른 항목(틀, 핀)을 건드리지 않고 그 항목만 고친다.
     @Test func storeWritesOnlyTheFoldedLinesOfTheWindowState() throws {
-        let root = FileManager.default.temporaryDirectory
+        let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("fold-store-tests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let location = StoreLocation.isolated(notesDirectory: root)

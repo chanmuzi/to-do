@@ -20,7 +20,7 @@ import Routing
         init() throws {
             _ = NSApplication.shared
             _ = FontRegistrar.registerBundledFonts()
-            root = FileManager.default.temporaryDirectory.appendingPathComponent("library-input-\(UUID())")
+            root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("library-input-\(UUID())")
             let location = StoreLocation.isolated(notesDirectory: root)
             notes = try FileNoteStore(location: location)
             let recorder = recorder
@@ -90,7 +90,7 @@ import Routing
     }
 
     @Test func clickSelectsDoubleClickAndReturnOpenAndTrashRestores() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("library-actions-\(UUID())")
+        let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("library-actions-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let location = StoreLocation.isolated(notesDirectory: root)
         let notes = try FileNoteStore(location: location)

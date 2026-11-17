@@ -32,6 +32,7 @@ struct TopRowState: Hashable {
     var reminder: ReminderPresentation?
     var pin: Pin
     var problem: NoteProblem?
+    var syncFailure: Bool
 
     init(
         note: Note,
@@ -50,13 +51,15 @@ struct TopRowState: Hashable {
         isTitlePlaceholder = note.title.isEmpty
         titleColor = isHovered || isEditingTitle ? .text : .text3
         hoverControlsAlpha = isHovered ? 1 : 0
-        reminder = note.reminder.map {
-            ReminderPresentation(reminder: $0, now: now, options: options, calendar: calendar)
+        reminder = note.displayedSchedule(at: now, calendar: calendar).map {
+            ReminderPresentation(item: $0, now: now, options: options, calendar: calendar)
         }
         pin = isPinned
             ? Pin(symbolName: "pin.fill", alpha: 1, color: isHovered ? .text2 : .text3, isOn: true)
             : Pin(symbolName: "pin", alpha: isHovered ? 1 : 0, color: .text2, isOn: false)
         self.problem = problem
+        syncFailure = note.schedules.contains { $0.syncError != nil }
+        if reminder != nil { reminder?.syncFailed = syncFailure }
     }
 
     /// 공용 아이콘 렌더러에 표시할 값을 전달한다. 아이콘이 없으면 이름으로 대신한다.

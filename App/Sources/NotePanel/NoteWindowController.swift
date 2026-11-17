@@ -80,6 +80,8 @@ final class NoteWindowController: NSObject {
 
     var isHovered: Bool { hoverOverride ?? isPointerInside }
 
+    var reminderAnchor: NSView { root.topRow.reminderAnchor }
+
     var snapshot: NoteWindowSnapshot {
         NoteWindowSnapshot(
             noteID: noteID, frame: panel.frame, isPinned: isPinned, level: panel.level.rawValue,
@@ -182,7 +184,7 @@ final class NoteWindowController: NSObject {
         reminderRefresh?.cancel()
         reminderRefresh = nil
         let now = Date()
-        guard let reminder = note.reminder,
+        guard let reminder = note.displayedSchedule(at: now)?.start,
               let next = ReminderPresentation.nextRefresh(
                   reminder: reminder, now: now, options: environment.options(), calendar: .current
               )
@@ -231,7 +233,10 @@ final class NoteWindowController: NSObject {
             add: { router.route(.newNote(NewNoteRequest(nextTo: id))) },
             reminder: { router.route(.openReminderEditor(id)) },
             pin: { [unowned self] in setPinned(!isPinned) },
-            problem: { [unowned self] anchor in popUpProblemMenu(from: anchor) },
+            problem: { [unowned self] anchor in
+                if problem != nil { popUpProblemMenu(from: anchor) }
+                else { router.route(.openReminderEditor(id)) }
+            },
             titleChanged: { [unowned self] title in mutate(deferred: true) { $0.title = title } },
             titleEditingChanged: { [unowned self] _ in refreshChrome(animated: true) },
             titleReturned: { [unowned self] in editor.focus() }

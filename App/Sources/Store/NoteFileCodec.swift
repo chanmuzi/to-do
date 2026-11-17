@@ -7,6 +7,7 @@ struct NoteFileContent: Equatable {
     var spaceID: SpaceID?
     var colorID: PaletteID?
     var reminder: Date?
+    var schedules: [ScheduleItem]?
     var created: Date?
     /// 이 앱이 모르는 머리 줄. 다시 쓸 때 그대로 둔다.
     var unknownLines: [String] = []
@@ -30,7 +31,7 @@ struct NoteFileContent: Equatable {
 /// 값이 없는 항목은 줄을 쓰지 않는다. 제목은 JSON 문자열로 따옴표에 넣어 어떤 글자든 담는다.
 /// 머리가 없는 파일은 전체를 본문으로 읽는다.
 ///
-/// 아는 항목은 줄 맨 앞(들여쓰기 없음)에서 시작하는 `title`, `space`, `color`, `reminder`, `created`뿐이다.
+/// 아는 항목은 줄 맨 앞(들여쓰기 없음)에서 시작하는 `title`, `space`, `color`, `reminder`, `schedules`, `created`다.
 /// 들여쓴 줄과 그 밖의 줄은 모르는 줄로 두고 건드리지 않는다.
 /// 이미 있는 파일을 고쳐 쓸 때는 `encode(_:over:)`를 쓴다.
 enum NoteFileCodec {
@@ -39,7 +40,7 @@ enum NoteFileCodec {
 
     /// 머리에서 이 앱이 아는 항목. 순서는 새 파일에 쓰는 순서다.
     enum Key: String, CaseIterable {
-        case title, space, color, reminder, created
+        case title, space, color, reminder, schedules, created
     }
 
     /// 새 파일의 표기.
@@ -63,6 +64,7 @@ enum NoteFileCodec {
             case .color: content.colorID = field.value.isEmpty ? nil : PaletteID(rawValue: field.value)
             // 읽지 못한 날짜 줄은 값 없음으로 읽고, 다시 쓸 때 `encode(_:over:)`가 원래 줄을 남긴다.
             case .reminder: content.reminder = parseDate(field.value)
+            case .schedules: content.schedules = decodeSchedules(field.value)
             case .created: content.created = parseDate(field.value)
             }
         }
@@ -91,8 +93,19 @@ enum NoteFileCodec {
         case .space: content.spaceID.map { "space: \(quoted($0.rawValue))" }
         case .color: content.colorID.map { "color: \($0.rawValue)" }
         case .reminder: content.reminder.map { "reminder: \(format($0))" }
+        case .schedules: content.schedules.map { "schedules: \(encodeSchedules($0))" }
         case .created: content.created.map { "created: \(format($0))" }
         }
+    }
+
+    static func decodeSchedules(_ value: String) -> [ScheduleItem]? {
+        try? JSONDecoder().decode([ScheduleItem].self, from: Data(value.utf8))
+    }
+
+    static func encodeSchedules(_ items: [ScheduleItem]) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return String(decoding: try! encoder.encode(items), as: UTF8.self)
     }
 
     /// ISO 8601 날짜를 읽는다. 초 아래 자리(`…00.123Z`)와 날짜만 있는 값(`2026-11-17`, UTC 자정)도 받는다.

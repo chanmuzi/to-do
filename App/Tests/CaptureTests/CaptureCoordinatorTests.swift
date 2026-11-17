@@ -213,7 +213,7 @@ import Testing
         #expect(capture.displayedReminder == "3:00 PM")
         try input().selectAll(nil)
         try input().type("내년 12월 1일 정산")
-        #expect(capture.displayedReminder == "2027/12/1 9:00 AM")
+        #expect(capture.displayedReminder == "2027/12/1")
     }
 
     /// 지난 때로 읽힌 표현은 지난 모습으로 보이고, 항목은 넣되 리마인더는 걸지 않는다.
@@ -343,7 +343,7 @@ import Testing
         try input().compose("십")
         #expect(try input().string == "회의 내일 10십")
         // 시각이 없어졌다. 날만 남아 오전 9시로 읽힌다.
-        #expect(capture.displayedReminder == "내일 9:00 AM")
+        #expect(capture.displayedReminder == "내일")
         #expect(capture.underlinedRange == NSRange(location: 3, length: 2))
     }
 
@@ -416,9 +416,12 @@ import Testing
         capture.performSubmitAsNewNote()
 
         #expect(!capture.isVisible)
-        #expect(fixture.routes == [.newNote(NewNoteRequest(draft: NoteDraft(
-            title: "분기 회고 금요일 3시", spaceID: home, reminder: TestClock.date(11, 20, 15, 0)
-        )))])
+        #expect(fixture.routes.count == 1)
+        guard case .newNote(let request) = fixture.routes.first else { Issue.record("새 노트 요청 없음"); return }
+        #expect(request.draft.title == "분기 회고 금요일 3시")
+        #expect(request.draft.spaceID == home)
+        #expect(request.draft.schedules?.first?.start == TestClock.date(11, 20, 15, 0))
+        #expect(request.draft.schedules?.first?.todo == nil)
         // 캡처 바가 직접 노트를 만들지 않는다.
         #expect(try fixture.notes.list().notes.isEmpty)
     }

@@ -7,7 +7,7 @@ struct TemporaryStore {
     let location: StoreLocation
 
     init() {
-        root = FileManager.default.temporaryDirectory
+        root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("store-tests-\(UUID().uuidString)", isDirectory: true)
         location = .isolated(notesDirectory: root.appendingPathComponent("notes", isDirectory: true))
     }

@@ -29,3 +29,4 @@
 | `18-assets.md` | 앱 아이콘, 화면 아이콘과 SF Symbols 대응표, 기본 이미지, 글꼴 | |
 | `19-native-notes.md` | AppKit·TextKit 2 구현 메모 | |
 | `20-open-questions.md` | 정해지지 않은 것 13가지와 임시 값 | |
+| `21-schedule.md` | 여러 예정, 리마인더 설정, EventKit 양방향 연동, 권한과 알림 | |

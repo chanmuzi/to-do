@@ -8,6 +8,7 @@ final class ReminderBadgeView: ClickableView {
 
     private let style: PanelStyle
     private let iconView = NSImageView()
+    private let failureView = NSImageView()
     private let label = InfoLabel()
     private var presentation: ReminderPresentation?
     /// 다 사라진 뒤 숨기는 일(`dur` 뒤). 그사이 다시 나타나면 취소한다.
@@ -19,7 +20,8 @@ final class ReminderBadgeView: ClickableView {
         wantsLayer = true
         iconView.wantsLayer = true
         iconView.imageScaling = .scaleNone
-        [iconView, label].forEach(addSubview)
+        [iconView, label, failureView].forEach(addSubview)
+        failureView.imageScaling = .scaleNone
         isHidden = true
         alphaValue = 0
         setAccessibilityElement(true)
@@ -62,7 +64,11 @@ final class ReminderBadgeView: ClickableView {
         iconView.contentTintColor = color
         label.isHidden = presentation.text == nil
         label.set(text: presentation.text ?? "", font: style.theme.nsFont(presentation.textStyle), color: color)
-        setAccessibilityLabel(["리마인더", presentation.text].compactMap { $0 }.joined(separator: " "))
+        setAccessibilityLabel(presentation.accessibilityLabel)
+        failureView.isHidden = !presentation.syncFailed
+        failureView.image = style.symbol("exclamationmark.circle", size: .iconSmall)
+        failureView.contentTintColor = style.color(.text3)
+        toolTip = presentation.syncFailed ? "연동 실패, 앱에 저장됨" : nil
         needsLayout = true
         updateRinging()
     }
@@ -71,8 +77,9 @@ final class ReminderBadgeView: ClickableView {
     var fittingWidth: CGFloat? {
         guard let presentation else { return nil }
         let icon = style.theme.component(.iconSmall)
-        guard let text = presentation.text else { return icon }
-        return icon + style.theme.component(.iconGap) + textWidth(text)
+        let failure = presentation.syncFailed ? icon + style.theme.component(.iconGap) : 0
+        guard let text = presentation.text else { return icon + failure }
+        return icon + style.theme.component(.iconGap) + textWidth(text) + failure
     }
 
     private func textWidth(_ text: String) -> CGFloat {
@@ -90,7 +97,9 @@ final class ReminderBadgeView: ClickableView {
             NSRect(x: 0, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
         )
         let labelX = icon + style.theme.component(.iconGap)
-        label.frame = NSRect(x: labelX, y: 0, width: max(0, bounds.width - labelX), height: bounds.height)
+        let failure = presentation?.syncFailed == true ? icon + style.theme.component(.iconGap) : 0
+        label.frame = NSRect(x: labelX, y: 0, width: max(0, bounds.width - labelX - failure), height: bounds.height)
+        failureView.frame = NSRect(x: bounds.width - icon, y: (bounds.height - icon) / 2, width: icon, height: icon)
         updateRinging()
     }
 

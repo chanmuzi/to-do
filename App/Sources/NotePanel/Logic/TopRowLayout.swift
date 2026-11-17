@@ -51,7 +51,11 @@ struct TopRowLayout: Hashable {
         }
 
         pin = takeTrailing(metrics.iconButton, isButton: true)
-        reminder = input.reminderWidth.map { takeTrailing($0, isButton: false) }
+        let fixed = metrics.paddingLeading + metrics.paddingTrailing
+            + (input.spaceWidth.map { $0 + metrics.gap } ?? 0)
+            + metrics.iconButton * (input.showsProblem ? 4 : 3)
+            + metrics.gap * 3 + metrics.buttonGap * (input.showsProblem ? 2 : 1)
+        reminder = input.reminderWidth.map { takeTrailing(min($0, max(0, input.width - fixed)), isButton: false) }
         add = takeTrailing(metrics.iconButton, isButton: true)
         more = takeTrailing(metrics.iconButton, isButton: true)
         problem = input.showsProblem ? takeTrailing(metrics.iconButton, isButton: true) : nil

@@ -9,7 +9,7 @@ import Theme
 @testable import FloatingNotes
 
 @Suite struct AppRouterTests {
-    private let root = FileManager.default.temporaryDirectory
+    private let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("app-router-tests-\(UUID().uuidString)", isDirectory: true)
 
     private func makeRouter() throws -> (AppRouter, NotePanelCoordinator, FileNoteStore) {
@@ -67,5 +67,30 @@ import Theme
         #expect(shown.count == 1)
         #expect(coordinator.openNoteIDs.isEmpty)
         #expect(router.unhandled == [.openSettings])
+    }
+}
+
+
+extension AppRouterTests {
+    @Test func newNoteCaptureRegistersOnlySchedulesInTheSuccessfulRequest() throws {
+        let (router, coordinator, notes) = try makeRouter()
+        defer {
+            coordinator.flushPendingEdits()
+            for id in coordinator.openNoteIDs { coordinator.closeWindow(id) }
+            do { try FileManager.default.removeItem(at: root) }
+            catch { Issue.record("임시 폴더 정리 실패: \(error)") }
+        }
+        var requests: [(NoteID, String)] = []
+        router.onScheduleCreated = { requests.append(($0, $1)) }
+        let item = ScheduleItem(start: Date(timeIntervalSince1970: 2_000_000_000))
+        #expect(router.route(.newNote(NewNoteRequest(draft: NoteDraft(title: "캡처", schedules: [item])))) == .handled)
+        #expect(requests.count == 1)
+        #expect(requests[0].1 == item.id)
+        let id = requests[0].0
+        #expect(try notes.load(id).schedules == [item])
+        try notes.update(id) { $0.body = "본문만 편집" }
+        #expect(requests.count == 1)
+        #expect(router.route(.newNote(NewNoteRequest(draft: NoteDraft(title: "예정 없는 노트")))) == .handled)
+        #expect(requests.count == 1)
     }
 }

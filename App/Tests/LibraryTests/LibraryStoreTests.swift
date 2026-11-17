@@ -10,7 +10,7 @@ import Theme
 
 @Suite struct LibraryStoreTests {
     func fixture() throws -> (URL, StoreLocation, FileNoteStore, SpaceStore) {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("library-tests-\(UUID().uuidString)")
+        let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("library-tests-\(UUID().uuidString)")
         let location = StoreLocation.isolated(notesDirectory: root)
         return (root, location, try FileNoteStore(location: location), try SpaceStore(location: location))
     }

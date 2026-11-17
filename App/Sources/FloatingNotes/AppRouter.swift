@@ -1,6 +1,8 @@
+import Models
 import Foundation
 import NotePanel
 import Library
+import Reminders
 import Routing
 
 extension Route {
@@ -11,8 +13,8 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker: true
-        case .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor: false
+        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor: true
+        case .openAIPanel, .openSettings, .openShortcuts: false
         }
     }
 }
@@ -28,6 +30,7 @@ final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
     /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
+    weak var reminders: ReminderEditorCoordinator?
     weak var library: LibraryCoordinator?
     weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
@@ -36,6 +39,7 @@ final class AppRouter: Routing {
     /// 메뉴 막대 메뉴, 캡처 바의 ⌘↵, 노트 찾기, 알림의 "열기"로 연 노트에 곧바로 글을 쓸 수 있게 한다.
     /// 기본은 아무것도 하지 않는다(시험이 사용자의 앱을 뒤로 보내지 않게). `AppDelegate`가 넣는다.
     var activateApp: () -> Void = {}
+    var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?
     /// 아직 연결되지 않아 기록만 한 요청.
     private(set) var unhandled: [Route] = []
 
@@ -53,7 +57,8 @@ final class AppRouter: Routing {
                 try notePanels.open(id)
                 activateApp()
             case .newNote(let request):
-                try notePanels.createNote(request)
+                let id = try notePanels.createNote(request)
+                request.draft.schedules?.forEach { onScheduleCreated?(id, $0.id) }
                 activateApp()
             case .closeNoteWindow(let id): notePanels.closeWindow(id)
             case .toggleAllNotesHidden: notePanels.toggleAllHidden()
@@ -70,7 +75,11 @@ final class AppRouter: Routing {
             case .openSpacePicker(let id):
                 guard let library else { return logUnhandled(route) }
                 library.showSpacePicker(for: id, anchor: notePanels.window(for: id)?.contentView)
-            case .openAIPanel, .openSettings, .openShortcuts, .openReminderEditor:
+            case .openReminderEditor(let id):
+                guard let reminders, let anchor = notePanels.reminderAnchor(for: id) else { return logUnhandled(route) }
+                notePanels.flushPendingEdits()
+                try reminders.show(id, anchor: anchor)
+            case .openAIPanel, .openSettings, .openShortcuts:
                 return logUnhandled(route)
             }
             return .handled

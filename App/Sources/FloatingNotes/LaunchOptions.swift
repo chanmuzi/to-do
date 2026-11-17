@@ -16,6 +16,7 @@ import Theme
 ///   사용자가 다른 앱에 치던 글자를 받는다. 자동 확인 실행은 이것을 켜고, 확인용 명령 `focus`만 잠깐 푼다.
 /// - `--debug-no-hotkeys`: 전역 단축키를 등록하지 않는다. 확인용 실행이 사용자의 키를 가로채지 않게 한다.
 struct LaunchOptions: Equatable {
+    var usesFakeCalendar = false
     var notesDirectory: URL?
     var appearance: ThemeAppearance?
     /// 이번 실행에서만 메뉴 막대 아이콘을 보일지. `nil`이면 저장된 설정을 따른다.
@@ -51,6 +52,10 @@ struct LaunchOptions: Equatable {
         }
         while let flag = remaining.popFirst() {
             switch flag {
+            case "--calendar":
+                let raw = try value(after: flag)
+                guard raw == "fake" else { throw ParseError.invalidSwitch(flag: flag, value: raw) }
+                usesFakeCalendar = true
             case "--notes-dir":
                 notesDirectory = URL(fileURLWithPath: try value(after: flag), isDirectory: true)
             case "--appearance":
@@ -70,6 +75,7 @@ struct LaunchOptions: Equatable {
                 debugControlDirectory = URL(fileURLWithPath: try value(after: flag), isDirectory: true)
             case "--debug-passive":
                 debugIsPassive = true
+                usesFakeCalendar = true
             case "--debug-no-hotkeys":
                 debugSkipsHotKeys = true
             #endif

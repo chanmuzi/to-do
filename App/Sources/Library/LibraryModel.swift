@@ -99,7 +99,7 @@ public final class LibraryModel {
         selectedNoteID = rows[next].id
     }
     public func reminderPresentation(for note: Note) -> ReminderPresentation? {
-        note.reminder.map { ReminderPresentation(reminder: $0, now: index.now, options: displayOptions, calendar: index.calendar) }
+        note.displayedSchedule(at: index.now, calendar: index.calendar).map { ReminderPresentation(item: $0, now: index.now, options: displayOptions, calendar: index.calendar) }
     }
 
     public func open(_ note: Note) {

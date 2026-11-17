@@ -81,6 +81,7 @@ public enum ShapeToken: String, CaseIterable, Sendable {
 
 /// 구성 요소 치수. `doc-pad`는 네 변 값이라 `ThemeTokens.docPadding`으로 따로 낸다.
 public enum ComponentToken: String, CaseIterable, Sendable {
+    case reminderEditorWidth = "reminder-editor-w"
     case gutter
     case indent
     case checkSize = "check-size"

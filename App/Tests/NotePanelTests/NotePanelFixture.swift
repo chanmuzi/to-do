@@ -9,7 +9,7 @@ import Theme
 /// 임시 폴더의 저장소와 테마로 노트 창을 실제로 만들어 보는 시험용 조립.
 @MainActor
 final class NotePanelFixture {
-    let root = FileManager.default.temporaryDirectory
+    let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("note-panel-tests-\(UUID().uuidString)", isDirectory: true)
     let location: StoreLocation
     let theme: Theme

@@ -230,7 +230,9 @@ import Testing
         try fixture.notes.update(note.id) { $0.reminder = base.addingTimeInterval(-3600) }
 
         _ = try writer.add(entry("새 일", space: work, reminder: base.addingTimeInterval(7200)), now: note.created)
-        #expect(try fixture.notes.load(note.id).reminder == base.addingTimeInterval(7200))
+        let saved = try fixture.notes.load(note.id)
+        #expect(saved.schedules.count == 2)
+        #expect(saved.displayedSchedule(at: note.created)?.start == base.addingTimeInterval(7200))
     }
 
     @Test func noSpaceUsesTodaysNoteWithoutASpace() throws {
@@ -240,5 +242,28 @@ import Testing
 
         #expect(try writer.add(entry("아무 데나", space: nil), now: loose.created) == .appended(loose.id))
         #expect(try fixture.notes.load(loose.id).body == "[ ] 아무 데나\n")
+    }
+}
+
+
+extension CaptureWriterTests {
+    @Test func registrationCallbackOnlyContainsNewlyCapturedSchedules() throws {
+        defer { fixture.cleanUp() }
+        var requests: [(NoteID, String)] = []
+        let writer = CaptureWriter(notes: fixture.notes, onScheduleCreated: { requests.append(($0, $1)) })
+        let now = Date()
+        let first = try writer.add(entry("새 알림", space: work, reminder: now.addingTimeInterval(3600)), now: now)
+        #expect(requests.count == 1)
+        #expect(requests[0].0 == first.noteID)
+        #expect(try fixture.notes.load(first.noteID).schedules[0].id == requests[0].1)
+        let legacy = try fixture.notes.create(NoteDraft(body: "옛 글", spaceID: home, reminder: now.addingTimeInterval(3600)))
+        let appended = try writer.add(entry("다음 알림", space: home, reminder: now.addingTimeInterval(7200)), now: legacy.created)
+        #expect(appended.noteID == legacy.id)
+        #expect(requests.count == 2)
+        #expect(requests[1].0 == legacy.id)
+        #expect(!requests[1].1.hasPrefix("legacy-"))
+        #expect(try fixture.notes.load(legacy.id).schedules[1].id == requests[1].1)
+        _ = try writer.add(entry("본문만", space: home), now: legacy.created)
+        #expect(requests.count == 2)
     }
 }

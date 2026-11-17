@@ -121,6 +121,7 @@ extension NoteFileCodec {
         case .space: isUnchanged = field.value == (content.spaceID?.rawValue ?? "")
         case .color: isUnchanged = field.value == (content.colorID?.rawValue ?? "")
         case .reminder: isUnchanged = parseDate(field.value) == content.reminder
+        case .schedules: isUnchanged = decodeSchedules(field.value) == content.schedules
         case .created: isUnchanged = true
         }
         return isUnchanged ? original : line(field.key, in: content)

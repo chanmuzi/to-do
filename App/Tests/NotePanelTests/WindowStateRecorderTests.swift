@@ -6,7 +6,7 @@ import Testing
 @testable import NotePanel
 
 @Suite @MainActor struct WindowStateRecorderTests {
-    private let root = FileManager.default.temporaryDirectory
+    private let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("note-panel-tests-\(UUID().uuidString)", isDirectory: true)
     private var location: StoreLocation { .isolated(notesDirectory: root) }
     private let id = NoteID(rawValue: "a")

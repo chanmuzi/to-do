@@ -23,6 +23,7 @@ Core         모든 기능이 공유하는 바탕
 | Core | `Theme` | `tokens.json` 읽기, 라이트·다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
 | Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit·SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme·Models만 참조 | 10, 16, 18 |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
+| Core | `Scheduling` | CalendarBridge·ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models·Store만 참조 | 21 |
 | Core | `Store` | 노트 파일 읽기·쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `Routing` | 기능 사이 요청을 전달하는 프로토콜 | 04 |
 | Features | `NotePanel` | Float 창, 상단 줄, 호버 동작 | 05 |
@@ -110,8 +111,8 @@ scripts/
 
 ### Models
 
-- `Note`: `id: NoteID`, `title`, `body`(Markdown 원문), `spaceID: SpaceID?`, `colorID: PaletteID?`, `reminder: Date?`, `created`, `modified`. 핀은 없다(아래).
-- `NoteDraft`: 새 노트 내용(`title`, `body`, `spaceID`, `colorID`, `reminder`).
+- `Note`: `id: NoteID`, `title`, `body`(Markdown 원문), `spaceID: SpaceID?`, `colorID: PaletteID?`, `schedules: [ScheduleItem]`, 호환용 `reminder: Date?`, `created`, `modified`. 핀은 없다(아래).
+- `NoteDraft`: 새 노트 내용(`title`, `body`, `spaceID`, `colorID`, `schedules`, 호환용 `reminder`).
 - `NoteWindowState`: `frame: WindowFrame?`, `isPinned`(기본 켜짐), `isOpen`, `stackOrder: Int?`(창이 겹친 차례. 앞으로 올 때마다 가장 큰 값보다 하나 큰 값, 클수록 앞), `foldedLines: [Int]?`(접어 둔 토글의 줄 번호, 오름차순. 없으면 `nil`. App의 편집기 어댑터가 적는다, D-023), `lastOpened: Date?`(사용자가 그 노트의 창을 마지막으로 띄웠거나 키 창으로 만든 때. 노트 창이 적고 노트 찾기가 읽는다, D-033). 노트 파일이 아니라 로컬 상태다(D-003). 항목마다 주인이 다르므로 고칠 때는 지금 값을 읽어 제 항목만 바꿔 넣는다(`WindowStateRecorder`, `NoteFoldStore`가 그렇게 한다).
 - `Space`(`id`, `name`, `icon: SpaceIcon`), `SpaceIcon`(`.symbol(name:colorID:)`, `.emoji`, `.image`).
 - `NoteID`, `SpaceID`, `PaletteID`: 문자열을 감싼 식별자. `PaletteID.rawValue`를 `Theme`의 `paletteID:`에 넘긴다.
@@ -450,7 +451,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 그 밖
 
-- Features 타깃 `Reminders`, `Settings`, `Agent`는 아직 없다. 그 화면을 여는 요청은 `AppRouter`가 기록만 하고 `.unconnected`로 답한다.
+- Features 타깃 `Settings`, `Agent`는 아직 없다. 그 화면을 여는 요청은 `AppRouter`가 기록만 하고 `.unconnected`로 답한다.
 - 움직임과 상태(D-032): 창이나 뷰의 움직임이 끝났다는 알림(`NSAnimationContext`의 `completionHandler`)에 상태를 걸지 않는다. 화면이 꺼져 있거나 잠겨 있으면 창의 움직임은 나아가지 않고 그 알림도 오지 않는다. 전환이 끝날 때 해야 하는 일(창 내리기, 끝의 값으로 놓기, 숨기고 자리 비우기)은 `Theme`의 `TransitionTimer.after(_:_:)`로 전환 시간 뒤에 잡고, 반대쪽 전환이 시작되면 취소한다. 세 기능의 `animate`(`CaptureStyle`, `BrowseStyle`, `PanelStyle`)는 끝났을 때를 알려 주는 인자가 없다. `swift test`는 화면이 잠겨 있어도 통과해야 한다.
 - 자동으로 확인하지 못한 것(실제 한글 입력, 실제 전역 단축키, 키 창이 넘어가는 모습 등)은 `docs/verification-checklist.md`에 손으로 볼 목록으로 모아 두었다.
 - SF Symbols 아이콘은 모두 `Theme.symbolImage(_:size:)`로 만든다(크기 토큰의 칸 안에 드는 크기, 눈으로 커 보이는 것만 `iconOptical` 표로 줄임, 1 이하만). 이미지 뷰는 그림을 늘리거나 줄이지 않고(`.scaleNone`) `Theme.symbolFrame`의 틀 가운데에 둔다(D-039).
@@ -470,3 +471,14 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - 메뉴 막대 아이콘은 18pt 그림의 투명한 좌우 열만 제거한다. `variableLength`에 시스템 여백을 맡긴다. 그림의 배율·높이는 유지한다.
 - 디버그 명령: `library`, `library-close`, `library-select today|all|floating|trash|reminders|archive:YYYY-MM|<spaceID>`, `library-open <noteID>`, `library-expand <spaceID>`, `library-icon <spaceID> <imageName>`, `library-dump <file>`, `library-snapshot <file>`, `icon-snapshot|icon-symbol-snapshot|icon-emoji-snapshot <spaceID> <file>`, `reopen`. 스냅숏은 앱 안에서 그린다. `--debug-passive`는 라이브러리도 키 창이 되지 않게 한다.
 - 실행 중인 사용자 앱을 덮어쓰지 않으려면 `FLOATING_NOTES_APP_DIR=<작업 폴더>/app scripts/build-app.sh debug`를 쓴다. `run.sh`에도 같은 변수가 전달된다.
+
+## 6단계 예정과 외부 연동
+
+- `Models.ScheduleItem`: 시작·종료 기반 종류, 날짜만/완료/삭제 대기, 제목, TodoAnchor, 로컬·외부 ID, 수정·동기화 시각, 마지막 동기화 값과 실패. `Note.schedules`가 정본이고 `reminder`는 호환 투영이다. `displayedSchedule(at:)`은 가장 이른 다가오는 항목, 없으면 지난 항목을 고른다.
+- `Store`는 `schedules` JSON을 한 줄 frontmatter로 저장한다. 기존 reminder는 안정된 ID로 읽고 옛 빌드용 날짜를 병기한다. 알 수 없는 줄 보존 정책은 유지한다. `LegacyStage5` 테스트 코드는 HEAD의 실제 codec을 이름만 바꿔 고정한 것이다.
+- Core `Scheduling`의 `ScheduleService`가 저장소 변경과 CalendarBridge.onChange를 직렬 처리한다. EventKitBridge만 EventKit을 import하며 저장소 생성은 지연된다. SystemReminderNotifier만 UserNotifications를 import한다. 둘의 가짜 구현은 실제 권한·계정을 전혀 쓰지 않는다.
+- Feature `Reminders`는 Theme·Models·Store만 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력·범위 검증·항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
+- 권한 요청 의도는 `ReminderEditorModel.onSave`와 `CaptureWriter.onScheduleCreated`(새 노트 캡처는 `AppRouter.onScheduleCreated`)에서 항목 ID로 전달하고 AppDelegate가 `ScheduleService.register`에 연결한다. 일반 저장 관찰은 권한을 요청하지 않는다. 옛 항목은 명시 저장과 다가오는 미완료 조건을 모두 확인한다(D-071).
+- AppDelegate는 실행 옵션에 따라 실제/가짜 의존성을 조립한다. `--calendar fake`는 두 외부 API를 모두 대체하며 `--debug-passive`도 강제로 같은 경로를 쓴다. 종료 시 서비스 관찰과 편집 화면을 닫는다.
+- Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜·범위·아이콘·임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor 모듈에는 변경이 없다.
+- 확인용 명령: `reminder-editor <noteID>`, `reminder-close`, `reminder-snapshot <file>`, `fake-delay|fake-complete|fake-delete <scheduleID>`. 가짜 외부 변경도 실제 서비스의 onChange 경로를 지난다. 스냅숏은 앱 내부 렌더링이다.

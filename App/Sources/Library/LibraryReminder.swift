@@ -12,10 +12,11 @@ struct LibraryReminder: View {
             HStack(spacing: model.theme.component(.iconGap)) {
                 LibraryReminderIcon(theme: model.theme, value: value)
                     .frame(width: model.theme.component(.iconSmall), height: model.theme.component(.iconSmall))
-                if let text = value.text { Text(text).lineLimit(1).fixedSize() }
+                if value.syncFailed { Image(systemName: "exclamationmark.circle").accessibilityLabel("연동 실패") }
+                if let text = value.text { Text(text).lineLimit(1).truncationMode(.tail) }
             }.font(model.theme.font(value.textStyle))
                 .foregroundStyle(model.theme.libraryColor(value.color))
-                .accessibilityLabel("리마인더 \(value.text ?? (value.isRinging ? "임박" : "시간"))")
+                .accessibilityLabel(value.accessibilityLabel)
         }
     }
 }

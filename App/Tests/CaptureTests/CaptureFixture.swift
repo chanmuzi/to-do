@@ -26,7 +26,7 @@ nonisolated enum TestClock {
 /// 임시 폴더의 저장소와 테마로 캡처 바를 실제로 만들어 보는 시험용 조립.
 @MainActor
 final class CaptureFixture {
-    let root = FileManager.default.temporaryDirectory
+    let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("capture-tests-\(UUID().uuidString)", isDirectory: true)
     let location: StoreLocation
     let theme: Theme
