@@ -37,6 +37,8 @@ final class NotePanelWindow: NSPanel {
 
     /// 앱이 시켜서 키 창이 되려 한 횟수. 시험이 "시켰는지"를 본다(시험에서는 실제로 키 창이 되지 않게 꺼 둔다).
     private(set) var keyRequestCount = 0
+    /// 활성화 전에 어떤 문서를 main으로 지정했는지, 앱을 활성화하지 않는 시험에서도 확인한다.
+    private(set) var mainRequestCount = 0
 
     /// 지금 누르고 있는 버튼. 뗄 때까지의 이벤트를 이 버튼이 받는다.
     private weak var pressedButton: ClickableView?
@@ -48,16 +50,33 @@ final class NotePanelWindow: NSPanel {
     /// 쪽이 지킨다: 켤 때 되살린 창, "노트 모두 보이기"로 돌아온 창, 마우스만 올린 창은 앱을 앞으로 가져오지 않는다.
     override var canBecomeKey: Bool { allowsKey }
 
-    override var canBecomeMain: Bool { false }
+    // 노트는 보조 도구가 아니라 편집 문서다. main을 라이브러리에 남겨 두면
+    // 버튼이 앱을 활성화할 때 AppKit이 이전 main 창(라이브러리)도 앞으로 가져온다.
+    override var canBecomeMain: Bool { allowsKey }
+
+    override func becomeKey() {
+        super.becomeKey()
+        requestMain()
+    }
+
+    private func requestMain() {
+        guard allowsKey else { return }
+        mainRequestCount += 1
+        makeMain()
+    }
 
     /// 앱이 시켜서 키 창이 된다(본문에 커서 두기, 제목 고치기, 다음 노트로, 새 노트, 키 창 이어받기).
     func becomeKeyByRequest() {
         keyRequestCount += 1
+        requestMain()
         makeKeyAndOrderFront(nil)
     }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .leftMouseDown { onMouseDown?() }
+        if event.type == .leftMouseDown {
+            requestMain()
+            onMouseDown?()
+        }
         if deliverToButton(event) { return }
         super.sendEvent(event)
     }
