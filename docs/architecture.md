@@ -22,6 +22,7 @@ Core         모든 기능이 공유하는 바탕
 | --- | --- | --- | --- |
 | Core | `Theme` | `tokens.json` 읽기, 라이트·다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
 | Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit·SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme·Models만 참조 | 10, 16, 18 |
+| Core | `DateTime` | 캡처·본문·제목 공용 날짜 읽기, UTF-16 인식 범위, InlineDateProposal·Acceptance·Effect. Models만 참조 | 07a |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
 | Core | `Scheduling` | CalendarBridge·ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models·Store만 참조 | 21 |
 | Core | `Store` | 노트 파일 읽기·쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
@@ -336,7 +337,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 안쪽 구조
 
-- `DateTime/`(화면도 저장소도 모르는 순수 모듈, D-029): 글에서 날짜와 시간 표현을 읽는다. `DateTimeParser.firstExpression(in:now:calendar:) -> DateTimeExpression?`가 창구이고, 결과는 `start`, `end`(범위일 때), `ranges`(차지한 글자들. 받은 글의 UTF-16 자리이고, 날과 시각을 떨어뜨려 적으면 두 곳), `assumptions`(`meridiem`, `timeOfDay`, `looseDate`, `past`, `recurring`, `unknownTimeZone`. 하나라도 있으면 `isAmbiguous`)다.
+- Core `Sources/DateTime/`(Capture에서 옮긴 화면·저장소 독립 모듈, D-029, D-074): 글에서 날짜와 시간 표현을 읽는다. `DateTimeParser.firstExpression(in:now:calendar:) -> DateTimeExpression?`가 창구이고, 결과는 `start`, `end`(범위일 때), `ranges`(차지한 글자들. 받은 글의 UTF-16 자리이고, 날과 시각을 떨어뜨려 적으면 두 곳), `assumptions`(`meridiem`, `timeOfDay`, `looseDate`, `past`, `recurring`, `unknownTimeZone`. 하나라도 있으면 `isAmbiguous`)다.
   - 차례: `NormalizedText`(NFC, 전각을 반각으로, 받은 글의 자리로 되돌리는 표) → `DateTimeLexer`(조각 찾기. 무늬는 `+Time`, `+Relative`, `+Date`에 나눠 둠) → `DateTimeParser`(조각을 시점과 범위로 잇기) → `DateTimeResolver`(지금 시각과 달력으로 날짜 정하기). 값 타입은 `DateTimePieces`, 기본 시각은 `DateTimeDefaults` 한 곳, 한글로 적은 수는 `KoreanNumeral`.
   - 규칙 요약(전체 표는 spec 7a): 앞에 0을 붙인 `HH:mm`과 0시, 13~23시는 24시간제. 오전과 오후가 없는 1~7시는 오후, 8~11시는 오전, 12시는 정오이고, 날이 없으면 오늘 남았을 때 오늘, 지났으면 같은 시각의 내일. 때를 가리키는 말은 시각 바로 앞이나 `N시 저녁에` 꼴일 때만 시각에 붙는다. 날만 적으면 09:00(때를 가리키는 말이 있으면 그 기본 시각). 오늘을 가리키는 날은 언제나 오늘이고 지났으면 `past`. 범위는 양 끝을 서로 맞게 읽는다(`9-6시`는 09:00~18:00). 날과 시각은 붙어 있으면 어느 쪽이 먼저든 한 표현이고, 떨어져 있어도 맨 앞이 날뿐이고 시각이 하나면 합친다. 지난 때와 되풀이, 기간, 분수, 비율은 읽지 않는다.
   - 규칙을 고칠 때는 `DateTime*Tests`의 표에 줄을 먼저 더한다.
@@ -480,5 +481,17 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - Feature `Reminders`는 Theme·Models·Store만 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력·범위 검증·항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
 - 권한 요청 의도는 `ReminderEditorModel.onSave`와 `CaptureWriter.onScheduleCreated`(새 노트 캡처는 `AppRouter.onScheduleCreated`)에서 항목 ID로 전달하고 AppDelegate가 `ScheduleService.register`에 연결한다. 일반 저장 관찰은 권한을 요청하지 않는다. 옛 항목은 명시 저장과 다가오는 미완료 조건을 모두 확인한다(D-071).
 - AppDelegate는 실행 옵션에 따라 실제/가짜 의존성을 조립한다. `--calendar fake`는 두 외부 API를 모두 대체하며 `--debug-passive`도 강제로 같은 경로를 쓴다. 종료 시 서비스 관찰과 편집 화면을 닫는다.
-- Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜·범위·아이콘·임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor 모듈에는 변경이 없다.
+- Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜·범위·아이콘·임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor와 NotePanel은 Core DateTime의 제안·수락 계약을 공유한다.
 - 확인용 명령: `reminder-editor <noteID>`, `reminder-close`, `reminder-snapshot <file>`, `fake-delay|fake-complete|fake-delete <scheduleID>`. 가짜 외부 변경도 실제 서비스의 onChange 경로를 지난다. 스냅숏은 앱 내부 렌더링이다.
+
+
+## 본문·제목 날짜 제안 (D-074~D-077)
+
+- Core `DateTime`: 기존 Capture의 읽기 파일을 그대로 옮겼다. `DateTimeParser.firstExpression`, `DateTimeExpression`을 공개하며 Capture의 기존 파서 테스트도 같은 모듈을 검증한다. `InlineDateProposal`은 커서 조건·제외 범위·지난 시각 검증과 종일 범위 변환만 더한다.
+- Core `Theme.DateSuggestionView`: 창 내부의 입력을 받지 않는 작은 미리 보기. 정보 글꼴·색·치수·전환은 기존 토큰만 사용하고 접근성 이름은 전체 종류/날짜를 유지한다. 본문 TextKit 2 문단, 제목 임시 속성에 밑줄을 얹으며 원문 속성으로 저장하지 않는다.
+- 제안 배치(D-077): Theme은 전달받은 전용 영역에만 표시한다. Editor는 제안 줄 번호·줄 수·위쪽 배치 상태를 보관하고 변경된 두 줄만 invalidate한다(줄 수 변경만 전체 갱신). 본문 뒤에 자리가 없으면 MarkdownLayoutFragment.topMargin으로 문단 위 공간을 확보한다. NotePanel은 제목 뒤에 자리가 없으면 TopRowView/NoteRootView의 상단 높이와 창 높이를 함께 늘린다. 표시가 사라질 때 공간도 함께 회수한다. 원문과 undo는 배치에 영향을 받지 않는다.
+- Feature `Editor/EditorController+DateTime`: MarkdownDocument의 코드/링크/감춘 기호 범위를 제외해 제안한다. 기존 EditorCommands 삭제·정리·안전 검증으로 원문 변경을 미리 계산하고, 받기를 독립된 UndoRecord로 묶는다. `dateEffect` ID는 바깥 변경의 기록 위치 이동을 그대로 따른다. 기록에서 떨어진 효과는 정리한다.
+- Feature `NotePanel/Views/TitleField+DateTime`: 한 줄 필드의 제안·Tab·Escape·선택 관찰. AppKit 텍스트 저장소를 수정하며 native undo 한 동작에 글자와 예정 효과를 함께 등록한다. 한글 조합 중에는 글자를 건드리지 않는다.
+- Core `Scheduling.InlineScheduleWriter`: 항목 단위 생성·갱신·삭제/복원. 삭제는 기존 ScheduleService 삭제 대기·재시도 경로를 사용하며 최신 외부 연결을 지킨다. `Models.InlineScheduleSource`가 출처를 저장하고 Note.body 변경 시 안전하게 식별되는 줄만 따라간다.
+- AppDelegate가 writer를 만들고 NoteEditorFactory.onAcceptDate와 NotePanelCoordinator.onAcceptTitleDate에 잇는다. Feature 간 import는 없고 Editor·Capture·NotePanel은 Core DateTime을 참조한다. 권한 의도는 수락된 항목 ID만 ScheduleService.register로 보낸다.
+- 디버그 `date-preview <id>`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestion을 포함한다. 실제 계정·시스템 이벤트·클립보드는 사용하지 않는다.
