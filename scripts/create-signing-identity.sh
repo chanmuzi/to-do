@@ -24,7 +24,8 @@ echo "신뢰 등록이나 관리자 권한은 필요하지 않습니다. 신뢰 
 echo "보통 암호를 묻지 않으며, 키체인이 잠겨 있으면 macOS의 security가 직접 묻습니다."
 # show-keychain-info는 잠금 설정을 읽으며, 잠긴 키체인에서는 암호 확인을
 # 기다릴 수 있다. 현재 상태는 SecKeychainGetStatus로 먼저 확인한다.
-KEYCHAIN_STATE="$(/usr/bin/swift "$SCRIPT_DIR/signing-keychain.swift" "$KEYCHAIN")"
+# 이 보조 스크립트의 컴파일 경고(SecKeychain 사용 중단 포함)만 숨긴다. 컴파일 오류와 실행 오류는 stderr/종료 코드로 그대로 전달한다.
+KEYCHAIN_STATE="$(/usr/bin/swift -suppress-warnings "$SCRIPT_DIR/signing-keychain.swift" "$KEYCHAIN")"
 unset FLOATING_NOTES_KEYCHAIN_PASSWORD
 if [ "$KEYCHAIN_STATE" = locked ]; then
   security unlock-keychain "$KEYCHAIN"
