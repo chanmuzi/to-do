@@ -61,6 +61,10 @@
 | `pen.svg` | 기호 목록 예시 | `pencil` | 15 |
 | `note.svg` | 기호 목록 예시 | `doc` | 15 |
 
+노트 더 보기 메뉴의 그림 크기는 `component.menu-icon`(12pt), 정렬 칸은 `icon-l`(14pt)입니다(D-058).
+
+닫기(`xmark`)와 더 보기(`ellipsis`)는 칸 크기를 유지하고 `iconOptical`의 `.80` 배율로 그림만 줄입니다(D-058, 사용자 확인 전 임시 값).
+
 SF Symbols 이름은 SF Symbols 앱에서 한 번 확인하세요. 버전에 따라 이름이 다를 수 있습니다.
 
 ### 18.3 기본 이미지 (`assets/pixel/`)
