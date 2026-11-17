@@ -1,7 +1,7 @@
 import AppKit
 import Theme
 
-/// 메뉴 한 줄(spec 5.4): 높이 `row-h`, 왼쪽에 14pt 아이콘, 고르는 중이면 `hover` 바탕. 단축키는 적지 않는다(규칙 4).
+/// 메뉴 한 줄(spec 5.4): 높이 `row-h`, 왼쪽 14pt 칸 안에 menu-icon 크기의 아이콘, 고르는 중이면 `hover` 바탕. 단축키는 적지 않는다(규칙 4).
 final class MenuRowView: NSView {
     private let style: PanelStyle
     private let highlightView = NSView()
@@ -22,7 +22,7 @@ final class MenuRowView: NSView {
         wantsLayer = true
         autoresizingMask = [.width]
         highlightView.wantsLayer = true
-        iconView.image = symbolName.flatMap { style.symbol($0, size: .iconLarge) }
+        iconView.image = symbolName.flatMap { style.symbol($0, size: .menuIcon) }
         iconView.contentTintColor = style.color(isDimmed ? .text3 : .text2)
         iconView.imageScaling = .scaleNone
         label.stringValue = title

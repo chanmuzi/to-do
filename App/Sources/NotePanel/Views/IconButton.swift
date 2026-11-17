@@ -21,7 +21,7 @@ final class IconButton: ClickableView {
         super.init(frame: .zero)
         wantsLayer = true
         imageView.wantsLayer = true
-        imageView.imageScaling = .scaleProportionallyDown
+        imageView.imageScaling = .scaleNone
         addSubview(imageView)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)

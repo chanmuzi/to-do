@@ -18,7 +18,7 @@ final class ColorSwatchRowView: NSView {
         ))
         wantsLayer = true
         autoresizingMask = [.width]
-        iconView.image = style.symbol("drop", size: .iconLarge)
+        iconView.image = style.symbol("drop", size: .menuIcon)
         iconView.contentTintColor = style.color(.text2)
         iconView.imageScaling = .scaleNone
         iconView.setAccessibilityLabel("노트 색")
