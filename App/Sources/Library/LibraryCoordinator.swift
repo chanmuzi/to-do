@@ -28,7 +28,10 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
             window.title = "라이브러리"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false; window.delegate = self
             window.minSize = NSSize(width: theme.component(.libraryMinWidth), height: theme.component(.libraryMinHeight))
-            window.contentView = NSHostingView(rootView: LibraryRootView(model: model))
+            let content = LibraryHostingView(rootView: LibraryRootView(model: model))
+            window.contentView = content
+            window.initialFirstResponder = content
+            window.defaultButtonCell = nil
             window.backgroundColor = theme.nsColor(.surface)
             window.center()
             if !allowsKeyWindows, let screen = NSScreen.screens.last {
@@ -47,7 +50,7 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
     public func importImageForVerification(_ url: URL, space: SpaceID) { model.importImage(url, for: space) }
     public func expandSpaceForVerification(_ id: SpaceID) { model.expanded.insert(id) }
     public func snapshotIconPicker(space: SpaceID, tab: Int? = nil, to url: URL) throws {
-        let view = NSHostingView(rootView: IconPickerView(model: model, spaceID: space, initialTab: tab))
+        let view = LibraryHostingView(rootView: IconPickerView(model: model, spaceID: space, initialTab: tab))
         view.frame = NSRect(origin: .zero, size: view.fittingSize)
         view.layoutSubtreeIfNeeded()
         guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
@@ -70,6 +73,33 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
 
 private final class LibraryWindow: NSWindow {
     var allowsKey = true
+    private weak var pressedRow: LibraryRowInputView?
+    override func sendEvent(_ event: NSEvent) {
+        // 노트 창과 같은 경로: hosting view의 제스처 처리 전에 줄이 누름/뗌 한 쌍을 소유한다.
+        // 특히 두 번째 누름이 SwiftUI 부모에 흡수되어 더블 클릭이 없어지지 않게 한다.
+        switch event.type {
+        case .leftMouseDown:
+            pressedRow = nil
+            if let content = contentView, let parent = content.superview,
+               let row = content.hitTest(parent.convert(event.locationInWindow, from: nil)) as? LibraryRowInputView {
+                pressedRow = row
+                if allowsKey, !isKeyWindow { makeKeyAndOrderFront(nil) }
+                row.mouseDown(with: event)
+                return
+            }
+        case .leftMouseUp:
+            if let row = pressedRow, row.window === self {
+                pressedRow = nil
+                row.mouseUp(with: event)
+                return
+            }
+            pressedRow = nil
+        case .leftMouseDragged:
+            if pressedRow != nil { return }
+        default: break
+        }
+        super.sendEvent(event)
+    }
     override var canBecomeKey: Bool { allowsKey }
     override var canBecomeMain: Bool { allowsKey }
 }
@@ -84,7 +114,7 @@ private struct SpacePickerView: View {
             Button("스페이스 없음") { move(nil) }
             ForEach(model.spaceList) { space in Button(space.name) { move(space.id) } }
             if let error = model.error { Text(error).font(model.theme.font(.rowSub)) }
-        }.buttonStyle(LibraryButtonStyle(theme: model.theme)).font(model.theme.font(.body))
+        }.focusEffectDisabled().buttonStyle(LibraryButtonStyle(theme: model.theme)).font(model.theme.font(.body))
             .padding(model.theme.space(.sp3)).frame(width: model.theme.component(.iconPickerWidth))
             .onExitCommand(perform: dismiss)
     }

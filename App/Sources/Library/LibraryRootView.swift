@@ -32,6 +32,20 @@ struct LibraryRootView: View {
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
                 ScrollView {
                     LazyVStack(spacing: 0) {
+                        if model.rows.isEmpty {
+                            Button(model.query.isEmpty ? (model.selection == .trash ? "전체 노트" : "새 노트") : "검색 지우기") {
+                                if !model.query.isEmpty { model.query = "" }
+                                else if model.selection == .trash { model.select(.all) }
+                                else {
+                                    var draft = NoteDraft()
+                                    switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
+                                    model.router.route(.newNote(NewNoteRequest(draft: draft)))
+                                }
+                            }.font(theme.font(.body))
+                                .padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.controlHeight))
+                                .buttonStyle(LibraryButtonStyle(theme: theme))
+                                .padding(theme.space(.sp3))
+                        }
                         ForEach(model.rows) { note in LibraryNoteRow(model: model, note: note) }
                     }
                 }
@@ -43,62 +57,49 @@ struct LibraryRootView: View {
                     }.padding(theme.space(.sp2))
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.libraryColor(.surface))
-        }.foregroundStyle(theme.libraryColor(.text)).ignoresSafeArea()
+        }.foregroundStyle(theme.libraryColor(.text)).ignoresSafeArea().focusEffectDisabled()
     }
 }
 
-struct LibraryReminder: View {
-    let note: Note
-    let model: LibraryModel
-    var body: some View {
-        if let date = note.reminder {
-            let imminent = date >= model.index.now && date.timeIntervalSince(model.index.now) <= 15 * 60
-            HStack(spacing: model.theme.space(.sp1)) {
-                Image(systemName: imminent ? "bell" : "clock")
-                Text(label(date)).strikethrough(date < model.index.now)
-            }.font(model.theme.font(.ui)).foregroundStyle(model.theme.libraryColor(imminent ? .warn : .text3))
-        }
-    }
-    private func label(_ date: Date) -> String {
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = model.index.calendar.timeZone
-        f.dateFormat = model.index.calendar.isDate(date, inSameDayAs: model.index.now) ? "h:mm a" : "M/d h:mm a"
-        return f.string(from: date)
-    }
-}
-
-private struct LibraryNoteRow: View {
+struct LibraryNoteRow: View {
     let model: LibraryModel
     let note: Note
     private var theme: Theme { model.theme }
     var body: some View {
-        Button { model.open(note) } label: {
+        LibrarySelectableRow(model: model, note: note) {
             HStack(spacing: theme.component(.libraryRowGap)) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(note.title.isEmpty ? "제목 없음" : note.title).font(theme.font(.row))
                         .foregroundStyle(theme.libraryColor(note.title.isEmpty ? .text3 : .text)).lineLimit(1)
-                    Text(LibraryPreview.text(note.body)).font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
+                        .frame(height: theme.lineHeight(.row))
+                    if !LibraryPreview.text(note.body).isEmpty {
+                        Text(LibraryPreview.text(note.body)).font(theme.font(.rowSub))
+                            .foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
+                            .frame(height: theme.lineHeight(.rowSub))
+                    }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 LibraryReminder(note: note, model: model)
                     .frame(width: theme.component(.libraryReminderWidth), alignment: .trailing)
-                Text(LibraryPreview.progress(note.body)).font(theme.font(.ui)).foregroundStyle(theme.libraryColor(.text2))
+                HStack(spacing: theme.component(.iconGap)) {
+                    if !LibraryPreview.progress(note.body).isEmpty {
+                        LibrarySymbol(theme: theme, name: "checkmark", size: .iconSmall)
+                        Text(LibraryPreview.progress(note.body)).font(theme.font(.ui))
+                    }
+                }.foregroundStyle(theme.libraryColor(.text3))
                     .frame(width: theme.component(.libraryProgressWidth), alignment: .trailing)
                 SpaceIconView(icon: note.spaceID.flatMap { model.spaces.space(for: $0)?.icon } ?? .none,
-                              directory: model.spaces.imageDirectory, theme: theme, size: theme.component(.iconLarge))
+                              directory: model.spaces.imageDirectory, theme: theme, size: theme.component(.iconMedium))
                     .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
-                Image(systemName: model.selection == .trash ? "arrow.uturn.backward" : "pin.fill")
-                    .font(.system(size: theme.component(.iconMedium)))
+                LibrarySymbol(theme: theme, name: model.selection == .trash ? "arrow.uturn.backward" : "pin.fill", size: .iconMedium)
+                    .foregroundStyle(theme.libraryColor(.text3))
                     .opacity(model.selection == .trash || model.index.windows[note.id]?.isOpen == true ? 1 : 0)
                     .frame(width: theme.component(.iconLarge))
             }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
                 .frame(height: theme.component(.libraryRowHeight))
-                .background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
-        }.buttonStyle(LibraryButtonStyle(theme: theme, rounded: false))
-            .accessibilityLabel(model.selection == .trash ? "\(note.title) 되돌리기" : "\(note.title) 열기")
-            .contextMenu {
-                if model.selection == .trash { Button("되돌리기") { model.restore(note.id) } }
-                else { Button("열기") { model.open(note) }; Button("스페이스 옮기기") { model.router.route(.openSpacePicker(note.id)) } }
-            }
+                .overlay(alignment: .bottom) {
+                    theme.libraryColor(.line).frame(height: theme.shape(.borderWidth)).allowsHitTesting(false)
+                }
+        }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
     }
 }
 

@@ -48,7 +48,7 @@ struct IconPickerView: View {
             if let error = model.error ?? catalog.warning { Text(error).font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text2)) }
             Divider()
             HStack { Spacer(); Button("완료") { model.iconSpace = nil }.buttonStyle(LibraryButtonStyle(theme: theme)) }
-        }.font(theme.font(.body)).foregroundStyle(theme.libraryColor(.text))
+        }.focusEffectDisabled().font(theme.font(.body)).foregroundStyle(theme.libraryColor(.text))
             .padding(theme.component(.iconPickerPadding)).frame(width: theme.component(.iconPickerWidth))
             .background(theme.libraryColor(.surface))
             .onAppear { searchFocused = true }

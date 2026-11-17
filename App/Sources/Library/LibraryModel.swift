@@ -18,7 +18,9 @@ public final class LibraryModel {
     public private(set) var index = LibraryIndex(notes: [])
     public private(set) var spaceList: [Space] = []
     public var selection: LibrarySelection = .today
-    public var query = ""
+    public var query = "" { didSet { if query != oldValue { selectedNoteID = nil } } }
+    public private(set) var selectedNoteID: NoteID?
+    public var displayOptions = NoteDisplayOptions()
     public var error: String?
     public private(set) var settings = LibraryPreferences()
     var expanded: Set<SpaceID> = []
@@ -74,10 +76,31 @@ public final class LibraryModel {
         return value
     }
     public func select(_ value: LibrarySelection) {
+        selectedNoteID = nil
         selection = value
         changeSettings { $0.lastSelection = value }
     }
     public var rows: [Note] { index.rows(for: selection, query: query) }
+
+    /// 한 번 클릭은 선택만 한다. 더블 클릭과 키보드 열기는 구분한다.
+    public func activate(_ note: Note, clickCount: Int = 1) {
+        selectedNoteID = note.id
+        if clickCount >= 2 { open(note) }
+    }
+    public func openSelected() {
+        guard let id = selectedNoteID,
+              let note = (rows + index.upcoming).first(where: { $0.id == id }) else { return }
+        open(note)
+    }
+    public func moveSelection(by offset: Int) {
+        guard !rows.isEmpty else { return }
+        let position = selectedNoteID.flatMap { id in rows.firstIndex { $0.id == id } }
+        let next = position.map { min(max($0 + offset, 0), rows.count - 1) } ?? (offset < 0 ? rows.count - 1 : 0)
+        selectedNoteID = rows[next].id
+    }
+    public func reminderPresentation(for note: Note) -> ReminderPresentation? {
+        note.reminder.map { ReminderPresentation(reminder: $0, now: index.now, options: displayOptions, calendar: index.calendar) }
+    }
 
     public func open(_ note: Note) {
         if index.trash.contains(where: { $0.id == note.id }) { restore(note.id) }

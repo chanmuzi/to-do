@@ -13,7 +13,11 @@ struct LibrarySidebar: View {
     private var theme: Theme { model.theme }
     var body: some View {
         VStack(spacing: theme.space(.sp2)) {
-            LibrarySearchField(text: $model.query, theme: theme)
+            HStack(spacing: theme.space(.sp1)) {
+                LibrarySymbol(theme: theme, name: "magnifyingglass", size: .iconSmall)
+                    .foregroundStyle(theme.libraryColor(.text3))
+                LibrarySearchField(text: $model.query, theme: theme)
+            }
                 .font(theme.font(.body)).padding(.horizontal, theme.space(.sp2))
                 .frame(height: theme.component(.browseFindHeight))
                 .background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
@@ -51,14 +55,14 @@ struct LibrarySidebar: View {
                         VStack(spacing: 0) {
                             sectionHeader("리마인더")
                             ForEach(model.index.upcoming) { note in
-                                Button { model.open(note) } label: {
+                                LibrarySelectableRow(model: model, note: note, rounded: true) {
                                     HStack(spacing: theme.space(.sp1)) {
                                         LibraryReminder(note: note, model: model)
                                         Text(note.title.isEmpty ? "제목 없음" : note.title).lineLimit(1)
                                         Spacer(minLength: 0)
                                     }.font(theme.font(.body)).frame(height: theme.component(.rowHeight))
                                         .padding(.horizontal, theme.space(.sp2))
-                                }.buttonStyle(LibraryButtonStyle(theme: theme))
+                                }
                             }
                         }
                     }
@@ -93,11 +97,13 @@ struct LibrarySidebar: View {
         let selected = model.selection == item
         return Button { model.select(item) } label: {
             HStack(spacing: theme.space(.sp2)) {
-                if let symbol { Image(systemName: symbol).frame(width: theme.component(.iconLarge)) }
+                if let symbol {
+                    LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
+                        .foregroundStyle(theme.libraryColor(selected ? .onAccent : .text2))
+                }
                 Text(model.title(item)).lineLimit(1)
                     .font(theme.font(indented || isArchive(item) ? .ui : .body))
                 Spacer(minLength: 0)
-                if !indented { Text("\(model.index.rows(for: item).count)").font(theme.font(.micro)) }
             }
             .foregroundStyle(theme.libraryColor(selected ? .onAccent : (isArchive(item) || isPastDay(item) ? .text3 : .text)))
             .padding(.leading, indented ? theme.space(.sp6) : theme.space(.sp2))
@@ -127,8 +133,9 @@ private struct LibrarySpaceRow: View {
             Button {
                 if model.expanded.contains(space.id) { model.expanded.remove(space.id) } else { model.expanded.insert(space.id) }
             } label: {
-                Image(systemName: model.expanded.contains(space.id) ? "chevron.down" : "chevron.right")
-                    .font(.system(size: theme.component(.iconSmall)))
+                LibrarySymbol(theme: theme, name: model.expanded.contains(space.id) ? "chevron.down" : "chevron.right", size: .iconSmall)
+                    .frame(width: theme.component(.iconSmall), height: theme.component(.rowHeight))
+                    .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜 펼치기")
             Button { model.select(.space(space.id)) } label: {
                 HStack(spacing: theme.space(.sp2)) {
@@ -137,11 +144,10 @@ private struct LibrarySpaceRow: View {
                         .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
                     Text(space.name).font(theme.font(.body)).lineLimit(1)
                     Spacer(minLength: 0)
-                }.contentShape(Rectangle())
+                }.frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
             }.buttonStyle(.plain)
             ZStack {
-                Text("\(model.index.rows(for: .space(space.id)).count)").font(theme.font(.micro)).opacity(hovered ? 0 : 1)
-                Menu { menuContents } label: { Image(systemName: "ellipsis") }
+                Menu { menuContents } label: { LibrarySymbol(theme: theme, name: "ellipsis", size: .iconLarge) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .opacity(hovered ? 1 : 0).accessibilityLabel("\(space.name) 더 보기")
             }.frame(width: theme.component(.libraryToolbarButton))
@@ -151,6 +157,7 @@ private struct LibrarySpaceRow: View {
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             .onHover { hovered = $0 }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
+            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: selected)
             .contextMenu { menuContents }
             .popover(isPresented: Binding(get: { model.iconSpace == space.id }, set: { if !$0 { model.iconSpace = nil } })) {
                 IconPickerView(model: model, spaceID: space.id)
