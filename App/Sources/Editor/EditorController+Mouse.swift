@@ -71,8 +71,14 @@ extension EditorController {
         return CGPoint(x: origin.x + frame.minX + bounds.minX + 1, y: origin.y + frame.minY + bounds.midY)
     }
 
+    /// 누를 수 있는 것(체크박스, 꺾쇠, 열 수 있는 링크, 보이는 코드 복사 버튼) 위인지. 그 위에서는 화살표 커서다(규칙 9).
     func isInteractive(at point: CGPoint) -> Bool {
-        hit(at: point) != nil
+        hit(at: point) != nil || isOverCopyButton(point)
+    }
+
+    /// 코드 블록의 복사 버튼이 보이고(블록에 마우스가 올라가 있다) 그 점이 버튼 위인지. 텍스트 뷰 좌표.
+    func isOverCopyButton(_ point: CGPoint) -> Bool {
+        hoveredCodeBlock != nil && !copyButton.isHidden && copyButton.frame.contains(point)
     }
 
     /// - Returns: 눌린 것을 처리했으면 `true`(텍스트 뷰는 커서를 옮기지 않는다).
@@ -106,7 +112,7 @@ extension EditorController {
         }
     }
 
-    /// - Returns: 누를 수 있는 것 위면 `true`(화살표 커서).
+    /// - Returns: 누를 수 있는 것(복사 버튼 포함) 위면 `true`(화살표 커서).
     func handleMouseMoved(at point: CGPoint) -> Bool {
         let hit = hit(at: point)
         var link: (line: Int, offset: Int)?
@@ -120,7 +126,7 @@ extension EditorController {
         // 복사 버튼 위에 있는 동안에는 그 블록을 유지한다.
         if block == nil, hoveredCodeBlock != nil, copyButton.frame.contains(point) { block = hoveredCodeBlock }
         setHoveredCodeBlock(block)
-        return hit != nil
+        return hit != nil || isOverCopyButton(point)
     }
 
     func handleMouseExited() {

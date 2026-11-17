@@ -148,4 +148,35 @@ import Theme
         #expect(controller.hoveredLink == nil)
         #expect(NSCursor.current == NSCursor.arrow)
     }
+
+    /// 코드 블록의 복사 버튼, 체크박스, 꺾쇠, 링크 위에서는 화살표, 글자 위에서는 I자 커서(규칙 9). 텍스트 뷰가
+    /// 마우스가 움직일 때마다 I자 커서를 넣어도, 누를 수 있는 것 위에서는 화살표로 남는다.
+    @Test func clickableOverlaysShowTheArrowCursor() throws {
+        let host = try Host("[ ] 할 일\n> 토글\n\t안\n[링크](https://example.com)\n```\nlet x = 1\n```\n끝")
+        let view = host.editor.controller.textView
+        let controller = host.editor.controller
+        func move(to point: CGPoint) throws {
+            NSCursor.iBeam.set()
+            view.mouseMoved(with: try host.mouseMoved(atWindowPoint: view.convert(point, to: nil)))
+        }
+        // 코드 블록에 올리면 복사 버튼이 나타난다. 버튼 위는 화살표다.
+        try move(to: try #require(controller.textPoint(forLine: 5)))
+        #expect(controller.hoveredCodeBlock != nil)
+        #expect(NSCursor.current == NSCursor.iBeam)
+        let button = controller.copyButton.frame
+        try move(to: CGPoint(x: button.midX, y: button.midY))
+        #expect(NSCursor.current == NSCursor.arrow)
+        #expect(controller.isInteractive(at: CGPoint(x: button.midX, y: button.midY)))
+        #expect(controller.hoveredCodeBlock != nil)
+        // 체크박스, 꺾쇠, 링크.
+        for point in [controller.gutterPoint(forLine: 0), controller.gutterPoint(forLine: 1), controller.textPoint(forLine: 3)] {
+            try move(to: try #require(point))
+            #expect(NSCursor.current == NSCursor.arrow)
+        }
+        // 보통 글자 위는 I자 커서이고, 블록을 떠나 버튼이 사라진 자리도 그렇다.
+        try move(to: try #require(controller.textPoint(forLine: 7)))
+        #expect(NSCursor.current == NSCursor.iBeam)
+        #expect(!controller.isInteractive(at: CGPoint(x: button.midX, y: button.midY)))
+    }
 }
+
