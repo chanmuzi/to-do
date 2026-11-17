@@ -14,6 +14,7 @@ public struct ThemeTokens: Hashable, Sendable {
     private let components: [ComponentToken: CGFloat]
     private let ratios: [RatioToken: Double]
     private let counts: [CountToken: Int]
+    private let symbolScales: [String: CGFloat]
 
     /// 노트 본문 안쪽 여백(`doc-pad`).
     public let docPadding: ThemeInsets
@@ -83,6 +84,10 @@ public struct ThemeTokens: Hashable, Sendable {
     public func ratio(_ token: RatioToken) -> Double { ratios[token]! }
     /// 1 이상의 개수.
     public func count(_ token: CountToken) -> Int { counts[token]! }
+
+    /// SF Symbols 아이콘 하나의 크기 보정(`tokens.json`의 `iconOptical`). 눈으로 커 보이는 아이콘을 이웃과 같은
+    /// 크기로 줄이는 값이다(0보다 크고 1 이하. 키우는 값은 받지 않는다). 적혀 있지 않으면 1.
+    public func symbolScale(_ name: String) -> CGFloat { symbolScales[name] ?? 1 }
 
     public func paletteColor(id: String) -> PaletteColor? {
         palette.first { $0.id == id }
@@ -154,6 +159,13 @@ public struct ThemeTokens: Hashable, Sendable {
         self.ratios = try table("component", TokenValueParser.fraction)
         self.counts = try table("component", TokenValueParser.count)
         self.docPadding = try parse("component.doc-pad", TokenValueParser.insets)
+        let scalePrefix = RawTokens.symbolScaleSection + "."
+        var symbolScales: [String: CGFloat] = [:]
+        for key in raw.values.keys where key.hasPrefix(scalePrefix) {
+            let scale = try parse(key) { TokenValueParser.number($0).flatMap { $0 > 0 && $0 <= 1 ? $0 : nil } }
+            symbolScales[String(key.dropFirst(scalePrefix.count))] = CGFloat(scale)
+        }
+        self.symbolScales = symbolScales
         self.material = MaterialTokens(
             opacity: try parse("material.opacity", TokenValueParser.unitNumber),
             blur: try parse("material.blur", TokenValueParser.length),
@@ -174,7 +186,8 @@ public struct ThemeTokens: Hashable, Sendable {
                 },
                 pivotFromTop: try motion(.bellPivot, TokenValueParser.fraction),
                 curve: try motion(.bellEase, TokenValueParser.bezier)
-            )
+            ),
+            toastHold: try motion(.toastHold, TokenValueParser.seconds)
         )
         self.palette = try raw.paletteOrder.map { key in
             PaletteColor(

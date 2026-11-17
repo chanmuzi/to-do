@@ -1,0 +1,87 @@
+import AppKit
+import Models
+@_spi(Verification) @testable import NotePanel
+import Routing
+import Testing
+@testable import FloatingNotes
+
+/// 노트를 누르면 앱이 앞으로 온다는 결정(D-025)의 App 쪽: 사용자가 노트를 열거나 만들라고 하면 앱이 앞으로 오고,
+/// 켤 때 되살린 창이나 숨김을 푼 창은 앱을 앞으로 가져오지 않는다. 메뉴 막대에는 앱의 메뉴가 시안 차례로 있다.
+@MainActor
+@Suite(.serialized) struct AppActivationTests {
+    private let fixture: WiringFixture
+    private var activations: Int { box.count }
+    private let box = Counter()
+
+    private final class Counter {
+        var count = 0
+    }
+
+    init() throws {
+        fixture = try WiringFixture()
+        let box = box
+        fixture.router.activateApp = { box.count += 1 }
+    }
+
+    @Test func openingOrCreatingANoteByRequestActivatesTheApp() throws {
+        defer { fixture.cleanUp() }
+        let note = try fixture.notes.create(NoteDraft(title: "열 노트"))
+        #expect(fixture.router.route(.openNote(note.id)) == .handled)
+        #expect(activations == 1)
+        #expect(fixture.router.route(.newNote(NewNoteRequest())) == .handled)
+        #expect(activations == 2)
+    }
+
+    @Test func hidingClosingAndFailedOpensDoNotActivate() throws {
+        defer { fixture.cleanUp() }
+        let id = try fixture.open("노트")
+        fixture.router.route(.toggleAllNotesHidden)
+        fixture.router.route(.toggleAllNotesHidden)
+        fixture.router.route(.closeNoteWindow(id))
+        #expect(fixture.router.route(.openNote(NoteID(rawValue: "없는 노트"))) == .failed)
+        #expect(activations == 0)
+    }
+
+    /// 켤 때 되살린 창은 키 창으로 시키지도, 앱을 앞으로 가져오지도 않는다.
+    @Test func restoringWindowsNeitherAsksForKeyNorActivates() throws {
+        defer { fixture.cleanUp() }
+        let id = try fixture.open("되살릴 노트")
+        fixture.notePanels.closeWindow(id)
+        try fixture.notePanels.open(id, focus: false)
+        #expect(fixture.keyRequests(id) == 0)
+        #expect(activations == 0)
+    }
+
+    /// 앱이 뒤에 있을 때(다른 앱에서 전역 단축키로 연 캡처 바) 닫히면 어느 노트에도 키 창을 돌려주지 않는다.
+    /// 앞에 있던 앱이 그대로 입력을 받는다.
+    @Test func captureOpenedFromAnotherAppReturnsNoKeyToANote() throws {
+        defer { fixture.cleanUp() }
+        let id = try fixture.open("쓰던 노트")
+        fixture.pretendKey(id)
+        fixture.isAppActive = false
+        fixture.quickPanels.toggleCapture()
+        fixture.quickPanels.toggleCapture()
+        #expect(fixture.keyRequests(id) == 0)
+        // 앱이 앞에 있었으면 돌려준다.
+        fixture.isAppActive = true
+        fixture.quickPanels.toggleCapture()
+        fixture.quickPanels.toggleCapture()
+        #expect(fixture.keyRequests(id) == 1)
+    }
+
+    @Test func mainMenuFollowsTheDesktopScreenOrder() {
+        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        #expect(menu.items.map(\.title) == ["플로팅 노트", "파일", "편집", "보기", "창", "도움말"])
+        func visible(_ title: String) -> [String] {
+            menu.items.first { $0.title == title }?.submenu?.items
+                .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? []
+        }
+        #expect(visible("플로팅 노트") == ["플로팅 노트에 관하여", "설정", "플로팅 노트 종료"])
+        #expect(visible("보기") == ["노트 모두 숨기기"])
+        #expect(visible("창") == ["다음 노트로"])
+        #expect(visible("도움말") == ["단축키"])
+        // 규칙 4: 보이는 항목에는 단축키가 적혀 있지 않다.
+        let all = menu.items.compactMap(\.submenu).flatMap(\.items).filter { !$0.isHidden }
+        #expect(all.allSatisfy { $0.keyEquivalent.isEmpty })
+    }
+}

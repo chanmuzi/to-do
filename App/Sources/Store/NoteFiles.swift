@@ -137,6 +137,15 @@ struct NoteFiles {
         }
     }
 
+    /// 노트 폴더의 파일을 지운다(휴지통을 거치지 않는다).
+    func delete(_ id: NoteID) throws(StoreError) {
+        do {
+            try fileManager.removeItem(at: url(id, in: location.notesDirectory))
+        } catch {
+            throw .writeFailed(id, message: error.localizedDescription)
+        }
+    }
+
     func restoreFromTrash(_ id: NoteID) throws(StoreError) {
         do {
             try fileManager.moveItem(

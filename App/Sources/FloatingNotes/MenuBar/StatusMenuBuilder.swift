@@ -12,7 +12,9 @@ struct StatusMenuBuilder {
         menu.items = entries.map { entry in
             switch entry {
             case .separator:
-                return .separator()
+                let item = NSMenuItem.separator()
+                item.view = MenuBarSeparatorView(theme: theme)
+                return item
             case .item(let title, let symbol, let action):
                 let target = StatusMenuTarget { handler(action) }
                 let item = NSMenuItem(title: title, action: #selector(StatusMenuTarget.fire), keyEquivalent: "")

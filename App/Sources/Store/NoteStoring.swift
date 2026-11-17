@@ -48,6 +48,10 @@ public protocol NoteStoring: AnyObject {
     /// 휴지통의 노트. 최근에 고친 것이 앞.
     func listTrash() throws -> NoteListing
     @discardableResult func restoreFromTrash(_ id: NoteID) throws -> Note
+    /// 노트 파일을 휴지통을 거치지 않고 지운다. 미뤄 둔 변경은 버린다. 아무것도 적지 않은 빈 노트를
+    /// 치울 때만 쓴다(되살릴 것이 없다). `.removed`(`.local`)로 알린다.
+    /// - Throws: 노트 폴더에 파일이 없으면 `noteNotFound`.
+    func delete(_ id: NoteID) throws
 
     /// 노트 폴더를 다시 훑어 다른 프로그램이 바꾼 것을 알린다. 앱이 앞으로 올 때 부른다.
     /// 폴더 감시는 파일이 생기고 없어지고 바꿔치기되는 것만 잡고, 제자리 수정은 이 호출이 잡는다.

@@ -14,7 +14,7 @@ final class BrowseActionRowView: BrowseEntryView {
         super.init(style: style)
         label.stringValue = title
         label.lineBreakMode = .byTruncatingMiddle
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         for view in [iconView, label] {
             view.setAccessibilityElement(false)
             addSubview(view)
@@ -38,8 +38,9 @@ final class BrowseActionRowView: BrowseEntryView {
     override func layout() {
         super.layout()
         let lead = style.leadWidth
-        iconView.frame = centered(width: lead, height: lead, x: style.rowPadding)
-        let labelX = iconView.frame.maxX + style.theme.component(.browseGap)
+        let slot = centered(width: lead, height: lead, x: style.rowPadding)
+        iconView.frame = style.theme.symbolFrame(slot)
+        let labelX = slot.maxX + style.theme.component(.browseGap)
         label.frame = style.labelFrame(
             label, textX: labelX, textWidth: bounds.width - style.rowPadding - labelX, centeredIn: bounds.height
         )

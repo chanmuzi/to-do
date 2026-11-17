@@ -60,3 +60,11 @@ public struct NoteDraft: Hashable, Sendable {
         self.reminder = reminder
     }
 }
+
+extension Note {
+    /// 아무것도 적지 않은 노트: 제목과 본문이 비었거나 공백뿐이고 리마인더가 없다. 창을 닫거나 앱을 끝낼 때
+    /// 휴지통을 거치지 않고 지운다(D-040). 스페이스와 색은 적은 것으로 치지 않는다.
+    public var isBlank: Bool {
+        title.allSatisfy(\.isWhitespace) && body.allSatisfy(\.isWhitespace) && reminder == nil
+    }
+}

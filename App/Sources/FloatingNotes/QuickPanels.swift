@@ -108,7 +108,9 @@ final class QuickPanels {
     /// (지금 키 창은 닫히는 그 화면이지 노트가 아니다).
     private func beginSession(closing hideOther: (() -> Void)?) {
         guard let hideOther else {
-            focusReturn.begin(keyNote: currentKeyNote())
+            // 앱이 뒤에 있을 때(다른 앱에서 전역 단축키로 열었을 때) 키 창인 노트는 키 입력을 받고 있지 않았다.
+            // 그 노트에게 돌려주지 않는다: 닫히면 앞에 있던 앱이 그대로 입력을 받는다.
+            focusReturn.begin(keyNote: isAppActive() ? currentKeyNote() : nil)
             return
         }
         isSwitching = true

@@ -75,8 +75,6 @@ struct PanelStyle {
 
     /// SF Symbols 아이콘(spec 18.2). 굵기는 regular, 크기는 토큰.
     func symbol(_ name: String, size: ComponentToken) -> NSImage? {
-        let configuration = NSImage.SymbolConfiguration(pointSize: theme.component(size), weight: .regular)
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration)
+        theme.symbolImage(name, size: size)
     }
 }

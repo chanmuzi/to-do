@@ -19,13 +19,9 @@ final class MenuBarRowView: NSView {
         wantsLayer = true
         autoresizingMask = [.width]
         highlightView.wantsLayer = true
-        iconView.image = symbolName.flatMap {
-            NSImage(systemSymbolName: $0, accessibilityDescription: nil)?.withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: theme.component(.iconLarge), weight: .regular)
-            )
-        }
+        iconView.image = symbolName.flatMap { theme.symbolImage($0, size: .iconLarge) }
         iconView.contentTintColor = theme.nsColor(isEnabled ? .text2 : .text3)
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         label.stringValue = title
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
         label.textColor = theme.nsColor(isEnabled ? .text : .text3)
@@ -51,7 +47,7 @@ final class MenuBarRowView: NSView {
         }
         highlightView.frame = bounds.insetBy(dx: edge, dy: 0)
         let contentX = edge + theme.space(.sp2)
-        iconView.frame = centered(x: contentX, width: icon, height: icon)
+        iconView.frame = theme.symbolFrame(centered(x: contentX, width: icon, height: icon))
         // 아이콘이 없는 줄(종료)도 글자는 같은 자리에서 시작한다.
         let labelX = contentX + icon + theme.space(.sp2)
         label.frame = centered(
@@ -61,7 +57,11 @@ final class MenuBarRowView: NSView {
     }
 
     /// 메뉴가 고른 줄을 바꾸면 다시 그리라는 요청이 온다. 그때 바탕을 `dur` 동안 바꾼다(규칙 8).
+    /// 줄의 바탕은 불투명한 `surface`다. 메뉴의 반투명 재질 너머가 비쳐 바탕이 탁해지고 글자가 바래지 않게 한다.
     override func updateLayer() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = theme.nsColor(.surface).cgColor
+        }
         highlightView.layer?.cornerRadius = theme.shape(.chipRadius)
         let highlighted = enclosingMenuItem.map { $0.isHighlighted && $0.isEnabled } == true
         guard highlighted != isShowingHighlight else { return }
@@ -74,6 +74,12 @@ final class MenuBarRowView: NSView {
             context.allowsImplicitAnimation = true
             highlightView.layer?.backgroundColor = highlighted ? hover : CGColor.clear
         }
+    }
+
+    /// 줄 안의 글자와 아이콘이 누름을 가로채지 않게 줄이 통째로 받는다(글자 칸은 제 누름 처리로 뗀 이벤트를 삼킬 수 있다).
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, frame.contains(point) else { return nil }
+        return self
     }
 
     override func mouseUp(with event: NSEvent) {

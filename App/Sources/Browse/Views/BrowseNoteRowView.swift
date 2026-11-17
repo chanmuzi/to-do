@@ -32,7 +32,7 @@ final class BrowseNoteRowView: BrowseEntryView {
             label.cell?.usesSingleLineMode = true
         }
         for imageView in [spaceIconView, reminderIconView, pinView] {
-            imageView.imageScaling = .scaleProportionallyDown
+            imageView.imageScaling = .scaleNone
         }
         [spaceIconView, spaceEmojiLabel, titleLabel, previewLabel, reminderIconView, reminderLabel, pinView]
             .forEach { view in
@@ -47,6 +47,8 @@ final class BrowseNoteRowView: BrowseEntryView {
 
     var noteRow: BrowseNoteRow { model.row }
     var titleText: String { titleLabel.stringValue }
+    /// 제목 글자의 자리(줄 좌표).
+    var titleFrame: NSRect { titleLabel.frame }
     var previewText: NSAttributedString { previewLabel.attributedStringValue }
     var reminderText: String? { model.reminder?.text }
     var showsPin: Bool { !pinView.isHidden }
@@ -124,7 +126,9 @@ final class BrowseNoteRowView: BrowseEntryView {
 
         // 맨 앞: 스페이스 아이콘 칸. 아이콘이 없어도 자리는 둔다.
         let icon = theme.component(.iconMedium)
-        spaceIconView.frame = centered(width: icon, height: icon, x: leading + ((lead - icon) / 2).rounded())
+        spaceIconView.frame = theme.symbolFrame(
+            centered(width: icon, height: icon, x: leading + ((lead - icon) / 2).rounded())
+        )
         let emojiWidth = style.textWidth(of: spaceEmojiLabel)
         spaceEmojiLabel.frame = style.labelFrame(
             spaceEmojiLabel, textX: leading + ((lead - emojiWidth) / 2).rounded(),
@@ -132,7 +136,9 @@ final class BrowseNoteRowView: BrowseEntryView {
         )
 
         // 맨 뒤: 핀 칸. 떠 있지 않아도 자리는 둔다.
-        pinView.frame = centered(width: icon, height: icon, x: trailing - lead + ((lead - icon) / 2).rounded())
+        pinView.frame = theme.symbolFrame(
+            centered(width: icon, height: icon, x: trailing - lead + ((lead - icon) / 2).rounded())
+        )
         var contentEnd = trailing - lead - gap
 
         if model.reminder != nil {
@@ -141,11 +147,12 @@ final class BrowseNoteRowView: BrowseEntryView {
             reminderLabel.frame = style.labelFrame(
                 reminderLabel, textX: contentEnd - labelWidth, textWidth: labelWidth, centeredIn: bounds.height
             )
-            reminderIconView.frame = centered(
+            let reminderSlot = centered(
                 width: reminderIcon, height: reminderIcon,
                 x: contentEnd - labelWidth - theme.component(.iconGap) - reminderIcon
             )
-            contentEnd = reminderIconView.frame.minX - gap
+            reminderIconView.frame = theme.symbolFrame(reminderSlot)
+            contentEnd = reminderSlot.minX - gap
         }
 
         // 제목은 제 너비만큼, 남는 자리는 본문 첫머리(시안의 칸 나눔). 자리가 모자라면 본문 첫머리가 먼저 줄어든다.

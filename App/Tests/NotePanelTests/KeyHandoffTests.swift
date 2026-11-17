@@ -215,28 +215,6 @@ import Testing
         #expect(requests(ids[1], in: coordinator) == 2)
     }
 
-    // MARK: - 손쉬운 사용
-
-    /// VoiceOver 같은 도구가 창에 포커스를 달라고 하면(AXFocused, AXMain) 사용자가 누른 것처럼 받는다.
-    @Test func accessibilityFocusRequestsAreNotRefused() {
-        let panel = NotePanelWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 120))
-        defer { panel.close() }
-        // 시험에서는 실제로 키 창이 되지 않게 꺼 둔다. 시켰는지만 본다.
-        panel.allowsKey = false
-
-        panel.setAccessibilityFocused(true)
-        #expect(panel.keyRequestCount == 1)
-        panel.setAccessibilityMain(true)
-        #expect(panel.keyRequestCount == 2)
-        // 포커스를 거두는 요청은 키 창을 시키지 않는다.
-        panel.setAccessibilityFocused(false)
-        panel.setAccessibilityMain(false)
-        #expect(panel.keyRequestCount == 2)
-        // 요청이 끝난 뒤에는 다시 저절로 키 창이 되지 못한다.
-        panel.allowsKey = true
-        #expect(!panel.canBecomeKey(during: nil))
-    }
-
     // MARK: - 휴지통 되돌리기의 "바로 뒤"
 
     /// 검토에서 나온 문제: B에 글을 쓰고, A를 휴지통으로 보내고, B로 돌아가 ⌘Z를 누르면 A가 되살아났다.

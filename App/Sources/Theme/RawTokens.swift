@@ -9,6 +9,7 @@ struct RawTokens: Hashable, Sendable {
     var paletteNames: [String: String]
     var accentPresets: [[String: String]]
 
+    static let symbolScaleSection = "iconOptical"
     private static let flatSections = ["fonts", "type", "space", "shape", "component", "material", "motion"]
 
     init(data: Data) throws {
@@ -25,6 +26,8 @@ struct RawTokens: Hashable, Sendable {
         }
 
         for name in Self.flatSections { try absorb(root[name], prefix: name) }
+        // 아이콘마다의 눈대중 크기 보정(없으면 모두 1).
+        if let optical = root[Self.symbolScaleSection] { try absorb(optical, prefix: Self.symbolScaleSection) }
         let color = root["color"] as? [String: Any]
         for appearance in ThemeAppearance.allCases {
             try absorb(color?[appearance.rawValue], prefix: "color.\(appearance.rawValue)")

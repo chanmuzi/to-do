@@ -26,8 +26,8 @@ import Testing
         #expect(frames.reminder?.maxX == frames.pin.minX - 6)
         #expect(frames.reminder?.width == 57)
         #expect(frames.add.maxX == (frames.reminder?.minX ?? 0) - 6)
-        #expect(frames.more.maxX == frames.add.minX - 6)
-        #expect(frames.search.maxX == frames.more.minX - 6)
+        // 나란히 놓인 아이콘 버튼은 `icon-btn-gap`(0)만큼: hover 상자가 맞닿는다.
+        #expect(frames.more.maxX == frames.add.minX)
     }
 
     @Test func absentSpaceAndReminderTakeNoSlot() {
@@ -35,12 +35,12 @@ import Testing
         #expect(frames.space == nil)
         #expect(frames.reminder == nil)
         #expect(frames.title.minX == 12)
-        #expect(frames.add.maxX == frames.pin.minX - 6)
+        #expect(frames.add.maxX == frames.pin.minX)
     }
 
     @Test func longTitleIsCutBeforeTheHoverIconSlots() {
         let frames = layout(title: 1000)
-        #expect(frames.title.maxX == frames.search.minX - 6)
+        #expect(frames.title.maxX == frames.more.minX - 6)
     }
 
     @Test func narrowNoteShrinksTheTitleFirst() {
@@ -51,7 +51,7 @@ import Testing
         #expect(narrow.pin.width == 20)
         #expect(narrow.reminder?.width == 93)
         #expect(narrow.pin.maxX == 254)
-        #expect(narrow.search.minX >= narrow.title.maxX + 6)
+        #expect(narrow.more.minX >= narrow.title.maxX + 6)
     }
 
     @Test func titleNeverGoesNegativeWhenThereIsNoRoom() {
@@ -64,9 +64,8 @@ import Testing
         let without = layout(title: 1000)
         let with = layout(title: 1000, problem: true)
         #expect(without.problem == nil)
-        #expect(with.problem?.maxX == with.search.minX - 6)
+        #expect(with.problem?.maxX == with.more.minX)
         #expect(with.problem?.width == 20)
-        #expect(with.search == without.search)
         #expect(with.more == without.more)
         #expect(with.add == without.add)
         #expect(with.pin == without.pin)
