@@ -218,15 +218,17 @@ import Testing
         try run(seed: seed, sequences: 12, steps: 50, wild: true, documents: documents)
     }
 
-    /// 이슈 #9에서 줄 머리 안에 커서를 남겼던 씨앗(`EDITOR_FUZZ_SEED=312`, `404`를 기본 씨앗에 더한 것).
-    /// 404는 기본 씨앗 13과 더한 417의 108번째 차례에서 실패했다(줄 종류를 바꾼 뒤 ⇧←). 312의 실패 차례는
-    /// 그 뒤의 수정으로 더는 나오지 않지만, 어느 기본 씨앗이었는지 남아 있지 않아 네 씨앗 모두 41번째 차례까지 돈다.
+    /// 이슈 #9의 회귀 확인은 씨앗 417(`EDITOR_FUZZ_SEED=404`를 기본 씨앗 13에 더한 것)뿐이다. 108번째 차례에서
+    /// 줄 머리 안에 커서를 남겼다(줄 종류를 바꾼 뒤 ⇧←).
+    /// `312`를 더한 여덟 씨앗은 회귀 확인이 아니다: 이슈 #9에서 실패했다고 적힌 씨앗이지만 어느 기본 씨앗이었는지
+    /// 남아 있지 않고, 지금 코드에서는 옛 실패를 다시 내지 않는다. 다른 씨앗처럼 같은 것이
+    /// 지켜지는지 보는 보통 씨앗으로 둔다.
     @Test(arguments: [
         (13 + 404, 110, true),
         (11 + 312, 45, true), (12 + 312, 45, true), (13 + 312, 45, true), (14 + 312, 45, true),
         (1 + 312, 45, false), (2 + 312, 45, false), (3 + 312, 45, false), (4 + 312, 45, false),
     ] as [(UInt64, Int, Bool)])
-    func seedsFromIssue9KeepTheCaretOutOfLinePrefixes(seed: UInt64, sequences: Int, wild: Bool) throws {
+    func issue9SeedAndExtraSeedsKeepTheCaretOutOfLinePrefixes(seed: UInt64, sequences: Int, wild: Bool) throws {
         try run(seed: seed, sequences: sequences, steps: 50, wild: wild, honoursEnvironment: false)
     }
 }
