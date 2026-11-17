@@ -54,6 +54,7 @@ public final class FakeCalendarBridge: CalendarBridge {
         // 외부 저장소의 식별자는 그대로여도 소유 노트와 로컬 항목 ID는 복구 때 바뀔 수 있다.
         remote.id = item.id
         remote.todo = item.todo
+        remote.inlineSource = item.inlineSource
         return remote
     }
     public func save(_ item: ScheduleItem) throws -> ScheduleItem {

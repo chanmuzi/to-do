@@ -3,6 +3,7 @@ import Models
 import Routing
 import Store
 import Theme
+import DateTime
 
 /// 떠 있는 노트 창 전부를 맡는 곳. App이 하나 만들어 들고, `Route`를 받아 이 타입의 메서드를 부른다.
 ///
@@ -71,6 +72,7 @@ public final class NotePanelCoordinator {
 
     /// 노트를 휴지통으로 보냈다(되돌릴 수 있게 된 뒤에 불린다). 그 노트의 창이 있던 화면을 함께 넘긴다.
     /// App이 "되돌리기"가 붙은 짧은 알림을 띄운다(D-041).
+    public var onAcceptTitleDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
     public var onMovedToTrash: ((NoteID, NSScreen?) -> Void)?
     /// 휴지통 되돌리기가 끝났다(되살렸거나, "바로 뒤"가 지났다). 알림을 거둔다.
     public var onTrashUndoEnded: (() -> Void)?

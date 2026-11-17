@@ -50,7 +50,7 @@ final class EditorUndoManager: UndoManager {
     }
 
     override func removeAllActions() {
-        MainActor.assumeIsolated { controller?.history = UndoHistory() }
+        MainActor.assumeIsolated { controller?.history = UndoHistory(); controller?.dateEffects = [:] }
     }
 
     override func removeAllActions(withTarget target: Any) {}

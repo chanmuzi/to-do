@@ -1,5 +1,6 @@
 import AppKit
 import Theme
+import DateTime
 
 /// 줄별 모양을 정하는 상태. 이 값이 같으면 모양도 같다.
 struct KeyStamp: Equatable {
@@ -40,6 +41,18 @@ final class EditorController: NSObject {
     let editorUndoManager = EditorUndoManager()
     let copyButton = CodeCopyButton()
     let linkField = LinkField()
+    lazy var dateHint = DateSuggestionView(theme: theme)
+    var dateSuggestion: InlineDateProposal?
+    var dateSuggestionLine: Int?
+    var dateSuggestionLineCount = 0
+    var dateSuggestionAbove = false
+    var isUpdatingDateSuggestion = false
+    var dismissedDate: (text: String, selection: NSRange)?
+    var dateNow: () -> Date = { Date() }
+    var dateCalendar = Calendar.current
+    var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
+    var onDateError: (Error) -> Void = { _ in }
+    var dateEffects: [UUID: InlineDateEffect] = [:]
 
     var document = MarkdownDocument("")
     var folded: Set<Int> = []
@@ -280,6 +293,7 @@ final class EditorController: NSObject {
                 MainActor.assumeIsolated {
                     guard let self, windowID == self.textView.window.map(ObjectIdentifier.init) else { return }
                     self.refreshStyling()
+                    self.updateDateSuggestion()
                 }
             })
         }
@@ -308,6 +322,7 @@ final class EditorController: NSObject {
         }
         restyleAll()
         reportContentHeight()
+        updateDateSuggestion()
     }
 
     func clamped(_ range: NSRange) -> NSRange {

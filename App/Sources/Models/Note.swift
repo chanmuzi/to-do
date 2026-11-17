@@ -7,7 +7,9 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
     /// 상단 줄에 보이는 제목. 본문과 별개다.
     public var title: String
     /// 본문 Markdown 원문. 저장할 때 한 글자도 바꾸지 않는다(D-008).
-    public var body: String
+    public var body: String {
+        didSet { moveInlineSources(from: oldValue) }
+    }
     public var spaceID: SpaceID?
     /// 노트 색. `nil`이면 색 없음(기본).
     public var colorID: PaletteID?

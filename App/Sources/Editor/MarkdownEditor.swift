@@ -1,5 +1,6 @@
 import AppKit
 import Theme
+import DateTime
 
 /// 마크다운 본문 편집기(spec 6). 미리 보기 없이 입력한 자리에서 스타일을 입힌다.
 ///
@@ -82,6 +83,17 @@ public final class MarkdownEditor {
         get { controller.onTextChange }
         set { controller.onTextChange = newValue }
     }
+
+    public var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)? {
+        get { controller.onAcceptDate }
+        set { controller.onAcceptDate = newValue }
+    }
+    public var onDateError: (Error) -> Void {
+        get { controller.onDateError }
+        set { controller.onDateError = newValue }
+    }
+    @_spi(Verification) public var dateSuggestionText: String? { controller.dateHint.message }
+    @_spi(Verification) public func refreshDateSuggestion() { controller.updateDateSuggestion() }
 
     /// 내용 높이(안쪽 여백 포함)가 바뀌었을 때. 노트 창이 이 높이에 맞춘다.
     public var onContentHeightChange: ((CGFloat) -> Void)? {

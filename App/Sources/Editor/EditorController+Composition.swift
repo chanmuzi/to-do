@@ -91,6 +91,7 @@ extension EditorController {
     /// 조합이 바뀌거나 끝난 뒤. 조합이 글자 없이 끝났으면 넣어 둔 빈 기호 쌍을 지운다(구간의 글자를 모두
     /// 고르고 조합하다 그만둔 경우도 같다. 다른 지우기처럼 빈 구간의 기호를 함께 지운다).
     func compositionDidChange() {
+        defer { updateDateSuggestion() }
         // 텍스트 뷰가 조합을 끝내는 중에는 조합 중인 글자가 잠깐 비어 보인다. 끝난 뒤에 다시 불린다.
         guard !isEndingComposition else { return }
         closeUndoRecordAfterCompositionIfNeeded()

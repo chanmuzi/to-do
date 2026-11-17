@@ -82,6 +82,7 @@ extension EditorController {
         } else if history.shift(outside: edit.range, delta: edit.delta, documentLength: oldLength, leadsDocument: leadsDocument) {
             historyDropCount += 1
         }
+        pruneDateEffects()
         isApplyingOutsideChange = true
         storage.replaceCharacters(in: edit.range, with: replacement)
         hasPendingChange = wasPending
@@ -109,6 +110,8 @@ extension EditorController {
         refreshStyling()
         reportContentHeight()
         layoutCopyButton()
+        dismissedDate = (text, selectedRange)
+        updateDateSuggestion()
     }
 
     /// 그 자리에 정해 둔 줄바꿈이 살아 있으면 거두고 `true`를 돌려준다.
