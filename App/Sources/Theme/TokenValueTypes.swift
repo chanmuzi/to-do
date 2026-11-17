@@ -61,6 +61,8 @@ public struct MotionTokens: Hashable, Sendable {
     public let duration: TimeInterval
     public let curve: BezierCurve
     public let bell: BellMotion
+    /// 짧은 알림(토스트)이 떠 있는 시간(초).
+    public let toastHold: TimeInterval
 }
 
 /// 임박한 리마인더의 종이 흔들리는 움직임(spec 15).

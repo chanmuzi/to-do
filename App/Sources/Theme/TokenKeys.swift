@@ -140,6 +140,10 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case browseGap = "browse-gap"
     case browseAnchorGap = "browse-anchor-gap"
     case browseAnchorInset = "browse-anchor-inset"
+    /// 짧은 알림(토스트, D-041): 높이, 좌우 여백, 글과 동작 사이.
+    case toastHeight = "toast-h"
+    case toastPadding = "toast-pad"
+    case toastGap = "toast-gap"
 }
 
 /// 치수가 아니라 비율로 적는 구성 요소 값(`component` 구역, `%` 표기).
@@ -152,6 +156,8 @@ public enum RatioToken: String, CaseIterable, Sendable {
     case browseTopScreen = "browse-top-screen"
     /// 노트 찾기 높이 한도: 화면 높이에서 차지할 수 있는 몫(임시 값). 넘으면 목록이 스크롤된다.
     case browseMaxScreenHeight = "browse-h-max-screen"
+    /// 짧은 알림(토스트)이 뜨는 높이: 화면(메뉴 막대와 Dock을 뺀 영역) 아래 끝에서 알림 아래쪽까지의 몫(D-041, 임시 값).
+    case toastBottomScreen = "toast-bottom-screen"
 }
 
 /// 치수가 아니라 개수로 적는 구성 요소 값(`component` 구역, 단위 없는 정수).
@@ -173,4 +179,6 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case bellAngle3 = "bell-angle-3"
     case bellPivot = "bell-pivot"
     case bellEase = "bell-ease"
+    /// 짧은 알림(토스트)이 떠 있는 시간(D-041, 임시 값). 지나면 `dur` 동안 사라진다.
+    case toastHold = "toast-hold"
 }
