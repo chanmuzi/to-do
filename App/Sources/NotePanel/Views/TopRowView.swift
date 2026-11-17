@@ -75,6 +75,7 @@ final class TopRowView: NSView {
     var isEditingTitle: Bool { title.isEditing }
     /// 더 보기 메뉴를 띄울 기준(단축키로 열 때도 쓴다).
     var moreAnchor: NSView { moreButton }
+    var reminderAnchor: NSView { state?.reminder == nil ? moreButton : reminderBadge }
 
     func beginTitleEditing() {
         guard let state else { return }
@@ -88,7 +89,7 @@ final class TopRowView: NSView {
     // MARK: - 상태
 
     func apply(_ state: TopRowState, animated: Bool) {
-        let hadProblem = self.state?.problem != nil
+        let hadProblem = self.state?.problem != nil || (self.state?.syncFailure == true && self.state?.reminder == nil)
         self.state = state
         spaceBadge.apply(state.space, color: state.spaceColor, animated: animated)
         title.show(
@@ -115,7 +116,8 @@ final class TopRowView: NSView {
     /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.
     private func applyProblem(_ problem: NoteProblem?, wasShown: Bool, animated: Bool) {
         if let problem { problemButton.setAccessibilityLabel(problem.accessibilityLabel) }
-        let isShown = problem != nil
+        let isShown = problem != nil || (state?.syncFailure == true && state?.reminder == nil)
+        if problem == nil && isShown { problemButton.setAccessibilityLabel("예정 연동 실패") }
         guard isShown != wasShown else { return }
         if isShown { holdsProblemSlot = true }
         problemFade?.cancel()
@@ -123,7 +125,7 @@ final class TopRowView: NSView {
             guard let self else { return }
             problemFade = nil
             // 다 사라졌으면 자리를 비운다. 움직임이 어디까지 갔든 끝의 값으로 놓는다.
-            guard self.state?.problem == nil else { return }
+            guard self.state?.problem == nil, !(self.state?.syncFailure == true && self.state?.reminder == nil) else { return }
             problemButton.alphaValue = 0
             problemButton.isHidden = true
             holdsProblemSlot = false

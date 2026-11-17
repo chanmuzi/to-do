@@ -1,4 +1,6 @@
 import AppKit
+import Scheduling
+import Reminders
 import NotePanel
 import Library
 import Routing
@@ -10,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var environment: AppEnvironment?
     private var router: AppRouter?
     private var notePanels: NotePanelCoordinator?
+    private var schedules: ScheduleService?
+    private var reminderEditor: ReminderEditorCoordinator?
+    private var fakeCalendar: FakeCalendarBridge?
     private var library: LibraryCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -57,12 +62,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
             router.notePanels = notePanels
+            let reminderEditor = ReminderEditorCoordinator(notes: environment.notes, theme: environment.theme)
+            #if DEBUG
+            reminderEditor.allowsKeyWindows = !options.debugIsPassive
+            #endif
+            self.reminderEditor = reminderEditor
+            router.reminders = reminderEditor
+            let notifier: any ReminderNotifier
+            let makeBridge: @MainActor () -> any CalendarBridge
+            if options.usesFakeCalendar {
+                let fake = FakeCalendarBridge()
+                fakeCalendar = fake
+                notifier = FakeReminderNotifier()
+                makeBridge = { fake }
+            } else {
+                let system = SystemReminderNotifier()
+                system.openNote = { [weak router] id in router?.route(.openNote(id)) }
+                notifier = system
+                makeBridge = { EventKitBridge() }
+            }
+            let schedules = ScheduleService(notes: environment.notes, notifier: notifier,
+                                            makeBridge: makeBridge, log: AppLog.warning)
+            try schedules.start()
+            self.schedules = schedules
+            reminderEditor.onSave = { [weak schedules] id, itemID, isNew in
+                schedules?.register(id, itemID: itemID, requestPermission: isNew)
+            }
+            router.onScheduleCreated = { [weak schedules] id, itemID in
+                schedules?.register(id, itemID: itemID, requestPermission: true)
+            }
             // 빠른 캡처와 노트 찾기. 노트 창과 같은 창 상태를 넘겨 "떠 있는 노트"와 핀이 보이게 한다.
             let quickPanels = QuickPanels(
                 theme: environment.theme, notes: environment.notes, spaces: environment.spaces,
                 windowStates: environment.windowStates, router: router, notePanels: notePanels,
                 log: AppLog.warning
             )
+            quickPanels.capture.onScheduleCreated = router.onScheduleCreated
             #if DEBUG
             if options.debugIsPassive { quickPanels.refuseKeyWindowsForVerification() }
             #endif
@@ -166,6 +201,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        schedules?.stop()
+        reminderEditor?.close()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -261,6 +301,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
+        control.reminderEditor = reminderEditor
+        control.fakeCalendar = fakeCalendar
         control.library = library
         control.reopen = { [weak self] in _ = self?.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false) }
         control.toastWindow = { [unowned self] in toasts?.presenter.window }

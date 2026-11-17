@@ -1,0 +1,84 @@
+import Foundation
+import Models
+
+@MainActor
+public protocol CalendarBridge: AnyObject {
+    var onChange: (@MainActor () -> Void)? { get set }
+    func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool
+    /// nil은 권한을 확인한 뒤 두 식별자로도 찾지 못한 경우뿐이다.
+    func fetch(_ item: ScheduleItem) throws -> ScheduleItem?
+    func save(_ item: ScheduleItem) throws -> ScheduleItem
+    func remove(_ item: ScheduleItem) throws
+    func stop()
+}
+
+public enum CalendarBridgeError: Error, LocalizedError {
+    case denied, noDefaultCalendar, readOnly, ambiguous, invalidDate
+    public var errorDescription: String? {
+        switch self {
+        case .denied: "연동 접근이 허용되지 않았습니다"
+        case .noDefaultCalendar: "기본 캘린더 또는 미리 알림 목록이 없습니다"
+        case .readOnly: "이 캘린더는 수정할 수 없습니다"
+        case .ambiguous: "연결된 항목을 하나로 찾을 수 없습니다"
+        case .invalidDate: "종료는 시작보다 뒤여야 합니다"
+        }
+    }
+}
+
+/// 실제 계정·권한 API를 호출하지 않는 확인용 양방향 저장소.
+@MainActor
+public final class FakeCalendarBridge: CalendarBridge {
+    public var onChange: (@MainActor () -> Void)?
+    public var items: [String: ScheduleItem] = [:]
+    public var isAllowed = true
+    public var authorizationGate: (@MainActor () async -> Void)?
+    public var authorizationFailure: CalendarBridgeError?
+    public var failure: CalendarBridgeError?
+    public private(set) var authorizationRequests: [ScheduleItem.Kind] = []
+    public private(set) var authorizationPromptAttempts: [ScheduleItem.Kind] = []
+    public private(set) var saves = 0
+    public private(set) var reads = 0
+    public init() {}
+    public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
+        if request { authorizationPromptAttempts.append(kind) }
+        await authorizationGate?()
+        if let authorizationFailure { throw authorizationFailure }
+        if request && !authorizationRequests.contains(kind) { authorizationRequests.append(kind) }
+        return isAllowed
+    }
+    public func fetch(_ item: ScheduleItem) throws -> ScheduleItem? {
+        reads += 1
+        if let failure { throw failure }
+        guard isAllowed else { throw CalendarBridgeError.denied }
+        guard var remote = items[item.link?.externalID ?? item.id] else { return nil }
+        // 외부 저장소의 식별자는 그대로여도 소유 노트와 로컬 항목 ID는 복구 때 바뀔 수 있다.
+        remote.id = item.id
+        remote.todo = item.todo
+        return remote
+    }
+    public func save(_ item: ScheduleItem) throws -> ScheduleItem {
+        if let failure { throw failure }
+        guard isAllowed else { throw CalendarBridgeError.denied }
+        var saved = item
+        let externalID = item.link?.externalID ?? item.id
+        saved.link = .init(localID: item.link?.localID ?? "fake-" + item.id, externalID: externalID, kind: item.kind)
+        saved.modified = Date()
+        items[externalID] = saved
+        saves += 1
+        return saved
+    }
+    public func remove(_ item: ScheduleItem) throws {
+        if let failure { throw failure }
+        guard isAllowed else { throw CalendarBridgeError.denied }
+        items[item.link?.externalID ?? item.id] = nil
+    }
+    public func changeExternally(_ id: String, _ mutate: (inout ScheduleItem) -> Void) {
+        guard var item = items[id] else { return }
+        mutate(&item)
+        item.modified = Date()
+        items[id] = item
+        onChange?()
+    }
+    public func deleteExternally(_ id: String) { items[id] = nil; onChange?() }
+    public func stop() { onChange = nil }
+}

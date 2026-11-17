@@ -30,8 +30,8 @@ public struct LibraryIndex: Sendable {
         Array(Set(notes.filter(isArchived).map { month(of: $0.created) })).sorted(by: >)
     }
     public var upcoming: [Note] {
-        notes.filter { ($0.reminder ?? .distantPast) >= now }
-            .sorted { $0.reminder! < $1.reminder! }
+        notes.filter { $0.schedules.contains { $0.isUpcoming(at: now, calendar: calendar) } }
+            .sorted { $0.displayedSchedule(at: now, calendar: calendar)!.start < $1.displayedSchedule(at: now, calendar: calendar)!.start }
     }
     public func days(in space: SpaceID?) -> [Date] {
         Array(Set(notes.filter { $0.spaceID == space && !isArchived($0) }
@@ -44,10 +44,10 @@ public struct LibraryIndex: Sendable {
             switch selection {
             case .today:
                 included = calendar.isDate(note.created, inSameDayAs: now)
-                    || note.reminder.map { calendar.isDate($0, inSameDayAs: now) } == true
+                    || note.schedules.contains { !$0.isDeleted && !$0.isCompleted && calendar.isDate($0.start, inSameDayAs: now) }
             case .floating: included = windows[note.id]?.isOpen == true
             case .all, .trash: included = true
-            case .reminders: included = note.reminder != nil
+            case .reminders: included = note.schedules.contains { !$0.isDeleted && !$0.isCompleted }
             case .space(let id): included = note.spaceID == id && !isArchived(note)
             case .day(let id, let day):
                 included = note.spaceID == id && !isArchived(note) && calendar.isDate(note.created, inSameDayAs: day)

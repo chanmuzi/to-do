@@ -19,6 +19,7 @@ let package = Package(
         // MARK: Core
         .target(
             name: "Theme",
+            dependencies: ["Models"],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
         ),
@@ -27,6 +28,8 @@ let package = Package(
                 resources: [.copy("Resources/SpaceImages")], swiftSettings: uiSettings),
         .target(name: "Store", dependencies: ["Models"]),
         .target(name: "Routing", dependencies: ["Models"]),
+
+        .target(name: "Scheduling", dependencies: ["Models", "Store"]),
 
         // MARK: Features (서로 의존하지 않는다)
         .target(
@@ -53,12 +56,14 @@ let package = Package(
         .target(name: "Library", dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
                 swiftSettings: uiSettings),
 
+        .target(name: "Reminders", dependencies: ["Theme", "Models", "Store"], swiftSettings: uiSettings),
+
         // MARK: App
         .executableTarget(
             name: "FloatingNotes",
             dependencies: [
                 "Theme", "Models", "Store", "Routing",
-                "NotePanel", "Editor", "Capture", "Browse", "Library",
+                "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/menubar-icon.pdf")],
@@ -80,6 +85,7 @@ let package = Package(
         ),
 
         // MARK: Tests
+        .testTarget(name: "SchedulingTests", dependencies: ["Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),
         .testTarget(name: "LibraryTests", dependencies: ["Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
         .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),

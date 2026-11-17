@@ -84,7 +84,7 @@ public final class FileNoteStore: NoteStoring {
         let now = NoteFileCodec.truncatedToSeconds(Date())
         let text = NoteFileCodec.encode(NoteFileContent(
             title: NoteTitle.singleLine(draft.title), spaceID: draft.spaceID, colorID: draft.colorID,
-            reminder: draft.reminder.map(NoteFileCodec.truncatedToSeconds), created: now, body: draft.body
+            reminder: draft.schedules?.map(\.start).min() ?? draft.reminder.map(NoteFileCodec.truncatedToSeconds), schedules: draft.schedules, created: now, body: draft.body
         ))
         try files.write(text, id)
         let file = try files.read(id, in: location.notesDirectory)
@@ -231,8 +231,14 @@ public final class FileNoteStore: NoteStoring {
         mutate(&note)
         note.title = NoteTitle.singleLine(note.title)
         note.modified = entry.note.modified
-        if note.reminder != entry.note.reminder {
-            note.reminder = note.reminder.map(NoteFileCodec.truncatedToSeconds)
+        for index in note.schedules.indices {
+            let previous = entry.note.schedules.first { $0.id == note.schedules[index].id }
+            if previous?.start != note.schedules[index].start {
+                note.schedules[index].start = NoteFileCodec.truncatedToSeconds(note.schedules[index].start)
+            }
+            if previous?.end != note.schedules[index].end {
+                note.schedules[index].end = note.schedules[index].end.map(NoteFileCodec.truncatedToSeconds)
+            }
         }
         guard note != entry.note || pending[id] != nil else { return note }
         entry.note = note
@@ -254,10 +260,14 @@ public final class FileNoteStore: NoteStoring {
             throw .conflict(id)
         }
         let note = entry.note
+        // 본문만 고친 옛 파일에 새 필드를 강제로 넣거나 날짜 표기를 바꾸지 않는다.
+        let diskContent = NoteFileCodec.decode(diskText)
+        let oldSchedules = try files.read(id, in: location.notesDirectory).note.schedules
+        let schedules = diskContent.schedules == nil && oldSchedules == note.schedules ? nil : note.schedules
         let text = NoteFileCodec.encode(
             NoteFileContent(
                 title: note.title, spaceID: note.spaceID, colorID: note.colorID,
-                reminder: note.reminder, created: note.created, body: note.body
+                reminder: note.reminder ?? note.schedules.map(\.start).min(), schedules: schedules, created: note.created, body: note.body
             ),
             over: diskText
         )

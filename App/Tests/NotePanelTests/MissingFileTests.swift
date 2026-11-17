@@ -210,3 +210,36 @@ import Testing
         #expect(try fixture.windowState(for: note.id) == nil)
     }
 }
+
+
+extension MissingFileTests {
+    @Test func saveAsNewTransfersLinksBaselinesAndPendingDeletions() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        var linked = ScheduleItem(start: Date(timeIntervalSince1970: 2_000_000_000), title: "연결 항목",
+                                  link: .init(localID: "local", externalID: "external", kind: .reminder), syncedAt: Date())
+        linked.syncBaseline = linked.value
+        var deleted = linked
+        deleted.id = "pending-delete"; deleted.isDeleted = true; deleted.syncError = "삭제 재시도"
+        let legacy = ScheduleItem(id: "legacy-old", start: linked.start)
+        let items = [linked, deleted, legacy]
+        let note = try fixture.notes.create(NoteDraft(body: "원문", schedules: items))
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        try typeText(" 편집", into: controller)
+        try FileManager.default.removeItem(at: fixture.noteFile(note.id))
+        try fixture.notes.refresh()
+        controller.resolveProblem(.saveAsNewNote)
+        let newID = try #require(coordinator.openNoteIDs.first)
+        #expect(newID != note.id)
+        let copied = try FileNoteStore(location: fixture.location).load(newID).schedules
+        #expect(copied.count == items.count)
+        for (old, new) in zip(items, copied) {
+            #expect(new.id != old.id)
+            var expected = old; expected.id = new.id
+            #expect(new == expected)
+        }
+        #expect(copied[2].id.hasPrefix("legacy-"))
+        #expect(!FileManager.default.fileExists(atPath: fixture.noteFile(note.id).path))
+    }
+}

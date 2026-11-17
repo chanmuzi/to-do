@@ -29,6 +29,7 @@ nonisolated struct DateTimeExpression: Hashable, Sendable {
     /// 날과 시각을 떨어뜨려 적으면 둘이다(`내일 회의 3시`의 `내일`과 `3시`).
     let ranges: [NSRange]
     let assumptions: Assumptions
+    var isDateOnly: Bool = false
 
     /// 첫 조각의 처음부터 마지막 조각의 끝까지.
     var range: NSRange {

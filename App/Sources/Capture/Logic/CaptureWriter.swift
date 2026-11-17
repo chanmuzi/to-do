@@ -23,6 +23,7 @@ struct CaptureWriter {
 
     let notes: any NoteStoring
     var calendar: Calendar = .current
+    var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?
 
     /// 줄은 언제나 디스크에 쓰인 노트에 들어간다. 저장소의 "쓰지 못한 변경"에만 남겨 두고 성공으로 치지 않는다.
     /// - Throws: 목록을 읽지 못했거나 쓰지 못했을 때의 `StoreError`. 이때는 아무것도 넣지 않은 것이다.
@@ -43,8 +44,9 @@ struct CaptureWriter {
             title: CaptureDestination.title(for: now, calendar: calendar),
             body: TodoAppender.append(entry.text, to: ""),
             spaceID: entry.spaceID,
-            reminder: entry.reminder
+            schedules: entry.schedule(now: now, line: 0, calendar: calendar).map { [$0] }
         ))
+        created.schedules.forEach { onScheduleCreated?(created.id, $0.id) }
         return blocked.map { .redirected(to: created.id, from: $0.id, reason: $0.reason) } ?? .created(created.id)
     }
 
@@ -59,10 +61,15 @@ struct CaptureWriter {
             // 쓰지 않은 변경이 없으면 디스크의 지금 글을 기준으로 삼는다(다른 프로그램이 고친 뒤일 수 있다).
             _ = try notes.load(id)
         }
+        var createdID: String?
         try notes.update(id) { current in
             current.body = TodoAppender.append(entry.text, to: current.body)
-            current.reminder = ReminderRule.merged(existing: current.reminder, new: entry.reminder, now: now)
+            if let item = entry.schedule(now: now, line: max(0, current.body.components(separatedBy: "\n").count - 2), calendar: calendar) {
+                current.schedules.append(item)
+                createdID = item.id
+            }
         }
+        if let createdID { onScheduleCreated?(id, createdID) }
     }
 
     /// 사용자가 풀어야 하는 문제인지. 이런 노트는 건너뛰고 다른 노트에 넣는다.

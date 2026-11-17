@@ -30,5 +30,9 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>노트의 일정을 기본 캘린더에 등록하고 iPhone에서 변경한 시간을 노트에 반영합니다.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>노트의 리마인더를 기본 미리 알림 목록에 등록하고 iPhone의 시간 변경과 완료를 반영합니다.</string>
 </dict>
 </plist>

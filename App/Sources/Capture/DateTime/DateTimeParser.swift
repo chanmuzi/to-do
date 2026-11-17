@@ -22,7 +22,10 @@ nonisolated enum DateTimeParser {
             return DateTimeExpression(
                 start: outcome.start, end: outcome.end,
                 ranges: candidate.ranges.map(normalized.originalRange),
-                assumptions: outcome.assumptions
+                assumptions: outcome.assumptions,
+                isDateOnly: candidate.start.point.time == nil && candidate.start.point.part == nil
+                    && candidate.start.point.fromNow == nil && candidate.end?.point.time == nil
+                    && candidate.end?.point.part == nil
             )
         }
         return nil
