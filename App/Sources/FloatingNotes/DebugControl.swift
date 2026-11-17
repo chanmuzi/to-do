@@ -5,6 +5,8 @@ import Models
 @_spi(Verification) import NotePanel
 import Routing
 import Library
+import Scheduling
+import Reminders
 
 extension NotePanelCoordinator {
     /// `--debug-passive`: 노트 창이 키 창이 되지 않게 한다(확인용 실행이 사용자의 키 입력을 가져오지 않게).
@@ -70,6 +72,8 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var reminderEditor: ReminderEditorCoordinator?
+    weak var fakeCalendar: FakeCalendarBridge?
     weak var library: LibraryCoordinator?
     var reopen: () -> Void = {}
     var toastWindow: () -> NSWindow? = { nil }
@@ -127,6 +131,18 @@ final class DebugControl {
         case ("library-mouse", let point?, let action?):
             guard let window = library?.window else { return }
             DebugLibraryInput.mouse(window: window, point: point.rawValue, action: action)
+        case ("reminder-editor", let id?, _): router.route(.openReminderEditor(id))
+        case ("reminder-close", _, _): reminderEditor?.close()
+        case ("reminder-snapshot", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            write(reminderEditor?.contentView?.window, to: url)
+        case ("fake-complete", let id?, _): fakeCalendar?.changeExternally(id.rawValue) { $0.isCompleted = true }
+        case ("fake-delete", let id?, _): fakeCalendar?.deleteExternally(id.rawValue)
+        case ("fake-delay", let id?, _):
+            fakeCalendar?.changeExternally(id.rawValue) { item in
+                item.start = item.start.addingTimeInterval(3600)
+                item.end = item.end?.addingTimeInterval(3600)
+            }
         case ("library-key", let key?, _):
             guard let window = library?.window else { return }
             DebugLibraryInput.key(window: window, key: key.rawValue)
