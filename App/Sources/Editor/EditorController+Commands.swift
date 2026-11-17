@@ -76,7 +76,7 @@ extension EditorController {
     ///   단계, 조합할 자리를 만드는 편집). 그 사이에 잠깐 드러나는 기호는 가리지 않는다.
     func apply(_ edit: TextEdit?, isIntermediate: Bool = false) {
         guard var edit, let storage = textView.textStorage, textView.isEditable else { return }
-        // 부모 항목을 없앤 편집은 부모를 잃는 하위 줄을 함께 내어 쓴다(D-043. 이미 붙어 있으면 그대로다).
+        // 부모 항목을 없앤 편집은 부모를 잃는 하위 줄을 함께 내어 쓴다(D-043. `finalized`에서 이미 따진 편집은 다시 따지지 않는다).
         if !isIntermediate { edit = EditorCommands.adoptingOrphans(document, edit, folded: folded) }
         // ``` 줄이 짝을 잃는 편집은 그대로 넣지 않는다(어느 길로 들어온 편집이든). 새로 생기는 ``` 를 글자로
         // 막아 넣을 수 있으면 그렇게 하고, 아니면 넣지 않고 알린다.

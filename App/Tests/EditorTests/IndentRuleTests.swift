@@ -50,6 +50,26 @@ import Testing
         #expect(ListStructure.guideLevels(in: doc) == [[], [0], [0, 1], [0, 1], [0, 1], [], [], []])
     }
 
+    /// 하위 줄을 가진 부모 항목(빈 줄은 건너뛰고, 얕은 줄이 나오면 끝난다).
+    @Test func hasChildrenLooksOnlyBelowTheLine() {
+        let doc = MarkdownDocument("- a\n\n\t- b\n본문\n\t\t고아\n- c\n\t\t깊은\n\t- d\n+ e\n- f")
+        #expect((0..<doc.lines.count).map { ListStructure.hasChildren(doc, $0) }
+            == [true, false, false, false, false, true, false, false, false, false])
+    }
+
+    /// 한 번 따진 편집은 다시 따지지 않는다(편집기가 다듬기와 넣기에서 두 번 부른다).
+    @Test func orphanCheckRunsOncePerEdit() {
+        let s = Scenario("- |a\n\t- b")
+        let first = EditorCommands.adoptingOrphans(s.doc, TextEdit(range: NSRange(location: 0, length: 2), replacement: "", selection: NSRange(location: 0, length: 0)))
+        #expect(first.checkedForOrphans)
+        #expect(first.applied(to: s.text) == "a\n- b")
+        #expect(EditorCommands.adoptingOrphans(s.doc, first) == first)
+        // 부모가 아닌 줄을 고친 편집은 그대로 돌아온다.
+        let blank = Scenario("- a\n|\n\t- b")
+        let typed = EditorCommands.adoptingOrphans(blank.doc, .insert("x", replacing: blank.selection))
+        #expect(typed.range == blank.selection && typed.replacement == "x")
+    }
+
     /// 다른 프로그램이 쓴 깊은 들여쓰기는 그대로 읽는다(원문을 고치지 않는다).
     @Test func orphanIndentsLoadUnchanged() {
         let text = "본문\n\t\t\t\t들여 쓴 본문\n\t- 항목"
@@ -125,6 +145,75 @@ import Testing
         h.undo()
         #expect(h.editor.text == "- p\n\t- a\n\t\t+ T\n\t\t\t안\n끝")
         #expect(h.editor.foldedLines == [2])
+    }
+
+    // MARK: 부모와 하위 줄 사이의 빈 줄을 채움(D-043 (3): 부모를 고치지 않은 편집은 하위 줄을 움직이지 않는다)
+
+    /// 영문 입력: 빈 줄에 친 글자는 아래 하위 줄을 움직이지 않는다.
+    @Test func typingInABlankLineUnderAParentKeepsTheChildren() throws {
+        let h = try EditorHarness.at("- a\n|\n\t- b")
+        h.type("x")
+        #expect(h.marked == "- a\nx|\n\t- b")
+        h.type("yz")
+        #expect(h.marked == "- a\nxyz|\n\t- b")
+    }
+
+    /// 빈 줄을 제목으로 바꾸는 입력(`#` 뒤 Space)도 하위 줄을 움직이지 않는다.
+    @Test func headingTriggerInABlankLineUnderAParentKeepsTheChildren() throws {
+        let h = try EditorHarness.at("- a\n|\n\t- b")
+        h.type("# ")
+        #expect(h.marked == "- a\n# |\n\t- b")
+    }
+
+    /// 한글 조합: 영문 입력과 같게 남는다.
+    @Test func composingInABlankLineUnderAParentKeepsTheChildren() throws {
+        let h = try EditorHarness.at("- a\n|\n\t- b")
+        h.mark("ㄱ")
+        h.commit("가")
+        #expect(h.marked == "- a\n가|\n\t- b")
+    }
+
+    /// 실제로 오는 길: 부모 끝에서 Return 두 번(새 항목, 빈 항목에서 나옴) 뒤에 친다. 영문과 한글이 같다.
+    @Test(arguments: [false, true])
+    func returnTwiceAtTheEndOfAParentThenTypingKeepsTheChildren(korean: Bool) throws {
+        let h = try EditorHarness.at("- a|\n\t- b")
+        h.press(NSResponder.newline)
+        #expect(h.marked == "- a\n- |\n\t- b")
+        h.press(NSResponder.newline)
+        // 빈 항목에서 나와도 `b`는 `a`를 부모로 삼아 그대로다.
+        #expect(h.marked == "- a\n|\n\t- b")
+        if korean {
+            h.mark("ㄱ")
+            h.commit("가")
+        } else {
+            h.type("가")
+        }
+        #expect(h.marked == "- a\n가|\n\t- b")
+        h.press(NSResponder.newline)
+        h.type("x")
+        #expect(h.marked == "- a\n가\nx|\n\t- b")
+    }
+
+    /// 부모 줄 안에서 글자를 치는 것은 부모를 바꾸지 않는다.
+    @Test func typingInsideAParentLineKeepsTheChildren() throws {
+        let h = try EditorHarness.at("- a|\n\t- b\n\t\t- c")
+        h.type("bc")
+        #expect(h.marked == "- abc|\n\t- b\n\t\t- c")
+    }
+
+    /// 앞 줄 끝부터 부모 줄 끝까지 골라 덮어쓰면 부모가 없어지므로 하위 줄이 나온다(영문과 한글이 같다).
+    @Test(arguments: [false, true])
+    func overwritingAParentLineOutdentsTheChildren(korean: Bool) throws {
+        let h = try EditorHarness("머리\n- a\n\t- b")
+        let start = h.document.lines[0].end
+        h.place(at: start, length: h.document.lines[1].end - start)
+        if korean {
+            h.mark("ㄱ")
+            h.commit("가")
+        } else {
+            h.type("가")
+        }
+        #expect(h.marked == "머리가|\n- b")
     }
 
     @Test func tabOnAPlainLineDoesNothing() throws {

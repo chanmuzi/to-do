@@ -54,6 +54,18 @@ nonisolated enum ListStructure {
         }
     }
 
+    /// 그 줄이 하위 줄을 가진 부모 항목인지: 그 줄보다 얕거나 같은 단계의 줄이 나오기 전에 바로 아래 단계의
+    /// 줄이 있다(빈 줄은 건너뛴다). 문서 전체를 읽지 않고 그 줄 뒤만 본다.
+    static func hasChildren(_ doc: MarkdownDocument, _ index: Int) -> Bool {
+        let parent = doc.lines[index]
+        guard parent.kind.isParentItem else { return false }
+        for line in doc.lines[(index + 1)...] where !isBlank(line) {
+            if line.level <= parent.level { return false }
+            if line.level == parent.level + 1 { return true }
+        }
+        return false
+    }
+
     /// 그 줄 앞까지 읽은 것.
     static func context(before index: Int, in doc: MarkdownDocument) -> Context {
         var context = Context()
