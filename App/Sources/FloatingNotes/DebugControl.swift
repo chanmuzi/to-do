@@ -7,6 +7,7 @@ import Routing
 import Library
 import Scheduling
 import Reminders
+import Theme
 
 extension NotePanelCoordinator {
     /// `--debug-passive`: 노트 창이 키 창이 되지 않게 한다(확인용 실행이 사용자의 키 입력을 가져오지 않게).
@@ -56,7 +57,7 @@ extension NotePanelCoordinator {
 /// - `input-key <id> [|]|"|space`: 본문의 `keyDown`에 앱 내부 이벤트 하나를 보낸다.
 /// - `input-mark|input-commit <id|title:id|capture|browse|library> <글자>`: 조합/확정 입력.
 /// - `input-check <같은 대상> <파일 이름>`: 자동 입력 설정과 조합 상태를 JSON으로 쓴다.
-/// - `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`: 자기 입력 칸의 날짜 제안·키 경로 확인.
+/// - `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`: 자기 입력 칸의 날짜 제안, 키 경로 확인.
 /// - `quit`
 ///
 /// 파일 이름은 출력 폴더 바로 아래의 이름이어야 한다. 경로를 주면 쓰지 않는다.
@@ -85,6 +86,7 @@ final class DebugControl {
     private var previousApplication: NSRunningApplication?
     private var lastKeyHandled: Bool?
     private let backdrop = DebugBackdrop()
+    private var verificationMenu: NSMenu?
     /// 노트 창이 키 창이 되지 않게 켠 실행(`--debug-passive`). `focus`와 `unfocus` 사이에만 푼다.
     private let isPassive: Bool
 
@@ -129,6 +131,63 @@ final class DebugControl {
         let id = words.count > 1 ? NoteID(rawValue: words[1]) : nil
         let argument = words.count > 2 ? words[2] : nil
         switch (words.first, id, argument) {
+        case ("audit-live-problem", let id?, let name?):
+            guard let menu = notePanels.problemMenuForVerification(for: id),
+                  let anchor = notePanels.window(for: id)?.contentView, let url = output(named: name) else { return }
+            snapshotLiveMenu(menu, anchor: anchor, to: url)
+        case ("audit-live-status", let id?, let name?):
+            guard let anchor = notePanels.window(for: id)?.contentView, let url = output(named: name) else { return }
+            do {
+                let theme = try Theme.bundled(appearance: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light)
+                let menu = NSMenu()
+                StatusMenuBuilder(theme: theme).fill(menu, with: StatusMenuModel.entries(areNotesHidden: false)) { _ in }
+                snapshotLiveMenu(menu, anchor: anchor, to: url)
+            } catch { AppLog.warning("메뉴 상태 검사 실패: \(error)") }
+        case ("audit-live-menu", let id?, let name?):
+            guard let menu = notePanels.moreMenuForVerification(for: id),
+                  let anchor = notePanels.window(for: id)?.contentView, let url = output(named: name) else { return }
+            snapshotLiveMenu(menu, anchor: anchor, to: url)
+        case ("audit-hover", let id?, let label?):
+            guard let root = notePanels.window(for: id)?.contentView else { return }
+            DebugViewAudit.hover(root, label: label)
+        case ("audit-drag", let id?, _):
+            guard let editor = editor(of: id), let window = editor.textView.window,
+                  let first = editor.textPoint(forLine: 1), let last = editor.textPoint(forLine: 4) else { return }
+            for (type, point) in [(NSEvent.EventType.leftMouseDown, first), (.leftMouseDragged, last), (.leftMouseUp, last)] {
+                let location = editor.textView.convert(point, to: nil)
+                guard let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1) else { continue }
+                NSApp.postEvent(event, atStart: false)
+            }
+        case ("audit-select", let id?, let range?):
+            guard let editor = editor(of: id) else { return }
+            editor.forcesActiveAppearance = true
+            if range == "all" { editor.textView.selectAll(nil) }
+            else {
+                let parts = range.split(separator: ",").compactMap { Int($0) }
+                guard parts.count == 2 else { return }
+                editor.selectedRange = NSRange(location: parts[0], length: parts[1])
+            }
+        case ("audit-menu-action", let id?, let title?):
+            guard let menu = notePanels.moreMenuForVerification(for: id),
+                  let index = menu.items.firstIndex(where: { $0.title == title }) else { return }
+            menu.performActionForItem(at: index)
+        case ("audit-problem", let id?, let name?):
+            guard let url = output(named: name), let menu = notePanels.problemMenuForVerification(for: id) else { return }
+            do { try DebugMenuSnapshot.write(menu, to: url) }
+            catch { AppLog.warning("문제 메뉴 검사 실패: \(error)") }
+        case ("audit-status", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            do {
+                let theme = try Theme.bundled(appearance: NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light)
+                let menu = NSMenu()
+                StatusMenuBuilder(theme: theme).fill(menu, with: StatusMenuModel.entries(areNotesHidden: false)) { _ in }
+                try DebugMenuSnapshot.write(menu, to: url)
+            } catch { AppLog.warning("메뉴 막대 검사 실패: \(error)") }
+        case ("audit-toast", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            write(toastWindow(), to: url)
         case ("library-mouse", let point?, let action?):
             guard let window = library?.window else { return }
             DebugLibraryInput.mouse(window: window, point: point.rawValue, action: action)
@@ -186,9 +245,10 @@ final class DebugControl {
             library?.importImageForVerification(url, space: SpaceID(rawValue: id.rawValue))
         case ("library-icon", let id?, let name?):
             library?.model.setIcon(.image(name), for: SpaceID(rawValue: id.rawValue))
-        case ("icon-symbol-snapshot", let id?, let name?), ("icon-emoji-snapshot", let id?, let name?):
+        case ("icon-symbol-snapshot", let id?, let name?), ("icon-emoji-snapshot", let id?, let name?), ("icon-image-snapshot", let id?, let name?):
             guard let url = output(named: name), let library else { return }
-            do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), tab: words[0] == "icon-symbol-snapshot" ? 0 : 1, to: url) }
+            do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue),
+                tab: words[0] == "icon-symbol-snapshot" ? 0 : words[0] == "icon-emoji-snapshot" ? 1 : 2, to: url) }
             catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
         case ("library-expand", let id?, _): library?.expandSpaceForVerification(SpaceID(rawValue: id.rawValue))
         case ("icon-snapshot", let id?, let name?):
@@ -343,6 +403,33 @@ final class DebugControl {
         return url
     }
 
+    /// 자기 앱 메뉴에 방향키만 보내 호버와 같은 실제 선택 바탕을 확인한다.
+    private func snapshotLiveMenu(_ menu: NSMenu, anchor: NSView, to url: URL) {
+        verificationMenu = menu
+        let known = Set(NSApp.windows.map(\.windowNumber))
+        let select = Timer(timeInterval: 0.2, repeats: false) { _ in
+            MainActor.assumeIsolated {
+                if let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: 0, context: nil,
+                    characters: "\u{F701}", charactersIgnoringModifiers: "\u{F701}", isARepeat: false, keyCode: 125) {
+                    NSApp.postEvent(event, atStart: true)
+                }
+            }
+        }
+        let capture = Timer(timeInterval: 0.7, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.write(NSApp.windows.first { !known.contains($0.windowNumber) && $0.isVisible }, to: url)
+                self?.verificationMenu?.cancelTracking()
+            }
+        }
+        RunLoop.main.add(select, forMode: .common)
+        RunLoop.main.add(capture, forMode: .common)
+        menu.popUp(positioning: nil, at: .zero, in: anchor)
+        select.invalidate()
+        capture.invalidate()
+        verificationMenu = nil
+    }
+
     /// 메뉴는 닫힐 때까지 돌아오지 않는다. 메뉴가 도는 동안에도 불리는 타이머로 모습을 쓰고 esc를 넣어 닫는다.
     private func showMoreMenu(for id: NoteID, snapshotURL: URL) {
         let known = Set(NSApplication.shared.windows.map(\.windowNumber))
@@ -378,6 +465,7 @@ final class DebugControl {
                 return
             }
             try data.write(to: url, options: .atomic)
+            try DebugViewAudit.write(view, to: url.appendingPathExtension("json"))
         } catch {
             AppLog.warning("확인용 그림을 쓰지 못했습니다(\(url.path)): \(error)")
         }
@@ -511,6 +599,7 @@ final class DebugControl {
         view.window?.contentView?.layoutSubtreeIfNeeded()
         write(json: [
             "text": editor.text,
+            "selectionFrames": editor.selectionFrames.map(NSStringFromRect),
             "dateSuggestionHelp": editor.textView.accessibilityHelp() ?? "",
             "selectedRange": NSStringFromRange(editor.selectedRange),
             "markedRange": NSStringFromRange(editor.textView.markedRange()),

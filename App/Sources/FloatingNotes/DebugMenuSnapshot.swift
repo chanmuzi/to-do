@@ -30,6 +30,7 @@ enum DebugMenuSnapshot {
             container.layoutSubtreeIfNeeded()
             window.displayIfNeeded()
             do {
+                try DebugViewAudit.write(container, to: url.appendingPathExtension("views.json"))
                 let rowsInfo = rows.map { ["class": String(describing: type(of: $0)), "frame": NSStringFromRect($0.frame), "hidden": String($0.isHidden), "attached": String($0.superview === container)] }
                 try JSONSerialization.data(withJSONObject: rowsInfo, options: .prettyPrinted).write(to: url.appendingPathExtension("json"))
                 guard let bitmap = container.bitmapImageRepForCachingDisplay(in: container.bounds) else { throw CocoaError(.fileWriteUnknown) }
