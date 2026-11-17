@@ -26,7 +26,15 @@ if [ ! -w "$DEST_DIR" ]; then
 fi
 DEST="$DEST_DIR/$APP_NAME"
 
-BUILT="$("$ROOT/scripts/build-app.sh" release | tail -n 1)"
+BUILD_LOG="$(mktemp -t floating-notes-build)"
+if ! "$ROOT/scripts/build-app.sh" release > "$BUILD_LOG" 2>&1; then
+  cat "$BUILD_LOG" >&2
+  echo "빌드에 실패했습니다. 설치하지 않았습니다." >&2
+  rm -f "$BUILD_LOG"
+  exit 1
+fi
+BUILT="$(tail -n 1 "$BUILD_LOG")"
+rm -f "$BUILD_LOG"
 if [ ! -d "$BUILT" ]; then
   echo "빌드한 앱을 찾지 못했습니다: $BUILT" >&2
   exit 1
@@ -39,7 +47,10 @@ running() {
 
 if running; then
   echo "실행 중인 플로팅 노트를 종료합니다"
-  osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null
+  if ! osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1; then
+    echo "플로팅 노트가 종료를 거절했습니다(저장하지 못한 노트가 있을 수 있습니다). 설치하지 않았습니다." >&2
+    exit 75
+  fi
   waited=0
   while running; do
     if [ "$waited" -ge "$QUIT_TIMEOUT" ]; then
@@ -55,7 +66,14 @@ fi
 STAGING="$DEST_DIR/.$APP_NAME.installing"
 rm -rf "$STAGING"
 ditto "$BUILT" "$STAGING"
-rm -rf "$DEST"
-mv "$STAGING" "$DEST"
+BACKUP="$DEST_DIR/.$APP_NAME.previous"
+rm -rf "$BACKUP"
+if [ -e "$DEST" ]; then mv "$DEST" "$BACKUP"; fi
+if ! mv "$STAGING" "$DEST"; then
+  if [ -e "$BACKUP" ]; then mv "$BACKUP" "$DEST"; fi
+  echo "새 앱으로 바꾸지 못했습니다. 이전 앱을 되돌렸습니다." >&2
+  exit 1
+fi
+rm -rf "$BACKUP"
 
 echo "$DEST"
