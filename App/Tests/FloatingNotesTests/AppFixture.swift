@@ -9,7 +9,7 @@ import Theme
 
 /// 임시 폴더의 저장소로 App의 조립(노트 창 + Markdown 편집기 + 동작 전달)을 실제로 만들어 보는 시험용 묶음.
 final class AppFixture {
-    let root = FileManager.default.temporaryDirectory
+    let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("app-tests-\(UUID().uuidString)", isDirectory: true)
     let location: StoreLocation
     let theme: Theme

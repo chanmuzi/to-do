@@ -9,7 +9,7 @@ import Testing
 /// 한 번에 하나씩 돈다(`.serialized`): 메뉴 항목을 고르는 시험은 메인 액터를 오래 잡는다. 한꺼번에 시작하면
 /// 전환 시간을 기다리는 다른 시험이 제때 차례를 받지 못한다.
 @Suite(.serialized) struct AppSettingsTests {
-    private let directory = FileManager.default.temporaryDirectory
+    private let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("app-settings-tests-\(UUID().uuidString)", isDirectory: true)
 
     private func cleanUp() {

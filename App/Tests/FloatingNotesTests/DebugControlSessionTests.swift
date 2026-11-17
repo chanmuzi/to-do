@@ -5,7 +5,7 @@ import Testing
 
 /// 확인용 명령 통로: 명령마다 이번 실행의 표가 있어야 하고, 출력은 받은 폴더 밖으로 나가지 못한다.
 @Suite struct DebugControlSessionTests {
-    private let directory = FileManager.default.temporaryDirectory
+    private let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("debug-control-tests-\(UUID().uuidString)", isDirectory: true)
 
     private func cleanUp() {
@@ -52,7 +52,7 @@ import Testing
             #expect(session.outputURL(named: name) == nil, "\(name)")
         }
         // 폴더 안에 놓인 링크를 따라 밖에 쓰지 않는다.
-        let outside = FileManager.default.temporaryDirectory
+        let outside = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("debug-control-outside-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: outside) }
         try FileManager.default.createSymbolicLink(

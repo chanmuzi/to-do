@@ -16,7 +16,7 @@ import Theme
 /// "시켰는지"(`keyRequests`)를 보고, 어느 노트가 키 창인지는 `pretendKey(_:)`로 정한다. 캡처 바와 노트 찾기는
 /// 화면에 올리되 투명하게 두고 키 창으로 만들지 않는다.
 final class WiringFixture {
-    let root = FileManager.default.temporaryDirectory
+    let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("wiring-tests-\(UUID().uuidString)", isDirectory: true)
     let location: StoreLocation
     let theme: Theme

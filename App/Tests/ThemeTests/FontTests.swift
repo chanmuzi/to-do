@@ -36,7 +36,7 @@ import Testing
 
     /// 글꼴 하나를 등록하지 못해도 던지지 않는다. 문제를 적어 돌려주고, 글꼴 고르기는 시스템 글꼴로 넘어간다.
     @Test func unregisterableFontIsReportedAndFallsBackToSystemFont() throws {
-        let directory = FileManager.default.temporaryDirectory
+        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("font-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
