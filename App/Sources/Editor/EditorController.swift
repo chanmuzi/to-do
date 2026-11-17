@@ -63,7 +63,9 @@ final class EditorController: NSObject {
     var lastContentHeight: CGFloat = -1
     var observers: [NSObjectProtocol] = []
     /// 창이 키 창이 아니어도 편집 중인 것으로 본다: 편집 단축키를 받는다(확인용).
-    var forcesActiveAppearance = false
+    var forcesActiveAppearance = false {
+        didSet { textView.caret?.forcesVisible = forcesActiveAppearance }
+    }
     /// 원문이 바뀔 때마다 올린다. 줄별 모양을 다시 계산할지 가리는 데 쓴다.
     var documentVersion = 0
     var keysCache: (stamp: KeyStamp, keys: [LineRenderKey])?
@@ -242,6 +244,10 @@ final class EditorController: NSObject {
         linkField.onCommit = { [weak self] in self?.commitLink($0) }
         linkField.onCancel = { [weak self] in self?.cancelLinkEditing() }
         textView.addSubview(linkField)
+
+        let caret = TextCaret(textView: textView, theme: theme)
+        caret.rectProvider = { [weak self] in self?.caretRect() }
+        textView.caret = caret
     }
 
     /// 글꼴, 색, 여백을 뷰에 옮긴다.
@@ -252,7 +258,6 @@ final class EditorController: NSObject {
             height: (padding.top + padding.bottom) / 2
         )
         textView.containerOrigin = NSPoint(x: padding.leading, y: padding.top)
-        textView.insertionPointColor = style.accent
         textView.font = style.body.font
         textView.textColor = style.text
         textView.typingAttributes = baseAttributes

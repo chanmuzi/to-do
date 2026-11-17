@@ -151,6 +151,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         typed("글머리표", ["-"]),
         typed("투두", ["[]"]),
         typed("토글", [">"]),
+        typed("인용문", ["\"", "|"]),
         typed("굵게", ["**글자**"]),
         typed("취소선", ["~~글자~~"]),
         typed("형광펜", ["==글자=="]),

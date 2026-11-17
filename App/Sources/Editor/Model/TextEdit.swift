@@ -14,6 +14,8 @@ nonisolated struct TextEdit: Equatable, Sendable {
     /// 접혀서 보이지 않는 줄까지 일부러 고치는 편집(접힌 덩어리를 통째로 옮기거나 들여 쓴다).
     /// 이 표시가 없는 편집이 감춘 줄에 닿으면 편집기가 막고 그 토글을 편다.
     var includesHiddenLines = false
+    /// 부모를 잃는 하위 줄을 이미 따진 편집(`EditorCommands.adoptingOrphans`). 다시 따지지 않는다.
+    var checkedForOrphans = false
 
     init(
         range: NSRange,

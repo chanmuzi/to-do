@@ -42,7 +42,8 @@ nonisolated extension EditorCommands {
             }
             return insert(doc, "\n" + indent, replacing: selection)
 
-        case .todo, .bullet, .toggle:
+        case .todo, .bullet, .toggle, .quote:
+            // 빈 항목(빈 인용문 줄 포함)에서는 기호를 지우거나 한 단계 내어 쓴다. 인용문은 `> `로 이어 간다.
             if isCaret, line.contentRange.length == 0 {
                 if line.indentLength > 0, let edit = outdent(doc, selection: selection, folded: folded) { return edit }
                 return TextEdit(range: line.markerRange, replacement: "", selection: NSRange(location: line.start + line.indentLength, length: 0))
@@ -56,7 +57,7 @@ nonisolated extension EditorCommands {
                 if isCaret, folded.contains(index) {
                     // 접힌 토글은 감춘 줄들 뒤에 새 토글을 만든다.
                     let at = doc.lines[line.subtreeEnd - 1].end
-                    let text = "\n" + indent + "> "
+                    let text = "\n" + indent + "+ "
                     return TextEdit(
                         range: NSRange(location: at, length: 0),
                         replacement: text,

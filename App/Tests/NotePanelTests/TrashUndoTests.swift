@@ -15,7 +15,7 @@ import Testing
     @Test func undoRightAfterTrashRestoresTheNoteAndItsWindow() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
-        let note = try fixture.notes.create(NoteDraft(title: "되돌릴 노트", body: "> 토글\n\t안쪽"))
+        let note = try fixture.notes.create(NoteDraft(title: "되돌릴 노트", body: "+ 토글\n\t안쪽"))
         try coordinator.open(note.id, focus: false)
         coordinator.setPinned(false, for: note.id)
         let panel = try #require(coordinator.window(for: note.id))
@@ -38,7 +38,7 @@ import Testing
         #expect(restored.frame == frame)
         #expect(!restored.isPinned)
         #expect(restored.isVisible)
-        #expect(try fixture.notes.load(note.id).body == "> 토글\n\t안쪽")
+        #expect(try fixture.notes.load(note.id).body == "+ 토글\n\t안쪽")
         #expect(try fixture.windowState(for: note.id)?.isOpen == true)
         // 한 번 더 부르면 되돌릴 것이 없다.
         #expect(try coordinator.undoTrash() == nil)
@@ -48,7 +48,7 @@ import Testing
     @Test func undoBringsBackFoldsStoredInTheWindowState() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
-        let note = try fixture.notes.create(NoteDraft(body: "> 토글\n\t안쪽"))
+        let note = try fixture.notes.create(NoteDraft(body: "+ 토글\n\t안쪽"))
         try coordinator.open(note.id, focus: false)
         let recorder = try #require(coordinator.controllers[note.id]).environment.recorder
         var state = try #require(recorder.savedState(for: note.id))

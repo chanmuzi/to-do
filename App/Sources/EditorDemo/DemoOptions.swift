@@ -7,7 +7,7 @@ import Theme
 /// - `--appearance light|dark`
 /// - `--checkbox box|bracket`
 /// - `--code-style accent|plain`: 인라인 코드의 글자색(기본 `accent`)
-/// - `--sample note|elements|code|literal|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
+/// - `--sample note|elements|code|literal|structure|empty`: 미리 넣을 내용(기본 `note`, 화면 2의 노트)
 /// - `--caret-line <n>`: 커서를 둘 줄(0부터). 그 줄 끝에 놓는다
 /// - `--fold <n,n>`: 접어 둘 토글의 줄 번호
 /// - `--width <pt>`: 창 너비(기본 340)
@@ -15,6 +15,7 @@ import Theme
 /// - `--script <단계;단계>`: 띄운 뒤 차례로 실행할 입력(`DemoScript` 참고)
 /// - `--print-text`: 스크립트를 마친 뒤 원문을 표준 출력에 적는다
 /// - `--activate`: 창을 키 창으로 만든다(기본은 다른 앱의 포커스를 빼앗지 않는다)
+/// - `--quit-after <초>`: 그만큼 뒤에 스스로 끝낸다(키 창으로 띄워 화면에서 볼 때. 띄워 둔 채 남지 않게)
 /// - `--snapshot <경로>`: 창 내용을 PNG로 그려 내고 끝낸다(화면 녹화 권한 없이 그 창만 찍는다)
 struct DemoOptions {
     var appearance: ThemeAppearance = .light
@@ -29,6 +30,7 @@ struct DemoOptions {
     var printsText = false
     var activates = false
     var snapshotPath: String?
+    var quitAfter: Double?
 
     enum ParseError: Error, CustomStringConvertible {
         case missingValue(String)
@@ -88,6 +90,10 @@ struct DemoOptions {
                 printsText = true
             case "--activate":
                 activates = true
+            case "--quit-after":
+                let raw = try value(flag)
+                guard let parsed = Double(raw), parsed > 0 else { throw ParseError.invalidValue(flag, raw) }
+                quitAfter = parsed
             case "--snapshot":
                 snapshotPath = try value(flag)
             default:

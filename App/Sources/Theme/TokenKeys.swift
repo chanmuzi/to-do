@@ -89,6 +89,9 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case controlHeight = "ctl-h"
     case rowHeight = "row-h"
     case caretWidth = "caret-w"
+    /// 인용문(spec 6): 왼쪽 막대의 너비, 블록 왼쪽 끝에서 글자까지의 거리.
+    case quoteBarWidth = "quote-bar-w"
+    case quotePadding = "quote-pad"
     /// 인라인 코드 상자(spec 6): 좌우 안쪽 여백, 바깥 간격, 높이, 줄 가운데에서 아래로 내리는 양,
     /// 글자 기준선을 올리는 양.
     case codePaddingX = "code-pad-x"
@@ -179,6 +182,8 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case bellAngle3 = "bell-angle-3"
     case bellPivot = "bell-pivot"
     case bellEase = "bell-ease"
+    /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(`TextCaret`).
+    case caretBlink = "caret-blink"
     /// 짧은 알림(토스트)이 떠 있는 시간(D-041, 임시 값). 지나면 `dur` 동안 사라진다.
     case toastHold = "toast-hold"
 }

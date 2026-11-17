@@ -14,24 +14,26 @@ import Testing
     }
 
     @Test func tabIndentsTheLineAndKeepsTheCaret() {
-        #expect(indent("[ ] 할| 일") == "\t[ ] 할| 일")
+        #expect(indent("[ ] 위\n[ ] 할| 일") == "[ ] 위\n\t[ ] 할| 일")
         #expect(indent("- a\n- b|") == "- a\n\t- b|")
     }
 
     @Test func threeLevelsAndMore() {
-        var text = "- 깊게|"
+        var text = "- 1\n\t- 2\n\t\t- 3\n- 깊게|"
         for _ in 0..<3 { text = indent(text)! }
-        #expect(text == "\t\t\t- 깊게|")
+        #expect(text == "- 1\n\t- 2\n\t\t- 3\n\t\t\t- 깊게|")
         #expect(MarkdownDocument("\t\t\t- 깊게").lines[0].level == 3)
     }
 
     @Test func stopsAtTheDeepestLevel() {
-        let deepest = String(repeating: "\t", count: MarkdownDocument.maxLevel) + "- 끝|"
-        #expect(indent(deepest) == nil)
+        let deepest = String(repeating: "\t", count: MarkdownDocument.maxLevel)
+        #expect(indent(deepest + "- 부모\n" + deepest + "- 끝|") == nil)
     }
 
+    /// 위에서부터 차례로 따진다. 첫 줄은 부모가 없어 그대로이고, 그 아래 줄들이 첫 줄의 하위가 된다(D-043).
     @Test func indentsEverySelectedLine() {
-        #expect(indent("- |a\n- b\n- c|\n- d") == "\t- |a\n\t- b\n\t- c|\n- d")
+        #expect(indent("- |a\n- b\n- c|\n- d") == "- |a\n\t- b\n\t- c|\n- d")
+        #expect(indent("- p\n- |a\n- b\n- c|\n- d") == "- p\n\t- |a\n\t- b\n\t- c|\n- d")
     }
 
     @Test func outdentRemovesOneTabOrTwoSpaces() {
@@ -81,8 +83,8 @@ import Testing
     }
 
     @Test func toggleMakesAChildOrASiblingWhenFolded() {
-        #expect(newline("> 토글|\n\t- 안") == "> 토글\n\t|\n\t- 안")
-        #expect(newline("> 토글|\n\t- 안\n밖", folded: [0]) == "> 토글\n\t- 안\n> |\n밖")
+        #expect(newline("+ 토글|\n\t- 안") == "+ 토글\n\t|\n\t- 안")
+        #expect(newline("+ 토글|\n\t- 안\n밖", folded: [0]) == "+ 토글\n\t- 안\n+ |\n밖")
     }
 
     @Test func returnInsideAFormattedRunSplitsTheRun() {
@@ -146,20 +148,20 @@ import Testing
         #expect(space("###|") == "### |")
         #expect(space("-|") == "- |")
         #expect(space("*|") == "- |")
-        #expect(space(">|") == "> |")
+        #expect(space(">|") == "+ |")
         #expect(space("[]|") == "[ ] |")
         #expect(MarkdownDocument("# ").lines[0].kind == .heading(1))
         #expect(MarkdownDocument("## ").lines[0].kind == .heading(2))
         #expect(MarkdownDocument("### ").lines[0].kind == .heading(3))
         #expect(MarkdownDocument("- ").lines[0].kind == .bullet)
-        #expect(MarkdownDocument("> ").lines[0].kind == .toggle)
+        #expect(MarkdownDocument("+ ").lines[0].kind == .toggle)
     }
 
     @Test func triggersOnALineThatAlreadyHasText() {
         #expect(space("#|글") == "# |글")
         #expect(space("##|글 더") == "## |글 더")
         #expect(space("-|글") == "- |글")
-        #expect(space(">|글") == "> |글")
+        #expect(space(">|글") == "+ |글")
         #expect(space("[]|글") == "[ ] |글")
     }
 
@@ -168,10 +170,10 @@ import Testing
         #expect(space("# -|제목") == "- |제목")
         #expect(space("- ##|항목") == "## |항목")
         #expect(space("### #|제목") == "# |제목")
-        #expect(space("[x] >|끝낸 일") == "> |끝낸 일")
-        #expect(space("> []|토글") == "[ ] |토글")
+        #expect(space("[x] >|끝낸 일") == "+ |끝낸 일")
+        #expect(space("+ []|토글") == "[ ] |토글")
         #expect(space("- [ ] -|표준 투두") == "- |표준 투두")
-        #expect(space("> ###|토글") == "### |토글")
+        #expect(space("+ ###|토글") == "### |토글")
         // 들여쓰기는 그대로다.
         #expect(space("\t- #|항목") == "\t# |항목")
         #expect(space("\t\t[ ] -|할 일") == "\t\t- |할 일")
@@ -226,7 +228,7 @@ import Testing
     @Test func backspaceAtContentStartRemovesTheMarker() {
         #expect(backspace("[ ] |할 일") == "|할 일")
         #expect(backspace("\t- |항목") == "\t|항목")
-        #expect(backspace("> |토글") == "|토글")
+        #expect(backspace("+ |토글") == "|토글")
         #expect(backspace("\t|들여 쓴 본문") == "|들여 쓴 본문")
         // 제목도 본문으로 돌아간다(`#`이 보이지 않으므로 글자로 지울 수 없다).
         #expect(backspace("# |제목") == "|제목")
@@ -382,12 +384,12 @@ import Testing
         #expect(move("가\n나|", .down) == nil)
         #expect(move("|가\n나|\n다", .down) == "다\n|가\n나|")
         // 접힌 토글은 감춘 줄과 함께 움직이고, 이웃이 접힌 토글이면 통째로 넘어간다.
-        #expect(move("> 토글|\n\t- 안\n밖", .down, folded: [0]) == "밖\n> 토글|\n\t- 안")
-        #expect(move("> 토글\n\t- 안\n밖|", .up, folded: [0]) == "밖|\n> 토글\n\t- 안")
+        #expect(move("+ 토글|\n\t- 안\n밖", .down, folded: [0]) == "밖\n+ 토글|\n\t- 안")
+        #expect(move("+ 토글\n\t- 안\n밖|", .up, folded: [0]) == "밖|\n+ 토글\n\t- 안")
     }
 
     @Test func moveLinesCarriesFoldState() {
-        let doc = MarkdownDocument("> 토글\n\t- 안\n밖")
+        let doc = MarkdownDocument("+ 토글\n\t- 안\n밖")
         let edit = EditorCommands.moveLines(doc, selection: NSRange(location: 0, length: 0), folded: [0], direction: .down)
         #expect(edit?.foldedAfter == [1])
     }

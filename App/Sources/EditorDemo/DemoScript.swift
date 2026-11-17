@@ -95,9 +95,9 @@ enum DemoScript {
                   ) else { return false }
             view.mouseMoved(with: event)
         case "mark":
-            view.setMarkedText(argument, selectedRange: NSRange(location: argument.utf16.count, length: 0), replacementRange: view.markedRange().location == NSNotFound ? view.selectedRange() : view.markedRange())
+            view.setMarkedText(argument, selectedRange: NSRange(location: argument.utf16.count, length: 0), replacementRange: view.hasMarkedText() ? view.markedRange() : view.selectedRange())
         case "commit":
-            view.insertText(argument, replacementRange: view.markedRange().location == NSNotFound ? view.selectedRange() : view.markedRange())
+            view.insertText(argument, replacementRange: view.hasMarkedText() ? view.markedRange() : view.selectedRange())
         case "cmd": view.doCommand(by: NSSelectorFromString(argument))
         case "link": editor.commitLink(argument)
         case "undo": editor.undoManager.undo()

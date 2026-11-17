@@ -1,4 +1,5 @@
 import AppKit
+import Theme
 
 /// 편집기의 텍스트 뷰. 키와 마우스를 받아 `MarkdownEditor`에 넘기는 일만 한다.
 final class EditorTextView: NSTextView {
@@ -8,9 +9,16 @@ final class EditorTextView: NSTextView {
 
     override var textContainerOrigin: NSPoint { containerOrigin }
 
-    // 입력 커서는 시스템의 것을 그대로 쓰고 색만 `insertionPointColor`로 맞춘다. 지금 macOS의 커서는
-    // 텍스트 뷰가 그리는 것이 아니라 따로 놓이는 표시 뷰여서, 옛 그리기 경로(`drawInsertionPoint`)를
-    // 덮어써 너비를 줄이면 두 번째 커서가 그려지고 지워지지 않는 자국이 남는다(D-025).
+    /// 얇은 입력 커서. 시스템의 커서 표시(`NSTextInsertionIndicator`)는 줄 높이 전체를 덮고 너비를 정할 수
+    /// 없어 만들지 않게 하고(`shouldDrawInsertionPoint`), 이 뷰 위에 따로 올린 작은 뷰가 대신한다(D-042).
+    var caret: TextCaret?
+
+    override var shouldDrawInsertionPoint: Bool { false }
+
+    override func layout() {
+        super.layout()
+        caret?.reposition()
+    }
 
     // MARK: 되돌리기
 
@@ -38,6 +46,7 @@ final class EditorTextView: NSTextView {
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
         if accepted { editor?.focusDidChange() }
+        caret?.refresh(focused: accepted ? true : nil)
         return accepted
     }
 
@@ -54,6 +63,7 @@ final class EditorTextView: NSTextView {
             editor?.compositionDidChange()
         }
         if accepted { editor?.focusDidChange() }
+        caret?.refresh(focused: accepted ? false : nil)
         return accepted
     }
 
@@ -69,6 +79,7 @@ final class EditorTextView: NSTextView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         editor?.windowDidChange()
+        caret?.refresh()
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -117,12 +128,14 @@ final class EditorTextView: NSTextView {
         super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacement)
         editor?.flushPendingChange()
         editor?.compositionDidChange()
+        caret?.refresh()
     }
 
     override func unmarkText() {
         endingComposition { super.unmarkText() }
         editor?.flushPendingChange()
         editor?.compositionDidChange()
+        caret?.refresh()
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {

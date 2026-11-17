@@ -11,7 +11,7 @@ private typealias Key = EditorShortcuts.Key
 @MainActor
 @Suite struct BlockTriggerTypingTests {
     @Test(arguments: [
-        ("#", "# |"), ("##", "## |"), ("###", "### |"), ("-", "- |"), ("[]", "[ ] |"), (">", "> |"),
+        ("#", "# |"), ("##", "## |"), ("###", "### |"), ("-", "- |"), ("[]", "[ ] |"), (">", "+ |"),
     ])
     func triggerOnAnEmptyLineConvertsAndUndoRestoresTheTypedCharacters(trigger: String, result: String) throws {
         let h = try EditorHarness()
@@ -32,7 +32,7 @@ private typealias Key = EditorShortcuts.Key
 
     @Test(arguments: [
         ("#", "# |본문 글"), ("##", "## |본문 글"), ("###", "### |본문 글"),
-        ("-", "- |본문 글"), ("[]", "[ ] |본문 글"), (">", "> |본문 글"),
+        ("-", "- |본문 글"), ("[]", "[ ] |본문 글"), (">", "+ |본문 글"),
     ])
     func triggerOnALineWithTextConvertsIt(trigger: String, result: String) throws {
         let h = try EditorHarness("앞\n본문 글\n뒤")
@@ -53,7 +53,7 @@ private typealias Key = EditorShortcuts.Key
         // 제목의 `#`은 보이지 않는다. 줄 맨 앞으로 가면 커서는 글자 앞에 선다.
         #expect(h.marked == "# |제목")
         let steps: [(typed: String, result: String)] = [
-            ("-", "- |제목"), ("##", "## |제목"), ("[]", "[ ] |제목"), (">", "> |제목"),
+            ("-", "- |제목"), ("##", "## |제목"), ("[]", "[ ] |제목"), (">", "+ |제목"),
             ("###", "### |제목"), ("-", "- |제목"), ("[]", "- [ ] |제목"), ("#", "# |제목"),
         ]
         var previous = h.marked
@@ -72,12 +72,12 @@ private typealias Key = EditorShortcuts.Key
     }
 
     @Test func conversionKeepsIndentationAndFoldsFollow() throws {
-        let h = try EditorHarness("- 부모\n\t- 항목\n> 토글\n\t안")
+        let h = try EditorHarness("- 부모\n\t- 항목\n+ 토글\n\t안")
         h.editor.foldedLines = [2]
         h.caret(at: h.document.lines[1].contentStart)
         h.type("[]")
         h.type(" ")
-        #expect(h.editor.text == "- 부모\n\t- [ ] 항목\n> 토글\n\t안")
+        #expect(h.editor.text == "- 부모\n\t- [ ] 항목\n+ 토글\n\t안")
         #expect(h.editor.foldedLines == [2])
         // 접힌 토글을 다른 종류로 바꾸면 접힘이 풀려 감춘 줄이 드러난다. 되돌리면 접힘도 돌아온다.
         h.caret(at: h.document.lines[2].contentStart)
@@ -86,7 +86,7 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.editor.text == "- 부모\n\t- [ ] 항목\n- 토글\n\t안")
         #expect(h.editor.foldedLines.isEmpty)
         h.undo()
-        #expect(h.editor.text == "- 부모\n\t- [ ] 항목\n> -토글\n\t안")
+        #expect(h.editor.text == "- 부모\n\t- [ ] 항목\n+ -토글\n\t안")
         #expect(h.editor.foldedLines == [2])
     }
 
@@ -148,7 +148,7 @@ private typealias Key = EditorShortcuts.Key
 
 @MainActor
 @Suite struct BlockBackspaceTypingTests {
-    @Test(arguments: ["# 제목", "## 제목", "### 제목", "- 제목", "[ ] 제목", "[x] 제목", "- [ ] 제목", "> 제목"])
+    @Test(arguments: ["# 제목", "## 제목", "### 제목", "- 제목", "[ ] 제목", "[x] 제목", "- [ ] 제목", "+ 제목"])
     func backspaceAtTheVisualStartMakesAParagraphThenJoins(line: String) throws {
         let h = try EditorHarness("앞\n" + line)
         h.caret(at: 2)

@@ -175,10 +175,10 @@ import Testing
             return editors[editors.count - 1]
         })
         defer { fixture.cleanUp(coordinator) }
-        let note = try fixture.notes.create(NoteDraft(title: "지워질 노트", body: "> 토글\n\t안"))
+        let note = try fixture.notes.create(NoteDraft(title: "지워질 노트", body: "+ 토글\n\t안"))
         try coordinator.open(note.id, focus: false)
         let controller = try #require(coordinator.controllers[note.id])
-        editors[0].type("> 토글\n\t안쪽 글")
+        editors[0].type("+ 토글\n\t안쪽 글")
         try FileManager.default.removeItem(at: fixture.noteFile(note.id))
         try fixture.notes.refresh()
         #expect(controller.problem == .fileMissing)
@@ -186,11 +186,11 @@ import Testing
         let recorder = controller.environment.recorder
         var state = try #require(recorder.savedState(for: note.id))
         state.foldedLines = [0]
-        state.foldedLineTexts = ["> 토글"]
+        state.foldedLineTexts = ["+ 토글"]
         recorder.restore(state, for: note.id)
         let frame = controller.panel.frame
         // 화면에만 있고 아직 알리지 않은 글.
-        editors[0].compose("> 토글\n\t안쪽 글 그리고 마지막에 친 글")
+        editors[0].compose("+ 토글\n\t안쪽 글 그리고 마지막에 친 글")
 
         controller.resolveProblem(.saveAsNewNote)
 
@@ -198,12 +198,12 @@ import Testing
         let newID = try #require(coordinator.openNoteIDs.first)
         #expect(coordinator.openNoteIDs.count == 1)
         #expect(newID != note.id)
-        #expect(try fixture.notes.load(newID).body == "> 토글\n\t안쪽 글 그리고 마지막에 친 글")
+        #expect(try fixture.notes.load(newID).body == "+ 토글\n\t안쪽 글 그리고 마지막에 친 글")
         #expect(editors.count == 2)
-        #expect(editors[1].assignments == ["> 토글\n\t안쪽 글 그리고 마지막에 친 글"])
+        #expect(editors[1].assignments == ["+ 토글\n\t안쪽 글 그리고 마지막에 친 글"])
         let carried = try #require(try fixture.windowState(for: newID))
         #expect(carried.foldedLines == [0])
-        #expect(carried.foldedLineTexts == ["> 토글"])
+        #expect(carried.foldedLineTexts == ["+ 토글"])
         #expect(carried.isOpen)
         #expect(carried.frame?.cgRect.minX == frame.minX)
         #expect(carried.frame?.cgRect.maxY == frame.maxY)

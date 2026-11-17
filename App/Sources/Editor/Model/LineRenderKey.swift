@@ -4,6 +4,8 @@ import Foundation
 nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
     var level: Int
+    /// 안내선을 그릴 단계(부모 항목이 있는 단계만, D-043).
+    var guideLevels: [Int] = []
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
     /// 접힌 토글 자신.
@@ -33,9 +35,10 @@ nonisolated enum LinePresentation {
         let folded = FoldState.sanitized(folded, in: doc)
         let hidden = FoldState.hiddenLines(doc, folded: folded)
         let trailingCode = trailingCodeLine(in: doc) != nil
+        let guides = ListStructure.guideLevels(in: doc)
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
-            var key = LineRenderKey(kind: line.kind, level: line.level)
+            var key = LineRenderKey(kind: line.kind, level: line.level, guideLevels: guides[index])
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)
             key.childCount = line.kind == .toggle ? line.childCount : 0

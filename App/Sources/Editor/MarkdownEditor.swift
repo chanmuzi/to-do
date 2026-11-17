@@ -157,6 +157,13 @@ public final class MarkdownEditor {
         set { controller.forcesActiveAppearance = newValue }
     }
 
+    /// 입력 커서의 틀(텍스트 뷰 좌표). 커서가 없을 때(포커스가 없다, 선택이 있다)는 `nil`.
+    @_spi(Verification)
+    public var caretFrame: NSRect? {
+        guard let caret = controller.textView.caret, caret.isActive else { return nil }
+        return caret.frame
+    }
+
     /// 그 줄 왼쪽 칸 그림(체크박스, 꺾쇠)의 가운데(텍스트 뷰 좌표). 누름을 흉내 낼 때 쓴다.
     @_spi(Verification)
     public func gutterPoint(forLine line: Int) -> CGPoint? {

@@ -27,7 +27,7 @@ import Testing
     static let documents = [
         "",
         "첫 줄\n**굵게** 그리고 ~~취소~~ 끝\n- 항목 하나\n- [ ] 할 일\n",
-        "# 제목\n본문 ==형광== 과 `코드` 와 [링크](https://a.example) 끝\n> 토글\n\t안쪽 줄\n꼬리",
+        "# 제목\n본문 ==형광== 과 `코드` 와 [링크](https://a.example) 끝\n+ 토글\n\t안쪽 줄\n꼬리",
         "앞\n```swift\nlet a = 1\nlet b = 2\n```\n뒤 **굵게**\n",
         "==**겹친** 서식=={2} 뒤\n\t- 들여 쓴 항목\n```\n코드\n```",
     ]
@@ -132,14 +132,17 @@ import Testing
         return nil
     }
 
-    private func run(seed: UInt64, sequences: Int, steps: Int, wild: Bool) throws {
+    private func run(
+        seed: UInt64, sequences: Int, steps: Int, wild: Bool, honoursEnvironment: Bool = true,
+        documents: [String] = EditorFuzzTests.documents
+    ) throws {
         // 더 많이 돌릴 때: EDITOR_FUZZ_SEED(씨앗에 더할 값), EDITOR_FUZZ_SEQUENCES(씨앗마다의 차례 수).
-        let environment = ProcessInfo.processInfo.environment
+        let environment = honoursEnvironment ? ProcessInfo.processInfo.environment : [:]
         let seed = seed &+ (environment["EDITOR_FUZZ_SEED"].flatMap(UInt64.init) ?? 0)
         let sequences = environment["EDITOR_FUZZ_SEQUENCES"].flatMap(Int.init) ?? sequences
         var random = Generator(state: seed)
         for sequence in 0..<sequences {
-            let original = random.pick(Self.documents)
+            let original = random.pick(documents)
             let h = try EditorHarness(original)
             h.caret(at: random.below(h.document.length + 1))
             var log: [String] = []
@@ -201,5 +204,31 @@ import Testing
     @Test(arguments: [11, 12, 13, 14] as [UInt64])
     func arbitraryTypingKeepsFencesBalancedAndUndoExact(seed: UInt64) throws {
         try run(seed: seed, sequences: 12, steps: 50, wild: true)
+    }
+
+    /// 인용문과 여러 단계의 목록, 부모 없는 들여쓰기가 든 글: 부모를 잃는 하위 줄을 함께 내어 쓰는 편집(D-043)과
+    /// 인용문(D-044)에서도 같은 것이 지켜진다.
+    @Test(arguments: [21, 22, 23, 24] as [UInt64])
+    func quotesAndNestedListsKeepTheSourceWellFormed(seed: UInt64) throws {
+        let documents = [
+            "> 인용 **굵게**\n> 둘째 ==형광==\n본문\n- 부모\n\t- 하위\n\t\t[ ] 할 일\n\t- 둘째\n끝",
+            "+ 토글\n\t> 안쪽 인용\n\t- 항목\n\t\t- 깊은 항목\n본문\n\t\t\t부모 없는 줄\n> 꼬리",
+            "- a\n\t+ T\n\t\t안쪽\n\t\t\t- 더 안쪽\n- b\n```\n코드\n```\n> 끝",
+        ]
+        try run(seed: seed, sequences: 12, steps: 50, wild: true, documents: documents)
+    }
+
+    /// 이슈 #9의 회귀 확인은 씨앗 417(`EDITOR_FUZZ_SEED=404`를 기본 씨앗 13에 더한 것)뿐이다. 108번째 차례에서
+    /// 줄 머리 안에 커서를 남겼다(줄 종류를 바꾼 뒤 ⇧←).
+    /// `312`를 더한 여덟 씨앗은 회귀 확인이 아니다: 이슈 #9에서 실패했다고 적힌 씨앗이지만 어느 기본 씨앗이었는지
+    /// 남아 있지 않고, 지금 코드에서는 옛 실패를 다시 내지 않는다. 다른 씨앗처럼 같은 것이
+    /// 지켜지는지 보는 보통 씨앗으로 둔다.
+    @Test(arguments: [
+        (13 + 404, 110, true),
+        (11 + 312, 45, true), (12 + 312, 45, true), (13 + 312, 45, true), (14 + 312, 45, true),
+        (1 + 312, 45, false), (2 + 312, 45, false), (3 + 312, 45, false), (4 + 312, 45, false),
+    ] as [(UInt64, Int, Bool)])
+    func issue9SeedAndExtraSeedsKeepTheCaretOutOfLinePrefixes(seed: UInt64, sequences: Int, wild: Bool) throws {
+        try run(seed: seed, sequences: sequences, steps: 50, wild: wild, honoursEnvironment: false)
     }
 }

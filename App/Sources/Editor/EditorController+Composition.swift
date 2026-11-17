@@ -20,6 +20,10 @@ extension EditorController {
         if selection.length > 0 {
             if EditorCommands.replacing(document, selection, with: "가") != nil {
                 if let edit = EditorCommands.replacing(document, selection, with: "") { apply(edit) }
+            } else if replacingMovesOrphans(selection) {
+                // 부모 줄을 덮어쓰는 조합: 조합 중에는 하위 줄을 함께 내어 쓸 수 없으므로 선택을 먼저 지운다
+                // (지우는 편집이 하위 줄을 내어 쓴다). 영문으로 덮어쓴 것과 같은 글이 남는다(D-043).
+                apply(.insert("", replacing: selection))
             } else {
                 // 구간의 글자를 모두 고르고 조합한다. 조합이 글자 없이 끝나면 빈 기호 쌍이 남으므로 적어 둔다.
                 let line = document.line(at: selection.location)
@@ -63,6 +67,13 @@ extension EditorController {
         let before = edit.selection.location - edit.range.location
         let text = edit.replacement as NSString
         pendingPair = (edit.selection.location, text.substring(to: before), text.substring(from: before))
+    }
+
+    /// 선택을 글자로 덮어쓰면 부모를 잃는 하위 줄을 함께 내어 써야 하는지.
+    private func replacingMovesOrphans(_ selection: NSRange) -> Bool {
+        let typed = TextEdit.insert("가", replacing: selection)
+        let adopted = EditorCommands.adoptingOrphans(document, typed, folded: folded)
+        return adopted.range != typed.range || adopted.replacement != typed.replacement
     }
 
     /// 조합이 바뀌거나 끝난 뒤. 조합이 글자 없이 끝났으면 넣어 둔 빈 기호 쌍을 지운다(구간의 글자를 모두

@@ -7,20 +7,20 @@
 | 역할 | 글꼴 | 크기 / 줄 높이 | 굵기 |
 | --- | --- | --- | --- |
 | 노트 제목 (상단 줄) | Pretendard | `fs-title` 12px / `lh-ui` 16px | `fw-title` 600 |
-| 본문 제목 1 (#) | Pretendard | `fs-h1` 17px / `lh-h1` 24px | `fw-h1` 700 |
-| 본문 제목 2 (##) | Pretendard | `fs-h2` 15px / `lh-h2` 22px | `fw-h2` 650 |
-| 본문 제목 3 (###) | Pretendard | `fs-h3` 13px / `lh-h3` 20px | `fw-h3` 650 |
-| 본문 | Pretendard | `fs-body` 13px / `lh-body` 20px | `fw-body` 400 |
-| 본문 굵게 | Pretendard | `fs-body` 13px / `lh-body` 20px | `fw-strong` 650 |
-| 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 20px | `fw-strong` 650 |
+| 본문 제목 1 (#) | Pretendard | `fs-h1` 17px / `lh-h1` 26px | `fw-h1` 700 |
+| 본문 제목 2 (##) | Pretendard | `fs-h2` 15px / `lh-h2` 24px | `fw-h2` 650 |
+| 본문 제목 3 (###) | Pretendard | `fs-h3` 13px / `lh-h3` 22px | `fw-h3` 650 |
+| 본문 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-body` 400 |
+| 본문 굵게 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-strong` 650 |
+| 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 22px | `fw-strong` 650 |
 | 라이브러리 줄 제목 | Pretendard | `fs-row` 12.5px / `lh-row` 18px | `fw-title` 600 |
 | 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 11.5px / `lh-ui` 16px | `fw-body` 400 |
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui` 400 |
 | 임박한 리마인더 | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui-strong` 700 |
 | 날짜, 보조 숫자 | D2Coding | `fs-micro` 11px / `lh-micro` 14px | `fw-ui` 400 |
-| 인라인 코드 | D2Coding | `fs-code` 11.5px / `lh-body` 20px | `fw-body` 400 |
-| 코드 블록 | D2Coding | `fs-code` 11.5px / `lh-code` 18px | `fw-body` 400 |
-| 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 20px | `fw-body` 400 |
+| 인라인 코드 | D2Coding | `fs-code` 11.5px / `lh-body` 22px | `fw-body` 400 |
+| 코드 블록 | D2Coding | `fs-code` 11.5px / `lh-code` 20px | `fw-body` 400 |
+| 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 22px | `fw-body` 400 |
 
 - `font-body`: Pretendard. `font-ui`, `font-micro`, `font-mono`: D2Coding.
 - 본문 글꼴과 크기는 사용자가 바꿀 수 있습니다(12장). 크기를 바꾸면 줄 높이는 크기의 약 1.54배를 짝수로 맞춥니다.
@@ -99,17 +99,19 @@
 | 모서리, 높이 | `r-code` | `4.5px` | 인라인 코드 |
 | 모서리, 높이 | `r-codeblock` | `8px` | 코드 블록 |
 | 구성 요소 | `doc-pad` | `10px 14px 18px` | 노트 본문 안쪽 여백 (위 오른쪽 아래 왼쪽). 아래쪽은 오른쪽 아래 버튼 자리 |
-| 구성 요소 | `gutter` | `22px` | 체크박스, 토글, 글머리표 칸 너비 |
-| 구성 요소 | `indent` | `22px` | 하위 계층 한 단계 들여쓰기 |
+| 구성 요소 | `gutter` | `19px` | 체크박스, 토글, 글머리표 칸 너비 (D-043) |
+| 구성 요소 | `indent` | `19px` | 하위 계층 한 단계 들여쓰기 (D-043) |
 | 구성 요소 | `check-size` | `13px` | 체크박스 크기 |
 | 구성 요소 | `icon-gap` | `3px` | 아이콘과 바로 옆 글자 사이 |
 | 구성 요소 | `pick-gutter` | `24px` | AI 후보 목록의 체크박스 칸 너비 |
 | 구성 요소 | `ctl-h` | `22px` | 버튼과 선택 칸 높이 |
 | 구성 요소 | `row-h` | `26px` | 사이드바 행 높이 |
-| 구성 요소 | `caret-w` | `1.5px` | 입력 커서 너비 (얇은 일반 커서) |
+| 구성 요소 | `caret-w` | `1.5px` | 입력 커서 너비 (얇은 일반 커서, D-042) |
+| 구성 요소 | `quote-bar-w` | `2px` | 인용문 왼쪽 막대 너비 (D-044) |
+| 구성 요소 | `quote-pad` | `14px` | 인용문 블록 왼쪽 끝에서 글자까지 (D-044) |
 | 구성 요소 | `code-pad-x` | `4.5px` | 인라인 코드 상자의 좌우 안쪽 여백 |
 | 구성 요소 | `code-gap` | `1.5px` | 인라인 코드 상자의 바깥 간격 |
-| 구성 요소 | `code-h` | `16px` | 인라인 코드 상자의 높이 (본문 줄 20 안에서. 제목에서는 비례해 커짐) |
+| 구성 요소 | `code-h` | `16px` | 인라인 코드 상자의 높이 (본문 줄 22 안에서. 제목에서는 비례해 커짐) |
 | 구성 요소 | `code-drop` | `1px` | 인라인 코드 상자를 줄 가운데에서 아래로 내리는 양 |
 | 구성 요소 | `code-rise` | `0.5px` | 인라인 코드 글자의 기준선을 올리는 양 |
 | 구성 요소 | `codeblock-pad-x` | `12px` | 코드 블록의 좌우 안쪽 여백 |
@@ -132,4 +134,5 @@
 | 재질 | `tint-mix-row` | `18%` | 라이브러리 줄 바탕에 섞는 비율 |
 | 움직임 | `dur` | `180ms` | 전환 시간 (호버로 나타나고 사라지는 것 모두) |
 | 움직임 | `ease` | `cubic-bezier(.25,.1,.25,1)` | 전환 곡선 |
+| 움직임 | `caret-blink` | `530ms` | 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간 (D-042, 임시) |
 

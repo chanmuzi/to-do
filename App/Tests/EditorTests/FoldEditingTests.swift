@@ -14,99 +14,102 @@ import Testing
     // MARK: 들여쓰기
 
     @Test func tabOnAFoldedToggleTakesItsHiddenChildrenAlong() throws {
-        let h = try loaded("- a\n> T\n\tc1\n\tc2\nafter", folded: [1])
+        let h = try loaded("- a\n+ T\n\tc1\n\tc2\nafter", folded: [1])
         h.caret(atEndOfLine: 1)
         h.press(NSResponder.tab)
-        #expect(h.editor.text == "- a\n\t> T\n\t\tc1\n\t\tc2\nafter")
+        #expect(h.editor.text == "- a\n\t+ T\n\t\tc1\n\t\tc2\nafter")
         #expect(h.editor.foldedLines == [1])
         #expect(h.document.lines[1].subtreeEnd == 4)
         #expect(h.editor.selectedRange == NSRange(location: h.document.lines[1].end, length: 0))
         h.press(NSResponder.backtab)
-        #expect(h.editor.text == "- a\n> T\n\tc1\n\tc2\nafter")
+        #expect(h.editor.text == "- a\n+ T\n\tc1\n\tc2\nafter")
         #expect(h.editor.foldedLines == [1])
         // 줄 번호가 그대로이므로 알릴 것이 없다.
         #expect(h.foldChanges.isEmpty)
     }
 
     @Test func tabOverSeveralLinesKeepsAFoldInTheMiddle() throws {
-        let h = try loaded("- a\n> T\n\tc1\n\tc2\nafter", folded: [1])
-        h.editor.selectedRange = NSRange(location: 2, length: h.document.lines[1].end - 2)
+        // 들여 쓴 줄은 부모 항목(`- p`) 아래에만 놓인다(D-043).
+        let h = try loaded("- p\n- a\n+ T\n\tc1\n\tc2\nafter", folded: [2])
+        let start = h.document.lines[1].contentStart
+        h.editor.selectedRange = NSRange(location: start, length: h.document.lines[2].end - start)
         h.press(NSResponder.tab)
-        #expect(h.editor.text == "\t- a\n\t> T\n\t\tc1\n\t\tc2\nafter")
-        #expect(h.editor.foldedLines == [1])
+        #expect(h.editor.text == "- p\n\t- a\n\t+ T\n\t\tc1\n\t\tc2\nafter")
+        #expect(h.editor.foldedLines == [2])
         h.undo()
-        #expect(h.editor.text == "- a\n> T\n\tc1\n\tc2\nafter")
-        #expect(h.editor.foldedLines == [1])
+        #expect(h.editor.text == "- p\n- a\n+ T\n\tc1\n\tc2\nafter")
+        #expect(h.editor.foldedLines == [2])
     }
 
     @Test func tabOverEverythingIndentsHiddenLinesToo() throws {
-        let h = try loaded("> T\n\tc1\nz", folded: [0])
-        h.editor.selectedRange = NSRange(location: 0, length: h.document.length)
+        let h = try loaded("- p\n+ T\n\tc1\nz", folded: [1])
+        let start = h.document.lines[1].start
+        h.editor.selectedRange = NSRange(location: start, length: h.document.length - start)
         h.press(NSResponder.tab)
-        #expect(h.editor.text == "\t> T\n\t\tc1\n\tz")
-        #expect(h.editor.foldedLines == [0])
+        #expect(h.editor.text == "- p\n\t+ T\n\t\tc1\n\tz")
+        #expect(h.editor.foldedLines == [1])
     }
 
     @Test func returnOnAnEmptyNestedFoldedToggleOutdentsItWithItsChildren() throws {
-        let h = try loaded("- a\n\t> \n\t\tc1\nz", folded: [1])
+        let h = try loaded("- a\n\t+ \n\t\tc1\nz", folded: [1])
         h.caret(atEndOfLine: 1)
         h.press(NSResponder.newline)
-        #expect(h.editor.text == "- a\n> \n\tc1\nz")
+        #expect(h.editor.text == "- a\n+ \n\tc1\nz")
         #expect(h.editor.foldedLines == [1])
     }
 
     // MARK: 줄 번호 따라가기
 
     @Test func deletingTheLineAboveKeepsTheToggleFolded() throws {
-        let h = try loaded("memo\n> T\n\tc1\n\tc2\nz", folded: [1])
+        let h = try loaded("memo\n+ T\n\tc1\n\tc2\nz", folded: [1])
         h.editor.selectedRange = NSRange(location: 0, length: 5)
         h.press(NSResponder.backspace)
-        #expect(h.editor.text == "> T\n\tc1\n\tc2\nz")
+        #expect(h.editor.text == "+ T\n\tc1\n\tc2\nz")
         #expect(h.editor.foldedLines == [0])
         #expect(h.foldChanges == [[0]])
         h.undo()
-        #expect(h.editor.text == "memo\n> T\n\tc1\n\tc2\nz")
+        #expect(h.editor.text == "memo\n+ T\n\tc1\n\tc2\nz")
         #expect(h.editor.foldedLines == [1])
         #expect(h.foldChanges == [[0], [1]])
     }
 
     @Test func replacingTheLineAboveKeepsTheToggleFolded() throws {
-        let h = try loaded("memo\n> T\n\tc1\n\tc2\nz", folded: [1])
+        let h = try loaded("memo\n+ T\n\tc1\n\tc2\nz", folded: [1])
         h.editor.selectedRange = NSRange(location: 0, length: 5)
         h.type("x")
-        #expect(h.editor.text == "x> T\n\tc1\n\tc2\nz")
-        // 토글이 아니게 됐으므로 접힘이 없어지고, 하위 줄이 보인다.
+        // 토글이 아니게 됐으므로 접힘이 없어지고, 부모를 잃은 하위 줄은 함께 나온다(D-043).
+        #expect(h.editor.text == "x+ T\nc1\nc2\nz")
         #expect(h.editor.foldedLines == [])
         h.undo()
         #expect(h.editor.foldedLines == [1])
     }
 
     @Test func pastingLinesAboveShiftsTheFold() throws {
-        let h = try loaded("memo\n> T\n\tc1\nz", folded: [1])
+        let h = try loaded("memo\n+ T\n\tc1\nz", folded: [1])
         h.caret(at: 0)
         h.step { h.view.insertText("a\nb\n", replacementRange: h.view.selectedRange()) }
         #expect(h.editor.foldedLines == [3])
         h.undo()
         #expect(h.editor.foldedLines == [1])
         h.redo()
-        #expect(h.editor.text == "a\nb\nmemo\n> T\n\tc1\nz")
+        #expect(h.editor.text == "a\nb\nmemo\n+ T\n\tc1\nz")
         #expect(h.editor.foldedLines == [3])
     }
 
     // MARK: 되돌리기
 
     @Test func undoAfterMovingAFoldedToggleRestoresTheFold() throws {
-        let source = "> A\n> T\n\tchild\nz"
+        let source = "+ A\n+ T\n\tchild\nz"
         let h = try loaded(source, folded: [1])
         h.caret(atEndOfLine: 1)
         h.perform(.moveLineUp)
-        #expect(h.editor.text == "> T\n\tchild\n> A\nz")
+        #expect(h.editor.text == "+ T\n\tchild\n+ A\nz")
         #expect(h.editor.foldedLines == [0])
         h.undo()
         #expect(h.editor.text == source)
         #expect(h.editor.foldedLines == [1])
         h.redo()
-        #expect(h.editor.text == "> T\n\tchild\n> A\nz")
+        #expect(h.editor.text == "+ T\n\tchild\n+ A\nz")
         #expect(h.editor.foldedLines == [0])
         h.undo()
         #expect(h.editor.foldedLines == [1])
@@ -120,12 +123,13 @@ import Testing
     }
 
     @Test func undoRestoresAFoldLostWithItsToggle() throws {
-        let source = "> T\n\tc1\nz"
+        let source = "+ T\n\tc1\nz"
         let h = try loaded(source, folded: [0])
         // 토글 기호를 지우면 접힘이 없어진다.
         h.caret(at: 2)
         h.press(NSResponder.backspace)
-        #expect(h.editor.text == "T\n\tc1\nz")
+        // 부모를 잃은 하위 줄은 함께 나온다(D-043).
+        #expect(h.editor.text == "T\nc1\nz")
         #expect(h.editor.foldedLines == [])
         h.undo()
         #expect(h.editor.text == source)
@@ -133,13 +137,13 @@ import Testing
     }
 
     @Test func undoOfAnEditInsideAFoldedToggleUnfoldsIt() throws {
-        let h = try loaded("> T\n\tc1\nz", folded: [])
+        let h = try loaded("+ T\n\tc1\nz", folded: [])
         h.caret(atEndOfLine: 1)
         h.type("!")
         h.editor.foldedLines = [0]
         h.undo()
         // 감춘 줄이 바뀌었으므로 보이게 편다(D-018).
-        #expect(h.editor.text == "> T\n\tc1\nz")
+        #expect(h.editor.text == "+ T\n\tc1\nz")
         #expect(h.editor.foldedLines == [])
         #expect(h.foldChanges == [[]])
     }
@@ -150,25 +154,25 @@ import Testing
         let h = try EditorHarness()
         // 원문보다 먼저 넣은 접힘은 토글이 없어 남지 않는다.
         h.editor.foldedLines = [1]
-        h.editor.text = "memo\n> T\n\tc1"
+        h.editor.text = "memo\n+ T\n\tc1"
         #expect(h.editor.foldedLines == [])
-        h.editor.load(text: "memo\n> T\n\tc1\nz", foldedLines: [1, 3, 9])
+        h.editor.load(text: "memo\n+ T\n\tc1\nz", foldedLines: [1, 3, 9])
         #expect(h.editor.foldedLines == [1])
-        #expect(h.editor.text == "memo\n> T\n\tc1\nz")
+        #expect(h.editor.text == "memo\n+ T\n\tc1\nz")
         #expect(h.foldChanges.isEmpty)
         #expect(h.changes.isEmpty)
         #expect(!h.editor.undoManager.canUndo)
         // 같은 글이면 접힘만 바꾸고 되돌리기 기록은 그대로다.
         h.caret(at: 4)
         h.type("!")
-        h.editor.load(text: "memo!\n> T\n\tc1\nz", foldedLines: [])
+        h.editor.load(text: "memo!\n+ T\n\tc1\nz", foldedLines: [])
         #expect(h.editor.foldedLines == [])
         #expect(h.editor.undoManager.canUndo)
         #expect(h.foldChanges.isEmpty)
     }
 
     @Test func settingTextThatDropsAFoldReportsItOnceRightAway() throws {
-        let h = try loaded("memo\n> T\n\tc1", folded: [1])
+        let h = try loaded("memo\n+ T\n\tc1", folded: [1])
         h.editor.text = "memo\nplain\n\tc1"
         #expect(h.editor.foldedLines == [])
         #expect(h.foldChanges == [[]])
@@ -177,14 +181,14 @@ import Testing
         h.type("!")
         #expect(h.foldChanges == [[]])
         // 접힘이 그대로 남는 글이면 알리지 않는다.
-        h.editor.load(text: "> T\n\tc1", foldedLines: [0])
-        h.editor.text = "> T2\n\tc1"
+        h.editor.load(text: "+ T\n\tc1", foldedLines: [0])
+        h.editor.text = "+ T2\n\tc1"
         #expect(h.editor.foldedLines == [0])
         #expect(h.foldChanges == [[]])
     }
 
     @Test func foldChangeIsReportedOnlyWhenTheSetChanges() throws {
-        let h = try loaded("> T\n\tc1\nz", folded: [])
+        let h = try loaded("+ T\n\tc1\nz", folded: [])
         h.perform(.unfold)
         h.caret(atEndOfLine: 0)
         h.perform(.fold)
@@ -207,22 +211,22 @@ import Testing
     }
 
     @Test func foldFollowsTheFirstCharacterOfItsLine() {
-        let text = "memo\n> T\n\tc1\nz"
+        let text = "memo\n+ T\n\tc1\nz"
         // 윗줄 전체(줄바꿈까지)를 지우거나 바꿔도 토글을 따라간다.
         #expect(remap(text, folded: [1], TextEdit(range: NSRange(location: 0, length: 5), replacement: "", selection: NSRange())) == [0])
         #expect(remap(text, folded: [1], TextEdit(range: NSRange(location: 0, length: 5), replacement: "a\nb\n", selection: NSRange())) == [2])
         // 윗줄과 합쳐지면 토글이 아니다.
         #expect(remap(text, folded: [1], TextEdit(range: NSRange(location: 4, length: 1), replacement: "", selection: NSRange())) == [])
         // 빈 윗줄과 합쳐지면 그 줄이 토글이 된다.
-        #expect(remap("\n> T\n\tc1", folded: [1], TextEdit(range: NSRange(location: 0, length: 1), replacement: "", selection: NSRange())) == [0])
+        #expect(remap("\n+ T\n\tc1", folded: [1], TextEdit(range: NSRange(location: 0, length: 1), replacement: "", selection: NSRange())) == [0])
         // 줄 맨 앞에 탭을 끼우면 여전히 그 줄이 토글이다.
         #expect(remap(text, folded: [1], .insert("\t", replacing: NSRange(location: 5, length: 0))) == [1])
         // 줄의 첫 글자가 바뀐 범위 한가운데에 있었으면 버린다.
-        #expect(remap(text, folded: [1], TextEdit(range: NSRange(location: 2, length: 6), replacement: "> X", selection: NSRange())) == [])
+        #expect(remap(text, folded: [1], TextEdit(range: NSRange(location: 2, length: 6), replacement: "+ X", selection: NSRange())) == [])
     }
 
     @Test func brokenRootsAreTheFoldsWhoseHiddenLinesTheRangeTouches() {
-        let doc = MarkdownDocument("> T\n\tchild one\n\tchild two\nafter")
+        let doc = MarkdownDocument("+ T\n\tchild one\n\tchild two\nafter")
         func broken(_ location: Int, _ length: Int) -> Set<Int> {
             FoldState.brokenRoots(by: NSRange(location: location, length: length), in: doc, folded: [0])
         }
@@ -241,7 +245,7 @@ import Testing
         // 접히지 않았으면 해당 없다.
         #expect(FoldState.brokenRoots(by: NSRange(location: 4, length: 3), in: doc, folded: []) == [])
         // 감춘 줄이 문서 끝이면 문서 끝도 감춘 줄 안이다.
-        let tail = MarkdownDocument("> T\n\tc")
+        let tail = MarkdownDocument("+ T\n\tc")
         #expect(FoldState.brokenRoots(by: NSRange(location: 6, length: 0), in: tail, folded: [0]) == [0])
     }
 }

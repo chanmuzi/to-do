@@ -187,6 +187,7 @@ public struct ThemeTokens: Hashable, Sendable {
                 pivotFromTop: try motion(.bellPivot, TokenValueParser.fraction),
                 curve: try motion(.bellEase, TokenValueParser.bezier)
             ),
+            caretBlink: try motion(.caretBlink, TokenValueParser.seconds),
             toastHold: try motion(.toastHold, TokenValueParser.seconds)
         )
         self.palette = try raw.paletteOrder.map { key in

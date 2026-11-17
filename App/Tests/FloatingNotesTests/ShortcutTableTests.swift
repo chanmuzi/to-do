@@ -171,4 +171,29 @@ import Theme
         #expect(fromTable == Set(EditorShortcuts.bindings))
         #expect(EditorShortcuts.bindings.count == fromTable.count)
     }
+
+    /// "마크다운으로 입력"의 줄 머리 기호는 편집기가 줄 맨 앞에서 Space와 함께 받는 기호와 같다(D-044).
+    @Test func lineMarkersInTheTableAreTheEditorsSpaceTriggers() throws {
+        let expected: [String: [LineKind]] = [
+            "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],
+            "글머리표": [.bullet],
+            "투두": [.todo(done: false)],
+            "토글": [.toggle],
+            "인용문": [.quote, .quote],
+        ]
+        let rows = ShortcutTable.standard.entries(in: .markdownInput).filter { expected[$0.action] != nil }
+        #expect(Set(rows.map(\.action)) == Set(expected.keys))
+        for row in rows {
+            let kinds = try #require(expected[row.action])
+            #expect(row.keyLabels.count == kinds.count, "\(row.action)")
+            for (label, kind) in zip(row.keyLabels, kinds) {
+                let doc = MarkdownDocument(label)
+                let edit = try #require(
+                    EditorCommands.spaceTrigger(doc, selection: NSRange(location: label.utf16.count, length: 0)),
+                    "\(row.action) \(label)"
+                )
+                #expect(MarkdownDocument(edit.applied(to: label)).lines[0].kind == kind, "\(row.action) \(label)")
+            }
+        }
+    }
 }

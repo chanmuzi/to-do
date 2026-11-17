@@ -155,6 +155,7 @@ extension EditorController {
         }
         isRestyling = false
         textView.needsDisplay = true
+        textView.caret?.reposition()
     }
 
     // MARK: 높이

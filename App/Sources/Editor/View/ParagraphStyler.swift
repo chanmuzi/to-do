@@ -118,10 +118,12 @@ nonisolated enum ParagraphStyler {
                 font = style.body
             }
             let isDone = key.kind == .todo(done: true)
-            let baseColor = isDone ? style.text3 : style.text
+            let isQuote = key.kind == .quote
+            // 인용문의 글자는 `text-2`다. 서식(형광펜, 코드)의 글자색은 그 위에 입힌다.
+            let baseColor = isDone ? style.text3 : isQuote ? style.text2 : style.text
 
             let left = CGFloat(key.level) * style.indent
-            let textStart = left + (key.kind.isListItem ? style.gutter : 0)
+            let textStart = left + (key.kind.isListItem ? style.gutter : isQuote ? style.quotePadding : 0)
             let paragraph = NSMutableParagraphStyle()
             paragraph.minimumLineHeight = font.lineHeight
             paragraph.maximumLineHeight = font.lineHeight
@@ -155,7 +157,7 @@ nonisolated enum ParagraphStyler {
             hide(line.markerRange)
 
             decoration.gutterX = left
-            decoration.guideCount = key.level
+            decoration.guideLevels = key.guideLevels
             switch key.kind {
             case .todo(let done): decoration.gutter = .checkbox(done: done)
             case .bullet: decoration.gutter = .bullet(key.level % 3)
@@ -165,6 +167,7 @@ nonisolated enum ParagraphStyler {
                     decoration.count = String(key.childCount)
                     decoration.countIndex = line.end - line.start
                 }
+            case .quote: decoration.quoteBar = true
             default: break
             }
         }
@@ -277,7 +280,7 @@ nonisolated enum ParagraphStyler {
             decoration.codeBox = (key.isCodeTop, key.isCodeBottom || key.hasTrailingCodeLine)
             decoration.codeBoxCoversExtraLine = key.hasTrailingCodeLine
             decoration.codeBoxX = boxX
-            decoration.guideCount = key.level
+            decoration.guideLevels = key.guideLevels
         }
 
         /// 주석 줄(`//`, `#`으로 시작)은 흐리게 한다. 구문 색은 없다.

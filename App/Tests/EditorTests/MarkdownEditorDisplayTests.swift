@@ -53,14 +53,14 @@ import Theme
         let decoration = try #require(try h.display(line: 2).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
         #expect(decoration.gutter == .checkbox(done: false))
         #expect(decoration.gutterX == h.theme.component(.indent))
-        #expect(decoration.guideCount == 1)
+        #expect(decoration.guideLevels == [0])
         let style = try #require(try h.display(line: 2).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
         #expect(style.headIndent == h.theme.component(.indent) + h.theme.component(.gutter))
         #expect(style.minimumLineHeight == h.theme.lineHeight(.body))
     }
 
     @Test func gutterGlyphsPerKindAndLevel() throws {
-        let h = try EditorHarness("- 0\n\t- 1\n\t\t- 2\n\t\t\t- 3\n> 토글\n\t하위\n[x] 끝")
+        let h = try EditorHarness("- 0\n\t- 1\n\t\t- 2\n\t\t\t- 3\n+ 토글\n\t하위\n[x] 끝")
         func gutter(_ line: Int) throws -> FragmentDecoration.Gutter? {
             (try h.display(line: line).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)?.gutter
         }
@@ -273,18 +273,18 @@ import Theme
     }
 
     @Test func typingAfterAFoldedToggleStaysVisible() throws {
-        let h = try EditorHarness("> 토글\n\t- 안\n밖")
+        let h = try EditorHarness("+ 토글\n\t- 안\n밖")
         h.editor.foldedLines = [0]
         h.caret(atEndOfLine: 0)
         h.press(NSResponder.newline)
         h.type("새 토글")
-        #expect(h.editor.text == "> 토글\n\t- 안\n> 새 토글\n밖")
+        #expect(h.editor.text == "+ 토글\n\t- 안\n+ 새 토글\n밖")
         #expect(h.editor.foldedLines == [0])
         // 접힌 줄과 맞닿은 줄바꿈을 지우려 하면 먼저 편다(보이지 않는 줄과 합쳐지지 않게).
         h.caret(atEndOfLine: 3)
         h.editor.selectedRange = NSRange(location: h.document.lines[3].start, length: 0)
         h.perform(.moveLineUp)
-        #expect(h.editor.text == "> 토글\n\t- 안\n밖\n> 새 토글")
+        #expect(h.editor.text == "+ 토글\n\t- 안\n밖\n+ 새 토글")
         #expect(!h.controller.textView(h.view, doCommandBy: NSResponder.backspace))
         #expect(h.editor.foldedLines == [])
     }
@@ -340,7 +340,7 @@ import Theme
     }
 
     @Test func pastingInsideTheAppRoundTripsTheSyntax() throws {
-        let source = "> 토글\n\t[ ] ==형광=={3}\n\t[x] 끝"
+        let source = "+ 토글\n\t[ ] ==형광=={3}\n\t[x] 끝"
         let from = try EditorHarness(source)
         let board = pasteboard()
         defer { board.releaseGlobally() }

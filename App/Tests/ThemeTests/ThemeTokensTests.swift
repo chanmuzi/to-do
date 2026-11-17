@@ -99,7 +99,7 @@ import Testing
         let body = tokens.textStyle(.body)
         #expect(body.families.first == "Pretendard")
         #expect(body.size == 13)
-        #expect(body.lineHeight == 20)
+        #expect(body.lineHeight == 22)
         #expect(body.weight == 400)
         #expect(body.tracking == 0)
 
