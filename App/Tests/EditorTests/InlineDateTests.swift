@@ -68,28 +68,20 @@ import Models
         #expect(h.editor.text == source)
     }
 
-    @Test(arguments: ["내일\n다음 줄", "윗줄 보존\n아주 긴 회의 제목 내일 오후 3시~4시\n아랫줄 보존",
-                      "윗줄\n내일 뒤에도 글이 남습니다\n아랫줄"])
-    func previewNeverOverlapsAnyText(source: String) throws {
-        let (h, _) = try setup(source)
-        let caret = source.contains("3시~4시") ? (source as NSString).range(of: "4시").upperBound
-            : (source as NSString).range(of: "내일").upperBound
-        h.caret(at: caret)
-        h.controller.updateDateSuggestion()
-        h.controller.layoutManager.ensureLayout(for: h.controller.layoutManager.documentRange)
-        h.controller.layoutDateHint()
-        #expect(!h.controller.dateHint.isHidden)
-        let preview = h.controller.dateHint.frame
-        let origin = h.view.textContainerOrigin
-        h.controller.layoutManager.enumerateTextLayoutFragments(from: nil, options: [.ensuresLayout]) { fragment in
-            for line in fragment.textLineFragments where line.characterRange.length > 0 {
-                let text = line.typographicBounds.offsetBy(dx: origin.x + fragment.layoutFragmentFrame.minX,
-                                                          dy: origin.y + fragment.layoutFragmentFrame.minY)
-                #expect(!preview.intersects(text), "preview \(preview) intersects text \(text)")
-            }
-            return true
-        }
-        #expect(h.editor.text == source)
+    @Test func underlineDoesNotChangeHeightOrAddAView() throws {
+        let (h, _) = try setup("윗줄\n내일 뒤에도 글이 남습니다\n아랫줄")
+        let height = h.editor.contentHeight
+        let views = h.view.subviews.count
+        h.caret(at: 3)
+        #expect(h.controller.dateSuggestion != nil)
+        #expect(try isDateUnderlined(h, line: 1))
+        #expect(h.view.accessibilityHelp()?.contains("리마인더") == true)
+        #expect(h.editor.contentHeight == height)
+        #expect(h.view.subviews.count == views)
+        h.press(#selector(NSResponder.cancelOperation(_:)))
+        #expect(try !isDateUnderlined(h, line: 1))
+        #expect(h.editor.contentHeight == height)
+        #expect(h.editor.text == "윗줄\n내일 뒤에도 글이 남습니다\n아랫줄")
     }
 
     private func isDateUnderlined(_ h: EditorHarness, line: Int) throws -> Bool {
@@ -158,8 +150,8 @@ import Models
         #expect(h.editor.text == source)
         #expect(effects.count == 0)
     }
-    @Test(arguments: ["`내일 3시`", "```\n내일 3시\n```", "[링크](https://x/내일3시)", "https://x/내일3시", "내일배움카드", "어제 3시", "회의 내일 3시 추가"])
-    func excludedContextsAndContinuedTypingNeverOffer(source: String) throws {
+    @Test(arguments: ["`내일 3시`", "```\n내일 3시\n```", "[링크](https://x/내일3시)", "https://x/내일3시", "내일배움카드", "어제 3시"])
+    func excludedContextsNeverOffer(source: String) throws {
         let (h, effects) = try setup(source)
         if let range = source.range(of: "3시") { h.caret(at: source[..<range.upperBound].utf16.count) }
         if source.hasSuffix("추가") { h.caret(at: source.utf16.count) }
@@ -210,8 +202,11 @@ import Models
             seed = seed &* 6364136223846793005 &+ 1
             let expression = ["내일 3시", "모레", "내일 3시~4시"][Int(seed % 3)]
             let prefix = ["😀 메모 ", "[ ] 일 ", "- 부모\n\t[ ] 할 일 "][Int((seed >> 8) % 3)]
-            let source = prefix + expression
+            let source = prefix + expression + " 이후 확인"
             let (h, effects) = try setup(source)
+            let line = h.document.lines.last!
+            let location = seed & 2 == 0 ? line.contentStart : h.editor.text.utf16.count - 2
+            h.caret(at: location)
             h.press(#selector(NSResponder.insertTab(_:)))
             let accepted = h.editor.text
             h.editor.applyOutsideChange(to: accepted + "\n바깥에서 온 글")

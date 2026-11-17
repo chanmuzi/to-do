@@ -134,6 +134,7 @@ import Testing
         #expect(coordinator.allowsKeyWindows == false)
         let panel = try #require(coordinator.controllers[first.id]).panel
         #expect(!panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
         coordinator.allowsKeyWindows = true
         #expect(panel.canBecomeKey)
 
@@ -141,6 +142,7 @@ import Testing
         let second = try coordinator.createNote()
 
         #expect(!panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
         #expect(coordinator.controllers[second]?.panel.allowsKey == false)
         #expect(coordinator.keyNoteID == nil)
     }
@@ -153,7 +155,7 @@ import Testing
         defer { panel.close() }
         #expect(!panel.styleMask.contains(.nonactivatingPanel))
         #expect(panel.canBecomeKey)
-        #expect(!panel.canBecomeMain)
+        #expect(panel.canBecomeMain)
         #expect(!panel.hidesOnDeactivate)
         #expect(!panel.becomesKeyOnlyIfNeeded)
         #expect(panel.collectionBehavior.contains(.canJoinAllSpaces))
@@ -164,6 +166,7 @@ import Testing
         #expect(panel.level == .normal)
         panel.allowsKey = false
         #expect(!panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
     }
 
     /// 창을 띄우기만 해서는(되살리기, 앞으로 가져오기) 키 창을 시키지 않는다. 커서를 두라고 할 때만 시킨다.

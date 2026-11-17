@@ -41,13 +41,12 @@ final class EditorController: NSObject {
     let editorUndoManager = EditorUndoManager()
     let copyButton = CodeCopyButton()
     let linkField = LinkField()
-    lazy var dateHint = DateSuggestionView(theme: theme)
     var dateSuggestion: InlineDateProposal?
     var dateSuggestionLine: Int?
     var dateSuggestionLineCount = 0
-    var dateSuggestionAbove = false
     var isUpdatingDateSuggestion = false
-    var dismissedDate: (text: String, selection: NSRange)?
+    var dismissedDateLines: [Int: String] = [:]
+    var dismissedDateDocument: MarkdownDocument?
     var dateNow: () -> Date = { Date() }
     var dateCalendar = Calendar.current
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?

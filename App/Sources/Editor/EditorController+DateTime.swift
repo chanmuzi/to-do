@@ -16,14 +16,14 @@ extension EditorController {
         let old = dateSuggestion
         let oldLine = dateSuggestionLine
         let oldLineCount = dateSuggestionLineCount
-        let oldAbove = dateSuggestionAbove
         dateSuggestion = nil
         dateSuggestionLine = nil
+        moveDateDismissals()
         let selection = selectedRange
         if onAcceptDate != nil, (isActive || forcesActiveAppearance), !textView.hasMarkedText(),
            !isEndingComposition, !isReplayingUndo, !isSettingText, !isApplyingOutsideChange,
            selection.length == 0, deferredOutsideEdit == nil,
-           !(dismissedDate?.text == text && dismissedDate?.selection == selection) {
+           dismissedDateLines[document.lineIndex(at: selection.location)] == nil {
             let index = document.lineIndex(at: selection.location)
             let line = document.lines[index]
             if !line.kind.isCode, selection.location >= line.contentStart {
@@ -45,17 +45,8 @@ extension EditorController {
             let p = ReminderPresentation(item: $0.item, now: dateNow(), options: NoteDisplayOptions(), calendar: dateCalendar)
             return ($0.item.kind == .event ? "일정 " : "리마인더 ") + (p.text ?? "")
         }
-        dateHint.prepare(message)
-        let caret = caretRect() ?? .zero
-        let right = textView.bounds.width - theme.docPadding.trailing
-        // 뒤에 원문(감춘 닫는 기호 포함)이 있으면 그 자리를 사용하지 않는다.
-        dateSuggestionAbove = dateSuggestionLine.map {
-            selection.location != document.lines[$0].end ||
-            caret.maxX + theme.space(.sp2) + dateHint.preferredSize.width > right ||
-            dateHint.preferredSize.height > style.body.lineHeight
-        } ?? false
         dateSuggestionLineCount = document.lines.count
-        if old != dateSuggestion || oldLine != dateSuggestionLine || oldAbove != dateSuggestionAbove ||
+        if old != dateSuggestion || oldLine != dateSuggestionLine ||
             (oldLine != nil && oldLineCount != document.lines.count) {
             if oldLine != nil && oldLineCount != document.lines.count {
                 restyleAll()
@@ -65,35 +56,35 @@ extension EditorController {
                 }
             }
         }
-        layoutDateHint()
-        if oldAbove != dateSuggestionAbove || oldLine != dateSuggestionLine { reportContentHeight() }
         textView.setAccessibilityHelp(message)
     }
 
-    /// 텍스트 뷰 안에 놓아 스크롤/클리핑도 본문과 함께 움직인다.
-    func layoutDateHint() {
-        guard let index = dateSuggestionLine, document.lines.indices.contains(index), let caret = caretRect() else {
-            dateHint.hide(); return
+    func dismissCurrentDateLine() {
+        let index = document.lineIndex(at: selectedRange.location)
+        dismissedDateLines[index] = document.string(in: document.lines[index].range)
+        dismissedDateDocument = document
+    }
+
+    /// 앞줄의 삽입·삭제는 닫아 둔 줄의 내용 변경이 아니다. 원문 위치를 따라 옮긴다.
+    private func moveDateDismissals() {
+        if let previous = dismissedDateDocument,
+           let edit = OutsideEdit(from: previous.text, to: document.text) {
+            var moved: [Int: String] = [:]
+            for (index, source) in dismissedDateLines where previous.lines.indices.contains(index) {
+                let line = previous.lines[index]
+                guard NSIntersectionRange(line.range, edit.range).length == 0 else { continue }
+                let start = edit.moved(line.start, sticksToEnd: true)
+                let next = document.lineIndex(at: min(start, document.length))
+                if document.string(in: document.lines[next].range) == source { moved[next] = source }
+            }
+            dismissedDateLines = moved
         }
-        let pad = theme.space(.sp2)
-        let right = textView.bounds.width - theme.docPadding.trailing
-        if dateSuggestionAbove,
-           let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[index].start),
-           let fragment = layoutManager.textLayoutFragment(for: location) {
-            layoutManager.ensureLayout(for: fragment.rangeInElement)
-            let origin = textView.textContainerOrigin
-            let area = NSRect(x: origin.x, y: origin.y + fragment.layoutFragmentFrame.minY,
-                              width: max(0, right - origin.x), height: dateHint.preferredSize.height)
-            dateHint.place(in: textView, area: area)
-        } else {
-            dateHint.place(in: textView, area: NSRect(x: caret.maxX + pad, y: caret.midY - dateHint.preferredSize.height / 2,
-                width: max(0, right - caret.maxX - pad), height: dateHint.preferredSize.height))
-        }
+        dismissedDateDocument = dismissedDateLines.isEmpty ? nil : document
     }
 
     @discardableResult func dismissDateSuggestion() -> Bool {
         guard dateSuggestion != nil else { return false }
-        dismissedDate = (text, selectedRange)
+        dismissCurrentDateLine()
         updateDateSuggestion()
         return true
     }
@@ -107,12 +98,14 @@ extension EditorController {
         let index = old.lineIndex(at: selectedRange.location)
         let line = old.lines[index]
         var planned = old
+        var caret = selectedRange.location
         for local in proposal.expression.ranges.reversed() {
             let range = NSRange(location: line.contentStart + local.location, length: local.length)
             let edit = EditorCommands.finalized(planned, EditorCommands.insert(planned, "", replacing: range))
             guard EditorCommands.keepsFencesBalanced(planned, edit), !EditorCommands.exposesHiddenMarkers(planned, edit) else {
                 onRejectedEdit(); return true
             }
+            caret = InlineDateProposal.caret(caret, replacing: edit.range, withLength: edit.replacement.utf16.count)
             planned = MarkdownDocument(edit.applied(to: planned.text))
             // 삭제 접점의 공백만 정리한다. 다른 곳의 정렬용 공백·인라인 코드는 보존한다.
             let currentLine = planned.lines[index]
@@ -125,6 +118,7 @@ extension EditorController {
                 let cleanup = EditorCommands.finalized(planned, EditorCommands.insert(planned, space,
                     replacing: NSRange(location: lower, length: upper - lower)))
                 guard !EditorCommands.exposesHiddenMarkers(planned, cleanup) else { onRejectedEdit(); return true }
+                caret = InlineDateProposal.caret(caret, replacing: cleanup.range, withLength: cleanup.replacement.utf16.count)
                 planned = MarkdownDocument(cleanup.applied(to: planned.text))
             }
         }
@@ -141,7 +135,7 @@ extension EditorController {
         do { effect = try accept(request) }
         catch { onDateError(error); onRejectedEdit(); return true }
         let edit = TextEdit(range: diff.range, replacement: diff.replacement,
-            selection: NSRange(location: min(diff.range.location + diff.replacement.utf16.count, nextLine.end), length: 0),
+            selection: NSRange(location: min(caret, nextLine.end), length: 0),
             preservesLines: true)
         // 미리 검증한 삭제는 기존 편집 경로에서 한 단계로 기록한다.
         apply(edit)

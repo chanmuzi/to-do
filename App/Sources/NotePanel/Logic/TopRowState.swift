@@ -51,8 +51,10 @@ struct TopRowState: Hashable {
         isTitlePlaceholder = note.title.isEmpty
         titleColor = isHovered || isEditingTitle ? .text : .text3
         hoverControlsAlpha = isHovered ? 1 : 0
+        var reminderOptions = options
+        reminderOptions.reminder = .time
         reminder = note.displayedSchedule(at: now, calendar: calendar).map {
-            ReminderPresentation(item: $0, now: now, options: options, calendar: calendar)
+            ReminderPresentation(item: $0, now: now, options: reminderOptions, calendar: calendar)
         }
         pin = isPinned
             ? Pin(symbolName: "pin.fill", alpha: 1, color: isHovered ? .text2 : .text3, isOn: true)

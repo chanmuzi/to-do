@@ -110,7 +110,6 @@ extension EditorController {
         refreshStyling()
         reportContentHeight()
         layoutCopyButton()
-        dismissedDate = (text, selectedRange)
         updateDateSuggestion()
     }
 

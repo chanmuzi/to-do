@@ -76,7 +76,6 @@ final class NoteWindowController: NSObject {
         panel.onButtonPress = nil
         root.onHoverChange = nil
         root.onLayout = nil
-        root.onDatePreviewHeightChange = nil
     }
 
     var isHovered: Bool { hoverOverride ?? isPointerInside }
@@ -220,10 +219,6 @@ final class NoteWindowController: NSObject {
             } else {
                 applyContentHeight(animated: true)
             }
-        }
-        root.onDatePreviewHeightChange = { [unowned self] in
-            if root.isLayingOut { heightChangedDuringLayout = true }
-            else { applyContentHeight(animated: true) }
         }
         root.onLayout = { [unowned self] in
             guard heightChangedDuringLayout else { return }
