@@ -15,16 +15,7 @@ public struct ReminderPresentation: Hashable, Sendable {
     public let text: String?
 
     public init(reminder: Date, now: Date, options: NoteDisplayOptions, calendar: Calendar) {
-        status = Self.status(reminder: reminder, now: now, leadTime: options.imminentLeadTime)
-        switch options.reminder {
-        case .iconOnly:
-            text = nil
-        case .time:
-            text = Self.dayPrefix(reminder: reminder, now: now, calendar: calendar)
-                + Self.clock(reminder, format: options.clock, calendar: calendar)
-        case .relative:
-            text = Self.relative(reminder: reminder, now: now, calendar: calendar)
-        }
+        self.init(item: ScheduleItem(start: reminder), now: now, options: options, calendar: calendar)
     }
 
     public init(item: ScheduleItem, now: Date, options: NoteDisplayOptions, calendar: Calendar) {
@@ -39,14 +30,14 @@ public struct ReminderPresentation: Hashable, Sendable {
             text = item.isDateOnly && calendar.isDate(item.start, inSameDayAs: now)
                 ? "오늘" : Self.relative(reminder: item.start, now: now, calendar: calendar)
         } else if item.isDateOnly {
-            let first = Self.dayLabel(item.start, now: now, calendar: calendar)
+            let first = Self.dayLabel(item.start, now: now, calendar: calendar, format: options.dateFormat)
             if let end = item.end {
                 let last = calendar.date(byAdding: .day, value: -1, to: end) ?? end
                 text = calendar.isDate(last, inSameDayAs: item.start) ? first
-                    : first + "~" + Self.dayLabel(last, now: now, calendar: calendar)
+                    : first + "~" + Self.dayLabel(last, now: now, calendar: calendar, format: options.dateFormat)
             } else { text = first }
         } else {
-            let first = Self.dayPrefix(reminder: item.start, now: now, calendar: calendar)
+            let first = Self.datePrefix(item.start, now: now, calendar: calendar, format: options.dateFormat)
                 + Self.clock(item.start, format: options.clock, calendar: calendar)
             if let end = item.end {
                 let sameDay = calendar.isDate(item.start, inSameDayAs: end)
@@ -55,16 +46,37 @@ public struct ReminderPresentation: Hashable, Sendable {
                     && calendar.component(.hour, from: item.start) / 12 == calendar.component(.hour, from: end) / 12 {
                     last = String(last.dropFirst(3))
                 }
-                text = first + "~" + (sameDay ? "" : Self.dayPrefix(reminder: end, now: now, calendar: calendar)) + last
+                text = first + "~" + (sameDay ? "" : Self.datePrefix(end, now: now, calendar: calendar, format: options.dateFormat)) + last
             } else { text = first }
         }
     }
-    private static func dayLabel(_ date: Date, now: Date, calendar: Calendar) -> String {
-        calendar.isDate(date, inSameDayAs: now) ? "오늘"
+    private static func dayLabel(_ date: Date, now: Date, calendar: Calendar, format: NoteDisplayOptions.DateFormat) -> String {
+        if format == .absolute { return absoluteDay(date, now: now, calendar: calendar) }
+        return calendar.isDate(date, inSameDayAs: now) ? "오늘"
             : dayPrefix(reminder: date, now: now, calendar: calendar).trimmingCharacters(in: .whitespaces)
     }
-    public var accessibilityLabel: String {
-        [isEvent ? "일정" : "리마인더", text ?? "", status == .imminent ? "임박" : "",
+    private static func datePrefix(_ date: Date, now: Date, calendar: Calendar, format: NoteDisplayOptions.DateFormat) -> String {
+        format == .absolute ? absoluteDay(date, now: now, calendar: calendar) + " "
+            : dayPrefix(reminder: date, now: now, calendar: calendar)
+    }
+    private static func absoluteDay(_ date: Date, now: Date, calendar: Calendar) -> String {
+        let p = calendar.dateComponents([.year, .month, .day], from: date)
+        let year = p.year != calendar.component(.year, from: now) ? "\(p.year!)년 " : ""
+        return year + "\(p.month!)월 \(p.day!)일"
+    }
+    /// 편집 입력은 연도까지 명시해 지난 항목도 같은 시점으로 다시 읽힌다.
+    public static func editingExpression(_ item: ScheduleItem, calendar: Calendar) -> String {
+        func point(_ date: Date) -> String {
+            let p = calendar.dateComponents([.year, .month, .day], from: date)
+            return "\(p.year!)년 \(p.month!)월 \(p.day!)일" + (item.isDateOnly ? "" : " " + clock(date, format: .koreanMeridiem, calendar: calendar))
+        }
+        guard let end = item.end else { return point(item.start) }
+        let last = item.isDateOnly ? calendar.date(byAdding: .day, value: -1, to: end)! : end
+        return item.isDateOnly && calendar.isDate(item.start, inSameDayAs: last) ? point(item.start) : point(item.start) + "~" + point(last)
+    }
+    public var accessibilityLabel: String { accessibilityLabel(title: "") }
+    public func accessibilityLabel(title: String) -> String {
+        [isEvent ? "일정" : "리마인더", title, text ?? "", status == .imminent ? "임박" : "",
          syncFailed ? "연동 실패, 앱에 저장됨" : ""].filter { !$0.isEmpty }.joined(separator: " ")
     }
 

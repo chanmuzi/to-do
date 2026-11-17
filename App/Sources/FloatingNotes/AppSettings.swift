@@ -10,11 +10,13 @@ nonisolated struct AppSettings: Codable, Equatable, Sendable {
     /// (`NoteEditorOptions(settings:)`).
     var inlineCode = "accent"
     var checkbox = "box"
+    var scheduleDateFormat = "relative"
 
-    init(showsMenuBarIcon: Bool = true, inlineCode: String = "accent", checkbox: String = "box") {
+    init(showsMenuBarIcon: Bool = true, inlineCode: String = "accent", checkbox: String = "box", scheduleDateFormat: String = "relative") {
         self.showsMenuBarIcon = showsMenuBarIcon
         self.inlineCode = inlineCode
         self.checkbox = checkbox
+        self.scheduleDateFormat = scheduleDateFormat
     }
 
     /// 나중에 더한 항목이 없는 예전 파일도 읽는다(없는 항목은 기본값).
@@ -22,6 +24,7 @@ nonisolated struct AppSettings: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         showsMenuBarIcon = try container.decodeIfPresent(Bool.self, forKey: .showsMenuBarIcon) ?? true
         inlineCode = try container.decodeIfPresent(String.self, forKey: .inlineCode) ?? "accent"
+        scheduleDateFormat = try container.decodeIfPresent(String.self, forKey: .scheduleDateFormat) ?? "relative"
         checkbox = try container.decodeIfPresent(String.self, forKey: .checkbox) ?? "box"
     }
 }
