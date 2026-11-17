@@ -1,3 +1,4 @@
+import AppKit
 import EventKit
 import Foundation
 import Models
@@ -20,6 +21,20 @@ public final class EventKitBridge: CalendarBridge {
             Task { @MainActor [weak self] in self?.onChange?() }
         }
         return value
+    }
+    public func destination(for item: ScheduleItem) -> ScheduleDestination? {
+        guard EKEventStore.authorizationStatus(for: item.kind == .event ? .event : .reminder) == .fullAccess else { return nil }
+        let store = store()
+        let calendar: EKCalendar?
+        if let link = item.link, link.kind == nil || link.kind == item.kind {
+            guard let existing = try? find(item, in: store) else { return nil }
+            calendar = existing.calendar
+        } else {
+            calendar = item.kind == .event ? store.defaultCalendarForNewEvents : store.defaultCalendarForNewReminders()
+        }
+        guard let calendar else { return nil }
+        let color = calendar.cgColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) }
+        return ScheduleDestination(name: calendar.title, color: color.map { .init(red: $0.redComponent, green: $0.greenComponent, blue: $0.blueComponent) })
     }
     public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
         let type: EKEntityType = kind == .event ? .event : .reminder

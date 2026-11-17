@@ -9,6 +9,7 @@ public protocol CalendarBridge: AnyObject {
     func fetch(_ item: ScheduleItem) throws -> ScheduleItem?
     func save(_ item: ScheduleItem) throws -> ScheduleItem
     func remove(_ item: ScheduleItem) throws
+    func destination(for item: ScheduleItem) -> ScheduleDestination?
     func stop()
 }
 
@@ -31,6 +32,16 @@ public final class FakeCalendarBridge: CalendarBridge {
     public var onChange: (@MainActor () -> Void)?
     public var items: [String: ScheduleItem] = [:]
     public var isAllowed = true
+    public var eventDestination: ScheduleDestination? = .init(name: "개인 일정", color: .init(red: 0.25, green: 0.52, blue: 0.80))
+    public var reminderDestination: ScheduleDestination? = .init(name: "할 일", color: .init(red: 0.85, green: 0.53, blue: 0.22))
+    public var linkedDestinations: [String: ScheduleDestination] = [:]
+    public func destination(for item: ScheduleItem) -> ScheduleDestination? {
+        guard isAllowed else { return nil }
+        if let link = item.link, link.kind == nil || link.kind == item.kind {
+            return linkedDestinations[link.localID] ?? (item.kind == .event ? eventDestination : reminderDestination)
+        }
+        return item.kind == .event ? eventDestination : reminderDestination
+    }
     public var authorizationGate: (@MainActor () async -> Void)?
     public var authorizationFailure: CalendarBridgeError?
     public var failure: CalendarBridgeError?

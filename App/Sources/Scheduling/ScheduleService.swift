@@ -46,6 +46,7 @@ public final class ScheduleService {
         bridgeStorage = value
         return value
     }
+    public func destination(for item: ScheduleItem) -> ScheduleDestination? { bridge.destination(for: item) }
     public func refreshLinked() {
         do {
             for note in try notes.list().notes where note.schedules.contains(where: { $0.link != nil }) {
