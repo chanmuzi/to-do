@@ -109,7 +109,7 @@ import Theme
         ])
 
         // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
-        let main = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let main = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
         let items = main.items.compactMap(\.submenu).flatMap(\.items)
         func validity(_ title: String) throws -> Bool {
             fixture.commands.validateMenuItem(try #require(items.first { $0.title == title && !$0.isHidden }))
@@ -156,7 +156,7 @@ import Theme
 
     @Test func mainMenuShowsNoKeyEquivalentsButStillHearsThem() throws {
         defer { fixture.cleanUp() }
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
 
         let visible = visibleItems(of: menu)
         #expect(visible.allSatisfy { $0.keyEquivalent.isEmpty })
@@ -177,7 +177,7 @@ import Theme
 
     @Test func everyNoteWindowRowHasAHiddenKeyItem() {
         defer { fixture.cleanUp() }
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
         func hidden(in menu: NSMenu) -> [NSMenuItem] {
             menu.items.flatMap { ($0.isHidden ? [$0] : []) + ($0.submenu.map(hidden(in:)) ?? []) }
         }
@@ -198,7 +198,7 @@ import Theme
     @Test func mainMenuFollowsAReboundTable() throws {
         defer { fixture.cleanUp() }
         let table = ShortcutTable.standard.replacing(.settings, with: KeyChord(.k, [.option, .command]))
-        let menu = MainMenu.make(appName: "플로팅 노트", table: table, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: table, dispatcher: fixture.commands)
 
         #expect(try !press(KeyChord(.comma, .command), in: menu))
         #expect(try press(KeyChord(.k, [.option, .command]), in: menu))
@@ -208,7 +208,7 @@ import Theme
     /// 시스템이 "편집" 메뉴에 끼워 넣는 항목(이모지 및 기호)의 단축키도 보이지 않게 한다.
     @Test func keyEquivalentsOfItemsAddedLaterAreConcealedWhenTheMenuOpens() throws {
         defer { fixture.cleanUp() }
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
         let edit = try #require(menu.items.compactMap(\.submenu).first { $0.title == "편집" })
         let added = NSMenuItem(title: "이모지 및 기호", action: #selector(NSApplication.orderFrontCharacterPalette(_:)), keyEquivalent: "e")
         added.keyEquivalentModifierMask = [.function]
@@ -228,7 +228,7 @@ import Theme
         defer { fixture.cleanUp() }
         var forwardedUndo = 0
         fixture.commands.forwardUndo = { _ in forwardedUndo += 1 }
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
         func press(_ chord: KeyChord, characters: String) throws -> Bool {
             let event = try #require(NSEvent.keyEvent(
                 with: .keyDown, location: .zero, modifierFlags: chord.modifiers.eventFlags, timestamp: 0,

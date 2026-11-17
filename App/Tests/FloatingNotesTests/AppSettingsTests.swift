@@ -129,7 +129,7 @@ import Testing
     @Test func mainMenuOffersEveryStatusMenuEntry() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
-        let menu = MainMenu.make(appName: "플로팅 노트", table: .standard, dispatcher: fixture.commands)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
         func visible(in menu: NSMenu) -> [(menu: NSMenu, index: Int, title: String)] {
             menu.items.enumerated().flatMap { index, item -> [(menu: NSMenu, index: Int, title: String)] in
                 if let submenu = item.submenu { return visible(in: submenu) }
@@ -141,7 +141,7 @@ import Testing
         for title in StatusMenuModel.entries(areNotesHidden: false).compactMap(\.title) where title != "종료" {
             #expect(titles.contains(title), "\(title)")
         }
-        #expect(titles.contains("플로팅 노트 종료"))
+        #expect(titles.contains("Float 종료"))
 
         for title in ["빠른 캡처", "노트 찾기", "라이브러리", "AI 패널", "설정", "단축키", "새 노트", "노트 모두 숨기기"] {
             let item = try #require(items.first { $0.title == title })
