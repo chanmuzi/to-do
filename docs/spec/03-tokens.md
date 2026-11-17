@@ -144,8 +144,11 @@
 
 - `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
 - `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
-- `library-reminder-w/progress-w`: 200/46(D-066과 6단계, 체크 아이콘 포함). 값이 없는 줄도 정보 열의 자리를 유지한다.
+- `library-reminder-w`: 200. L1 오른쪽에는 시간과 icon-s 12 핀 칸만 남긴다. 예전 progress-w 토큰은 저장 호환을 위해 남기되 화면에는 사용하지 않는다(D-086).
+- `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
 
 - 6단계: `component.reminder-editor-w` 320px(설정 팝오버), `component.library-reminder-w` 200px(범위를 담는 예정 열).
+
+- E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 48, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-strong, 시간은 font-ui/fs-row-sub/fw-ui를 조합한다(D-088).
