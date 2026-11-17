@@ -45,6 +45,8 @@ public final class CaptureCoordinator {
     /// ↵로 넣지 못했을 때 불린다(`log`에도 남는다). App이 사용자에게 알린다. 알리는 동안 바가 키 창에서
     /// 물러나도(알림 창) 닫히지 않고, 돌아오면 적은 글을 그대로 둔 채 다시 입력을 받는다.
     public var onFailure: (@MainActor (Error) -> Void)?
+    /// ↵로 넣은 줄이 들어간 노트. 바가 닫히기 시작한 뒤에 한 번 불린다(App이 짧은 알림을 띄운다, D-041).
+    public var onCaptured: (@MainActor (NoteID) -> Void)?
     /// 넣지 못한 것을 알리는 중이거나 ⌘↵의 요청이 돌아오기를 기다리는 중이다. 이때는 키 창에서 물러나도
     /// (알림 창, 새로 뜬 노트) 닫지 않는다. 닫을지는 그 일이 끝난 뒤에 정한다.
     private var staysOpenWithoutKey = false
@@ -353,6 +355,7 @@ public final class CaptureCoordinator {
             }
             rememberSpace(entry.spaceID)
             hide()
+            onCaptured?(outcome.noteID)
         } catch {
             log("캡처: 넣지 못했습니다: \(error)")
             reportFailure(error)
