@@ -1,6 +1,6 @@
-# to-do
+# Float
 
-작은 메모 창 여러 개를 화면 위에 항상 띄워 두는 macOS용 메모·투두 앱 "플로팅 노트"(가칭).
+작은 메모 창 여러 개를 화면 위에 항상 띄워 두는 macOS용 메모·투두 앱 "Float".
 SwiftUI + AppKit, 개인용. 아직 개발 중이며 진행 상황은 `docs/roadmap.md`에 있다.
 
 ## 요구 사항
@@ -17,10 +17,10 @@ cd to-do
 scripts/install-app.sh
 ```
 
-- 릴리스 빌드를 만들어 `/Applications/플로팅 노트.app`으로 넣는다. `/Applications`에 쓸 수 없으면 `~/Applications`에 넣는다.
+- 릴리스 빌드를 만들어 `/Applications/FloatingNotes.app`으로 넣는다. `/Applications`에 쓸 수 없으면 `~/Applications`에 넣는다.
   `sudo`는 쓰지 않는다.
 - 이미 실행 중이면 먼저 정상 종료를 요청하고(저장하지 못한 노트가 있으면 앱이 묻는다) 끝난 뒤 바꿔 넣는다.
-- 설치한 뒤에는 Spotlight나 Launchpad에서 "플로팅 노트"로 찾아 실행한다.
+- 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱·Finder·Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `FloatingNotes.app`이다.
 - 서명하지 않은 개인용 빌드다. 다른 Mac으로 복사하면 Gatekeeper가 막을 수 있다.
 
 ### 업데이트
@@ -79,3 +79,16 @@ swift test --package-path App
 - 모듈 구조: `docs/architecture.md`
 
 확인용 묶음을 실행 중인 앱과 분리하려면 `FLOATING_NOTES_APP_DIR=/원하는/폴더 scripts/build-app.sh debug`를 사용합니다. `scripts/run.sh`도 같은 변수를 따르며 기본은 `build/`입니다.
+
+### 브랜드 에셋
+
+흑백 체크 카드 C2 아이콘을 쓴다. `App/Resources/app-icon-1024.svg`와 `menubar-icon.svg`가 벡터 원본이다.
+`swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 SVG·16~1024px PNG·18pt 메뉴 막대 PDF를 다시 만든다(macOS, 외부 의존성 없음).
+1024px 캔버스의 본체는 824px(80.46875%), 사방 여백은 100px이며 시스템 메모 앱의 본체 비율을 따른다.
+번들 ID, 실행 파일·타깃·모듈, 앱 파일 이름, 기존 노트·설정 저장 위치는 유지한다(D-062).
+
+파일명을 유지하면서 시스템 표시를 Float로 통일하기 위해 원본 `Info.plist`의 `CFBundleDisplayName`은
+`FloatingNotes`, `CFBundleName`은 `Float`, `LSHasLocalizedDisplayName`은 true로 둔다.
+`ko.lproj`와 `en.lproj`의 `InfoPlist.strings`에서는 두 이름 모두 `Float`다. 빌드 스크립트가 이 지역화 폴더를 앱에 복사한다.
+앱 메뉴는 지역화 값을 읽으며 `swift run`과 테스트에서는 Float를 기본값으로 쓴다(D-062).
+[Apple 표시 이름 규칙](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPFileSystem/Articles/DisplayNames.html)을 따른다.
