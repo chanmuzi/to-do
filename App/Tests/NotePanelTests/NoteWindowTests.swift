@@ -63,7 +63,8 @@ import Theme
 
         controller.hoverOverride = false
         let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
-        #expect(buttons.count == 4)
+        // 더 보기, 새 노트, 꺼진 핀(돋보기는 더 보기 메뉴로 옮겼다).
+        #expect(buttons.count == 3)
         #expect(buttons.allSatisfy { $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 
@@ -416,12 +417,10 @@ import Theme
         try coordinator.open(note.id, focus: false)
         let actions = try #require(coordinator.controllers[note.id]).root.topRow.actions
 
-        actions.search()
         actions.add()
         actions.reminder()
 
         #expect(fixture.routes == [
-            .openBrowse(anchor: note.id),
             .newNote(NewNoteRequest(nextTo: note.id)),
             .openReminderEditor(note.id),
         ])
@@ -542,8 +541,8 @@ import Theme
         }
         let all = descendants(of: controller.root)
         let pressable = all.filter { $0 is IconButton || $0 is ReminderBadgeView }
-        // 상단 줄의 버튼 다섯과 리마인더, 오른쪽 아래의 휴지통과 닫기.
-        #expect(pressable.count == 8)
+        // 상단 줄의 버튼 넷(더 보기, 새 노트, 저장 문제 표시, 핀)과 리마인더, 오른쪽 아래의 휴지통과 닫기.
+        #expect(pressable.count == 7)
         let clickables = pressable.compactMap { $0 as? ClickableView }
         #expect(clickables.count == pressable.count)
         for view in clickables {
@@ -589,7 +588,7 @@ import Theme
         // 긴 제목이 잘리는 자리만 표시 앞으로 당겨진다.
         #expect(title.frame.minX == titleFrame.minX)
         #expect(title.frame.maxX == indicator.frame.minX - fixture.theme.component(.chromeGap))
-        #expect(indicator.frame.maxX == reserved.map(\.frame.minX).min()! - fixture.theme.component(.chromeGap))
+        #expect(indicator.frame.maxX == reserved.map(\.frame.minX).min()! - fixture.theme.component(.iconButtonGap))
 
         controller.resolveProblem(.keepMine)
         #expect(controller.problem == nil)

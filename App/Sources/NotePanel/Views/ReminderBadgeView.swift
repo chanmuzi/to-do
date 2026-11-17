@@ -18,7 +18,7 @@ final class ReminderBadgeView: ClickableView {
         super.init(frame: .zero)
         wantsLayer = true
         iconView.wantsLayer = true
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         [iconView, label].forEach(addSubview)
         isHidden = true
         alphaValue = 0
@@ -86,7 +86,9 @@ final class ReminderBadgeView: ClickableView {
     override func layout() {
         super.layout()
         let icon = style.theme.component(.iconSmall)
-        iconView.frame = NSRect(x: 0, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+        iconView.frame = style.theme.symbolFrame(
+            NSRect(x: 0, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+        )
         let labelX = icon + style.theme.component(.iconGap)
         label.frame = NSRect(x: labelX, y: 0, width: max(0, bounds.width - labelX), height: bounds.height)
         updateRinging()
@@ -112,8 +114,6 @@ final class ReminderBadgeView: ClickableView {
 
     // MARK: - 마우스
 
-    override var mouseDownCanMoveWindow: Bool { false }
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {}
 
     override func mouseUp(with event: NSEvent) {

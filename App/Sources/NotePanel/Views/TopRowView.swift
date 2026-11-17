@@ -5,7 +5,6 @@ import Theme
 /// 이 줄을 끌면 창이 움직이고(spec 4.1), 제목을 누르면 그 자리에서 고친다.
 final class TopRowView: NSView {
     struct Actions {
-        var search: () -> Void = {}
         var more: (NSView) -> Void = { _ in }
         var add: () -> Void = {}
         var reminder: () -> Void = {}
@@ -21,7 +20,6 @@ final class TopRowView: NSView {
     private let style: PanelStyle
     private let spaceBadge: SpaceBadgeView
     private let title: TitleField
-    private let searchButton: IconButton
     private let moreButton: IconButton
     private let addButton: IconButton
     private let problemButton: IconButton
@@ -38,7 +36,6 @@ final class TopRowView: NSView {
         self.style = style
         spaceBadge = SpaceBadgeView(style: style)
         title = TitleField(style: style)
-        searchButton = IconButton(style: style, symbolName: "magnifyingglass", iconSize: .iconLarge, label: "노트 찾기")
         moreButton = IconButton(style: style, symbolName: "ellipsis", iconSize: .iconLarge, label: "더 보기")
         addButton = IconButton(style: style, symbolName: "plus", iconSize: .iconLarge, label: "새 노트")
         problemButton = IconButton(
@@ -49,7 +46,7 @@ final class TopRowView: NSView {
             style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "항상 위에 고정", tint: .text3
         )
         super.init(frame: .zero)
-        [spaceBadge, title, searchButton, moreButton, addButton, problemButton, reminderBadge, pinButton]
+        [spaceBadge, title, moreButton, addButton, problemButton, reminderBadge, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
         problemButton.alphaValue = 0
@@ -62,7 +59,6 @@ final class TopRowView: NSView {
     }
 
     private func connect() {
-        searchButton.onPress = { [unowned self] in actions.search() }
         moreButton.onPress = { [unowned self] in actions.more(moreButton) }
         addButton.onPress = { [unowned self] in actions.add() }
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
@@ -105,7 +101,7 @@ final class TopRowView: NSView {
         applyProblem(state.problem, wasShown: hadProblem, animated: animated)
 
         let alphas: [(NSView, Double)] = [
-            (searchButton, state.hoverControlsAlpha), (moreButton, state.hoverControlsAlpha),
+            (moreButton, state.hoverControlsAlpha),
             (addButton, state.hoverControlsAlpha), (pinButton, state.pin.alpha),
         ]
         if animated {
@@ -139,7 +135,7 @@ final class TopRowView: NSView {
         spaceBadge.refresh()
         title.refreshTheme()
         reminderBadge.refresh()
-        [searchButton, moreButton, addButton, problemButton, pinButton].forEach { $0.refresh() }
+        [moreButton, addButton, problemButton, pinButton].forEach { $0.refresh() }
         needsLayout = true
     }
 
@@ -162,9 +158,11 @@ final class TopRowView: NSView {
             metrics: TopRowLayout.Metrics(
                 height: bounds.height,
                 paddingLeading: theme.space(.sp3),
-                paddingTrailing: theme.component(.chromePaddingEnd),
+                // 핀 아이콘의 오른쪽 끝이 제목의 왼쪽 여백과 같은 거리에 오게 한다(좌우 균형).
+                paddingTrailing: max(0, theme.space(.sp3) - pinButton.glyphSideInset),
                 gap: theme.component(.chromeGap),
-                iconButton: theme.component(.iconButton)
+                iconButton: theme.component(.iconButton),
+                buttonGap: theme.component(.iconButtonGap)
             )
         )
         spaceBadge.frame = frames.space ?? .zero
@@ -173,7 +171,6 @@ final class TopRowView: NSView {
             x: frames.title.minX, y: ((bounds.height - titleHeight) / 2).rounded(),
             width: frames.title.width, height: titleHeight
         )
-        searchButton.frame = frames.search
         moreButton.frame = frames.more
         addButton.frame = frames.add
         // 사라지는 중인 것은 자리가 없어져도 마지막 자리에서 사라진다.

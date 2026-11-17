@@ -73,6 +73,7 @@ final class NoteWindowController: NSObject {
         editor.onTextChange = nil
         editor.onContentHeightChange = nil
         panel.onMouseDown = nil
+        panel.onButtonPress = nil
         root.onHoverChange = nil
         root.onLayout = nil
     }
@@ -133,6 +134,7 @@ final class NoteWindowController: NSObject {
         panel.orderFrontRegardless()
         isPointerInside = root.containsPointer
         refreshChrome(animated: false)
+        root.syncButtonHover()
     }
 
     /// 창을 없앤다. 상태를 남기는 일은 부르는 쪽이 한다.
@@ -199,7 +201,9 @@ final class NoteWindowController: NSObject {
         root.onHoverChange = { [unowned self] inside in
             isPointerInside = inside
             refreshChrome(animated: true)
+            if inside { root.syncButtonHover() }
         }
+        panel.onButtonPress = { [unowned self] in coordinator?.noteButtonPressed() }
         editor.onTextChange = { [unowned self] text in
             exchangedBody = text
             mutate(deferred: true) { $0.body = text }
@@ -222,7 +226,6 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         root.topRow.actions = TopRowView.Actions(
-            search: { router.route(.openBrowse(anchor: id)) },
             more: { [unowned self] anchor in popUpMoreMenu(from: anchor) },
             add: { router.route(.newNote(NewNoteRequest(nextTo: id))) },
             reminder: { router.route(.openReminderEditor(id)) },
@@ -260,6 +263,7 @@ final class NoteWindowController: NSObject {
                 case .setReminder: router.isConnected(.openReminderEditor(id))
                 case .moveToSpace: router.isConnected(.openSpacePicker(id))
                 case .openAIPanel: router.isConnected(.openAIPanel(context: id))
+                case .findNote: router.isConnected(.openBrowse(anchor: id))
                 case .togglePin, .setColor, .closeWindow, .moveToTrash: true
                 }
             }
@@ -269,6 +273,7 @@ final class NoteWindowController: NSObject {
             case .moveToSpace: router.route(.openSpacePicker(id))
             case .togglePin: self?.setPinned(self?.isPinned == false)
             case .setColor(let paletteID): self?.setColor(paletteID)
+            case .findNote: router.route(.openBrowse(anchor: id))
             case .openAIPanel: router.route(.openAIPanel(context: id))
             case .closeWindow: router.route(.closeNoteWindow(id))
             case .moveToTrash: self?.coordinator?.moveToTrash(id)

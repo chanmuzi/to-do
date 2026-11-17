@@ -15,7 +15,8 @@ import Theme
         ) { chosen.append($0) }
 
         #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == [
-            "리마인더 설정", "스페이스 옮기기", "항상 위에 고정", "노트 색", "AI 패널 열기", "창 닫기", "휴지통으로 보내기",
+            "리마인더 설정", "스페이스 옮기기", "항상 위에 고정", "노트 색", "노트 찾기", "AI 패널 열기", "창 닫기",
+            "휴지통으로 보내기",
         ])
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
             "리마인더 설정", "스페이스 옮기기", "AI 패널 열기",
@@ -25,6 +26,12 @@ import Theme
         #expect(chosen.isEmpty)
         menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "창 닫기" }))
         #expect(chosen == [.closeWindow])
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "노트 찾기" }))
+        #expect(chosen == [.closeWindow, .findNote])
+        // 구분선은 구분선 항목이고, 뒤가 비치지 않는 불투명 바탕의 뷰로 그린다.
+        let separators = menu.items.filter(\.isSeparatorItem)
+        #expect(separators.count == 2)
+        #expect(separators.allSatisfy { $0.view is MenuSeparatorView })
 
         // 모두 이어져 있으면(기본) 전부 고를 수 있다.
         let all = builder.moreMenu(isPinned: false, selectedPaletteID: nil) { _ in }

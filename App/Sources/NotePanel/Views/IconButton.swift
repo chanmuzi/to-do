@@ -63,22 +63,38 @@ final class IconButton: ClickableView {
 
     override func layout() {
         super.layout()
-        let side = min(style.theme.component(iconSize), bounds.width, bounds.height)
-        imageView.frame = NSRect(
+        let side = style.theme.component(iconSize)
+        imageView.frame = style.theme.symbolFrame(NSRect(
             x: ((bounds.width - side) / 2).rounded(), y: ((bounds.height - side) / 2).rounded(),
             width: side, height: side
-        )
+        ))
+    }
+
+    /// 버튼 가장자리에서 그림의 가장자리까지(좌우 한쪽). 그림은 버튼 가운데에 제 크기로 놓인다.
+    var glyphSideInset: CGFloat {
+        let button = style.theme.component(.iconButton)
+        let glyph = imageView.image?.size.width ?? style.theme.component(iconSize)
+        return max(0, (button - glyph) / 2)
     }
 
     // MARK: - 마우스
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+    /// 영역은 한 번만 건다. `.inVisibleRect`라 뷰가 움직이고 커져도 AppKit이 따라 맞춘다. 예전에는 자리가 바뀔
+    /// 때마다(창 높이가 움직이는 동안 오른쪽 아래 버튼이 따라 움직인다) 영역을 새로 걸었는데, 마우스가 이미 안에
+    /// 있는 채로 새로 건 영역은 들어왔다는 알림을 보내지 않아 그 버튼에만 `hover` 상자가 나타나지 않았다.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, trackingAreas.isEmpty else { return }
         addTrackingArea(NSTrackingArea(
             rect: .zero, options: [.mouseEnteredAndExited, .cursorUpdate, .activeAlways, .inVisibleRect],
             owner: self
         ))
+    }
+
+    /// 지금 마우스가 이 버튼 위에 있는지 다시 잰다(창이 뜬 직후, 호버로 나타날 때).
+    func syncPointerInside() {
+        guard let window, window.isVisible, !isHidden else { return setPointerInside(false) }
+        setPointerInside(bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)))
     }
 
     override func mouseEntered(with event: NSEvent) { setPointerInside(true) }
@@ -92,8 +108,6 @@ final class IconButton: ClickableView {
         style.animate { updateLayer() }
     }
 
-    override var mouseDownCanMoveWindow: Bool { false }
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {}
 
     override func mouseUp(with event: NSEvent) {
