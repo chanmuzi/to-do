@@ -161,6 +161,12 @@ public final class FileNoteStore: NoteStoring {
 
     public func delete(_ id: NoteID) throws {
         guard files.noteExists(id, in: location.notesDirectory) else { throw StoreError.noteNotFound(id) }
+        // 이 앱이 모르는 머리 줄(다른 도구가 적은 태그 등)이 있으면 그 내용을 잃지 않게 휴지통으로 보낸다.
+        let text = try files.readText(id, in: location.notesDirectory)
+        if !NoteFileCodec.decode(text).unknownLines.isEmpty {
+            try moveToTrash(id)
+            return
+        }
         try files.delete(id)
         discardPending(id)
         known[id] = nil

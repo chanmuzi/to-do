@@ -29,6 +29,23 @@ import Testing
         withExtendedLifetime(observation) {}
     }
 
+    /// 이 앱이 모르는 머리 줄이 있는 노트는 지우지 않고 휴지통으로 보낸다(그 줄을 잃지 않게).
+    @Test func noteWithUnknownHeaderLinesGoesToTheTrashInstead() throws {
+        defer { temporary.cleanUp() }
+        let store = try FileNoteStore(location: temporary.location)
+        let id = NoteID(rawValue: "태그만")
+        try "---\ntags: [keep-me]\n---\n".write(
+            to: temporary.noteFile(id.rawValue), atomically: true, encoding: .utf8
+        )
+        try store.refresh()
+        #expect(try store.load(id).isBlank)
+
+        try store.delete(id)
+
+        #expect(!FileManager.default.fileExists(atPath: temporary.noteFile(id.rawValue).path))
+        #expect(try store.listTrash().notes.map(\.id) == [id])
+    }
+
     @Test func deletingAMissingNoteThrows() throws {
         defer { temporary.cleanUp() }
         let store = try FileNoteStore(location: temporary.location)
