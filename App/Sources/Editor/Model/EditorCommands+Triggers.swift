@@ -6,10 +6,15 @@ import Foundation
 nonisolated extension EditorCommands {
     private static let spaceTriggers: [(text: String, kind: LineKind)] = [
         ("###", .heading(3)), ("##", .heading(2)), ("#", .heading(1)),
-        ("[]", .todo(done: false)), ("-", .bullet), ("*", .bullet), (">", .toggle),
+        // `[ ]`, `- [ ]`도 받는다(이미 글머리표인 줄에서 `- [ ]`를 쳐도 투두가 된다). 긴 것부터 견준다.
+        ("- [ ]", .todo(done: false)), ("- []", .todo(done: false)), ("* [ ]", .todo(done: false)),
+        ("[ ]", .todo(done: false)), ("[]", .todo(done: false)),
+        ("-", .bullet), ("*", .bullet), (">", .toggle),
+        // 인용문은 `"`나 `|`로 친다(`>`는 토글이다). 원문은 표준의 `> `다(D-044).
+        ("\"", .quote), ("|", .quote),
     ]
 
-    /// Space를 치기 직전. 커서 앞이 줄 맨 앞에 친 `#`, `##`, `###`, `-`, `[]`, `>`이면 그 기호를 지우고
+    /// Space를 치기 직전. 커서 앞이 줄 맨 앞에 친 `#`, `##`, `###`, `-`, `[]`, `[ ]`, `- [ ]`, `>`, `"`, `|`이면 그 기호를 지우고
     /// 줄 머리를 바꾼다. 들여쓰기와 글은 그대로다. 이미 그 종류인 줄에서는 `nil`(공백을 그대로 넣는다).
     static func spaceTrigger(_ doc: MarkdownDocument, selection: NSRange) -> TextEdit? {
         guard selection.length == 0 else { return nil }
@@ -51,7 +56,8 @@ nonisolated extension EditorCommands {
         switch kind {
         case .heading(let level): return String(repeating: "#", count: level) + " "
         case .bullet: return "- "
-        case .toggle: return "> "
+        case .toggle: return "+ "
+        case .quote: return "> "
         case .todo:
             // 표준 문법의 글머리표(`- `)에서 바꾸면 그 꼴(`- [ ] `)을 지킨다(D-017).
             let old = doc.string(in: line.markerRange)

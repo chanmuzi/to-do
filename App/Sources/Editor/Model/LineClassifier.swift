@@ -8,6 +8,7 @@ nonisolated enum LineClassifier {
     private static let dash: unichar = 0x2D
     private static let star: unichar = 0x2A
     private static let greater: unichar = 0x3E
+    private static let plus: unichar = 0x2B
     private static let backtick: unichar = 0x60
 
     /// 줄 앞 들여쓰기. 탭 하나 또는 공백 둘이 한 단계다.
@@ -45,7 +46,10 @@ nonisolated enum LineClassifier {
             if let todo = todo(u, from: start + 2, to: end) { return (.todo(done: todo.done), 2 + todo.length) }
             return (.bullet, 2)
         }
-        if c == greater, start + 1 < end, u[start + 1] == space { return (.toggle, 2) }
+        // 토글은 `+ `(표준 Markdown의 목록 기호라 다른 앱에서는 하위 항목을 가진 목록으로 읽힌다),
+        // `> `는 표준대로 인용문이다(D-044).
+        if c == plus, start + 1 < end, u[start + 1] == space { return (.toggle, 2) }
+        if c == greater, start + 1 < end, u[start + 1] == space { return (.quote, 2) }
         if let todo = todo(u, from: start, to: end) { return (.todo(done: todo.done), todo.length) }
         return (.paragraph, 0)
     }

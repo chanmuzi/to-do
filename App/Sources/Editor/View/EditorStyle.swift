@@ -99,6 +99,9 @@ nonisolated struct EditorStyle {
     let codeBlockPadX: CGFloat
     let codeBlockPadY: CGFloat
     let codeBlockGap: CGFloat
+    /// 인용문: 왼쪽 막대의 너비, 블록 왼쪽 끝에서 글자까지.
+    let quoteBarWidth: CGFloat
+    let quotePadding: CGFloat
 
     @MainActor
     init(theme: Theme, configuration: MarkdownEditorConfiguration, increaseContrast: Bool) {
@@ -146,6 +149,8 @@ nonisolated struct EditorStyle {
         codeBlockPadX = theme.component(.codeBlockPaddingX)
         codeBlockPadY = theme.component(.codeBlockPaddingY)
         codeBlockGap = theme.component(.codeBlockGap)
+        quoteBarWidth = theme.component(.quoteBarWidth)
+        quotePadding = theme.component(.quotePadding)
     }
 
     /// 그 줄 글꼴에 맞춘 인라인 코드 글꼴. 제목 안에서는 제목 크기에 비례해 커진다.

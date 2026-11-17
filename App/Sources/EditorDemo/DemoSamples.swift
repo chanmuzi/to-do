@@ -6,6 +6,7 @@ enum DemoSamples {
         case "elements": elements
         case "code": code
         case "literal": literal
+        case "structure": structure
         case "empty": ""
         default: nil
         }
@@ -34,7 +35,7 @@ enum DemoSamples {
     \t[ ] 포커스 전환 애니메이션 확인
     \t- 리뷰 코멘트 2건에 답글
     [ ] ==배포 체크리스트 확인==
-    > 지난주에서 넘어온 것
+    + 지난주에서 넘어온 것
     \t[ ] **온보딩 문서** 초안 마무리
     \t[ ] `feature/quick-capture` 브랜치 정리
     \t\t- 리베이스한 뒤 푸시
@@ -70,11 +71,11 @@ enum DemoSamples {
     \t- 리뷰 코멘트 2건에 답글
     \t\t- 스크린샷 첨부
     [x] 스탠드업 회의록 공유
-    > 지난주에서 넘어온 것
+    + 지난주에서 넘어온 것
     \t[ ] 온보딩 문서
     \t[ ] 브랜치 정리
     \t[x] 주간 리포트
-    > 참고 링크
+    + 참고 링크
     \t- [NSPanel 문서](https://developer.apple.com/documentation/appkit/nspanel)
     **굵게**, ~~취소선~~, [링크](https://example.com)
     ==형광 1== ==형광 2=={2} ==형광 3=={3} ==형광 4=={4}
@@ -86,5 +87,24 @@ enum DemoSamples {
     panel.hidesOnDeactivate = false
     ```
     - 주소 붙여넣기 https://example.com/a/b
+    """
+
+    /// 하위 계층과 인용문(D-043, D-044): 부모가 있는 들여쓰기, 부모 없는 들여쓰기(다른 프로그램이 쓴 파일),
+    /// 이어지는 인용문 줄, 목록 안의 인용문. 문서가 줄바꿈으로 끝나 끝의 빈 줄까지 안내선이 이어지지 않는지 본다.
+    static let structure = """
+    - 부모 항목
+    \t- 하위 항목
+    \t\t[ ] 더 깊은 할 일
+    \t본문 하위 줄
+    본문 줄
+    \t\t\t부모 없이 들여 쓴 줄(다른 앱이 쓴 파일)
+    > 인용문 첫 줄은 길게 써서 줄이 넘어가는 모습까지 보이게 한다 **굵게** 와 `코드`
+    > 둘째 줄 ==형광==
+    본문 사이
+    + 토글은 이제 원문에 + 로 적는다
+    \t> 토글 안의 인용
+    - 마지막 항목
+    \t- 하위
+
     """
 }

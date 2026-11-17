@@ -33,12 +33,12 @@ import Testing
     }
 
     @Test func markdownKeepsHeadingsParagraphsAndCode() {
-        let text = "# 제목\n본문 **굵게**\n\n```swift\n> 코드는 그대로\n```"
+        let text = "# 제목\n본문 **굵게**\n\n```swift\n+ 코드는 그대로\n```"
         #expect(export(text).markdown == text)
     }
 
     @Test func sourceKeepsTheAppSyntaxForPastingBack() {
-        let text = "> 토글\n\t[ ] ==형광=={3}"
+        let text = "+ 토글\n\t[ ] ==형광=={3}"
         #expect(export(text).source == text)
     }
 

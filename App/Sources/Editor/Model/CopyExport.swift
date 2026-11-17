@@ -88,7 +88,7 @@ nonisolated struct CopyExport: Sendable {
 
     // MARK: 표준 Markdown
 
-    /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 형광펜은 색 번호 없이 `==글자==`로.
+    /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 인용문은 `> `로, 형광펜은 색 번호 없이 `==글자==`로.
     var markdown: String {
         let base = baseLevel
         return lines.compactMap { line -> String? in
@@ -107,6 +107,8 @@ nonisolated struct CopyExport: Sendable {
                 return indent + (done ? "- [x] " : "- [ ] ") + inlineMarkdown(line)
             case .bullet, .toggle:
                 return indent + "- " + inlineMarkdown(line)
+            case .quote:
+                return indent + "> " + inlineMarkdown(line)
             }
         }.joined(separator: "\n")
     }
@@ -166,6 +168,17 @@ nonisolated struct CopyExport: Sendable {
                     index = end
                 }
                 out += "</ul>"
+            case .quote:
+                // 같은 단계에 이어지는 인용문 줄은 하나의 인용문이다. 줄마다 문단이고, 하위 줄은 그 안에 든다.
+                out += "<blockquote>"
+                while index < range.upperBound, doc.lines[index].kind == .quote, doc.lines[index].level == line.level {
+                    let item = doc.lines[index]
+                    let end = min(item.subtreeEnd, range.upperBound)
+                    out += "<p>" + inline(item.contentRange, item.spans, colors) + "</p>"
+                    if index + 1 < end { out += blocks((index + 1)..<end, colors) }
+                    index = end
+                }
+                out += "</blockquote>"
             case .heading(let level):
                 out += "<h\(level)>" + inline(line.contentRange, line.spans, colors) + "</h\(level)>"
                 index += 1

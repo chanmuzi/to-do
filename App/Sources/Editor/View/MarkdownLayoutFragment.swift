@@ -84,6 +84,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         context.translateBy(x: point.x, y: point.y)
         drawCodeBox(decoration, in: context)
         drawGuides(decoration, in: context)
+        drawQuoteBar(decoration, in: context)
         drawInlineBackgrounds(decoration, in: context)
         context.restoreGState()
 
@@ -113,14 +114,31 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         return bounds.midY + (font.ascender + font.descender) / 2
     }
 
+    /// 이 문단이 세로로 차지하는 높이. 문서 끝의 빈 줄 조각(이 조각에 붙어 놓인다)은 넣지 않는다.
+    /// 넣으면 안내선과 인용문 막대가 그 빈 줄까지 이어져 보인다.
+    private var ownHeight: CGFloat {
+        let lines = textLineFragments
+        guard lines.count > 1, let last = lines.last, last.characterRange.length == 0 else { return layoutFragmentFrame.height }
+        return min(layoutFragmentFrame.height, last.typographicBounds.minY)
+    }
+
     private func drawGuides(_ decoration: FragmentDecoration, in context: CGContext) {
-        guard decoration.guideCount > 0 else { return }
+        guard !decoration.guideLevels.isEmpty else { return }
         let style = decoration.style
         context.setFillColor(style.guide.cgColor)
-        for level in 0..<decoration.guideCount {
+        for level in decoration.guideLevels {
             let x = CGFloat(level) * style.indent + EditorMetrics.guideOffset - layoutFragmentFrame.minX
-            context.fill(CGRect(x: x, y: 0, width: style.borderWidth, height: layoutFragmentFrame.height))
+            context.fill(CGRect(x: x, y: 0, width: style.borderWidth, height: ownHeight))
         }
+    }
+
+    /// 인용문의 왼쪽 막대. 문단의 위아래 끝까지 칠해 이어지는 인용문 줄의 막대가 하나로 보인다.
+    private func drawQuoteBar(_ decoration: FragmentDecoration, in context: CGContext) {
+        guard decoration.quoteBar else { return }
+        let style = decoration.style
+        context.setFillColor(style.text3.cgColor)
+        let x = decoration.gutterX - layoutFragmentFrame.minX
+        context.fill(CGRect(x: x, y: 0, width: style.quoteBarWidth, height: ownHeight))
     }
 
     /// 코드 블록 상자에서 이 문단이 차지하는 부분. 조각 좌표.

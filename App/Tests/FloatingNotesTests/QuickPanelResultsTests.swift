@@ -106,7 +106,7 @@ import Testing
     /// 커서와 접힘은 그대로다(통째로 바꿔 넣으면 커서가 끝으로 가고 접힘이 풀린다).
     @Test func captureIntoTheOpenTodayNoteShowsInItsWindowAndSurvivesLaterTyping() throws {
         defer { fixture.cleanUp() }
-        let body = "> 접어 둔 토글\n\t안쪽 줄\n쓰던 줄\n"
+        let body = "+ 접어 둔 토글\n\t안쪽 줄\n쓰던 줄\n"
         // 오늘 만든 노트가 오늘 노트다(D-026).
         let today = try fixture.open("오늘", body: body)
         let adapter = try #require(fixture.editors.editor(for: today))
@@ -126,7 +126,7 @@ import Testing
 
         // 새 노트를 만들지 않고 그 노트에 붙였고, 그 창의 편집기에 바로 보인다.
         #expect(try fixture.notes.list().notes.count == 1)
-        let captured = "> 접어 둔 토글\n\t안쪽 줄\n쓰던! 줄\n[ ] 우유 사기\n"
+        let captured = "+ 접어 둔 토글\n\t안쪽 줄\n쓰던! 줄\n[ ] 우유 사기\n"
         #expect(editor.text == captured)
         #expect(try fixture.fileText(today).hasSuffix(captured))
         #expect(editor.selectedRange == typedCaret)
@@ -139,7 +139,7 @@ import Testing
         fixture.notePanels.flushPendingEdits()
         try fixture.notes.flushPendingSaves()
 
-        let final = "> 접어 둔 토글\n\t안쪽 줄\n쓰던!? 줄\n[ ] 우유 사기\n"
+        let final = "+ 접어 둔 토글\n\t안쪽 줄\n쓰던!? 줄\n[ ] 우유 사기\n"
         #expect(try fixture.fileText(today).hasSuffix(final))
         #expect(editor.text == final)
         #expect(editor.foldedLines == [0])

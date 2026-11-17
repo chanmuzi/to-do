@@ -70,7 +70,7 @@ import Testing
         defer { fixture.cleanUp() }
         var forwarded = 0
         fixture.commands.forwardUndo = { _ in forwarded += 1 }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "되돌릴 노트", body: "> 토글\n\t안쪽\n끝"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "되돌릴 노트", body: "+ 토글\n\t안쪽\n끝"))
         adapter.editor.selectedRange = NSRange(location: 1, length: 0)
         adapter.editor.perform(.fold)
         let frame = try #require(fixture.notePanels.snapshot(of: id)).frame
@@ -82,7 +82,7 @@ import Testing
 
         #expect(forwarded == 0)
         #expect(fixture.notePanels.openNoteIDs == [id])
-        #expect(try fixture.fileText(id).hasSuffix("> 토글\n\t안쪽\n끝"))
+        #expect(try fixture.fileText(id).hasSuffix("+ 토글\n\t안쪽\n끝"))
         // 같은 자리(왼쪽, 위쪽 가장자리, 너비)에 돌아온다. 높이는 내용이 정한다.
         let restored = try #require(fixture.notePanels.snapshot(of: id)).frame
         #expect(restored.minX == frame.minX)

@@ -149,18 +149,18 @@ import Testing
     }
 
     @Test func changeInTheMiddleKeepsSelectionFoldsAndReportsNothing() throws {
-        let h = try EditorHarness("머리\n> 토글\n\t안\n가운데 줄\n꼬리")
+        let h = try EditorHarness("머리\n+ 토글\n\t안\n가운데 줄\n꼬리")
         h.editor.foldedLines = [1]
         let tail = h.document.lines[4]
         h.place(at: tail.start + 1, length: 1)
-        h.step { h.editor.applyOutsideChange(to: "머리\n> 토글\n\t안\n가운데를 고친 줄\n꼬리") }
+        h.step { h.editor.applyOutsideChange(to: "머리\n+ 토글\n\t안\n가운데를 고친 줄\n꼬리") }
         #expect(h.editor.foldedLines == [1])
-        #expect(h.marked == "머리\n> 토글\n\t안\n가운데를 고친 줄\n꼬|리|")
+        #expect(h.marked == "머리\n+ 토글\n\t안\n가운데를 고친 줄\n꼬|리|")
         // 위에 줄이 끼어들면 접힘은 줄을 따라 옮겨지고, 선택은 같은 글자를 가리킨다.
-        h.step { h.editor.applyOutsideChange(to: "새 줄\n머리\n> 토글\n\t안\n가운데를 고친 줄\n꼬리") }
-        #expect(h.editor.text == "새 줄\n머리\n> 토글\n\t안\n가운데를 고친 줄\n꼬리")
+        h.step { h.editor.applyOutsideChange(to: "새 줄\n머리\n+ 토글\n\t안\n가운데를 고친 줄\n꼬리") }
+        #expect(h.editor.text == "새 줄\n머리\n+ 토글\n\t안\n가운데를 고친 줄\n꼬리")
         #expect(h.editor.foldedLines == [2])
-        #expect(h.marked == "새 줄\n머리\n> 토글\n\t안\n가운데를 고친 줄\n꼬|리|")
+        #expect(h.marked == "새 줄\n머리\n+ 토글\n\t안\n가운데를 고친 줄\n꼬|리|")
         #expect(h.changes.isEmpty)
         // 커서가 바뀐 부분 안에 있었으면 바뀐 부분 뒤로 간다.
         let k = try EditorHarness("가 나나나 다")
@@ -173,11 +173,11 @@ import Testing
     }
 
     @Test func changeTouchingAFoldedSubtreeUnfoldsIt() throws {
-        let h = try EditorHarness("> 토글\n\t안\n밖")
+        let h = try EditorHarness("+ 토글\n\t안\n밖")
         h.editor.foldedLines = [0]
         h.caret(atEndOfLine: 2)
-        h.step { h.editor.applyOutsideChange(to: "> 토글\n\t안을 고침\n밖") }
-        #expect(h.editor.text == "> 토글\n\t안을 고침\n밖")
+        h.step { h.editor.applyOutsideChange(to: "+ 토글\n\t안을 고침\n밖") }
+        #expect(h.editor.text == "+ 토글\n\t안을 고침\n밖")
         #expect(h.editor.foldedLines.isEmpty)
     }
 

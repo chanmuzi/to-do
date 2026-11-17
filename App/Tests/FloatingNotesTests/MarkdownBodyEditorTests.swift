@@ -71,7 +71,7 @@ import Theme
     @Test func windowKeepsItsHeightUnderTheCaretAndFollowsTypingOnALinkLine() async throws {
         defer { fixture.cleanUp() }
         // 본문 영역의 가장 낮은 높이(네 줄)보다 길어야 창 높이가 내용을 그대로 따른다.
-        let body = "## 아이디어\n하나\n둘\n셋\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
+        let body = "## 아이디어\n하나\n둘\n셋\n+ 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         let (id, adapter) = try fixture.open(NoteDraft(title: "링크", body: body))
         let window = try #require(fixture.notePanels.window(for: id))
         let chrome = fixture.theme.shape(.chromeHeight) + fixture.theme.shape(.borderWidth)
@@ -307,7 +307,7 @@ import Theme
 
     @Test func foldsArePersistedInWindowStateAndRestoredOnReopen() throws {
         defer { fixture.cleanUp() }
-        let body = "> 토글\n\t안쪽 하나\n\t안쪽 둘\n마지막 줄"
+        let body = "+ 토글\n\t안쪽 하나\n\t안쪽 둘\n마지막 줄"
         let (id, adapter) = try fixture.open(NoteDraft(title: "접힘", body: body))
         #expect(try fixture.storedFolds(for: id) == nil)
 
@@ -333,18 +333,18 @@ import Theme
     /// 다른 프로그램이 접힌 토글 위에 줄을 더하면 접힘이 그 토글을 따라간다. 토글이 없어지면 접힘도 없어진다.
     @Test func externalEditKeepsFoldsOnTheSameToggle() throws {
         defer { fixture.cleanUp() }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "바깥", body: "첫 줄\n> 토글\n\t안쪽\n끝"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "바깥", body: "첫 줄\n+ 토글\n\t안쪽\n끝"))
         adapter.editor.selectedRange = NSRange(location: 6, length: 0)
         adapter.editor.perform(.fold)
         #expect(adapter.editor.foldedLines == [1])
 
         try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "첫 줄\n", with: "첫 줄\n새로 낀 줄\n") }
         try fixture.notes.refresh()
-        #expect(adapter.text == "첫 줄\n새로 낀 줄\n> 토글\n\t안쪽\n끝")
+        #expect(adapter.text == "첫 줄\n새로 낀 줄\n+ 토글\n\t안쪽\n끝")
         #expect(adapter.editor.foldedLines == [2])
         #expect(try fixture.storedFolds(for: id) == [2])
 
-        try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "> 토글", with: "토글 아님") }
+        try fixture.rewriteOutside(id) { $0.replacingOccurrences(of: "+ 토글", with: "토글 아님") }
         try fixture.notes.refresh()
         #expect(adapter.editor.foldedLines.isEmpty)
         #expect(try fixture.storedFolds(for: id) == nil)
@@ -435,7 +435,7 @@ import Theme
     /// 다시 열 때 줄 번호만 보고 엉뚱한 토글을 접었다.
     @Test func foldsFollowTheirToggleWhenTheFileChangedWhileTheWindowWasClosed() throws {
         defer { fixture.cleanUp() }
-        let body = "머리말\n> 첫 토글\n\t안\n> 접어 둔 토글\n\t안\n> 셋째 토글\n\t안"
+        let body = "머리말\n+ 첫 토글\n\t안\n+ 접어 둔 토글\n\t안\n+ 셋째 토글\n\t안"
         let (id, adapter) = try fixture.open(NoteDraft(title: "닫힌 사이", body: body))
         adapter.editor.selectedRange = NSRange(location: (body as NSString).range(of: "접어 둔").location, length: 0)
         adapter.editor.perform(.fold)
@@ -457,18 +457,18 @@ import Theme
     /// 닫힌 노트의 끝에 줄이 붙어도(빠른 캡처) 접힘은 그대로다. 접힌 토글이 없어졌으면 접힘도 버린다.
     @Test func foldsSurviveLinesAppendedWhileClosedAndAreDroppedWhenTheirToggleIsGone() throws {
         defer { fixture.cleanUp() }
-        let body = "> 토글\n\t안\n끝"
+        let body = "+ 토글\n\t안\n끝"
         let (id, adapter) = try fixture.open(NoteDraft(title: "덧붙임", body: body))
         adapter.editor.selectedRange = NSRange(location: 1, length: 0)
         adapter.editor.perform(.fold)
         fixture.notePanels.closeWindow(id)
 
-        try fixture.notes.update(id) { $0.body += "\n- [ ] 캡처한 줄\n> 새 토글\n\t안" }
+        try fixture.notes.update(id) { $0.body += "\n- [ ] 캡처한 줄\n+ 새 토글\n\t안" }
         try fixture.notePanels.open(id, focus: false)
         #expect(fixture.editors.editor(for: id)?.editor.foldedLines == [0])
         fixture.notePanels.closeWindow(id)
 
-        try fixture.notes.update(id) { $0.body = "다른 줄\n> 새 토글\n\t안" }
+        try fixture.notes.update(id) { $0.body = "다른 줄\n+ 새 토글\n\t안" }
         try fixture.notePanels.open(id, focus: false)
         #expect(fixture.editors.editor(for: id)?.editor.foldedLines.isEmpty == true)
         #expect(try fixture.storedFolds(for: id) == nil)
@@ -477,12 +477,12 @@ import Theme
     /// 접힌 토글 줄의 글을 고치면 적어 둔 글도 따라 바뀐다. 낡은 글이 남으면 다시 열 때 접힘을 잃는다.
     @Test func editingAFoldedToggleLineKeepsItsFoldAcrossReopen() throws {
         defer { fixture.cleanUp() }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "토글 고침", body: "> 토글\n\t안\n끝"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "토글 고침", body: "+ 토글\n\t안\n끝"))
         adapter.editor.selectedRange = NSRange(location: 1, length: 0)
         adapter.editor.perform(.fold)
         let view = adapter.editor.textView
         view.insertText(" 고친 이름", replacementRange: NSRange(location: 4, length: 0))
-        #expect(adapter.text == "> 토글 고친 이름\n\t안\n끝")
+        #expect(adapter.text == "+ 토글 고친 이름\n\t안\n끝")
         #expect(adapter.editor.foldedLines == [0])
 
         fixture.notePanels.closeWindow(id)
@@ -497,7 +497,7 @@ import Theme
     /// 그대로다. 이어서 친 글과 덧붙인 줄이 모두 파일에 남는다.
     @Test func lineAppendedByAnotherWriterKeepsCaretUndoAndFoldsAndSurvivesTyping() throws {
         defer { fixture.cleanUp() }
-        let (id, adapter) = try fixture.open(NoteDraft(title: "캡처", body: "> 토글\n\t안\n끝"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "캡처", body: "+ 토글\n\t안\n끝"))
         adapter.editor.selectedRange = NSRange(location: 1, length: 0)
         adapter.editor.perform(.fold)
         type("!", into: adapter)
@@ -509,7 +509,7 @@ import Theme
 
         try fixture.notes.update(id) { $0.body += "\n- [ ] 캡처한 줄" }
 
-        #expect(adapter.text == "> 토글\n\t안\n끝!\n- [ ] 캡처한 줄")
+        #expect(adapter.text == "+ 토글\n\t안\n끝!\n- [ ] 캡처한 줄")
         #expect(adapter.editor.selectedRange == caret)
         #expect(adapter.editor.undoManager.canUndo)
         #expect(adapter.editor.foldedLines == [0])
@@ -518,7 +518,7 @@ import Theme
         let view = adapter.editor.textView
         view.insertText("?", replacementRange: view.selectedRange())
         try fixture.notes.flushPendingSaves()
-        #expect(try fixture.fileText(id).hasSuffix("> 토글\n\t안\n끝!?\n- [ ] 캡처한 줄"))
+        #expect(try fixture.fileText(id).hasSuffix("+ 토글\n\t안\n끝!?\n- [ ] 캡처한 줄"))
         #expect(try fixture.storedFolds(for: id) == [0])
     }
 

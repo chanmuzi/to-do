@@ -6,7 +6,7 @@ import Theme
 @MainActor
 @Suite struct MarkdownEditorTextTests {
     @Test func textGoesInAndComesOutUnchanged() throws {
-        let source = "# 제목\n[ ] ==형광=={3}\n\t> 토글\n```\ncode\n```\n"
+        let source = "# 제목\n[ ] ==형광=={3}\n\t+ 토글\n```\ncode\n```\n"
         let h = try EditorHarness(source)
         #expect(h.editor.text == source)
         #expect(h.view.string == source)
@@ -66,7 +66,7 @@ import Theme
         h.press(NSResponder.newline)
         h.press(NSResponder.newline)
         h.type("> 토글")
-        #expect(h.editor.text == "# 제목\n[ ] 할 일\n[ ] 둘째\n- 글머리표\n> 토글")
+        #expect(h.editor.text == "# 제목\n[ ] 할 일\n[ ] 둘째\n- 글머리표\n+ 토글")
         #expect(h.document.lines.map(\.kind) == [.heading(1), .todo(done: false), .todo(done: false), .bullet, .toggle])
     }
 
@@ -74,13 +74,14 @@ import Theme
         let h = try EditorHarness("- 하나\n- 둘")
         h.caret(atEndOfLine: 1)
         h.press(NSResponder.tab)
+        // 부모(`- 하나`)보다 한 단계 깊게까지만 들어간다(D-043).
         h.press(NSResponder.tab)
         h.press(NSResponder.tab)
-        #expect(h.editor.text == "- 하나\n\t\t\t- 둘")
-        #expect(h.document.lines[1].level == 3)
+        #expect(h.editor.text == "- 하나\n\t- 둘")
+        #expect(h.document.lines[1].level == 1)
         #expect(h.editor.selectedRange.location == h.document.lines[1].end)
         h.press(NSResponder.backtab)
-        #expect(h.editor.text == "- 하나\n\t\t- 둘")
+        #expect(h.editor.text == "- 하나\n- 둘")
     }
 
     @Test func backspaceRemovesTheMarkerThenJoinsLines() throws {
@@ -130,11 +131,11 @@ import Theme
     }
 
     @Test func moveLineKeepsTheFoldWithItsToggle() throws {
-        let h = try EditorHarness("> 토글\n\t- 안\n밖")
+        let h = try EditorHarness("+ 토글\n\t- 안\n밖")
         h.editor.foldedLines = [0]
         h.caret(atEndOfLine: 0)
         h.perform(.moveLineDown)
-        #expect(h.editor.text == "밖\n> 토글\n\t- 안")
+        #expect(h.editor.text == "밖\n+ 토글\n\t- 안")
         #expect(h.editor.foldedLines == [1])
         #expect(h.foldChanges == [[1]])
     }

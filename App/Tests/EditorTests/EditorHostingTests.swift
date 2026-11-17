@@ -92,7 +92,7 @@ import Theme
     /// 링크 줄 끝에 글자를 쳐도 높이를 곧바로 알린다.
     @Test func heightFollowsTypingOnALinkLine() async throws {
         let h = try EditorHarness(
-            "## 아이디어\n> 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
+            "## 아이디어\n+ 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         )
         h.caret(atEndOfLine: 2)
         h.type(String(repeating: "가나다라마바사 ", count: 6))
@@ -152,7 +152,7 @@ import Theme
     /// 코드 블록의 복사 버튼, 체크박스, 꺾쇠, 링크 위에서는 화살표, 글자 위에서는 I자 커서(규칙 9). 텍스트 뷰가
     /// 마우스가 움직일 때마다 I자 커서를 넣어도, 누를 수 있는 것 위에서는 화살표로 남는다.
     @Test func clickableOverlaysShowTheArrowCursor() throws {
-        let host = try Host("[ ] 할 일\n> 토글\n\t안\n[링크](https://example.com)\n```\nlet x = 1\n```\n끝")
+        let host = try Host("[ ] 할 일\n+ 토글\n\t안\n[링크](https://example.com)\n```\nlet x = 1\n```\n끝")
         let view = host.editor.controller.textView
         let controller = host.editor.controller
         func move(to point: CGPoint) throws {

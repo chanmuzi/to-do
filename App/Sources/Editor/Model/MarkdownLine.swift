@@ -5,7 +5,10 @@ nonisolated enum LineKind: Hashable, Sendable {
     case heading(Int)
     case todo(done: Bool)
     case bullet
+    /// 접고 펴는 토글. 원문은 `+ `(D-044).
     case toggle
+    /// 인용문. 원문은 표준 Markdown의 `> `(D-044).
+    case quote
     /// 코드 블록을 여는 ``` 줄, 닫는 ``` 줄, 그 사이의 줄.
     case fenceOpen
     case fenceClose
@@ -14,6 +17,14 @@ nonisolated enum LineKind: Hashable, Sendable {
     var isListItem: Bool {
         switch self {
         case .todo, .bullet, .toggle: true
+        default: false
+        }
+    }
+
+    /// 하위 계층의 부모가 될 수 있는 줄(목록, 투두, 토글, 인용문). 들여 쓴 줄은 이런 줄 아래에만 놓인다(D-043).
+    var isParentItem: Bool {
+        switch self {
+        case .todo, .bullet, .toggle, .quote: true
         default: false
         }
     }
@@ -37,7 +48,7 @@ nonisolated struct MarkdownLine: Hashable, Sendable {
     /// 하위 계층 단계. 탭 하나 또는 공백 둘이 한 단계다.
     var level = 0
     var kind: LineKind = .paragraph
-    /// 들여쓰기 뒤 기호(`- `, `[ ] `, `> `, `# `)의 길이.
+    /// 들여쓰기 뒤 기호(`- `, `[ ] `, `+ `, `> `, `# `)의 길이.
     var markerLength = 0
     var spans: [InlineSpan] = []
     /// 이 줄의 하위 줄이 끝나는 줄 번호(그 줄은 포함하지 않음).
@@ -62,7 +73,7 @@ nonisolated struct MarkdownLine: Hashable, Sendable {
     var caretStart: Int {
         switch kind {
         case .fenceOpen, .fenceClose, .code: start + indentLength
-        case .paragraph, .heading, .todo, .bullet, .toggle: contentStart
+        case .paragraph, .heading, .todo, .bullet, .toggle, .quote: contentStart
         }
     }
 }

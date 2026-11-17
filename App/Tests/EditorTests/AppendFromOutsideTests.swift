@@ -51,17 +51,17 @@ import Testing
     }
 
     @Test func foldsStayOnTheirLines() throws {
-        let h = try EditorHarness("> 토글\n\t안쪽\n끝")
+        let h = try EditorHarness("+ 토글\n\t안쪽\n끝")
         h.caret(at: 1)
         h.perform(.fold)
         #expect(h.editor.foldedLines == [0])
         let reported = h.foldChanges.count
 
-        h.editor.appendFromOutside("\n> 덧붙인 토글\n\t안")
+        h.editor.appendFromOutside("\n+ 덧붙인 토글\n\t안")
 
         #expect(h.editor.foldedLines == [0])
         #expect(h.foldChanges.count == reported)
-        #expect(h.editor.text == "> 토글\n\t안쪽\n끝\n> 덧붙인 토글\n\t안")
+        #expect(h.editor.text == "+ 토글\n\t안쪽\n끝\n+ 덧붙인 토글\n\t안")
     }
 
     /// 한글을 조합하는 중에 덧붙여도 조합이 끊기지 않는다. 입력기를 거치지 않고 저장소가 바뀌면 텍스트 뷰가

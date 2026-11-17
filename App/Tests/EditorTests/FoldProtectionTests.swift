@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite struct FoldProtectionTests {
     /// 0 `> T`(0..<3), 1 `\tchild one`(4..<14), 2 `\tchild two`(15..<25), 3 `after`(26..<31)
-    private static let source = "> T\n\tchild one\n\tchild two\nafter"
+    private static let source = "+ T\n\tchild one\n\tchild two\nafter"
     private static let titleEnd = 3
     private static let afterStart = 26
 
@@ -71,7 +71,7 @@ import Testing
         #expect(h.changes.isEmpty)
         // 펴진 뒤에 다시 누르면 보이는 글자를 지우는 것이므로 지워진다.
         h.press(NSResponder.backspace)
-        #expect(h.editor.text == "> T")
+        #expect(h.editor.text == "+ T")
     }
 
     @Test func typingOverASelectionAcrossTheFoldUnfoldsInsteadOfReplacing() throws {
@@ -104,7 +104,7 @@ import Testing
         h.press(Selector(selector))
         // 감춘 줄의 글자는 한 글자도 사라지지 않는다.
         #expect(h.editor.text.contains("\tchild one\n\tchild two"))
-        #expect(h.editor.text.hasPrefix("> T\n"))
+        #expect(h.editor.text.hasPrefix("+ T\n"))
         #expect(h.editor.text.hasSuffix("after"))
     }
 
@@ -113,7 +113,7 @@ import Testing
         h.caret(at: Self.afterStart)
         h.press(NSResponder.backspace)
         #expect(h.editor.foldedLines == [])
-        #expect(h.editor.text == "> T\n\tchild one\n\tchild twoafter")
+        #expect(h.editor.text == "+ T\n\tchild one\n\tchild twoafter")
     }
 
     @Test(arguments: [
@@ -133,14 +133,14 @@ import Testing
         h.press(NSResponder.forwardDelete)
         #expect(h.editor.foldedLines == [])
         // 펴진 첫 하위 줄이 제목에 이어 붙는다. 글자는 사라지지 않는다.
-        #expect(h.editor.text == "> Tchild one\n\tchild two\nafter")
+        #expect(h.editor.text == "+ Tchild one\n\tchild two\nafter")
     }
 
     @Test func wordDeletesInsideVisibleTextStillWork() throws {
         let h = try folded()
         h.caret(at: h.document.length)
         h.press(#selector(NSResponder.deleteWordBackward(_:)))
-        #expect(h.editor.text == "> T\n\tchild one\n\tchild two\n")
+        #expect(h.editor.text == "+ T\n\tchild one\n\tchild two\n")
         #expect(h.editor.foldedLines == [0])
     }
 

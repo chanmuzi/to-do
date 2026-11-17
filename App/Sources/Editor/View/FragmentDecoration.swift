@@ -24,8 +24,10 @@ nonisolated final class FragmentDecoration: NSObject {
     var gutter: Gutter?
     /// 왼쪽 칸이 시작하는 곳(텍스트 컨테이너 기준 x).
     var gutterX: CGFloat = 0
-    /// 안내선 수(하위 계층 단계).
-    var guideCount = 0
+    /// 안내선을 그리는 단계(0부터). 그 단계에 부모 항목이 있을 때만 든다(D-043).
+    var guideLevels: [Int] = []
+    /// 인용문 줄. 왼쪽(`gutterX`)에 세로 막대를 그린다. 이어지는 인용문 줄의 막대는 하나로 이어진다.
+    var quoteBar = false
     /// 토글 제목 뒤에 적는 줄 수.
     var count: String?
     /// 문단 안에서 제목 글자가 끝나는 위치.
