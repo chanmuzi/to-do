@@ -57,7 +57,7 @@ let package = Package(
         .target(name: "Library", dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
                 swiftSettings: uiSettings),
 
-        .target(name: "Reminders", dependencies: ["Theme", "Models", "Store"], swiftSettings: uiSettings),
+        .target(name: "Reminders", dependencies: ["Theme", "Models", "Store", "DateTime"], swiftSettings: uiSettings),
 
         // MARK: App
         .executableTarget(

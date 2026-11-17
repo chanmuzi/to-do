@@ -14,7 +14,7 @@ struct LibraryRowInput: NSViewRepresentable {
         view.model = model
         view.note = note
         view.hover = hover
-        view.setAccessibilityLabel(note.title.isEmpty ? "제목 없음" : note.title)
+        view.setAccessibilityLabel(LibraryPreview.title(note))
         view.setAccessibilityValue(model.selectedNoteID == note.id ? "선택됨" : "")
         view.setAccessibilityCustomActions([
             NSAccessibilityCustomAction(name: model.index.trash.contains { $0.id == note.id } ? "복원 후 열기" : "열기") {

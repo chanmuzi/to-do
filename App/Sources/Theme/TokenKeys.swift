@@ -104,6 +104,14 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case editorHeading3Before = "editor-heading3-before"
     case editorHeading3After = "editor-heading3-after"
 
+    case libraryUpcomingTimeWidth = "library-upcoming-time-w"
+    case librarySidebarRowGap = "library-sidebar-row-gap"
+    case reminderInputHeight = "reminder-input-h"
+    case scheduleMarkerWidth = "schedule-marker-w"
+    case scheduleEventBarWidth = "schedule-event-bar-w"
+    case scheduleReminderCircle = "schedule-reminder-circle"
+    case scheduleRowHeight = "schedule-row-h"
+    case scheduleListMaxHeight = "schedule-list-max-h"
     case reminderEditorWidth = "reminder-editor-w"
     case gutter
     case indent

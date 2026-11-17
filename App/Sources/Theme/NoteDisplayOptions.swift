@@ -23,6 +23,9 @@ public struct NoteDisplayOptions: Hashable, Sendable {
         case twentyFourHour
     }
 
+    public enum DateFormat: String, Codable, Hashable, Sendable { case relative, absolute }
+
+    public var dateFormat: DateFormat
     public var space: SpaceDisplay
     public var reminder: ReminderDisplay
     public var clock: ClockFormat
@@ -30,11 +33,13 @@ public struct NoteDisplayOptions: Hashable, Sendable {
     public var imminentLeadTime: TimeInterval
 
     public init(
+        dateFormat: DateFormat = .relative,
         space: SpaceDisplay = .icon,
         reminder: ReminderDisplay = .time,
         clock: ClockFormat = .koreanMeridiem,
         imminentLeadTime: TimeInterval = 15 * 60
     ) {
+        self.dateFormat = dateFormat
         self.space = space
         self.reminder = reminder
         self.clock = clock

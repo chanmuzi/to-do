@@ -7,12 +7,14 @@ struct LibraryButtonStyle: ButtonStyle {
     var selected = false
     var rounded = true
     var icon = false
+    var hoverName = ""
     func makeBody(configuration: Configuration) -> some View {
-        LibraryButtonBody(theme: theme, selected: selected, rounded: rounded, icon: icon, pressed: configuration.isPressed,
+        LibraryButtonBody(hoverName: hoverName, theme: theme, selected: selected, rounded: rounded, icon: icon, pressed: configuration.isPressed,
                           label: configuration.label)
     }
 }
 private struct LibraryButtonBody<Label: View>: View {
+    let hoverName: String
     let theme: Theme
     let selected: Bool
     let rounded: Bool
@@ -23,8 +25,12 @@ private struct LibraryButtonBody<Label: View>: View {
     @State private var hovered = false
     var body: some View {
         label.contentShape(Rectangle())
-            .background(selected ? theme.libraryColor(.accent) : ((hovered || pressed) && enabled ? theme.libraryColor(.hover) : .clear))
+            .background {
+                if !hoverName.isEmpty { LibrarySidebarHover(name: hoverName) { hovered = $0 && enabled } }
+            }
+            .background(selected ? theme.libraryColor(.surface) : ((hovered || pressed) && enabled ? theme.libraryColor(.hover) : .clear))
             .clipShape(RoundedRectangle(cornerRadius: rounded ? theme.shape(icon ? .chipRadius : .controlRadius) : 0))
+            .overlay { if selected { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.libraryColor(.outline), lineWidth: theme.shape(.borderWidth)) } }
             .onHover { hovered = $0 && enabled }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation,
                        value: hovered || pressed || selected)
@@ -81,4 +87,27 @@ final class LibraryHostingView<Content: View>: NSHostingView<Content> {
         }
         suppressRing(self)
     }
+}
+
+/// 창 안의 추적 영역만 사용한다. 디버그 검사도 같은 mouseEntered 경로를 지난다.
+private struct LibrarySidebarHover: NSViewRepresentable {
+    let name: String
+    let changed: (Bool) -> Void
+    func makeNSView(context: Context) -> SidebarHoverView { SidebarHoverView() }
+    func updateNSView(_ view: SidebarHoverView, context: Context) {
+        view.changed = changed; view.setAccessibilityLabel(name + " 호버")
+    }
+}
+private final class SidebarHoverView: NSView {
+    var changed: (Bool) -> Void = { _ in }
+    private var area: NSTrackingArea?
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let area { removeTrackingArea(area) }
+        let value = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+        addTrackingArea(value); area = value
+    }
+    override func mouseEntered(with event: NSEvent) { changed(true) }
+    override func mouseExited(with event: NSEvent) { changed(false) }
 }

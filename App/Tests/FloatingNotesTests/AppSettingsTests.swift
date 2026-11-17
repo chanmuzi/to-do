@@ -164,3 +164,16 @@ import Testing
         #expect(!fixture.notePanels.areNotesHidden)
     }
 }
+
+extension AppSettingsTests {
+    @Test func scheduleFormatDefaultsAndRoundTrips() throws {
+        #expect(try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8)).scheduleDateFormat == "relative")
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("schedule-format-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let settings = try AppSettingsStore(stateDirectory: root)
+        try settings.update { $0.scheduleDateFormat = "absolute" }
+        #expect(try AppSettingsStore(stateDirectory: root).settings.scheduleDateFormat == "absolute")
+        let value = AppSettings(scheduleDateFormat: "absolute")
+        #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(value)).scheduleDateFormat == "absolute")
+    }
+}

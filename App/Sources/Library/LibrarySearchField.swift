@@ -30,6 +30,7 @@ struct LibrarySearchField: NSViewRepresentable {
         if field.currentEditor() == nil, field.stringValue != text { field.stringValue = text }
         field.font = theme.nsFont(.body)
         field.textColor = theme.nsColor(.text)
+        field.placeholderAttributedString = NSAttributedString(string: "검색", attributes: [.foregroundColor: theme.nsColor(.text3)])
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }

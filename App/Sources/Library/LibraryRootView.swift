@@ -16,12 +16,6 @@ struct LibraryRootView: View {
                 HStack(spacing: theme.space(.sp1)) {
                     Text(model.title(model.selection)).font(theme.font(.paneTitle))
                     Spacer()
-                    LibraryIconButton(theme: theme, title: "AI 패널", symbol: "sparkle", enabled: model.router.isConnected(.openAIPanel(context: nil))) {
-                        model.router.route(.openAIPanel(context: nil))
-                    }
-                    LibraryIconButton(theme: theme, title: "설정", symbol: "slider.horizontal.3", enabled: model.router.isConnected(.openSettings)) {
-                        model.router.route(.openSettings)
-                    }
                     LibraryIconButton(theme: theme, title: "새 노트", symbol: "plus") {
                         var draft = NoteDraft()
                         switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
@@ -69,60 +63,26 @@ struct LibraryNoteRow: View {
         LibrarySelectableRow(model: model, note: note) {
             HStack(spacing: theme.component(.libraryRowGap)) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(note.title.isEmpty ? "제목 없음" : note.title).font(theme.font(.row))
-                        .foregroundStyle(theme.libraryColor(note.title.isEmpty ? .text3 : .text)).lineLimit(1)
+                    Text(LibraryPreview.title(note)).font(theme.font(.row))
+                        .foregroundStyle(theme.libraryColor(LibraryPreview.isEmpty(note) ? .text3 : .text)).lineLimit(1)
                         .frame(height: theme.lineHeight(.row))
-                    if !LibraryPreview.text(note.body).isEmpty {
-                        Text(LibraryPreview.text(note.body)).font(theme.font(.rowSub))
+                    if !LibraryPreview.subtitle(note).isEmpty {
+                        Text(LibraryPreview.subtitle(note)).font(theme.font(.rowSub))
                             .foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
                             .frame(height: theme.lineHeight(.rowSub))
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 LibraryReminder(note: note, model: model)
                     .frame(width: theme.component(.libraryReminderWidth), alignment: .trailing)
-                HStack(spacing: theme.component(.iconGap)) {
-                    if !LibraryPreview.progress(note.body).isEmpty {
-                        LibrarySymbol(theme: theme, name: "checkmark", size: .iconSmall)
-                        Text(LibraryPreview.progress(note.body)).font(theme.font(.ui))
-                    }
-                }.foregroundStyle(theme.libraryColor(.text3))
-                    .frame(width: theme.component(.libraryProgressWidth), alignment: .trailing)
-                SpaceIconView(icon: note.spaceID.flatMap { model.spaces.space(for: $0)?.icon } ?? .none,
-                              directory: model.spaces.imageDirectory, theme: theme, size: theme.component(.iconMedium))
-                    .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
-                LibrarySymbol(theme: theme, name: model.selection == .trash ? "arrow.uturn.backward" : "pin.fill", size: .iconMedium)
+                LibrarySymbol(theme: theme, name: "pin.fill", size: .iconSmall)
                     .foregroundStyle(theme.libraryColor(.text3))
-                    .opacity(model.selection == .trash || model.index.windows[note.id]?.isOpen == true ? 1 : 0)
-                    .frame(width: theme.component(.iconLarge))
+                    .opacity(model.index.windows[note.id]?.isOpen == true ? 1 : 0)
+                    .frame(width: theme.component(.iconSmall))
             }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
                 .frame(height: theme.component(.libraryRowHeight))
                 .overlay(alignment: .bottom) {
                     theme.libraryColor(.line).frame(height: theme.shape(.borderWidth)).allowsHitTesting(false)
                 }
         }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
-    }
-}
-
-/// 편집기 의존 없이 목록용 텍스트와 투두 개수만 추린다. 코드 울타리 안 체크박스는 세지 않는다.
-enum LibraryPreview {
-    static func text(_ body: String) -> String {
-        body.split(separator: "\n").prefix(3).map {
-            String($0).replacingOccurrences(of: #"^\s*(?:[-*] )?(?:\[[ xX]\] |#{1,3} |[>+] )?"#, with: "", options: .regularExpression)
-        }.joined(separator: ", ")
-    }
-    static func progress(_ body: String) -> String {
-        var fence: String?, done = 0, total = 0
-        for line in body.split(separator: "\n") {
-            let text = line.trimmingCharacters(in: .whitespaces)
-            if text.hasPrefix("```") || text.hasPrefix("~~~") {
-                let marker = String(text.prefix(3)); if fence == marker { fence = nil } else if fence == nil { fence = marker }; continue
-            }
-            guard fence == nil else { continue }
-            let value = text.hasPrefix("- ") ? String(text.dropFirst(2)) : text
-            if value.hasPrefix("[ ] ") || value.hasPrefix("[x] ") || value.hasPrefix("[X] ") {
-                total += 1; if !value.hasPrefix("[ ]") { done += 1 }
-            }
-        }
-        return total == 0 ? "" : "\(done)/\(total)"
     }
 }

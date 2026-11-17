@@ -1,95 +1,108 @@
 import AppKit
 import SwiftUI
-import Observation
 import Models
-import Store
 import Theme
 
 struct ReminderEditorView: View {
     @Bindable var model: ReminderEditorModel
     let theme: Theme
     let close: () -> Void
-    @FocusState private var titleFocused: Bool
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.space(.sp3)) {
-            HStack(spacing: theme.space(.sp2)) {
-                Text("리마인더 설정").font(theme.font(.paneTitle))
-                Spacer()
-                Button("추가") { model.select(nil); titleFocused = true }
-            }
-            HStack(spacing: theme.space(.sp1)) {
-                TextField("제목", text: $model.title).focused($titleFocused)
-                    .font(theme.font(.row, weight: theme.tokens.textStyle(.strong).weight))
-                    .textFieldStyle(.plain).autocorrectionDisabled().accessibilityLabel("예정 제목")
-                if !model.items.isEmpty {
-                    Menu {
-                        ForEach(model.items) { item in
-                            Button(item.title.isEmpty ? "제목 없음" : item.title) {
-                                model.select(item.id)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(theme.font(.ui, size: theme.component(.iconSmall)))
-                    }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .accessibilityLabel("수정할 예정")
+        VStack(alignment: .leading, spacing: theme.space(.sp2)) {
+            CommandTextField(text: $model.input, theme: theme, placeholder: "예정 입력", style: .scheduleInput,
+                ranges: model.expressionRanges, focusToken: model.focusToken, submit: { model.submitCandidate() }, cancel: close, move: model.moveCandidate)
+                .padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.reminderInputHeight))
+                .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            VStack(spacing: 0) {
+                ForEach(Array(model.candidates.enumerated()), id: \.element.id) { index, item in
+                    Button { model.chooseCandidate(index) } label: {
+                        row(item, title: item.title,
+                            selected: model.candidateIndex == index, destination: model.destinationForCandidate(item))
+                    }.buttonStyle(.plain).accessibilityElement(children: .ignore)
+                        .accessibilityLabel(model.presentation(item).accessibilityLabel(title: item.title))
                 }
             }
-            .padding(.horizontal, theme.space(.sp2))
-            .frame(height: theme.component(.controlHeight))
-            .background(theme.color(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-            Toggle("시각 지정", isOn: Binding(get: { !model.dateOnly }, set: { model.dateOnly = !$0 }))
-                .toggleStyle(.checkbox)
-            DatePicker("시작", selection: $model.start, displayedComponents: model.dateOnly ? [.date] : [.date, .hourAndMinute])
-                .datePickerStyle(.field).font(theme.font(.ui))
-                .frame(height: theme.component(.controlHeight))
-            Toggle("종료 지정", isOn: $model.hasEnd).toggleStyle(.checkbox)
-            if model.hasEnd {
-                DatePicker("종료", selection: $model.end, displayedComponents: model.dateOnly ? [.date] : [.date, .hourAndMinute])
-                    .datePickerStyle(.field).font(theme.font(.ui))
-                    .frame(height: theme.component(.controlHeight))
-            } else if model.selectedID != nil {
-                Toggle("완료", isOn: $model.completed).toggleStyle(.checkbox)
+            if !model.items.isEmpty {
+                theme.color(.line).frame(height: theme.shape(.borderWidth))
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(model.items) { item in
+                            existingRow(item)
+                        }
+                    }
+                }.frame(height: min(CGFloat(model.items.count) * theme.component(.scheduleRowHeight), theme.component(.scheduleListMaxHeight)))
             }
-            if let error = model.error { Text(error).foregroundStyle(theme.color(.text2)) }
+            if model.selectedID != nil {
+                Button("지우기") { model.remove() }
+                    .font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3))
+                    .buttonStyle(.plain).frame(height: theme.component(.controlHeight))
+            }
+            if let error = model.error { Text(error).font(theme.font(.rowSub)).foregroundStyle(theme.color(.text2)) }
+        }.padding(theme.space(.sp3)).frame(width: theme.component(.reminderEditorWidth))
+            .background(theme.color(.surface)).foregroundStyle(theme.color(.text)).focusEffectDisabled()
+            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: model.candidateIndex)
+            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: model.selectedID)
+            .onExitCommand(perform: close)
+    }
+    private func existingRow(_ item: ScheduleItem) -> some View {
+        HStack(alignment: .top, spacing: theme.space(.sp2)) {
+            if item.kind == .reminder {
+                Button { model.toggleCompleted(item.id) } label: { marker(item, destination: model.destinationForItem(item)) }
+                    .buttonStyle(.plain).accessibilityLabel(item.isCompleted ? "미완료로 바꾸기" : "완료로 바꾸기")
+            } else { marker(item, destination: model.destinationForItem(item)) }
+            Button { model.select(item.id) } label: {
+                rowText(item, title: item.title.isEmpty ? (item.kind == .event ? "일정" : "리마인더") : item.title,
+                        selected: model.selectedID == item.id, destination: model.destinationForItem(item))
+            }.buttonStyle(.plain)
+        }.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.space(.sp1))
+            .frame(height: theme.component(.scheduleRowHeight))
+            .background(model.selectedID == item.id ? theme.color(.surface3) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+    }
+    private func row(_ item: ScheduleItem, title: String, selected: Bool, destination: ScheduleDestination?) -> some View {
+        HStack(alignment: .top, spacing: theme.space(.sp2)) {
+            marker(item, destination: destination)
+            rowText(item, title: title, selected: selected, destination: destination)
+        }.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.space(.sp1))
+            .frame(height: theme.component(.scheduleRowHeight))
+            .contentShape(Rectangle())
+            .background(selected ? theme.color(.surface3) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+    }
+    private func rowText(_ item: ScheduleItem, title: String, selected: Bool, destination: ScheduleDestination?) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: theme.space(.sp2)) {
-                if model.selectedID != nil { Button("삭제") { if model.remove() { close() } } }
-                Spacer()
-                Button("취소", action: close)
-                Button("저장") { if model.save() { close() } }
-            }
-        }
-        .font(theme.font(.row)).foregroundStyle(theme.color(.text))
-        .buttonStyle(ReminderActionStyle(theme: theme))
-        .padding(theme.space(.sp3)).frame(width: theme.component(.reminderEditorWidth))
-        .background(theme.color(.surface)).tint(theme.color(.accent))
-        .controlSize(.small).focusEffectDisabled()
-        .environment(\.locale, Locale(identifier: "ko_KR"))
-        .onAppear { titleFocused = true }
-        .onExitCommand(perform: close)
+                Text(title).font(theme.font(selected ? .strong : .body)).lineLimit(1)
+                    .foregroundStyle(theme.color(item.isCompleted ? .text3 : .text))
+                Spacer(minLength: 0)
+                if let destination { Text(destination.name).font(theme.font(.rowSub, size: theme.tokens.textStyle(.micro).size)).foregroundStyle(theme.color(.text3)).lineLimit(1) }
+            }.frame(height: theme.lineHeight(.body))
+            Text(model.presentation(item).text ?? "").font(theme.font(.scheduleTime)).foregroundStyle(theme.color(.text2))
+                .lineLimit(1).truncationMode(.tail).frame(height: theme.lineHeight(.scheduleTime))
+        }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+            .accessibilityLabel(model.presentation(item).accessibilityLabel(title: title))
+    }
+    private func marker(_ item: ScheduleItem, destination: ScheduleDestination?) -> some View {
+        ScheduleMarker(item: item, destination: destination, theme: theme)
     }
 }
 
-private struct ReminderActionStyle: ButtonStyle {
+struct ScheduleMarker: View {
+    let item: ScheduleItem
+    let destination: ScheduleDestination?
     let theme: Theme
-    func makeBody(configuration: Configuration) -> some View {
-        ReminderActionBody(theme: theme, pressed: configuration.isPressed, label: configuration.label)
+    var color: Color {
+        if let color = destination?.color { return Color(.sRGB, red: color.red, green: color.green, blue: color.blue) }
+        return theme.color(Self.fallback(for: item.kind))
     }
-}
-private struct ReminderActionBody<Label: View>: View {
-    let theme: Theme
-    let pressed: Bool
-    let label: Label
-    @State private var hovered = false
+    static func fallback(for kind: ScheduleItem.Kind) -> ColorToken { kind == .event ? .text : .text2 }
     var body: some View {
-        label.padding(.horizontal, theme.space(.sp2))
-            .frame(height: theme.component(.controlHeight))
-            .contentShape(Rectangle())
-            .background(hovered || pressed ? theme.color(.hover) : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: theme.shape(.chipRadius)))
-            .onHover { hovered = $0 }
-            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation,
-                       value: hovered || pressed)
+        ZStack {
+            if item.kind == .event {
+                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(.scheduleReminderCircle))
+            } else {
+                Circle().strokeBorder(color, lineWidth: theme.shape(.borderWidth))
+                    .background(Circle().fill(item.isCompleted ? color : .clear))
+                    .frame(width: theme.component(.scheduleReminderCircle), height: theme.component(.scheduleReminderCircle))
+            }
+        }.frame(width: theme.component(.scheduleMarkerWidth), height: theme.lineHeight(.body))
     }
 }

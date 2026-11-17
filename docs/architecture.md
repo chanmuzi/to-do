@@ -478,7 +478,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - `Models.ScheduleItem`: 시작, 종료 기반 종류, 날짜만/완료/삭제 대기, 제목, TodoAnchor, 로컬, 외부 ID, 수정, 동기화 시각, 마지막 동기화 값과 실패. `Note.schedules`가 정본이고 `reminder`는 호환 투영이다. `displayedSchedule(at:)`은 가장 이른 다가오는 항목, 없으면 지난 항목을 고른다.
 - `Store`는 `schedules` JSON을 한 줄 frontmatter로 저장한다. 기존 reminder는 안정된 ID로 읽고 옛 빌드용 날짜를 병기한다. 알 수 없는 줄 보존 정책은 유지한다. `LegacyStage5` 테스트 코드는 HEAD의 실제 codec을 이름만 바꿔 고정한 것이다.
 - Core `Scheduling`의 `ScheduleService`가 저장소 변경과 CalendarBridge.onChange를 직렬 처리한다. EventKitBridge만 EventKit을 import하며 저장소 생성은 지연된다. SystemReminderNotifier만 UserNotifications를 import한다. 둘의 가짜 구현은 실제 권한, 계정을 전혀 쓰지 않는다.
-- Feature `Reminders`는 Theme, Models, Store만 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력, 범위 검증, 항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
+- Feature `Reminders`는 Theme, Models, Store, DateTime을 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력, 범위 검증, 항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
 - 권한 요청 의도는 `ReminderEditorModel.onSave`와 `CaptureWriter.onScheduleCreated`(새 노트 캡처는 `AppRouter.onScheduleCreated`)에서 항목 ID로 전달하고 AppDelegate가 `ScheduleService.register`에 연결한다. 일반 저장 관찰은 권한을 요청하지 않는다. 옛 항목은 명시 저장과 다가오는 미완료 조건을 모두 확인한다(D-071).
 - AppDelegate는 실행 옵션에 따라 실제/가짜 의존성을 조립한다. `--calendar fake`는 두 외부 API를 모두 대체하며 `--debug-passive`도 강제로 같은 경로를 쓴다. 종료 시 서비스 관찰과 편집 화면을 닫는다.
 - Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜, 범위, 아이콘, 임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor와 NotePanel은 Core DateTime의 제안, 수락 계약을 공유한다.
@@ -494,3 +494,5 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - Core `Scheduling.InlineScheduleWriter`: 항목 단위 생성, 갱신, 삭제/복원. 삭제는 기존 ScheduleService 삭제 대기, 재시도 경로를 사용하며 최신 외부 연결을 지킨다. `Models.InlineScheduleSource`가 출처를 저장하고 Note.body 변경 시 안전하게 식별되는 줄만 따라간다.
 - AppDelegate가 writer를 만들고 NoteEditorFactory.onAcceptDate와 NotePanelCoordinator.onAcceptTitleDate에 잇는다. Feature 간 import는 없고 Editor, Capture, NotePanel은 Core DateTime을 참조한다. 권한 의도는 수락된 항목 ID만 ScheduleService.register로 보낸다.
 - 디버그 `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestionHelp 접근성 도움말을 포함한다. 실제 계정, 시스템 이벤트, 클립보드는 사용하지 않는다.
+
+- L1과 E2(D-086~D-088): Theme.CommandTextField가 조합 보호, 밑줄, Return과 Escape를 제공한다. LibraryPreview는 목록 표시 제목과 본문을 만들며 저장 제목은 바꾸지 않는다. Models.ScheduleDestination은 외부 캘린더의 이름과 sRGB 색 값만 담는다. CalendarBridge.destination은 권한 요청 없이 조회하고 App이 ScheduleService를 통해 ReminderEditorCoordinator에 주입한다. AppSettings.scheduleDateFormat은 열린 NotePanel, Library, Reminders에 동시에 전달한다.

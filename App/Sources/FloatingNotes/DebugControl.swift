@@ -77,6 +77,7 @@ final class DebugControl {
     weak var reminderEditor: ReminderEditorCoordinator?
     weak var fakeCalendar: FakeCalendarBridge?
     weak var library: LibraryCoordinator?
+    var setScheduleDateFormat: (String) -> Void = { _ in }
     var reopen: () -> Void = {}
     var toastWindow: () -> NSWindow? = { nil }
     var toastAction: () -> Void = {}
@@ -191,6 +192,53 @@ final class DebugControl {
         case ("library-mouse", let point?, let action?):
             guard let window = library?.window else { return }
             DebugLibraryInput.mouse(window: window, point: point.rawValue, action: action)
+        case ("library-audit", let name?, _):
+            guard let root = library?.window?.contentView, let url = output(named: name.rawValue) else { return }
+            do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("라이브러리 검사 실패: \(error)") }
+        case ("library-hover", let label?, let rest):
+            if let root = library?.window?.contentView { DebugViewAudit.hover(root, label: label.rawValue + (rest.map { " " + $0 } ?? "")) }
+        case ("reminder-key", let key?, _):
+            guard let root = reminderEditor?.contentView else { return }
+            func field(in view: NSView) -> NSTextField? {
+                if let value = view as? NSTextField, value.isEditable { return value }
+                return view.subviews.lazy.compactMap { field(in: $0) }.first
+            }
+            guard let input = field(in: root) else { return }
+            input.window?.makeFirstResponder(input)
+            guard let editor = input.currentEditor() as? NSTextView else { return }
+            let selectors: [String: Selector] = ["down": #selector(NSResponder.moveDown(_:)), "up": #selector(NSResponder.moveUp(_:)),
+                "return": #selector(NSResponder.insertNewline(_:)), "escape": #selector(NSResponder.cancelOperation(_:))]
+            if let selector = selectors[key.rawValue] { editor.doCommand(by: selector) }
+        case ("schedule-dump", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            let model = reminderEditor?.model
+            let state: [String: Any] = ["input": model?.input ?? "", "selected": model?.selectedID ?? "", "candidate": model?.candidateIndex ?? -1,
+                "candidateKinds": model?.candidates.map { $0.kind.rawValue } ?? [],
+                "candidateTitles": model?.candidates.map { $0.title } ?? [],
+                "candidateLabels": model.map { model in model.candidates.map { model.presentation($0).accessibilityLabel(title: $0.title) } } ?? [],
+                "items": model?.items.map { ["id": $0.id, "title": $0.title, "kind": $0.kind.rawValue] } ?? [],
+                "permissionRequests": fakeCalendar?.authorizationPromptAttempts.count ?? -1,
+                "error": model?.error ?? ""]
+            do { try JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]).write(to: url) }
+            catch { AppLog.warning("예정 검사 저장 실패: \(error)") }
+        case ("schedule-format", let value?, _):
+            if ["relative", "absolute"].contains(value.rawValue) { setScheduleDateFormat(value.rawValue) }
+        case ("space-edit", let value?, _):
+            library?.model.beginSpaceEditing(value.rawValue == "new" ? nil : SpaceID(rawValue: value.rawValue))
+        case ("space-name", let value?, let rest): library?.model.spaceName = value.rawValue + (rest.map { " " + $0 } ?? "")
+        case ("space-submit", _, _): library?.model.submitSpaceEditing()
+        case ("space-cancel", _, _): library?.model.cancelSpaceEditing()
+        case ("reminder-input", let value?, let rest): reminderEditor?.model?.input = value.rawValue + (rest.map { " " + $0 } ?? "")
+        case ("reminder-select", let value?, _): reminderEditor?.model?.select(value.rawValue == "new" ? nil : value.rawValue)
+        case ("reminder-candidate", let value?, _): if let index = Int(value.rawValue) { reminderEditor?.model?.candidateIndex = index }
+        case ("reminder-submit", _, _): reminderEditor?.model?.submitCandidate()
+        case ("reminder-toggle", let value?, _): reminderEditor?.model?.toggleCompleted(value.rawValue)
+        case ("fake-access", let value?, _):
+            fakeCalendar?.isAllowed = value.rawValue == "on"
+            reminderEditor?.model?.reload()
+        case ("reminder-audit", let name?, _):
+            guard let root = reminderEditor?.contentView, let url = output(named: name.rawValue) else { return }
+            do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("예정 화면 검사 실패: \(error)") }
         case ("reminder-editor", let id?, _): router.route(.openReminderEditor(id))
         case ("reminder-close", _, _): reminderEditor?.close()
         case ("reminder-snapshot", let name?, _):

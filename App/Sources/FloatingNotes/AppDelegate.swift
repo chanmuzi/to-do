@@ -85,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                             makeBridge: makeBridge, log: AppLog.warning)
             try schedules.start()
             self.schedules = schedules
+            reminderEditor.destination = { [weak schedules] item in schedules?.destination(for: item) }
             let inlineWriter = InlineScheduleWriter(notes: environment.notes, service: schedules)
             editors.onAcceptDate = { id, request in try inlineWriter.accept(request, in: id) }
             editors.onDateError = { AppLog.warning("본문 예정 저장 실패: \($0)") }
@@ -114,6 +115,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #endif
             router.library = library
             self.library = library
+            let priorSettingsChange = environment.settings.onChange
+            let applyDisplay: (AppSettings) -> Void = { [weak notePanels, weak library, weak reminderEditor] settings in
+                let options = NoteDisplayOptions(dateFormat: .init(rawValue: settings.scheduleDateFormat) ?? .relative)
+                notePanels?.displayOptions = options
+                library?.model.displayOptions = options
+                reminderEditor?.displayOptions = options
+            }
+            applyDisplay(environment.settings.settings)
+            environment.settings.onChange = { settings in priorSettingsChange?(settings); applyDisplay(settings) }
             router.quickPanels = quickPanels
             self.router = router
             self.notePanels = notePanels
@@ -308,6 +318,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         control.reminderEditor = reminderEditor
         control.fakeCalendar = fakeCalendar
         control.library = library
+        control.setScheduleDateFormat = { [weak self] value in
+            do { try self?.environment?.settings.update { $0.scheduleDateFormat = value } }
+            catch { AppLog.warning("표시 설정 저장 실패: \(error)") }
+        }
         control.reopen = { [weak self] in _ = self?.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false) }
         control.toastWindow = { [unowned self] in toasts?.presenter.window }
         control.toastAction = { [unowned self] in toasts?.presenter.performAction() }

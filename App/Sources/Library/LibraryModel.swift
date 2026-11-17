@@ -26,6 +26,22 @@ public final class LibraryModel {
     var expanded: Set<SpaceID> = []
     var iconSpace: SpaceID?
     var editingViews = false
+    public private(set) var editingSpace = false
+    public private(set) var renamingSpaceID: SpaceID?
+    public var spaceName = ""
+    public func beginSpaceEditing(_ id: SpaceID? = nil) {
+        renamingSpaceID = id; spaceName = id.flatMap { spaces.space(for: $0)?.name } ?? ""; editingSpace = true
+    }
+    public func cancelSpaceEditing() { editingSpace = false; renamingSpaceID = nil; spaceName = "" }
+    public func submitSpaceEditing() {
+        let value = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        do {
+            if let id = renamingSpaceID { try spaces.update(id) { $0.name = value } }
+            else { let space = try spaces.create(name: value); refresh(); select(.space(space.id)) }
+            refresh(); cancelSpaceEditing()
+        } catch { self.error = error.localizedDescription }
+    }
     private var observations: [StoreObservation] = []
     private var refreshPending = false
 
@@ -66,19 +82,21 @@ public final class LibraryModel {
     }
     private func validated(_ value: LibrarySelection) -> LibrarySelection {
         switch value {
+        case .space(nil), .day(nil, _): return .all
         case .space(let id), .day(let id, _):
             if let id, spaces.space(for: id) == nil { return .today }
         default: break
         }
         if LibrarySelection.views.contains(value), !settings.visibleViews.contains(value) {
-            return settings.visibleViews.first ?? .space(nil)
+            return settings.visibleViews.first ?? .all
         }
         return value
     }
     public func select(_ value: LibrarySelection) {
         selectedNoteID = nil
-        selection = value
-        changeSettings { $0.lastSelection = value }
+        let target: LibrarySelection = value == .space(nil) ? .all : value
+        selection = target
+        changeSettings { $0.lastSelection = target }
     }
     public var rows: [Note] { index.rows(for: selection, query: query) }
 
