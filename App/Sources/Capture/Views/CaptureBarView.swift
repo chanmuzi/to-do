@@ -55,14 +55,7 @@ final class CaptureBarView: NSView {
         view.importsGraphics = false
         view.allowsUndo = true
         view.drawsBackground = false
-        view.isAutomaticQuoteSubstitutionEnabled = false
-        view.isAutomaticDashSubstitutionEnabled = false
-        view.isAutomaticTextReplacementEnabled = false
-        view.isAutomaticSpellingCorrectionEnabled = false
-        view.isContinuousSpellCheckingEnabled = false
-        view.isGrammarCheckingEnabled = false
-        view.isAutomaticLinkDetectionEnabled = false
-        view.isAutomaticDataDetectionEnabled = false
+        TextInputPolicy.apply(to: view)
         view.textContainerInset = .zero
         view.isVerticallyResizable = false
         view.isHorizontallyResizable = true

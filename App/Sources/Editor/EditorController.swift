@@ -215,14 +215,7 @@ final class EditorController: NSObject {
         // 되돌리기는 편집기가 직접 적는다(`UndoHistory`). 텍스트 뷰의 기록은 쓰지 않는다.
         textView.allowsUndo = false
         textView.drawsBackground = false
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticSpellingCorrectionEnabled = false
-        textView.isAutomaticLinkDetectionEnabled = false
-        textView.isContinuousSpellCheckingEnabled = false
-        textView.isGrammarCheckingEnabled = false
-        textView.smartInsertDeleteEnabled = false
+        TextInputPolicy.apply(to: textView)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
         textView.autoresizingMask = [.width]

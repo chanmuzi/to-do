@@ -107,9 +107,7 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         textView.autoresizingMask = [.width]
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
+        TextInputPolicy.apply(to: textView)
         textView.setAccessibilityLabel("본문")
     }
 
