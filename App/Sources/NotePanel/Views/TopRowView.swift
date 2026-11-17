@@ -17,8 +17,6 @@ final class TopRowView: NSView {
     }
 
     var actions = Actions()
-    var onDatePreviewHeightChange: (() -> Void)?
-    var datePreviewHeight: CGFloat { title.datePreviewHeight }
 
     private let style: PanelStyle
     private let spaceBadge: SpaceBadgeView
@@ -67,10 +65,6 @@ final class TopRowView: NSView {
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
         reminderBadge.onPress = { [unowned self] in actions.reminder() }
         pinButton.onPress = { [unowned self] in actions.pin() }
-        title.onDatePreviewHeightChange = { [weak self] in
-            self?.needsLayout = true
-            self?.onDatePreviewHeightChange?()
-        }
         title.onChange = { [unowned self] in actions.titleChanged($0) }
         title.onReturn = { [unowned self] in actions.titleReturned() }
         title.onEditingChange = { [unowned self] in
@@ -185,7 +179,7 @@ final class TopRowView: NSView {
         spaceBadge.frame = frames.space ?? .zero
         let titleHeight = title.idealHeight
         title.frame = NSRect(
-            x: frames.title.minX, y: datePreviewHeight + ((style.theme.shape(.chromeHeight) - titleHeight) / 2).rounded(),
+            x: frames.title.minX, y: ((style.theme.shape(.chromeHeight) - titleHeight) / 2).rounded(),
             width: frames.title.width, height: titleHeight
         )
         moreButton.frame = frames.more
@@ -194,10 +188,6 @@ final class TopRowView: NSView {
         if let problem = frames.problem { problemButton.frame = problem }
         if let reminder = frames.reminder { reminderBadge.frame = reminder }
         pinButton.frame = frames.pin
-        for view in [spaceBadge, moreButton, addButton, problemButton, reminderBadge, pinButton] {
-            view.frame.origin.y += datePreviewHeight
-        }
-        title.layoutDateHint()
     }
 
     // MARK: - 끌기와 제목 누르기

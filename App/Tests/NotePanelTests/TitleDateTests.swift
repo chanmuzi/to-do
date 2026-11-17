@@ -5,8 +5,57 @@ import DateTime
 @testable import NotePanel
 
 @MainActor @Suite struct TitleDateTests {
+    @Test(arguments: ["오늘 오후 1시 미팅", "회의 내일 오후 3시"], [false, true])
+    func feedbackTitleInputPaths(source: String, composing: Bool) throws {
+        try withField("") { field, editor in
+            field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+            for character in source {
+                if composing && character.isLetter {
+                    editor.setMarkedText(String(character), selectedRange: NSRange(location: 1, length: 0), replacementRange: editor.selectedRange())
+                    #expect(field.dateSuggestion == nil)
+                    editor.insertText(String(character), replacementRange: editor.markedRange())
+                } else { editor.insertText(String(character), replacementRange: editor.selectedRange()) }
+            }
+            #expect(editor.string == source)
+            // 제목은 실제 시계를 쓴다. 오늘 13시가 지났으면 명세대로 제안하지 않는다.
+            let valid = source.hasPrefix("회의") || Calendar.current.component(.hour, from: Date()) < 13
+            #expect((field.dateSuggestion != nil) == valid)
+        }
+    }
+
+    @Test func unmarkRefreshesTitleWithoutAnotherKeystroke() throws {
+        try withField("회의 내일 오후 3") { field, editor in
+            field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+            editor.setMarkedText("시", selectedRange: NSRange(location: 1, length: 0), replacementRange: editor.selectedRange())
+            #expect(field.dateSuggestion == nil)
+            editor.unmarkText()
+            #expect(field.dateSuggestion != nil)
+            #expect(editor.string == "회의 내일 오후 3시")
+        }
+    }
+
+    @Test(arguments: [0, 1, 3, 7, 14])
+    func outsideExpressionAcceptanceUndoAndEscape(position: Int) throws {
+        let source = "회의 내일 오후 3시 메모"
+        try withField(source) { field, editor in
+            field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+            editor.setSelectedRange(NSRange(location: position, length: 0))
+            #expect(field.dateSuggestion != nil)
+            let undo = try #require(editor.undoManager)
+            undo.groupsByEvent = false
+            editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            #expect(editor.string == "회의 메모")
+            if position < 3 { #expect(editor.selectedRange().location == position) }
+            undo.undo()
+            #expect(editor.string == source)
+            #expect(editor.selectedRange().location == position)
+            undo.redo()
+            #expect(editor.string == "회의 메모")
+        }
+    }
+
     @Test(arguments: ["내일", "긴 회의 제목 내일 오후 3시~4시"])
-    func previewHasItsOwnSpaceAboveTitleAndBody(source: String) throws {
+    func underlineKeepsTitleAndBodyFrames(source: String) throws {
         let theme = try Theme.bundled()
         let body = NSTextView(frame: NSRect(x: 0, y: 0, width: 340, height: 100))
         body.string = "본문 첫 줄은 가리지 않습니다\n본문 둘째 줄도 그대로입니다"
@@ -19,28 +68,26 @@ import DateTime
         root.layoutSubtreeIfNeeded()
         let field = try #require(root.topRow.subviews.compactMap { $0 as? TitleField }.first)
         field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+        let bodyBefore = body.frame
+        let chromeBefore = root.chromeHeight
         field.beginEditing(title: source)
         field.updateDateSuggestion()
         root.layoutSubtreeIfNeeded()
         root.layoutSubtreeIfNeeded()
-        let preview = root.convert(field.dateHint.bounds, from: field.dateHint)
         let editor = try #require(field.currentEditor() as? NSTextView)
-        let titleScreen = editor.firstRect(forCharacterRange: NSRange(location: 0, length: editor.string.utf16.count), actualRange: nil)
-        let title = root.convert(window.convertFromScreen(titleScreen), from: nil)
-        let bodyRect = root.convert(body.bounds, from: body)
-        #expect(!field.dateHint.isHidden)
-        #expect(!preview.intersects(title))
-        #expect(!preview.intersects(bodyRect))
-        #expect(root.bounds.contains(preview))
+        #expect(field.dateSuggestion != nil)
+        #expect(field.accessibilityHelp()?.contains("리마인더") == true || field.accessibilityHelp()?.contains("일정") == true)
+        #expect(editor.string == source)
+        #expect(body.frame == bodyBefore)
+        #expect(root.chromeHeight == chromeBefore)
         #expect(body.string == "본문 첫 줄은 가리지 않습니다\n본문 둘째 줄도 그대로입니다")
         field.hideDateSuggestion()
         root.layoutSubtreeIfNeeded()
-        #expect(root.topRow.datePreviewHeight == 0)
         #expect(root.chromeHeight == theme.shape(.chromeHeight) + theme.shape(.borderWidth))
     }
 
     @Test(arguments: ["회의 내일 3시 다음 안건", "😀 회의 내일 다음 😀 안건", "내일 3시 다음 안건", "회의 내일   다음 안건"])
-    func acceptanceAndRedoMoveCaretBackByDeletedUTF16Length(source: String) throws {
+    func acceptanceAndRedoKeepCaretAtTheDeletionJoin(source: String) throws {
         try withField(source) { field, editor in
             field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
             let token = source.contains("3시") ? "3시" : "내일"
@@ -52,7 +99,7 @@ import DateTime
             undo.groupsByEvent = false
             editor.doCommand(by: #selector(NSResponder.insertTab(_:)))
             let accepted = editor.string
-            let expected = before.location - (source.utf16.count - accepted.utf16.count)
+            let expected = (accepted as NSString).range(of: "다음").location
             #expect(editor.selectedRange() == NSRange(location: max(0, expected), length: 0))
             #expect(editor.selectedRange().location < accepted.utf16.count)
             #expect(accepted.hasSuffix("안건"))

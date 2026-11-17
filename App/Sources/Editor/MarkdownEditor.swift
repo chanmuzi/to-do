@@ -92,7 +92,6 @@ public final class MarkdownEditor {
         get { controller.onDateError }
         set { controller.onDateError = newValue }
     }
-    @_spi(Verification) public var dateSuggestionText: String? { controller.dateHint.message }
     @_spi(Verification) public func refreshDateSuggestion() { controller.updateDateSuggestion() }
 
     /// 내용 높이(안쪽 여백 포함)가 바뀌었을 때. 노트 창이 이 높이에 맞춘다.

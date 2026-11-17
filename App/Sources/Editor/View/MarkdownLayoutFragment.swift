@@ -4,8 +4,6 @@ import AppKit
 /// 왼쪽 칸의 그림(체크박스, 글머리표, 꺾쇠)과 안내선을 함께 그리는 문단 조각(spec 19).
 nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     /// 미리 보기가 들어갈 전용 공간. TextKit이 뒤의 모든 글자를 함께 밀어 원문을 덮지 않는다.
-    var datePreviewMargin: CGFloat = 0
-    override var topMargin: CGFloat { super.topMargin + datePreviewMargin }
     private lazy var paragraphString: NSAttributedString? = (textElement as? NSTextParagraph)?.attributedString
 
     private(set) lazy var decoration: FragmentDecoration? = {

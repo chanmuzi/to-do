@@ -133,7 +133,7 @@ extension EditorController {
         textView.didChangeText()
         selectionVersion = documentVersion
         undoDidReplay()
-        dismissedDate = (text, selectedRange)
+        dismissCurrentDateLine()
         updateDateSuggestion()
         textView.scrollRangeToVisible(textView.selectedRange())
     }

@@ -38,10 +38,6 @@ extension EditorController: NSTextLayoutManagerDelegate {
         in textElement: NSTextElement
     ) -> NSTextLayoutFragment {
         let fragment = MarkdownLayoutFragment(textElement: textElement, range: textElement.elementRange)
-        let offset = contentStorage.offset(from: contentStorage.documentRange.location, to: location)
-        if dateSuggestionAbove, document.lineIndex(at: offset) == dateSuggestionLine {
-            fragment.datePreviewMargin = dateHint.preferredSize.height + theme.space(.sp2)
-        }
         return fragment
     }
 }
@@ -205,7 +201,6 @@ extension EditorController {
     func focusDidChange() {
         // 포커스가 바뀌면 정해 둔 서식은 버린다.
         typingMarks = nil
-        dismissedDate = (text, selectedRange)
         updateDateSuggestion()
     }
 

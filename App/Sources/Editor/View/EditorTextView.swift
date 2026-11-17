@@ -18,7 +18,6 @@ final class EditorTextView: NSTextView {
     override func layout() {
         super.layout()
         caret?.reposition()
-        editor?.layoutDateHint()
     }
 
     // MARK: 되돌리기

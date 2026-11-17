@@ -14,12 +14,8 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
     var dateSuggestion: InlineDateProposal?
-    var dismissedDate: (text: String, selection: NSRange)?
+    var dismissedDate: String?
     var dateObserver: NSObjectProtocol?
-    var datePreviewHeight: CGFloat = 0
-    var onDatePreviewHeightChange: (() -> Void)?
-    var isLayingOutDateHint = false
-    lazy var dateHint = DateSuggestionView(theme: style.theme)
 
     isolated deinit {
         if let dateObserver { NotificationCenter.default.removeObserver(dateObserver) }
@@ -173,7 +169,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             return acceptDateSuggestion(in: textView)
         case #selector(NSResponder.cancelOperation(_:)):
             if dateSuggestion != nil {
-                dismissedDate = (textView.string, textView.selectedRange())
+                dismissedDate = textView.string
                 updateDateSuggestion()
                 return true
             }
