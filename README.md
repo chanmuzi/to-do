@@ -1,6 +1,6 @@
 # Float
 
-작은 메모 창 여러 개를 화면 위에 항상 띄워 두는 macOS용 메모·투두 앱 "Float".
+작은 메모 창 여러 개를 화면 위에 항상 띄워 두는 macOS용 메모, 투두 앱 "Float".
 SwiftUI + AppKit, 개인용. 아직 개발 중이며 진행 상황은 `docs/roadmap.md`에 있다.
 
 ## 요구 사항
@@ -21,7 +21,7 @@ scripts/install-app.sh
 - 릴리스 빌드를 만들어 `/Applications/FloatingNotes.app`으로 넣는다. `/Applications`에 쓸 수 없으면 `~/Applications`에 넣는다.
   `sudo`는 쓰지 않는다.
 - 이미 실행 중이면 먼저 정상 종료를 요청하고(저장하지 못한 노트가 있으면 앱이 묻는다) 끝난 뒤 바꿔 넣는다.
-- 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱·Finder·Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `FloatingNotes.app`이다.
+- 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱, Finder, Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `FloatingNotes.app`이다.
 - `create-signing-identity.sh`는 로그인 키체인에 `Float Local Code Signing` 자체 서명 인증서와 개인 키를 넣는다.
   유효기간은 10년(3,650일), 용도는 코드 서명이다. 이미 해당 이름의 인증서가 있으면 아무것도 바꾸지 않는다.
   **보통 암호를 묻지 않으며, 키체인이 잠겨 있으면 macOS의 `security`가 직접 묻는다.**
@@ -29,7 +29,7 @@ scripts/install-app.sh
   임시 개인 키 파일은 작업 종료 시 지운다. Apple 개발자 계정은 필요 없다.
   마지막 확인에서 `Matching identities`에 인증서가 나오면 된다. `CSSMERR_TP_NOT_TRUSTED`와 `0 valid identities`는 신뢰 등록을 하지 않은 자체 서명에서 예상되는 표시다.
 - 같은 인증서와 번들 ID를 계속 사용하면 빌드 내용이 바뀌어도 지정 요구사항이 유지된다.
-  인증서를 삭제·재생성하면 달라지므로 업데이트할 때는 생성 스크립트를 다시 실행할 필요가 없다.
+  인증서를 삭제, 재생성하면 달라지므로 업데이트할 때는 생성 스크립트를 다시 실행할 필요가 없다.
   임시 서명에서 처음 전환할 때의 권한 재승인과 실제 EventKit 권한 유지 여부는 별도 확인이 필요하다.
 - Apple 공증을 받지 않은 개인용 빌드다. 다른 Mac으로 복사하면 Gatekeeper가 막을 수 있다.
 
@@ -97,16 +97,16 @@ swift test --package-path App
 서명은 `FLOATING_NOTES_SIGN_IDENTITY`로 이름(또는 SHA-1 지문)을 지정할 수 있다. `-`를 지정하면 임시 서명을 쓴다.
 지정하지 않으면 키체인의 `Float Local Code Signing`을 사용하고, 없으면 한 줄 경고 후 임시 서명으로 빌드한다.
 명시한 인증서의 서명 실패는 그대로 실패로 보고한다. Hardened Runtime은 켜지 않는다.
-생성·빌드 스크립트 모두 `FLOATING_NOTES_KEYCHAIN=/임시/키체인.keychain-db`로 확인용 키체인을 지정할 수 있으며 검색 목록을 바꾸지 않는다.
+생성, 빌드 스크립트 모두 `FLOATING_NOTES_KEYCHAIN=/임시/키체인.keychain-db`로 확인용 키체인을 지정할 수 있으며 검색 목록을 바꾸지 않는다.
 자동 확인에만 `FLOATING_NOTES_KEYCHAIN_PASSWORD`로 명시한 임시 키체인(`/private/tmp` 또는 `/private/var/folders` 아래)의 암호를 넘길 수 있다.
-보조 스크립트 `scripts/signing-keychain.swift`가 Security API로 잠금 상태를 확인하고 임시 키체인을 연다. 임시 암호도 명령 인자로 전달하지 않으며, 로그인·시스템 키체인 및 그곳으로 향하는 심볼릭 링크는 이 경로에서 거부한다.
+보조 스크립트 `scripts/signing-keychain.swift`가 Security API로 잠금 상태를 확인하고 임시 키체인을 연다. 임시 암호도 명령 인자로 전달하지 않으며, 로그인, 시스템 키체인 및 그곳으로 향하는 심볼릭 링크는 이 경로에서 거부한다.
 
 ### 브랜드 에셋
 
 흑백 체크 카드 C2 아이콘을 쓴다. `App/Resources/app-icon-1024.svg`와 `menubar-icon.svg`가 벡터 원본이다.
-`swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 SVG·16~1024px PNG·18pt 메뉴 막대 PDF를 다시 만든다(macOS, 외부 의존성 없음).
+`swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 SVG, 16~1024px PNG, 18pt 메뉴 막대 PDF를 다시 만든다(macOS, 외부 의존성 없음).
 1024px 캔버스의 본체는 824px(80.46875%), 사방 여백은 100px이며 시스템 메모 앱의 본체 비율을 따른다.
-번들 ID, 실행 파일·타깃·모듈, 앱 파일 이름, 기존 노트·설정 저장 위치는 유지한다(D-062).
+번들 ID, 실행 파일, 타깃, 모듈, 앱 파일 이름, 기존 노트, 설정 저장 위치는 유지한다(D-062).
 
 파일명을 유지하면서 시스템 표시를 Float로 통일하기 위해 원본 `Info.plist`의 `CFBundleDisplayName`은
 `FloatingNotes`, `CFBundleName`은 `Float`, `LSHasLocalizedDisplayName`은 true로 둔다.
@@ -120,6 +120,6 @@ swift test --package-path App
 
 처음 실제 등록할 때 macOS가 묻는 **캘린더 전체 접근**, **미리 알림 접근**을 허용해 주세요. 앱을 켜기만 할 때는 묻지 않습니다. 시스템 기본 캘린더와 기본 미리 알림 목록을 쓰며, Mac Apple 캘린더에 연결된 Google 계정도 EventKit으로 동기화합니다. 기본 대상 선택은 현재 Apple 앱 설정에서 하고 Float 설정 화면은 다음 단계입니다.
 
-iPhone과 Mac의 같은 iCloud 계정에서 미리 알림을 켜면 시간·완료·삭제가 양방향으로 반영됩니다. 외부 제목 변경은 예정 제목만 바꾸고 노트 원문을 보호합니다. 연결된 리마인더는 Apple 미리 알림이 알립니다. 연동 권한이 없거나 거부하면 실패 표시 없이 앱 안에 보존합니다. 권한은 설정에서 새 항목을 저장하거나 빠른 캡처로 새 예정이 생길 때만 요청합니다. 옛 리마인더는 설정에서 그 항목을 열어 저장한 경우에만 다가오는 미완료 항목을 등록합니다. 권한 확인 후 실제 연동이 실패하면 작은 느낌표를 표시하며, 시각 지정 항목에는 Float 알림 권한을 받아 대체 알림을 냅니다. 날짜만인 항목에는 임의 알림 시각을 붙이지 않습니다.
+iPhone과 Mac의 같은 iCloud 계정에서 미리 알림을 켜면 시간, 완료, 삭제가 양방향으로 반영됩니다. 외부 제목 변경은 예정 제목만 바꾸고 노트 원문을 보호합니다. 연결된 리마인더는 Apple 미리 알림이 알립니다. 연동 권한이 없거나 거부하면 실패 표시 없이 앱 안에 보존합니다. 권한은 설정에서 새 항목을 저장하거나 빠른 캡처로 새 예정이 생길 때만 요청합니다. 옛 리마인더는 설정에서 그 항목을 열어 저장한 경우에만 다가오는 미완료 항목을 등록합니다. 권한 확인 후 실제 연동이 실패하면 작은 느낌표를 표시하며, 시각 지정 항목에는 Float 알림 권한을 받아 대체 알림을 냅니다. 날짜만인 항목에는 임의 알림 시각을 붙이지 않습니다.
 
-[설치 후 Mac·iPhone 확인 순서](docs/verification-checklist.md#6단계-설치-앱과-iphone에서-직접-확인)를 따라 확인할 수 있습니다. Apple 계정의 동기화 주기에 따라 반영이 늦을 수 있습니다. 같은 고정 서명 인증서를 유지해야 업데이트 뒤 권한 유지 여부를 확인할 수 있습니다(D-063). 확인용 실행의 `--calendar fake`와 디버그 `--debug-passive`는 실제 계정·권한에 접근하지 않습니다.
+[설치 후 Mac, iPhone 확인 순서](docs/verification-checklist.md#6단계-설치-앱과-iphone에서-직접-확인)를 따라 확인할 수 있습니다. Apple 계정의 동기화 주기에 따라 반영이 늦을 수 있습니다. 같은 고정 서명 인증서를 유지해야 업데이트 뒤 권한 유지 여부를 확인할 수 있습니다(D-063). 확인용 실행의 `--calendar fake`와 디버그 `--debug-passive`는 실제 계정, 권한에 접근하지 않습니다.

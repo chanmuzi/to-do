@@ -3,11 +3,15 @@
 이 파일이 규약의 단일 진입점이다. 아래 판정표로 작업 유형을 정하고 **그 행의 파일만** 읽는다.
 `docs/spec/` 전체를 한꺼번에 읽지 않는다.
 
-macOS 네이티브 플로팅 메모·투두 앱. SwiftUI + AppKit, 개인용, macOS 우선.
+macOS 네이티브 플로팅 메모, 투두 앱. SwiftUI + AppKit, 개인용, macOS 우선.
+
+## 절대 규칙
+
+- **가운뎃점과 유사 기호(U+00B7, U+2027, U+2219, U+22C5)는 어디에도 쓰지 않는다.** U+2022 글머리표는 제외한다. 앱 화면 글자, 접근성 라벨, 코드 주석, 테스트, 문서, 시안, 커밋과 PR, 보고서 모두 해당한다. 나열은 쉼표나 `와/과`, 화면에서 두 정보를 나눌 때는 간격이나 줄 바꿈으로 한다. 검사할 때 기호를 직접 기록하지 않고 유니코드 번호로 패턴을 만든다.
 
 ## 기본 규칙
 
-1. **화면 값은 토큰을 거친다.** 색·크기·간격·시간을 코드에 직접 적지 않는다. 정본은 `App/Resources/tokens.json`.
+1. **화면 값은 토큰을 거친다.** 색, 크기, 간격, 시간을 코드에 직접 적지 않는다. 정본은 `App/Resources/tokens.json`.
 2. **컴포넌트는 서로를 직접 참조하지 않는다.** 경계와 의존 방향은 `docs/architecture.md`를 따른다.
 3. **결정은 바뀔 수 있다.** `docs/spec/`은 현재의 기본값이지 불변 규칙이 아니다.
    - 사용자가 다른 결정을 내리면 그 결정이 우선한다. 해당 spec 장을 직접 고치고 `docs/decisions.md`에 한 줄을 남긴다.
@@ -24,17 +28,17 @@ macOS 네이티브 플로팅 메모·투두 앱. SwiftUI + AppKit, 개인용, ma
 | 작업 | 읽을 것 |
 | --- | --- |
 | 어떤 장이 있는지 모를 때 | `docs/spec/index.md` |
-| 프로젝트 뼈대, 모듈 추가·분리 | `docs/architecture.md` |
-| 테마 계층, 색·글꼴·치수 | `docs/spec/03-tokens.md`, `App/Resources/tokens.json` |
+| 프로젝트 뼈대, 모듈 추가, 분리 | `docs/architecture.md` |
+| 테마 계층, 색, 글꼴, 치수 | `docs/spec/03-tokens.md`, `App/Resources/tokens.json` |
 | 노트 창, 메뉴 막대 | `docs/spec/04-windows.md`, `05-note-panel.md`, `19-native-notes.md` |
 | 본문 편집기 | `docs/spec/06-editor.md`, `13-shortcuts.md`, `19-native-notes.md` |
 | 빠른 캡처, 노트 찾기 | `docs/spec/07-capture.md`, `08-browse.md`. 날짜와 시간 읽기를 고칠 때는 `07a-datetime.md` |
 | 라이브러리, 스페이스 아이콘 | `docs/spec/09-library.md`, `10-icon-picker.md` |
 | AI 패널, 에이전트 연결 | `docs/spec/11-ai-panel.md`, `docs/decisions.md`의 에이전트 항목 |
 | 테마 설정, 단축키 표 | `docs/spec/12-settings.md`, `13-shortcuts.md` |
-| 호버·포커스·움직임 판단 | `docs/spec/02-rules.md`, `14-states.md`, `15-motion.md` |
+| 호버, 포커스, 움직임 판단 | `docs/spec/02-rules.md`, `14-states.md`, `15-motion.md` |
 | 가장자리 경우, 접근성 | `docs/spec/16-edge-cases.md`, `17-accessibility.md` |
-| 아이콘·이미지·글꼴 파일 | `docs/spec/18-assets.md` → `design/handoff/`에서 필요한 것만 복사 |
+| 아이콘, 이미지, 글꼴 파일 | `docs/spec/18-assets.md` → `design/handoff/`에서 필요한 것만 복사 |
 | 저장 방식, 과거 결정 확인 | `docs/decisions.md` |
 | 화면 모양 확인 | `design/handoff/screens/NN-*.png` 중 해당 화면 한두 장 |
 
@@ -48,7 +52,7 @@ UI를 새로 만들거나 고칠 때는 `docs/spec/02-rules.md`(21줄)를 함께
 - 모듈 구조: `docs/architecture.md`
 - 손으로 확인할 목록(자동 확인이 보지 못한 것): `docs/verification-checklist.md`
 - 디자인 토큰: `App/Resources/tokens.json`
-- 시안·캡처·에셋 원본: `design/handoff/` (로컬 전용, gitignore)
+- 시안, 캡처, 에셋 원본: `design/handoff/` (로컬 전용, gitignore)
 - 이 Mac에만 해당하는 메모: `CLAUDE.local.md` (gitignore)
 
 ## Git

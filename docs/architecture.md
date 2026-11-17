@@ -20,12 +20,12 @@ Core         모든 기능이 공유하는 바탕
 
 | 계층 | 모듈 | 책임 | 명세 |
 | --- | --- | --- | --- |
-| Core | `Theme` | `tokens.json` 읽기, 라이트·다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
-| Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit·SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme·Models만 참조 | 10, 16, 18 |
-| Core | `DateTime` | 캡처·본문·제목 공용 날짜 읽기, UTF-16 인식 범위, InlineDateProposal·Acceptance·Effect. Models만 참조 | 07a |
+| Core | `Theme` | `tokens.json` 읽기, 라이트, 다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
+| Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit, SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme, Models만 참조 | 10, 16, 18 |
+| Core | `DateTime` | 캡처, 본문, 제목 공용 날짜 읽기, UTF-16 인식 범위, InlineDateProposal, Acceptance, Effect. Models만 참조 | 07a |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
-| Core | `Scheduling` | CalendarBridge·ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models·Store만 참조 | 21 |
-| Core | `Store` | 노트 파일 읽기·쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
+| Core | `Scheduling` | CalendarBridge, ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models, Store만 참조 | 21 |
+| Core | `Store` | 노트 파일 읽기, 쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `Routing` | 기능 사이 요청을 전달하는 프로토콜 | 04 |
 | Features | `NotePanel` | Float 창, 상단 줄, 호버 동작 | 05 |
 | Features | `Editor` | TextKit 2 마크다운 편집기. 창과 무관하게 단독으로 쓸 수 있어야 한다 | 06 |
@@ -71,12 +71,12 @@ scripts/
 ## 빌드 설정
 
 - Swift 6 언어 모드(엄격한 동시성 검사), swift-tools-version 6.2, macOS 26 이상, 외부 의존 없음.
-- Features와 App 타깃은 기본 격리가 MainActor다(`.defaultIsolation(MainActor.self)`). AppKit·SwiftUI 코드에 `@MainActor`를 일일이 붙이지 않는다. 메인 밖에서 돌릴 코드만 `nonisolated`로 표시한다.
+- Features와 App 타깃은 기본 격리가 MainActor다(`.defaultIsolation(MainActor.self)`). AppKit, SwiftUI 코드에 `@MainActor`를 일일이 붙이지 않는다. 메인 밖에서 돌릴 코드만 `nonisolated`로 표시한다.
 - Core 타깃은 기본 격리가 없다. 값 타입은 `Sendable`이고, 상태를 가진 클래스(`Theme`, `FileNoteStore` 등)에만 `@MainActor`를 붙였다.
 - 테스트는 Swift Testing(`import Testing`)으로 쓴다.
 - 앱 묶음은 `scripts/build-app.sh [debug|release]`가 만들고 `FLOATING_NOTES_APP_DIR`로 출력 폴더를 분리한다.
 - 로컬 고정 서명(D-063): 사용자가 `scripts/create-signing-identity.sh`를 한 번 실행해 로그인 키체인에 `Float Local Code Signing` 자체 서명 인증서(3,650일, EKU codeSigning)를 만든다. 기존 인증서는 바꾸지 않고 개인 키 임시 파일은 종료 시 지운다. `security import -T /usr/bin/codesign`으로 해당 키 접근을 허용하며 신뢰 설정과 다른 키의 ACL은 바꾸지 않는다.
-- 빌드 서명 우선순위는 `FLOATING_NOTES_SIGN_IDENTITY` → 키체인의 위 identity → 경고 후 임시 서명(`-`)이다. 명시한 identity의 실패는 숨기지 않는다. 자체 서명은 신뢰되지 않아도 사용할 수 있으므로 `security find-identity`에 `-v`를 붙이지 않는다. 생성·빌드는 `FLOATING_NOTES_KEYCHAIN`으로 임시 키체인을 지정할 수 있고 검색 목록은 바꾸지 않는다.
+- 빌드 서명 우선순위는 `FLOATING_NOTES_SIGN_IDENTITY` → 키체인의 위 identity → 경고 후 임시 서명(`-`)이다. 명시한 identity의 실패는 숨기지 않는다. 자체 서명은 신뢰되지 않아도 사용할 수 있으므로 `security find-identity`에 `-v`를 붙이지 않는다. 생성, 빌드는 `FLOATING_NOTES_KEYCHAIN`으로 임시 키체인을 지정할 수 있고 검색 목록은 바꾸지 않는다.
 - Hardened Runtime은 켜지 않는다. 켜면 EventKit 캘린더 접근에 `com.apple.security.personal-information.calendars` 엔타이틀먼트가 필요하다. 고정 인증서로 지정 요구사항을 유지하지만 실제 TCC 권한 유지는 6단계에서 권한 요청과 함께 확인한다.
 
 ## Core 공개 API
@@ -85,18 +85,18 @@ scripts/
 
 ### Theme
 
-- `NoteDisplayOptions`, `ReminderPresentation`, `BellRing`: 노트 상단과 라이브러리가 공유하는 리마인더 표시 설정·포맷·상태·움직임. `NotePanelDisplayOptions`는 호환 타입 별칭이다(D-066). 기능 모듈 간 참조는 추가하지 않는다.
+- `NoteDisplayOptions`, `ReminderPresentation`, `BellRing`: 노트 상단과 라이브러리가 공유하는 리마인더 표시 설정, 포맷, 상태, 움직임. `NotePanelDisplayOptions`는 호환 타입 별칭이다(D-066). 기능 모듈 간 참조는 추가하지 않는다.
 
 - `Theme` (`@MainActor @Observable`): `Theme.bundled(overrideStore:appearance:)`로 만든다. App이 하나 만들어 넘긴다. SwiftUI는 `@Environment(\.theme)`로도 받는다.
-  - 색: `color(_: ColorToken) -> Color`, `nsColor(_:) -> NSColor`(둘 다 뷰의 라이트·다크를 스스로 따라감), `rgba(_:) -> RGBA`(지금 모양의 값), `noteBackgroundColor(paletteID:)` / `noteBackgroundNSColor(paletteID:)`, `shadow(_: ShadowToken) -> [ShadowLayer]`
+  - 색: `color(_: ColorToken) -> Color`, `nsColor(_:) -> NSColor`(둘 다 뷰의 라이트, 다크를 스스로 따라감), `rgba(_:) -> RGBA`(지금 모양의 값), `noteBackgroundColor(paletteID:)` / `noteBackgroundNSColor(paletteID:)`, `shadow(_: ShadowToken) -> [ShadowLayer]`
   - 글꼴: `font(_: TextStyle, size:weight:) -> Font`, `nsFont(_:size:weight:) -> NSFont`, `lineHeight(_:)`, `tracking(_:)`. `TextStyle`은 spec 3.1 표의 줄(`.title .h1 .h2 .h3 .body .strong .paneTitle .row .rowSub .ui .micro .code .capture`)
   - 치수: `space(_: SpaceToken)`, `shape(_: ShapeToken)`, `component(_: ComponentToken)`, `docPadding`, `material`(opacity, blur, tintMix, tintMixRow), `motion`(duration, curve, `.animation`, `.timingFunction`), `palette`, `accentPresets`
   - 형광펜: `HighlightColor`(`.yellow=1 .gray .rose .blue`, 번호는 D-008의 `{n}`) → `.background`, `.foreground`가 `ColorToken`
-  - 상태: `appearance`, `tokens`, `overrides`, `setOverrides(_:) throws`(잘못된 키·값이면 던지고 아무것도 바꾸지 않음), `followAppearance(of: NSApplication)`, `loadWarnings: [String]`. AppKit 쪽은 `Theme.didChangeNotification`을 받아 다시 그린다.
+  - 상태: `appearance`, `tokens`, `overrides`, `setOverrides(_:) throws`(잘못된 키, 값이면 던지고 아무것도 바꾸지 않음), `followAppearance(of: NSApplication)`, `loadWarnings: [String]`. AppKit 쪽은 `Theme.didChangeNotification`을 받아 다시 그린다.
   - 저장된 덮어쓰기를 읽을 때는 던지지 않는다. 없어진 키나 잘못된 값은 버리고, 깨진 파일은 `theme-overrides.json.corrupt`로 옮긴 뒤 기본 테마로 시작하며, 버린 것을 `loadWarnings`에 적는다.
 - `ThemeTokens` (`Sendable` 값): `tokens.json`을 푼 것. `Theme` 없이 쓸 수 있다. `color(_:_:)`, `textStyle(_:)`, `noteBackground(paletteID:_:)`, `rowTint(paletteID:)`, `applying(_: ThemeOverrides) throws`(엄격), `applyingValid(_:) -> (tokens, accepted, rejected: [ThemeError])`(쓸 수 있는 것만 얹음).
-- 토큰 값 검증: 수는 십진 표기만 받는다(`nan`, `inf`, `0x10`, `1e3` 거부). 글자 크기·줄 높이는 0보다 커야 하고, 간격·모서리·치수·여백·흐림은 0 이상, 굵기는 1~1000, 불투명도는 0~1, 섞는 비율은 0~100%여야 한다. `tokens.json`과 덮어쓰기에 똑같이 적용된다.
-- `TextInputPolicy.apply(to:)`: AppKit 입력의 자동 변경·완성·예측을 끄고 조합 장식을 숨긴다. `PlainTextInputCell`은 제목/라이브러리 검색의 재사용 필드 편집기에 매번 적용한다. Features가 Core의 이 정책을 함께 사용한다(D-057).
+- 토큰 값 검증: 수는 십진 표기만 받는다(`nan`, `inf`, `0x10`, `1e3` 거부). 글자 크기, 줄 높이는 0보다 커야 하고, 간격, 모서리, 치수, 여백, 흐림은 0 이상, 굵기는 1~1000, 불투명도는 0~1, 섞는 비율은 0~100%여야 한다. `tokens.json`과 덮어쓰기에 똑같이 적용된다.
+- `TextInputPolicy.apply(to:)`: AppKit 입력의 자동 변경, 완성, 예측을 끄고 조합 장식을 숨긴다. `PlainTextInputCell`은 제목/라이브러리 검색의 재사용 필드 편집기에 매번 적용한다. Features가 Core의 이 정책을 함께 사용한다(D-057).
 - `ThemeOverrides`: `[구역.키: 값]` 사전. 키 예 `color.light.accent`, `type.fs-body`, `palette.tint-1`. 값 표기는 `tokens.json`과 같다. `ThemeOverrideStore(url:)`가 JSON 파일로 읽고 쓴다(`stateDirectory/theme-overrides.json`).
 - `TransitionTimer.after(_ duration:, _ work:) -> Task<Void, Never>?` (`@MainActor`): 전환이 끝날 때 해야 하는 일을 전환 시간 뒤에 잡는다. 시간이 0이면("동작 줄이기") 그 자리에서 하고 `nil`을 돌려주며, 돌려받은 것을 취소하면 하지 않는다. 움직임이 끝났다는 알림에 상태를 걸지 않기 위한 한 곳이다(아래 "그 밖"의 "움직임과 상태").
 - 입력 커서(D-042). 시스템의 커서 표시(`NSTextInsertionIndicator`)는 너비와 높이를 정할 수 없어 쓰지 않고, 텍스트 뷰 위에 작은 뷰 하나로 얇은 커서를 그린다.
@@ -337,7 +337,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 안쪽 구조
 
-- Core `Sources/DateTime/`(Capture에서 옮긴 화면·저장소 독립 모듈, D-029, D-074): 글에서 날짜와 시간 표현을 읽는다. `DateTimeParser.firstExpression(in:now:calendar:) -> DateTimeExpression?`가 창구이고, 결과는 `start`, `end`(범위일 때), `ranges`(차지한 글자들. 받은 글의 UTF-16 자리이고, 날과 시각을 떨어뜨려 적으면 두 곳), `assumptions`(`meridiem`, `timeOfDay`, `looseDate`, `past`, `recurring`, `unknownTimeZone`. 하나라도 있으면 `isAmbiguous`)다.
+- Core `Sources/DateTime/`(Capture에서 옮긴 화면, 저장소 독립 모듈, D-029, D-074): 글에서 날짜와 시간 표현을 읽는다. `DateTimeParser.firstExpression(in:now:calendar:) -> DateTimeExpression?`가 창구이고, 결과는 `start`, `end`(범위일 때), `ranges`(차지한 글자들. 받은 글의 UTF-16 자리이고, 날과 시각을 떨어뜨려 적으면 두 곳), `assumptions`(`meridiem`, `timeOfDay`, `looseDate`, `past`, `recurring`, `unknownTimeZone`. 하나라도 있으면 `isAmbiguous`)다.
   - 차례: `NormalizedText`(NFC, 전각을 반각으로, 받은 글의 자리로 되돌리는 표) → `DateTimeLexer`(조각 찾기. 무늬는 `+Time`, `+Relative`, `+Date`에 나눠 둠) → `DateTimeParser`(조각을 시점과 범위로 잇기) → `DateTimeResolver`(지금 시각과 달력으로 날짜 정하기). 값 타입은 `DateTimePieces`, 기본 시각은 `DateTimeDefaults` 한 곳, 한글로 적은 수는 `KoreanNumeral`.
   - 규칙 요약(전체 표는 spec 7a): 앞에 0을 붙인 `HH:mm`과 0시, 13~23시는 24시간제. 오전과 오후가 없는 1~7시는 오후, 8~11시는 오전, 12시는 정오이고, 날이 없으면 오늘 남았을 때 오늘, 지났으면 같은 시각의 내일. 때를 가리키는 말은 시각 바로 앞이나 `N시 저녁에` 꼴일 때만 시각에 붙는다. 날만 적으면 09:00(때를 가리키는 말이 있으면 그 기본 시각). 오늘을 가리키는 날은 언제나 오늘이고 지났으면 `past`. 범위는 양 끝을 서로 맞게 읽는다(`9-6시`는 09:00~18:00). 날과 시각은 붙어 있으면 어느 쪽이 먼저든 한 표현이고, 떨어져 있어도 맨 앞이 날뿐이고 시각이 하나면 합친다. 지난 때와 되풀이, 기간, 분수, 비율은 읽지 않는다.
   - 규칙을 고칠 때는 `DateTime*Tests`의 표에 줄을 먼저 더한다.
@@ -402,7 +402,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 앱 메뉴와 활성화
 
-- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: Float(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 이름은 지역화된 `CFBundleDisplayName`이다. 원본 Info.plist의 DisplayName은 파일명과 같은 FloatingNotes, CFBundleName은 Float이며 ko/en InfoPlist.strings의 두 이름은 Float다(D-062). SwiftPM 실행·테스트에서는 Float를 기본값으로 쓴다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
+- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: Float(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 이름은 지역화된 `CFBundleDisplayName`이다. 원본 Info.plist의 DisplayName은 파일명과 같은 FloatingNotes, CFBundleName은 Float이며 ko/en InfoPlist.strings의 두 이름은 Float다(D-062). SwiftPM 실행, 테스트에서는 Float를 기본값으로 쓴다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
 - `AppRouter.activateApp`: `.openNote`, `.newNote`를 해낸 뒤 부른다(기본은 아무것도 하지 않고 `AppDelegate`가 넣는다. 확인용 실행 `--debug-passive`에서는 넣지 않는다).
 - `applicationDidBecomeActive`: 키 창인 노트가 없을 때만 맨 앞 노트를 키 창으로 만들고, 노트를 눌러 앞으로 온 경우 그 누름이 먼저 처리되도록 한 차례 미룬다.
 
@@ -462,35 +462,35 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 - `LibraryCoordinator`가 일반 NSWindow(880×560, 최소 660×400)와 스페이스 옮기기 팝오버를 소유한다. App이 `Theme`, `NoteStoring`, `SpaceStore`, `WindowStateStore`, `LibraryPreferencesStore`, `Routing`을 주입한다. Features끼리는 import하지 않는다.
 - `LibraryModel`이 저장소 변경을 다음 메인 큐 차례에 모아 읽고, 오류는 화면에 유지한다. 열린 창에서는 분마다 날짜와 리마인더를 다시 분류하며 닫으면 타이머를 해제한다.
-- `LibraryIndex`는 현재 시각·달력·노트·창 상태를 값으로 받아 날짜, 7일 아카이브, 오늘 합집합, 달별 목록, 개수, 검색, 떠 있는 순서를 계산한다.
-- `LibrarySelection`/`LibraryPreferences`는 Models, `LibraryPreferencesStore`는 Store다. 보기와 아이콘 고정·최근·이미지 목록은 `state/library.json`으로 저장하고 깨진 파일은 기존 JSON 복구 정책을 따른다.
+- `LibraryIndex`는 현재 시각, 달력, 노트, 창 상태를 값으로 받아 날짜, 7일 아카이브, 오늘 합집합, 달별 목록, 개수, 검색, 떠 있는 순서를 계산한다.
+- `LibrarySelection`/`LibraryPreferences`는 Models, `LibraryPreferencesStore`는 Store다. 보기와 아이콘 고정, 최근, 이미지 목록은 `state/library.json`으로 저장하고 깨진 파일은 기존 JSON 복구 정책을 따른다.
 - `SpaceStore.create/update/delete`로 CRUD한다. 삭제는 노트 소속만 해제하며 오류가 나면 스페이스를 남긴다. 휴지통 파일은 복원 때 없어진 스페이스 연결을 해제한다.
 - `SpaceIcon`은 기존 세 경우를 읽고 쓰는 형태를 유지하고 `.none`, `.customSymbol(name:hex:)`만 추가했다. `SpaceIcons`의 공용 뷰는 기본 GIF와 업로드 PNG/GIF를 표시한다. ImageIO에서 읽은 프레임과 지연에 따라 이미지를 교체해 화면과 내부 스냅숏에 같은 프레임을 그린다. 뷰가 창에서 떨어지거나 창이 닫히면 재생 타이머를 멈춘다. SVG는 가져올 때 PNG로 렌더링한다.
 - 기본 GIF는 `App/Resources/SpaceImages/`가 정본이며 SwiftPM은 심볼릭 링크로, `.app`은 빌드 스크립트의 복사로 사용한다. 사용자 이미지는 `SpaceStore.imageDirectory` 아래에 둔다. 경로 이탈과 외부 심볼릭 링크를 거부한다.
-- 노트 창은 `SpaceStore.observe`를 구독하고 상단 줄에 공용 아이콘 뷰를 넣는다. 이름·색·이미지를 바꾸면 열린 노트에도 반영된다. 편집기 모듈은 고치지 않았다.
+- 노트 창은 `SpaceStore.observe`를 구독하고 상단 줄에 공용 아이콘 뷰를 넣는다. 이름, 색, 이미지를 바꾸면 열린 노트에도 반영된다. 편집기 모듈은 고치지 않았다.
 - App은 `.openLibrary`, `.openSpacePicker`를 연결했다. 메뉴 막대, Dock, 앱 메뉴, 노트 찾기와 기존 단축키 표가 `Route.isConnected`를 따라 활성화된다. `.openSpacePicker` 전에 편집 중인 노트의 미전달 변경을 먼저 반영한다.
-- 메뉴 막대 아이콘은 18pt 그림의 투명한 좌우 열만 제거한다. `variableLength`에 시스템 여백을 맡긴다. 그림의 배율·높이는 유지한다.
+- 메뉴 막대 아이콘은 18pt 그림의 투명한 좌우 열만 제거한다. `variableLength`에 시스템 여백을 맡긴다. 그림의 배율, 높이는 유지한다.
 - 디버그 명령: `library`, `library-close`, `library-select today|all|floating|trash|reminders|archive:YYYY-MM|<spaceID>`, `library-open <noteID>`, `library-expand <spaceID>`, `library-icon <spaceID> <imageName>`, `library-dump <file>`, `library-snapshot <file>`, `icon-snapshot|icon-symbol-snapshot|icon-emoji-snapshot <spaceID> <file>`, `reopen`. 스냅숏은 앱 안에서 그린다. `--debug-passive`는 라이브러리도 키 창이 되지 않게 한다.
 - 실행 중인 사용자 앱을 덮어쓰지 않으려면 `FLOATING_NOTES_APP_DIR=<작업 폴더>/app scripts/build-app.sh debug`를 쓴다. `run.sh`에도 같은 변수가 전달된다.
 
 ## 6단계 예정과 외부 연동
 
-- `Models.ScheduleItem`: 시작·종료 기반 종류, 날짜만/완료/삭제 대기, 제목, TodoAnchor, 로컬·외부 ID, 수정·동기화 시각, 마지막 동기화 값과 실패. `Note.schedules`가 정본이고 `reminder`는 호환 투영이다. `displayedSchedule(at:)`은 가장 이른 다가오는 항목, 없으면 지난 항목을 고른다.
+- `Models.ScheduleItem`: 시작, 종료 기반 종류, 날짜만/완료/삭제 대기, 제목, TodoAnchor, 로컬, 외부 ID, 수정, 동기화 시각, 마지막 동기화 값과 실패. `Note.schedules`가 정본이고 `reminder`는 호환 투영이다. `displayedSchedule(at:)`은 가장 이른 다가오는 항목, 없으면 지난 항목을 고른다.
 - `Store`는 `schedules` JSON을 한 줄 frontmatter로 저장한다. 기존 reminder는 안정된 ID로 읽고 옛 빌드용 날짜를 병기한다. 알 수 없는 줄 보존 정책은 유지한다. `LegacyStage5` 테스트 코드는 HEAD의 실제 codec을 이름만 바꿔 고정한 것이다.
-- Core `Scheduling`의 `ScheduleService`가 저장소 변경과 CalendarBridge.onChange를 직렬 처리한다. EventKitBridge만 EventKit을 import하며 저장소 생성은 지연된다. SystemReminderNotifier만 UserNotifications를 import한다. 둘의 가짜 구현은 실제 권한·계정을 전혀 쓰지 않는다.
-- Feature `Reminders`는 Theme·Models·Store만 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력·범위 검증·항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
+- Core `Scheduling`의 `ScheduleService`가 저장소 변경과 CalendarBridge.onChange를 직렬 처리한다. EventKitBridge만 EventKit을 import하며 저장소 생성은 지연된다. SystemReminderNotifier만 UserNotifications를 import한다. 둘의 가짜 구현은 실제 권한, 계정을 전혀 쓰지 않는다.
+- Feature `Reminders`는 Theme, Models, Store만 참조한다. `ReminderEditorCoordinator`가 팝오버를, `ReminderEditorModel`이 입력, 범위 검증, 항목 단위 저장을 담당한다. Features끼리 참조하지 않는다. AppRouter가 `.openReminderEditor`를 노트 상단 anchor와 연결한다.
 - 권한 요청 의도는 `ReminderEditorModel.onSave`와 `CaptureWriter.onScheduleCreated`(새 노트 캡처는 `AppRouter.onScheduleCreated`)에서 항목 ID로 전달하고 AppDelegate가 `ScheduleService.register`에 연결한다. 일반 저장 관찰은 권한을 요청하지 않는다. 옛 항목은 명시 저장과 다가오는 미완료 조건을 모두 확인한다(D-071).
 - AppDelegate는 실행 옵션에 따라 실제/가짜 의존성을 조립한다. `--calendar fake`는 두 외부 API를 모두 대체하며 `--debug-passive`도 강제로 같은 경로를 쓴다. 종료 시 서비스 관찰과 편집 화면을 닫는다.
-- Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜·범위·아이콘·임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor와 NotePanel은 Core DateTime의 제안·수락 계약을 공유한다.
+- Theme는 Models에 의존해 공통 ReminderPresentation으로 날짜, 범위, 아이콘, 임박을 포맷한다. NotePanel과 Library가 공유한다. Capture는 DateTimeExpression.isDateOnly와 end를 ScheduleItem에 전달하고 범위 글자를 제거한다. Editor와 NotePanel은 Core DateTime의 제안, 수락 계약을 공유한다.
 - 확인용 명령: `reminder-editor <noteID>`, `reminder-close`, `reminder-snapshot <file>`, `fake-delay|fake-complete|fake-delete <scheduleID>`. 가짜 외부 변경도 실제 서비스의 onChange 경로를 지난다. 스냅숏은 앱 내부 렌더링이다.
 
 
-## 본문·제목 날짜 제안 (D-074~D-077)
+## 본문, 제목 날짜 제안 (D-074~D-077)
 
-- Core `DateTime`: 기존 Capture의 읽기 파일을 그대로 옮겼다. `DateTimeParser.firstExpression`, `DateTimeExpression`을 공개하며 Capture의 기존 파서 테스트도 같은 모듈을 검증한다. `InlineDateProposal`은 커서 조건·제외 범위·지난 시각 검증과 종일 범위 변환만 더한다.
-- 표시(D-078): 본문 TextKit 2 문단·제목 임시 속성에 단일 밑줄만 얹고 원문 속성으로 저장하지 않는다. 종류·전체 날짜는 접근성 도움말이다. 제안 줄 번호·줄 수를 보관하고 이전·새 줄만 invalidate한다(줄 수 변경만 전체 갱신). 미리 보기 뷰·문단 위 공간·제목/창 높이 조정은 제거했다.
-- Feature `Editor/EditorController+DateTime`: MarkdownDocument의 코드/링크/감춘 기호 범위를 제외해 제안한다. 기존 EditorCommands 삭제·정리·안전 검증으로 원문 변경을 미리 계산하고, 받기를 독립된 UndoRecord로 묶는다. `dateEffect` ID는 바깥 변경의 기록 위치 이동을 그대로 따른다. 기록에서 떨어진 효과는 정리한다.
-- Feature `NotePanel/Views/TitleField+DateTime`: 한 줄 필드의 제안·Tab·Escape·선택 관찰. AppKit 텍스트 저장소를 수정하며 native undo 한 동작에 글자와 예정 효과를 함께 등록한다. 한글 조합 중에는 글자를 건드리지 않는다.
-- Core `Scheduling.InlineScheduleWriter`: 항목 단위 생성·갱신·삭제/복원. 삭제는 기존 ScheduleService 삭제 대기·재시도 경로를 사용하며 최신 외부 연결을 지킨다. `Models.InlineScheduleSource`가 출처를 저장하고 Note.body 변경 시 안전하게 식별되는 줄만 따라간다.
-- AppDelegate가 writer를 만들고 NoteEditorFactory.onAcceptDate와 NotePanelCoordinator.onAcceptTitleDate에 잇는다. Feature 간 import는 없고 Editor·Capture·NotePanel은 Core DateTime을 참조한다. 권한 의도는 수락된 항목 ID만 ScheduleService.register로 보낸다.
-- 디버그 `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestionHelp 접근성 도움말을 포함한다. 실제 계정·시스템 이벤트·클립보드는 사용하지 않는다.
+- Core `DateTime`: 기존 Capture의 읽기 파일을 그대로 옮겼다. `DateTimeParser.firstExpression`, `DateTimeExpression`을 공개하며 Capture의 기존 파서 테스트도 같은 모듈을 검증한다. `InlineDateProposal`은 커서 조건, 제외 범위, 지난 시각 검증과 종일 범위 변환만 더한다.
+- 표시(D-078): 본문 TextKit 2 문단, 제목 임시 속성에 단일 밑줄만 얹고 원문 속성으로 저장하지 않는다. 종류, 전체 날짜는 접근성 도움말이다. 제안 줄 번호, 줄 수를 보관하고 이전, 새 줄만 invalidate한다(줄 수 변경만 전체 갱신). 미리 보기 뷰, 문단 위 공간, 제목/창 높이 조정은 제거했다.
+- Feature `Editor/EditorController+DateTime`: MarkdownDocument의 코드/링크/감춘 기호 범위를 제외해 제안한다. 기존 EditorCommands 삭제, 정리, 안전 검증으로 원문 변경을 미리 계산하고, 받기를 독립된 UndoRecord로 묶는다. `dateEffect` ID는 바깥 변경의 기록 위치 이동을 그대로 따른다. 기록에서 떨어진 효과는 정리한다.
+- Feature `NotePanel/Views/TitleField+DateTime`: 한 줄 필드의 제안, Tab, Escape, 선택 관찰. AppKit 텍스트 저장소를 수정하며 native undo 한 동작에 글자와 예정 효과를 함께 등록한다. 한글 조합 중에는 글자를 건드리지 않는다.
+- Core `Scheduling.InlineScheduleWriter`: 항목 단위 생성, 갱신, 삭제/복원. 삭제는 기존 ScheduleService 삭제 대기, 재시도 경로를 사용하며 최신 외부 연결을 지킨다. `Models.InlineScheduleSource`가 출처를 저장하고 Note.body 변경 시 안전하게 식별되는 줄만 따라간다.
+- AppDelegate가 writer를 만들고 NoteEditorFactory.onAcceptDate와 NotePanelCoordinator.onAcceptTitleDate에 잇는다. Feature 간 import는 없고 Editor, Capture, NotePanel은 Core DateTime을 참조한다. 권한 의도는 수락된 항목 ID만 ScheduleService.register로 보낸다.
+- 디버그 `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestionHelp 접근성 도움말을 포함한다. 실제 계정, 시스템 이벤트, 클립보드는 사용하지 않는다.
