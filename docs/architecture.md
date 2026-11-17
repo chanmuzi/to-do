@@ -488,10 +488,9 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 ## 본문·제목 날짜 제안 (D-074~D-077)
 
 - Core `DateTime`: 기존 Capture의 읽기 파일을 그대로 옮겼다. `DateTimeParser.firstExpression`, `DateTimeExpression`을 공개하며 Capture의 기존 파서 테스트도 같은 모듈을 검증한다. `InlineDateProposal`은 커서 조건·제외 범위·지난 시각 검증과 종일 범위 변환만 더한다.
-- Core `Theme.DateSuggestionView`: 창 내부의 입력을 받지 않는 작은 미리 보기. 정보 글꼴·색·치수·전환은 기존 토큰만 사용하고 접근성 이름은 전체 종류/날짜를 유지한다. 본문 TextKit 2 문단, 제목 임시 속성에 밑줄을 얹으며 원문 속성으로 저장하지 않는다.
-- 제안 배치(D-077): Theme은 전달받은 전용 영역에만 표시한다. Editor는 제안 줄 번호·줄 수·위쪽 배치 상태를 보관하고 변경된 두 줄만 invalidate한다(줄 수 변경만 전체 갱신). 본문 뒤에 자리가 없으면 MarkdownLayoutFragment.topMargin으로 문단 위 공간을 확보한다. NotePanel은 제목 뒤에 자리가 없으면 TopRowView/NoteRootView의 상단 높이와 창 높이를 함께 늘린다. 표시가 사라질 때 공간도 함께 회수한다. 원문과 undo는 배치에 영향을 받지 않는다.
+- 표시(D-078): 본문 TextKit 2 문단·제목 임시 속성에 단일 밑줄만 얹고 원문 속성으로 저장하지 않는다. 종류·전체 날짜는 접근성 도움말이다. 제안 줄 번호·줄 수를 보관하고 이전·새 줄만 invalidate한다(줄 수 변경만 전체 갱신). 미리 보기 뷰·문단 위 공간·제목/창 높이 조정은 제거했다.
 - Feature `Editor/EditorController+DateTime`: MarkdownDocument의 코드/링크/감춘 기호 범위를 제외해 제안한다. 기존 EditorCommands 삭제·정리·안전 검증으로 원문 변경을 미리 계산하고, 받기를 독립된 UndoRecord로 묶는다. `dateEffect` ID는 바깥 변경의 기록 위치 이동을 그대로 따른다. 기록에서 떨어진 효과는 정리한다.
 - Feature `NotePanel/Views/TitleField+DateTime`: 한 줄 필드의 제안·Tab·Escape·선택 관찰. AppKit 텍스트 저장소를 수정하며 native undo 한 동작에 글자와 예정 효과를 함께 등록한다. 한글 조합 중에는 글자를 건드리지 않는다.
 - Core `Scheduling.InlineScheduleWriter`: 항목 단위 생성·갱신·삭제/복원. 삭제는 기존 ScheduleService 삭제 대기·재시도 경로를 사용하며 최신 외부 연결을 지킨다. `Models.InlineScheduleSource`가 출처를 저장하고 Note.body 변경 시 안전하게 식별되는 줄만 따라간다.
 - AppDelegate가 writer를 만들고 NoteEditorFactory.onAcceptDate와 NotePanelCoordinator.onAcceptTitleDate에 잇는다. Feature 간 import는 없고 Editor·Capture·NotePanel은 Core DateTime을 참조한다. 권한 의도는 수락된 항목 ID만 ScheduleService.register로 보낸다.
-- 디버그 `date-preview <id>`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestion을 포함한다. 실제 계정·시스템 이벤트·클립보드는 사용하지 않는다.
+- 디버그 `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestionHelp 접근성 도움말을 포함한다. 실제 계정·시스템 이벤트·클립보드는 사용하지 않는다.
