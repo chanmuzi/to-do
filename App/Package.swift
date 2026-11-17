@@ -24,27 +24,28 @@ let package = Package(
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
         ),
         .target(name: "Models"),
+        .target(name: "DateTime", dependencies: ["Models"]),
         .target(name: "SpaceIcons", dependencies: ["Models", "Theme"],
                 resources: [.copy("Resources/SpaceImages")], swiftSettings: uiSettings),
         .target(name: "Store", dependencies: ["Models"]),
         .target(name: "Routing", dependencies: ["Models"]),
 
-        .target(name: "Scheduling", dependencies: ["Models", "Store"]),
+        .target(name: "Scheduling", dependencies: ["Models", "Store", "DateTime"]),
 
         // MARK: Features (서로 의존하지 않는다)
         .target(
             name: "NotePanel",
-            dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
+            dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons", "DateTime"],
             swiftSettings: uiSettings
         ),
         .target(
             name: "Editor",
-            dependencies: ["Theme"],
+            dependencies: ["Theme", "DateTime"],
             swiftSettings: uiSettings
         ),
         .target(
             name: "Capture",
-            dependencies: ["Theme", "Models", "Store", "Routing"],
+            dependencies: ["Theme", "Models", "Store", "Routing", "DateTime"],
             swiftSettings: uiSettings
         ),
         .target(
@@ -63,7 +64,7 @@ let package = Package(
             name: "FloatingNotes",
             dependencies: [
                 "Theme", "Models", "Store", "Routing",
-                "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders",
+                "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders", "DateTime",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/menubar-icon.pdf")],
@@ -105,7 +106,7 @@ let package = Package(
         .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
         .testTarget(
             name: "CaptureTests",
-            dependencies: ["Capture", "Theme", "Models", "Store", "Routing"],
+            dependencies: ["Capture", "Theme", "Models", "Store", "Routing", "DateTime"],
             swiftSettings: uiSettings
         ),
         .testTarget(
