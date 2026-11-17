@@ -62,6 +62,8 @@ final class MenuBarRowView: NSView {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = theme.nsColor(.surface).cgColor
         }
+        // 메뉴 위아래 여백도 같은 바탕으로 칠한다. 반투명 여백이 뒤를 비쳐 어두운 띠가 생기지 않게 한다.
+        if let surface = layer?.backgroundColor { fillEnclosingMenuBackground(with: surface) }
         highlightView.layer?.cornerRadius = theme.shape(.chipRadius)
         let highlighted = enclosingMenuItem.map { $0.isHighlighted && $0.isEnabled } == true
         guard highlighted != isShowingHighlight else { return }
