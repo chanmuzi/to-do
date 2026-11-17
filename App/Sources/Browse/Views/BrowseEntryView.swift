@@ -73,6 +73,6 @@ class BrowseEntryView: NSView {
 
     /// 세로 가운데에 놓은 틀.
     func centered(width: CGFloat, height: CGFloat, x: CGFloat) -> NSRect {
-        NSRect(x: x, y: ((bounds.height - height) / 2).rounded(), width: width, height: height)
+        NSRect(x: x, y: (bounds.height - height) / 2, width: width, height: height)
     }
 }

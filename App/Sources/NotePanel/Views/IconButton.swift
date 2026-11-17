@@ -65,7 +65,7 @@ final class IconButton: ClickableView {
         super.layout()
         let side = style.theme.component(iconSize)
         imageView.frame = style.theme.symbolFrame(NSRect(
-            x: ((bounds.width - side) / 2).rounded(), y: ((bounds.height - side) / 2).rounded(),
+            x: (bounds.width - side) / 2, y: (bounds.height - side) / 2,
             width: side, height: side
         ))
     }

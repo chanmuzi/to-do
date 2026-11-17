@@ -10,6 +10,7 @@ final class ReminderBadgeView: ClickableView {
     private let iconView = NSImageView()
     private let failureView = NSImageView()
     private var presentation: ReminderPresentation?
+    private var isPointerInside = false
     /// 다 사라진 뒤 숨기는 일(`dur` 뒤). 그사이 다시 나타나면 취소한다.
     private var fadeSettle: Task<Void, Never>?
 
@@ -58,8 +59,8 @@ final class ReminderBadgeView: ClickableView {
             updateRinging()
             return
         }
-        let color = style.color(presentation.color)
-        iconView.image = style.symbol(presentation.symbolName, size: .iconLarge)
+        let color = style.color(isPointerInside && presentation.color != .warn ? .text : presentation.color)
+        iconView.image = style.symbol(presentation.symbolName, size: .iconMedium)
         iconView.contentTintColor = color
         setAccessibilityLabel(presentation.accessibilityLabel)
         failureView.isHidden = !presentation.syncFailed
@@ -78,13 +79,19 @@ final class ReminderBadgeView: ClickableView {
     }
 
     override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        layer?.cornerRadius = style.theme.shape(.chipRadius)
+        layer?.backgroundColor = isPointerInside ? style.cgColor(.hover, in: self) : CGColor.clear
+    }
 
     override func layout() {
         super.layout()
-        let icon = style.theme.component(.iconLarge)
+        let icon = style.theme.component(.iconMedium)
         let button = style.theme.component(.iconButton)
         iconView.frame = style.theme.symbolFrame(
-            NSRect(x: (button - icon) / 2, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+            NSRect(x: (button - icon) / 2, y: (bounds.height - icon) / 2, width: icon, height: icon)
         )
         let failure = style.theme.component(.iconSmall)
         failureView.frame = NSRect(x: bounds.width - failure, y: (bounds.height - failure) / 2, width: failure, height: failure)
@@ -93,6 +100,10 @@ final class ReminderBadgeView: ClickableView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window != nil, trackingAreas.isEmpty {
+            addTrackingArea(NSTrackingArea(rect: .zero,
+                options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        }
         updateRinging()
     }
 
@@ -110,6 +121,17 @@ final class ReminderBadgeView: ClickableView {
     }
 
     // MARK: - 마우스
+
+    override func mouseEntered(with event: NSEvent) { setPointerInside(true) }
+    override func mouseExited(with event: NSEvent) { setPointerInside(false) }
+
+    private func setPointerInside(_ inside: Bool) {
+        guard inside != isPointerInside else { return }
+        isPointerInside = inside
+        style.crossfade(iconView)
+        refresh()
+        style.animate { updateLayer() }
+    }
 
     override func mouseDown(with event: NSEvent) {}
 

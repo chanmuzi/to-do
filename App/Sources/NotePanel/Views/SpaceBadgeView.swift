@@ -37,7 +37,7 @@ final class SpaceBadgeView: NSView {
         iconView.isHidden = badge?.icon == nil || badge?.icon == .some(.none)
         if let badge, let directory = badge.imageDirectory {
             iconView.apply(badge.icon, directory: directory, theme: style.theme,
-                           size: style.theme.component(.iconMedium), color: style.color(colorToken))
+                           size: style.theme.component(.iconMedium), color: style.color(colorToken), symbolSize: .iconMedium)
         }
         nameLabel.stringValue = badge?.name ?? ""
         nameLabel.font = style.theme.nsFont(.title, weight: style.theme.tokens.textStyle(.body).weight)
@@ -68,10 +68,10 @@ final class SpaceBadgeView: NSView {
     override func layout() {
         super.layout()
         func centered(_ width: CGFloat, _ height: CGFloat, x: CGFloat) -> NSRect {
-            NSRect(x: x, y: ((bounds.height - height) / 2).rounded(), width: width, height: height)
+            NSRect(x: x, y: (bounds.height - height) / 2, width: width, height: height)
         }
         let icon = style.theme.component(.iconMedium)
-        iconView.frame = style.theme.symbolFrame(centered(icon, icon, x: 0))
+        iconView.frame = centered(icon, icon, x: 0)
         let nameX = iconWidth > 0 ? iconWidth + style.theme.space(.sp1) : 0
         nameLabel.frame = centered(
             max(0, bounds.width - nameX), nameLabel.intrinsicContentSize.height.rounded(.up), x: nameX
