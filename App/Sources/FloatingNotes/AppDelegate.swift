@@ -1,5 +1,6 @@
 import AppKit
 import NotePanel
+import Library
 import Routing
 import Store
 import Theme
@@ -9,11 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var environment: AppEnvironment?
     private var router: AppRouter?
     private var notePanels: NotePanelCoordinator?
+    private var library: LibraryCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
     private var commands: AppCommandDispatcher?
     private var menuBarIcon: MenuBarIconSwitch<StatusItemController>?
-    private var fallbackNote: FallbackNotePresenter?
     private var activationFocus = ActivationFocusPolicy()
     private var hotKeys: GlobalHotKeys?
     private var pointerPresses: PointerPressMonitor?
@@ -65,6 +66,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #if DEBUG
             if options.debugIsPassive { quickPanels.refuseKeyWindowsForVerification() }
             #endif
+            let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
+                spaces: environment.spaces, windows: environment.windowStates,
+                preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            library.beforeMove = { [weak notePanels] in notePanels?.flushPendingEdits() }
+            #if DEBUG
+            library.allowsKeyWindows = !options.debugIsPassive
+            #endif
+            router.library = library
+            self.library = library
             router.quickPanels = quickPanels
             self.router = router
             self.notePanels = notePanels
@@ -95,13 +105,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 shown: options.menuBarIconOverride ?? environment.settings.settings.showsMenuBarIcon
             )
             registerGlobalHotKeys(shortcuts, commands)
-            let fallbackNote = FallbackNotePresenter(
-                notes: environment.notes, notePanels: notePanels, warn: AppLog.warning,
-                presentFailure: { RouteFailureAlert.present(title: $0, error: $1) }
-            )
-            self.fallbackNote = fallbackNote
-            // 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 하나를 띄운다.
-            if notePanels.restoreOpenNotes().isEmpty { try fallbackNote.showFallbackNote() }
+            // 떠 있던 노트가 없으면 닫은 노트를 찾는 주된 길인 라이브러리를 연다.
+            if notePanels.restoreOpenNotes().isEmpty { library.show() }
             #if DEBUG
             try startDebugging(router: router, notePanels: notePanels)
             #endif
@@ -168,7 +173,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Dock 아이콘을 눌렀을 때: 숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄우고, 맨 앞 노트가
     /// 키 창이 된다. 띄우지 못하면 알림 창으로 까닭을 보여 준다(`FallbackNotePresenter`).
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        fallbackNote?.handleReopen()
+        if notePanels?.areNotesHidden == true { notePanels?.toggleAllHidden() }
+        if notePanels?.openNoteIDs.isEmpty != false { router?.route(.openLibrary) }
+        else { notePanels?.focusFrontmostNote() }
         return false
     }
 
@@ -253,6 +260,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
+        control.library = library
+        control.reopen = { [weak self] in _ = self?.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false) }
         control.toastWindow = { [unowned self] in toasts?.presenter.window }
         control.toastAction = { [unowned self] in toasts?.presenter.performAction() }
         control.start()

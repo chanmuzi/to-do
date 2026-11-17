@@ -144,6 +144,27 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case browseAnchorGap = "browse-anchor-gap"
     case browseAnchorInset = "browse-anchor-inset"
     /// 짧은 알림(토스트, D-041): 높이, 좌우 여백, 글과 동작 사이.
+    case libraryWidth = "library-w"
+    case libraryHeight = "library-h"
+    case libraryMinWidth = "library-min-w"
+    case libraryMinHeight = "library-min-h"
+    case librarySidebarWidth = "library-sidebar-w"
+    case libraryHeaderHeight = "library-header-h"
+    case libraryRowHeight = "library-row-h"
+    case libraryRowLeading = "library-row-leading"
+    case libraryRowTrailing = "library-row-trailing"
+    case libraryReminderWidth = "library-reminder-w"
+    case libraryProgressWidth = "library-progress-w"
+    case libraryRowGap = "library-row-gap"
+    case libraryToolbarButton = "library-toolbar-button"
+    case iconPickerWidth = "icon-picker-w"
+    case iconPickerPadding = "icon-picker-pad"
+    case iconPickerCellHeight = "icon-picker-cell-h"
+    case iconPickerIcon = "icon-picker-icon"
+    case iconPickerRing = "icon-picker-ring"
+    case iconPickerGridHeight = "icon-picker-grid-h"
+    case iconPickerDropHeight = "icon-picker-drop-h"
+    case iconImportMaxPixels = "icon-import-max-pixels"
     case toastHeight = "toast-h"
     case toastPadding = "toast-pad"
     case toastGap = "toast-gap"
@@ -166,6 +187,7 @@ public enum RatioToken: String, CaseIterable, Sendable {
 /// 치수가 아니라 개수로 적는 구성 요소 값(`component` 구역, 단위 없는 정수).
 public enum CountToken: String, CaseIterable, Sendable {
     /// 노트 창의 본문 영역이 적어도 보이는 본문 줄 수(D-031, 임시 값). 글이 그보다 적어도 창은 이만큼 높다.
+    case iconPickerColumns = "icon-picker-columns"
     case noteBodyLinesMin = "note-body-lines-min"
 }
 

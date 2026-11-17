@@ -171,7 +171,7 @@ import Testing
         #expect(fixture.keyRequests(writing) == 0)
         // 글자를 치면 "새 노트 만들기"가 보인다.
         try type("새 계획", into: fixture.browse.inputView)
-        #expect(fixture.browse.rowDescriptions == ["*create “새 계획” 새 노트 만들기"])
+        #expect(fixture.browse.rowDescriptions == ["*create “새 계획” 새 노트 만들기", " separator", " library 라이브러리 열기"])
 
         // esc로 닫으면 쓰던 노트로 돌아간다.
         try #require(fixture.browse.inputView).doCommand(by: escapeKey)
@@ -287,17 +287,17 @@ import Testing
 
     // MARK: - 이어지지 않은 화면
 
-    /// 앱에서는 라이브러리가 아직 이어져 있지 않다. 노트 찾기에 "라이브러리 열기" 줄이 없다.
-    @Test func browseHasNoLibraryRowUntilTheLibraryIsConnected() throws {
+    /// 연결 표에 따라 라이브러리 열기 줄이 나온다. 이 fixture에는 실제 라이브러리 창을 조립하지 않는다.
+    @Test func browseExposesLibraryWhenItsRouteIsConnected() throws {
         defer { fixture.cleanUp() }
         _ = try fixture.notes.create(NoteDraft(title: "노트"))
-        #expect(!fixture.router.isConnected(.openLibrary))
+        #expect(fixture.router.isConnected(.openLibrary))
         #expect(fixture.router.route(.openLibrary) == .unconnected)
 
         fixture.router.route(.openBrowse(anchor: nil))
-        #expect(fixture.browse.rowDescriptions.count == 2)
-        #expect(!fixture.browse.rowDescriptions.contains { $0.contains("library") })
+        #expect(fixture.browse.rowDescriptions.count == 4)
+        #expect(fixture.browse.rowDescriptions.contains { $0.contains("library") })
         try type("없는 말", into: fixture.browse.inputView)
-        #expect(fixture.browse.rowDescriptions == ["*create “없는 말” 새 노트 만들기"])
+        #expect(fixture.browse.rowDescriptions == ["*create “없는 말” 새 노트 만들기", " separator", " library 라이브러리 열기"])
     }
 }

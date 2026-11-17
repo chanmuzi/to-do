@@ -21,6 +21,7 @@ Core         모든 기능이 공유하는 바탕
 | 계층 | 모듈 | 책임 | 명세 |
 | --- | --- | --- | --- |
 | Core | `Theme` | `tokens.json` 읽기, 라이트·다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
+| Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit·SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme·Models만 참조 | 10, 16, 18 |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
 | Core | `Store` | 노트 파일 읽기·쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `Routing` | 기능 사이 요청을 전달하는 프로토콜 | 04 |
@@ -50,7 +51,7 @@ App/
 ├─ Tests/<모듈명>Tests/
 └─ Resources/         tokens.json, Fonts/, AppIcon.appiconset, menubar-icon.pdf, Info.plist
 scripts/
-├─ build-app.sh       빌드해서 build/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
+├─ build-app.sh       빌드해서 ${FLOATING_NOTES_APP_DIR:-build}/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
 ├─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
 ├─ install-app.sh     릴리스로 빌드해 /Applications(쓸 수 없으면 ~/Applications)에 "플로팅 노트.app"으로 넣는다. sudo를 쓰지 않고, 실행 중이면 먼저 정상 종료를 요청해 끝날 때까지 기다린다. FLOATING_NOTES_INSTALL_DIR로 넣을 폴더를 바꾼다
 └─ debug-send.sh      실행 중인 디버그 빌드에 확인용 명령을 보낸다 (인자: 출력 폴더, 명령)
@@ -388,7 +389,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - `AppEnvironment`가 `Theme`, `FileNoteStore`, `WindowStateStore`(쓰기를 한데 모은다, `coalescingWriteDelay`), `SpaceStore`, `AppSettingsStore`(`stateDirectory/app-settings.json`. `showsMenuBarIcon`과 본문 편집기의 표시 방식 `inlineCode`(`accent` | `plain`), `checkbox`(`box` | `bracket`). 바뀌어 파일에 적히면 `onChange`를 부른다)를 한 번 만들고, `AppDelegate`가 아래를 조립한다(`AppRouter`, `NotePanelCoordinator`, `QuickPanels`, `AppCommandDispatcher`, 메뉴와 전역 단축키의 차례). 기능 모듈끼리는 서로를 모르고 여기서만 이어진다.
 - 켤 때 버려도 되는 상태가 잘못돼 있으면 앱을 멈추지 않고 기본값으로 넘어간다(글꼴 등록 실패 → 시스템 글꼴, 쓸 수 없는 테마 덮어쓰기 → 버림, 깨진 상태 파일 → 옆으로 옮기고 빈 상태). 넘어간 것은 `AppEnvironment.launchWarnings`에 모아 `AppLog.warning`(표준 오류)으로 남긴다. 읽지 못한 노트 파일과 등록하지 못한 전역 단축키도 같은 방식으로 남긴다. 메뉴 막대 아이콘 파일은 아이콘을 켤 때 처음 읽고(`MenuBarIconSwitch`), 읽지 못하면 경고를 남긴 채 아이콘 없이 간다(같은 항목이 앱 메뉴와 Dock 메뉴에 있다). 꺼 둔 동안에는 읽지 않는다. 번들에 든 토큰이 없으면 시작하지 않는다.
 - `AppDelegate`: 앱이 앞으로 올 때 `notes.refresh()`를 부르고, 사용자가 앞으로 가져온 것이면 `notePanels.focusFrontmostNote()`로 맨 앞 노트를 키 창으로 만든다(D-025). 알림 창이나 캡처 바, 노트 찾기가 키 입력을 받는 중이면 하지 않는다(실패를 알리는 알림 창은 스스로 앱을 앞으로 가져온다. 그때 노트가 키 창을 가져가면 알림 창과 캡처 바가 입력을 잃는다). 켜면서 오는 활성화는 뺀다: AppKit이 둘을 가려 주지 않아 `ActivationFocusPolicy`가 다 켠 뒤 1초(`launchGrace`) 안에 온 첫 활성화만 켜면서 온 것으로 본다(뒤에서 켠 실행에는 켜면서 오는 활성화가 없어 첫 활성화가 사용자의 것이다). 노트 창이 키 창이 될 때의 `refresh()`는 `NotePanelCoordinator`가 부른다. 끝낼 때(`applicationShouldTerminate`) `notePanels.flushPendingEdits()`로 편집기가 아직 알리지 않은 글을 받은 뒤 `flushPendingSaves()`를 부르고, 못 쓴 노트가 있으면 노트 이름과 까닭을 알림으로 보여 주고 돌아갈지 저장하지 않고 끝낼지 묻는다(`UnsavedNotesAlert`). 그 앞에 한데 모아 쓰려고 미뤄 둔 창 상태도 쓴다(`windowStates.flush()`. 쓰지 못하면 경고만 남기고 끝내기를 막지 않는다).
-- 켤 때 `NotePanelCoordinator.restoreOpenNotes()`로 지난번에 떠 있던 노트 창을 되살린다. 되살린 것이 없으면 가장 최근에 고친 노트를, 노트가 하나도 없으면 빈 노트를 새로 만들어 띄운다(D-021, `FallbackNotePresenter`). Dock 아이콘을 눌렀을 때도 같고(`handleReopen()`: 숨긴 노트를 되돌리거나 하나를 띄운 뒤 맨 앞 노트를 키 창으로), 띄우지 못하면 기록만 하지 않고 새 노트 실패와 같은 알림 창(`RouteFailureAlert`)으로 까닭을 보여 준다.
+- 켤 때 `NotePanelCoordinator.restoreOpenNotes()`로 지난번 노트 창을 되살린다. 복원할 노트가 없으면 라이브러리를 연다. Dock 재열기도 숨긴 노트를 먼저 보이고, 열린 노트가 없으면 라이브러리로 간다(D-049). 최근 노트/빈 노트 자동 생성은 하지 않는다. `FallbackNotePresenter`는 기존 단위 테스트를 위한 구현으로 남아 있고 앱 시작에서는 쓰지 않는다.
 
 ### 앱 메뉴와 활성화
 
@@ -403,7 +404,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 요청 전달 (`AppRouter`)
 
-- `Routing` 구현. `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로, `.openCapture`, `.openBrowse(anchor:)`를 `QuickPanels`로 넘기고, 나머지(라이브러리, AI 패널, 설정, 단축키 표, 리마인더 설정, 스페이스 옮기기)는 아직 기록만 하고(`unhandled`) `.unconnected`로 답한다. 어느 요청이 이어져 있는지는 `Route.isConnected`(App의 확장) 한 곳에 적고, `Routing.isConnected(_:)`로 기능 모듈에도 알려 준다. `AppCommand.isConnected`가 그것을 읽고, 전역 단축키는 그 값이 참인 동작만 등록하며, 메뉴 막대 메뉴와 Dock 메뉴와 앱 메뉴는 그 값이 거짓인 항목을 고를 수 없게 둔다. 뒤 단계의 화면을 이을 때도 그 줄을 참 쪽으로 옮기고 `route(_:)`에서 그 화면을 부르면 된다.
+- `Routing` 구현. `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로, `.openCapture`, `.openBrowse(anchor:)`를 `QuickPanels`로 넘기고, `.openLibrary`와 `.openSpacePicker`는 `LibraryCoordinator`로 넘긴다. 나머지(AI 패널, 설정, 단축키 표, 리마인더 설정)는 아직 기록만 하고(`unhandled`) `.unconnected`로 답한다. 어느 요청이 이어져 있는지는 `Route.isConnected`(App의 확장) 한 곳에 적고, `Routing.isConnected(_:)`로 기능 모듈에도 알려 준다. `AppCommand.isConnected`가 그것을 읽고, 전역 단축키는 그 값이 참인 동작만 등록하며, 메뉴 막대 메뉴와 Dock 메뉴와 앱 메뉴는 그 값이 거짓인 항목을 고를 수 없게 둔다. 뒤 단계의 화면을 이을 때도 그 줄을 참 쪽으로 옮기고 `route(_:)`에서 그 화면을 부르면 된다.
 - 새 노트를 만들거나 노트를 열다가 실패하면 기록과 함께 알림 창으로 까닭을 보여 준 뒤 `.failed`로 답한다(`RouteFailureAlert`). 보낸 쪽이 그 답으로 뒷일을 정한다: 캡처 바는 적은 글을 둔 채 열려 있고, 노트 찾기는 닫히며 쓰던 노트가 다시 키 창이 된다. 캡처 바와 노트 찾기가 보낸 요청(고른 노트의 `.openNote`, "새 노트 만들기"와 캡처 ⌘↵의 `.newNote`)도 같은 길로 돌아오므로 같은 알림이 뜬다. `.openNote`는 그 창을 앞으로 가져오고 키 창으로 만든다(사용자가 고른 것이다, D-025의 "앱이 시킨다").
 
 ### 빠른 캡처와 노트 찾기 (`QuickPanels`)
@@ -434,16 +435,31 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 메뉴 막대 (`MenuBar/`)
 
-- 메뉴 막대 아이콘은 꺼 둘 수 있다(`AppSettings.showsMenuBarIcon`, 기본 보임. `AppDelegate.setMenuBarIconShown(_:)`이 적고 곧바로 반영한다. 실행 인자 `--menu-bar-icon on|off`가 그 실행에서만 덮어쓴다). 꺼도 모든 기능에 닿는다: 전역 단축키, 앱 안의 단축키, 앱 메뉴(메뉴 막대 메뉴의 항목이 모두 보이는 항목으로 있다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다), Dock 메뉴(`DockMenu`: 메뉴 막대 메뉴에서 종료만 뺀 같은 항목), Dock 아이콘 누르기(숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄운다).
+- 메뉴 막대 아이콘은 꺼 둘 수 있다(`AppSettings.showsMenuBarIcon`, 기본 보임. `AppDelegate.setMenuBarIconShown(_:)`이 적고 곧바로 반영한다. 실행 인자 `--menu-bar-icon on|off`가 그 실행에서만 덮어쓴다). 꺼도 모든 기능에 닿는다: 전역 단축키, 앱 안의 단축키, 앱 메뉴(메뉴 막대 메뉴의 항목이 모두 보이는 항목으로 있다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다), Dock 메뉴(`DockMenu`: 메뉴 막대 메뉴에서 종료만 뺀 같은 항목), Dock 아이콘 누르기(숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 라이브러리를 연다).
 - `StatusItemController`: `NSStatusItem`(너비는 그림에 맞춤, `variableLength`)에 `MenuBarIcon.load()`의 18pt 템플릿 이미지(`App/Resources/menubar-icon.pdf`)를 넣고, 메뉴가 열릴 때마다 `StatusMenuModel.entries(areNotesHidden:)`로 다시 채운다. 노트를 숨긴 중이면 "노트 모두 숨기기" 자리에 "노트 모두 보이기"가 온다.
 - `StatusMenuModel`: 항목의 순서, 이름, 아이콘(SF Symbols, spec 18.2), 동작(`StatusMenuAction`). 이름과 순서는 `tokens.json`의 `navigation.menuBar`와 같은지 테스트가 견준다. `StatusMenuBuilder`가 `NSMenu`로 만들고 줄은 `MenuBarRowView`(노트의 더 보기 메뉴와 같은 모양: `row-h`, 14pt 아이콘, `hover` 바탕, 불투명 `surface` 바탕), 구분선은 `MenuBarSeparatorView`가 그린다(D-039). `keyEquivalent`는 넣지 않는다.
-- 여는 화면이 아직 이어지지 않은 항목(지금은 라이브러리, AI 패널, 설정, 단축키. `StatusMenuAction.isConnected`)은 자리와 이름을 그대로 두되 고를 수 없게 흐려 둔다(글자와 아이콘 `text-3`, `hover` 바탕 없음). 항목과 차례는 spec 4.3 그대로다(D-034). Dock 메뉴와 앱 메뉴도 같다. 노트의 더 보기 메뉴에서도 "리마인더 설정", "스페이스 옮기기", "AI 패널 열기"가 같은 모습이다.
+- 여는 화면이 아직 이어지지 않은 항목(지금은 AI 패널, 설정, 단축키. `StatusMenuAction.isConnected`)은 자리와 이름을 그대로 두되 고를 수 없게 흐려 둔다(글자와 아이콘 `text-3`, `hover` 바탕 없음). 항목과 차례는 spec 4.3 그대로다(D-034). Dock 메뉴와 앱 메뉴도 같다. 노트의 더 보기 메뉴에서도 "리마인더 설정", "AI 패널 열기"가 같은 모습이다. "스페이스 옮기기"는 Library로 연결됐다.
 - 고른 항목은 `AppCommandDispatcher.performStatusMenu(_:)`가 받는다. 메뉴 막대에서 연 노트 찾기는 `.openBrowse(anchor: nil)`이다(spec 4.1).
 
 ### 그 밖
 
-- Features 타깃 `Library`, `Reminders`, `Settings`, `Agent`는 아직 없다. 그 화면을 여는 요청은 `AppRouter`가 기록만 하고 `.unconnected`로 답한다.
+- Features 타깃 `Reminders`, `Settings`, `Agent`는 아직 없다. 그 화면을 여는 요청은 `AppRouter`가 기록만 하고 `.unconnected`로 답한다.
 - 움직임과 상태(D-032): 창이나 뷰의 움직임이 끝났다는 알림(`NSAnimationContext`의 `completionHandler`)에 상태를 걸지 않는다. 화면이 꺼져 있거나 잠겨 있으면 창의 움직임은 나아가지 않고 그 알림도 오지 않는다. 전환이 끝날 때 해야 하는 일(창 내리기, 끝의 값으로 놓기, 숨기고 자리 비우기)은 `Theme`의 `TransitionTimer.after(_:_:)`로 전환 시간 뒤에 잡고, 반대쪽 전환이 시작되면 취소한다. 세 기능의 `animate`(`CaptureStyle`, `BrowseStyle`, `PanelStyle`)는 끝났을 때를 알려 주는 인자가 없다. `swift test`는 화면이 잠겨 있어도 통과해야 한다.
 - 자동으로 확인하지 못한 것(실제 한글 입력, 실제 전역 단축키, 키 창이 넘어가는 모습 등)은 `docs/verification-checklist.md`에 손으로 볼 목록으로 모아 두었다.
 - SF Symbols 아이콘은 모두 `Theme.symbolImage(_:size:)`로 만든다(크기 토큰의 칸 안에 드는 크기, 눈으로 커 보이는 것만 `iconOptical` 표로 줄임, 1 이하만). 이미지 뷰는 그림을 늘리거나 줄이지 않고(`.scaleNone`) `Theme.symbolFrame`의 틀 가운데에 둔다(D-039).
 - 창 그림자와 뒤 배경 흐림은 시스템의 것을 쓴다(`shadow-window`, `blur` 토큰 값은 쓰지 않는다. 까닭은 D-025).
+
+## 5단계 Library와 SpaceIcons
+
+- `LibraryCoordinator`가 일반 NSWindow(880×560, 최소 660×400)와 스페이스 옮기기 팝오버를 소유한다. App이 `Theme`, `NoteStoring`, `SpaceStore`, `WindowStateStore`, `LibraryPreferencesStore`, `Routing`을 주입한다. Features끼리는 import하지 않는다.
+- `LibraryModel`이 저장소 변경을 다음 메인 큐 차례에 모아 읽고, 오류는 화면에 유지한다. 열린 창에서는 분마다 날짜와 리마인더를 다시 분류하며 닫으면 타이머를 해제한다.
+- `LibraryIndex`는 현재 시각·달력·노트·창 상태를 값으로 받아 날짜, 7일 아카이브, 오늘 합집합, 달별 목록, 개수, 검색, 떠 있는 순서를 계산한다.
+- `LibrarySelection`/`LibraryPreferences`는 Models, `LibraryPreferencesStore`는 Store다. 보기와 아이콘 고정·최근·이미지 목록은 `state/library.json`으로 저장하고 깨진 파일은 기존 JSON 복구 정책을 따른다.
+- `SpaceStore.create/update/delete`로 CRUD한다. 삭제는 노트 소속만 해제하며 오류가 나면 스페이스를 남긴다. 휴지통 파일은 복원 때 없어진 스페이스 연결을 해제한다.
+- `SpaceIcon`은 기존 세 경우를 읽고 쓰는 형태를 유지하고 `.none`, `.customSymbol(name:hex:)`만 추가했다. `SpaceIcons`의 공용 뷰는 기본 GIF와 업로드 PNG/GIF를 표시한다. ImageIO에서 읽은 프레임과 지연에 따라 이미지를 교체해 화면과 내부 스냅숏에 같은 프레임을 그린다. 뷰가 창에서 떨어지거나 창이 닫히면 재생 타이머를 멈춘다. SVG는 가져올 때 PNG로 렌더링한다.
+- 기본 GIF는 `App/Resources/SpaceImages/`가 정본이며 SwiftPM은 심볼릭 링크로, `.app`은 빌드 스크립트의 복사로 사용한다. 사용자 이미지는 `SpaceStore.imageDirectory` 아래에 둔다. 경로 이탈과 외부 심볼릭 링크를 거부한다.
+- 노트 창은 `SpaceStore.observe`를 구독하고 상단 줄에 공용 아이콘 뷰를 넣는다. 이름·색·이미지를 바꾸면 열린 노트에도 반영된다. 편집기 모듈은 고치지 않았다.
+- App은 `.openLibrary`, `.openSpacePicker`를 연결했다. 메뉴 막대, Dock, 앱 메뉴, 노트 찾기와 기존 단축키 표가 `Route.isConnected`를 따라 활성화된다. `.openSpacePicker` 전에 편집 중인 노트의 미전달 변경을 먼저 반영한다.
+- 메뉴 막대 아이콘은 18pt 그림의 투명한 좌우 열만 제거한다. `variableLength`에 시스템 여백을 맡긴다. 그림의 배율·높이는 유지한다.
+- 디버그 명령: `library`, `library-close`, `library-select today|all|floating|trash|reminders|archive:YYYY-MM|<spaceID>`, `library-open <noteID>`, `library-expand <spaceID>`, `library-icon <spaceID> <imageName>`, `library-dump <file>`, `library-snapshot <file>`, `icon-snapshot|icon-symbol-snapshot|icon-emoji-snapshot <spaceID> <file>`, `reopen`. 스냅숏은 앱 안에서 그린다. `--debug-passive`는 라이브러리도 키 창이 되지 않게 한다.
+- 실행 중인 사용자 앱을 덮어쓰지 않으려면 `FLOATING_NOTES_APP_DIR=<작업 폴더>/app scripts/build-app.sh debug`를 쓴다. `run.sh`에도 같은 변수가 전달된다.

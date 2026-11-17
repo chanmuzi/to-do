@@ -52,13 +52,14 @@ import Testing
         #expect(hotKeys.registered == [
             .quickCapture: KeyChord(.n, [.control, .option]),
             .toggleNotesHidden: KeyChord(.h, [.control, .option]),
+            .library: KeyChord(.l, [.control, .option]),
         ])
-        #expect(hotKeys.skipped == [.library, .aiPanel])
-        #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option])])
+        #expect(hotKeys.skipped == [.aiPanel])
+        #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option]), KeyChord(.l, [.control, .option])])
         registrar.press(KeyChord(.n, [.control, .option]))
         registrar.press(KeyChord(.l, [.control, .option]))
         registrar.press(KeyChord(.h, [.control, .option]))
-        #expect(performed == [.quickCapture, .toggleNotesHidden])
+        #expect(performed == [.quickCapture, .library, .toggleNotesHidden])
     }
 
     /// 등록할지는 요청이 이어져 있는지 하나로 정해진다(`Route.isConnected`). 그 값을 바꾸면 따라온다.
@@ -70,7 +71,7 @@ import Testing
         #expect(AppCommand.findNote.isConnected == Route.openBrowse(anchor: nil).isConnected)
         // 빠른 캡처와 노트 찾기는 이어졌다(4단계). 라이브러리와 AI 패널은 아직이다.
         #expect(AppCommand.quickCapture.isConnected && AppCommand.findNote.isConnected)
-        #expect(!AppCommand.library.isConnected && !AppCommand.aiPanel.isConnected)
+        #expect(AppCommand.library.isConnected && !AppCommand.aiPanel.isConnected)
 
         // 화면이 이어진 뒤처럼 넘기면 그 키도 등록된다.
         let registrar = FakeRegistrar()

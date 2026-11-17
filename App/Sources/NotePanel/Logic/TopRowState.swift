@@ -6,9 +6,9 @@ import Theme
 /// 입력에 포커스가 없다. 포커스는 창 모습을 바꾸지 않는다(규칙 5).
 struct TopRowState: Hashable {
     struct SpaceBadge: Hashable {
-        var symbolName: String?
-        var emoji: String?
         var name: String?
+        var icon: SpaceIcon = .none
+        var imageDirectory: URL?
     }
 
     struct Pin: Hashable {
@@ -59,17 +59,11 @@ struct TopRowState: Hashable {
         self.problem = problem
     }
 
-    /// 이미지 아이콘은 Library 단계에서 만든다. 그때까지는 이름으로 대신한다.
+    /// 공용 아이콘 렌더러에 표시할 값을 전달한다. 아이콘이 없으면 이름으로 대신한다.
     static func badge(for space: Space, display: NotePanelDisplayOptions.SpaceDisplay) -> SpaceBadge? {
         var badge = SpaceBadge()
-        if display != .name {
-            switch space.icon {
-            case .symbol(let name, _): badge.symbolName = name
-            case .emoji(let emoji): badge.emoji = emoji
-            case .image: break
-            }
-        }
-        let hasIcon = badge.symbolName != nil || badge.emoji != nil
+        if display != .name { badge.icon = space.icon }
+        let hasIcon = badge.icon != .none
         if display != .icon || !hasIcon { badge.name = space.name }
         if badge.name?.isEmpty == true { badge.name = nil }
         return hasIcon || badge.name != nil ? badge : nil

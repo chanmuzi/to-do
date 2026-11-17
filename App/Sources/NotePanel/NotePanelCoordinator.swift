@@ -56,6 +56,7 @@ public final class NotePanelCoordinator {
     private(set) var controllers: [NoteID: NoteWindowController] = [:]
     /// 띄운 순서.
     private var order: [NoteID] = []
+    private var spaceObservation: StoreObservation?
     private var storeObservation: StoreObservation?
     private var observers: [any NSObjectProtocol] = []
     private var isRefreshingStore = false
@@ -103,6 +104,9 @@ public final class NotePanelCoordinator {
             recorder: recorder, makeBodyEditor: makeBodyEditor,
             options: { [unowned self] in displayOptions }, now: { [unowned self] in now() }, log: log
         )
+        spaceObservation = spaces.observe { [weak self] in
+            self?.controllers.values.forEach { $0.refreshChrome(animated: true) }
+        }
         storeObservation = notes.observe { [weak self] in self?.storeDidChange($0) }
         observeAppearance(of: theme)
     }

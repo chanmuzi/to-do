@@ -150,7 +150,7 @@ final class NoteWindowController: NSObject {
     // MARK: - 상단 줄
 
     func refreshChrome(animated: Bool) {
-        let state = TopRowState(
+        var state = TopRowState(
             note: note,
             space: note.spaceID.flatMap { environment.spaces.space(for: $0) },
             isPinned: isPinned,
@@ -161,6 +161,7 @@ final class NoteWindowController: NSObject {
             now: Date(),
             calendar: .current
         )
+        state.space?.imageDirectory = environment.spaces.imageDirectory
         root.topRow.apply(state, animated: animated)
         root.setHoverControlsAlpha(state.hoverControlsAlpha, animated: animated)
         root.background.setPalette(note.colorID?.rawValue, animated: animated)

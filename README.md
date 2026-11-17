@@ -77,3 +77,5 @@ swift test --package-path App
 - 구현 명세: `docs/spec/index.md`
 - 결정 기록: `docs/decisions.md`
 - 모듈 구조: `docs/architecture.md`
+
+확인용 묶음을 실행 중인 앱과 분리하려면 `FLOATING_NOTES_APP_DIR=/원하는/폴더 scripts/build-app.sh debug`를 사용합니다. `scripts/run.sh`도 같은 변수를 따르며 기본은 `build/`입니다.

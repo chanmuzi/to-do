@@ -1,0 +1,94 @@
+import AppKit
+import SwiftUI
+import Models
+import Routing
+import Store
+import Theme
+
+/// App만 이 객체를 조립한다. 노트를 열고 옮기는 요청은 Core Routing으로 돌아간다.
+public final class LibraryCoordinator: NSObject, NSWindowDelegate {
+    public let model: LibraryModel
+    public private(set) var window: NSWindow?
+    private var spacePopover: NSPopover?
+    public var allowsKeyWindows = true
+    public var beforeMove: () -> Void = {}
+    private var timer: Timer?
+    public init(theme: Theme, notes: any NoteStoring, spaces: SpaceStore, windows: WindowStateStore,
+                preferences: LibraryPreferencesStore, router: any Routing) {
+        model = LibraryModel(theme: theme, notes: notes, spaces: spaces, windows: windows, preferences: preferences, router: router)
+        super.init()
+    }
+    public func show() {
+        model.opened()
+        if window == nil {
+            let theme = model.theme
+            let window = LibraryWindow(contentRect: NSRect(x: 0, y: 0, width: theme.component(.libraryWidth), height: theme.component(.libraryHeight)),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+            window.allowsKey = allowsKeyWindows
+            window.title = "라이브러리"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
+            window.isReleasedWhenClosed = false; window.delegate = self
+            window.minSize = NSSize(width: theme.component(.libraryMinWidth), height: theme.component(.libraryMinHeight))
+            window.contentView = NSHostingView(rootView: LibraryRootView(model: model))
+            window.backgroundColor = theme.nsColor(.surface)
+            window.center()
+            if !allowsKeyWindows, let screen = NSScreen.screens.last {
+                window.setFrameOrigin(screen.visibleFrame.origin)
+            }
+            self.window = window
+        }
+        if allowsKeyWindows { window?.makeKeyAndOrderFront(nil) } else { window?.orderFront(nil) }
+        timer?.invalidate()
+        // 자정과 리마인더가 지나면 열린 라이브러리의 분류도 갱신한다.
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.model.refresh() }
+        }
+    }
+    #if DEBUG
+    public func importImageForVerification(_ url: URL, space: SpaceID) { model.importImage(url, for: space) }
+    public func expandSpaceForVerification(_ id: SpaceID) { model.expanded.insert(id) }
+    public func snapshotIconPicker(space: SpaceID, tab: Int? = nil, to url: URL) throws {
+        let view = NSHostingView(rootView: IconPickerView(model: model, spaceID: space, initialTab: tab))
+        view.frame = NSRect(origin: .zero, size: view.fittingSize)
+        view.layoutSubtreeIfNeeded()
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        guard let data = rep.representation(using: .png, properties: [:]) else { return }
+        try data.write(to: url)
+    }
+    #endif
+    public func close() { spacePopover?.close(); window?.close(); timer?.invalidate(); timer = nil }
+    public func windowWillClose(_ notification: Notification) { timer?.invalidate(); timer = nil }
+    public func showSpacePicker(for id: NoteID, anchor: NSView?) {
+        beforeMove()
+        guard let anchor = anchor ?? window?.contentView else { show(); showSpacePicker(for: id, anchor: window?.contentView); return }
+        let popover = NSPopover(); popover.behavior = .transient
+        popover.contentViewController = NSHostingController(rootView: SpacePickerView(model: model, noteID: id) { [weak popover] in popover?.close() })
+        spacePopover = popover
+        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .maxY)
+    }
+}
+
+private final class LibraryWindow: NSWindow {
+    var allowsKey = true
+    override var canBecomeKey: Bool { allowsKey }
+    override var canBecomeMain: Bool { allowsKey }
+}
+
+private struct SpacePickerView: View {
+    @Bindable var model: LibraryModel
+    let noteID: NoteID
+    let dismiss: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: model.theme.space(.sp1)) {
+            Text("스페이스 옮기기").font(model.theme.font(.row))
+            Button("스페이스 없음") { move(nil) }
+            ForEach(model.spaceList) { space in Button(space.name) { move(space.id) } }
+            if let error = model.error { Text(error).font(model.theme.font(.rowSub)) }
+        }.buttonStyle(LibraryButtonStyle(theme: model.theme)).font(model.theme.font(.body))
+            .padding(model.theme.space(.sp3)).frame(width: model.theme.component(.iconPickerWidth))
+            .onExitCommand(perform: dismiss)
+    }
+    private func move(_ id: SpaceID?) {
+        do { try model.move(noteID, to: id); dismiss() } catch { model.error = error.localizedDescription }
+    }
+}

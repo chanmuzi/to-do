@@ -136,3 +136,11 @@
 | 움직임 | `ease` | `cubic-bezier(.25,.1,.25,1)` | 전환 곡선 |
 | 움직임 | `caret-blink` | `530ms` | 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간 (D-042, 임시) |
 
+
+### 3.5 라이브러리와 아이콘 선택 (D-051)
+
+- `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
+- `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
+- `library-reminder-w/progress-w`: 110/28. 값이 없는 줄도 정보 열의 자리를 유지한다.
+- `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
+- `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.

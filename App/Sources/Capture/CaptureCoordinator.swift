@@ -305,7 +305,8 @@ public final class CaptureCoordinator {
         switch space.icon {
         case .symbol(let name, _): content.symbolName = name
         case .emoji(let emoji): content.text = space.name.isEmpty ? emoji : "\(emoji) \(space.name)"
-        case .image: break
+        case .customSymbol(let name, _): content.symbolName = name
+        case .none, .image: break
         }
         return content
     }

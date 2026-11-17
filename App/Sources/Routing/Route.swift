@@ -14,8 +14,9 @@ public enum Route: Hashable, Sendable {
     case openBrowse(anchor: NoteID?)
     /// 떠 있는 노트를 모두 숨기거나 되돌린다.
     case toggleAllNotesHidden
-    // 아래는 뒤 단계에서 만드는 화면이다. 그때까지 App은 요청을 받아 기록만 한다.
+    /// 닫은 노트를 다시 여는 라이브러리.
     case openLibrary
+    // 아래의 AI·설정·리마인더 화면은 뒤 단계에서 연결한다.
     case openAIPanel(context: NoteID?)
     case openSettings
     case openShortcuts
