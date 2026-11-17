@@ -53,6 +53,10 @@ final class DebugQuickPanels {
         return true
     }
 
+    func input(named target: String) -> NSTextView? {
+        target == "capture" ? panels.capture.inputView : target == "browse" ? panels.browse.inputView : nil
+    }
+
     /// `capture` 또는 `browse`의 창. 한 번도 띄우지 않았으면 `nil`.
     func window(named target: String) -> NSWindow? {
         switch target {
