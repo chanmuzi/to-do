@@ -166,6 +166,11 @@ extension NoteWindowController {
         problem != nil || hasUnstoredEdits || environment.notes.hasPendingChanges(noteID)
     }
 
+    /// 아무것도 적지 않았고(`Note.isBlank`) 풀지 않은 문제나 쓰지 못한 글도 없다. 이때만 창과 함께 지운다.
+    var isBlankAndSettled: Bool {
+        !hasUnwrittenWork && latestNote.isBlank
+    }
+
     /// 쓰지 못한 변경까지 든 이 노트의 지금 값.
     var latestNote: Note {
         // 저장소가 받지 못한 변경은 창만 들고 있고, 그때의 `note`가 가장 새 값이다.

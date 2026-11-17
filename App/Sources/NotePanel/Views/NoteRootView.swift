@@ -114,8 +114,10 @@ final class NoteRootView: NSView {
         placeBody()
         let corner = cornerButtons.preferredSize
         let inset = theme.space(.sp1)
+        // 닫기 아이콘의 오른쪽 끝이 핀 아이콘과 같은 세로줄(창 오른쪽에서 `sp-3`)에 오게 한다.
+        let trailing = max(0, theme.space(.sp3) - cornerButtons.closeButton.glyphSideInset)
         cornerButtons.frame = NSRect(
-            x: bounds.width - inset - corner.width, y: bounds.height - inset - corner.height,
+            x: bounds.width - trailing - corner.width, y: bounds.height - inset - corner.height,
             width: corner.width, height: corner.height
         )
     }
@@ -139,12 +141,23 @@ final class NoteRootView: NSView {
 
     // MARK: - 호버
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+    /// 영역은 한 번만 건다(`.inVisibleRect`라 창 크기를 따라간다). 크기가 바뀔 때마다 새로 걸면 마우스가 이미
+    /// 안에 있을 때 들어왔다는 알림이 오지 않는다.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, trackingAreas.isEmpty else { return }
         addTrackingArea(NSTrackingArea(
             rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self
         ))
+    }
+
+    /// 버튼마다 마우스가 그 위에 있는지 다시 잰다. 창이 뜬 직후나 마우스가 창으로 들어온 순간에는
+    /// 버튼에 들어왔다는 알림이 오지 않을 수 있다.
+    func syncButtonHover() {
+        func buttons(in view: NSView) -> [IconButton] {
+            view.subviews.flatMap { ($0 as? IconButton).map { [$0] } ?? buttons(in: $0) }
+        }
+        buttons(in: self).forEach { $0.syncPointerInside() }
     }
 
     override func mouseEntered(with event: NSEvent) { onHoverChange?(true) }

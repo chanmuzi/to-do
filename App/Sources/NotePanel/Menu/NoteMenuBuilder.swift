@@ -8,6 +8,7 @@ enum MoreMenuAction: Hashable {
     case togglePin
     /// 팔레트 키. 색 없음이면 `nil`.
     case setColor(String?)
+    case findNote
     case openAIPanel
     case closeWindow
     case moveToTrash
@@ -45,9 +46,10 @@ struct NoteMenuBuilder {
             },
             row("항상 위에 고정", symbol: "pin", isOn: isPinned) { handler(.togglePin) },
             colorRow(selectedPaletteID: selectedPaletteID) { handler(.setColor($0)) },
-            .separator(),
+            separator(),
+            row("노트 찾기", symbol: "magnifyingglass") { handler(.findNote) },
             row("AI 패널 열기", symbol: "sparkle", isEnabled: isAvailable(.openAIPanel)) { handler(.openAIPanel) },
-            .separator(),
+            separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
             row("휴지통으로 보내기", symbol: "trash") { handler(.moveToTrash) },
         ]
@@ -96,6 +98,13 @@ struct NoteMenuBuilder {
         item.representedObject = target
         item.isEnabled = isEnabled
         item.view = MenuRowView(style: style, title: title, symbolName: symbol, isOn: isOn, isDimmed: !isEnabled)
+        return item
+    }
+
+    /// 구분선. 구분선 항목(`isSeparatorItem`)으로 두되 모습은 불투명 바탕의 `MenuSeparatorView`다.
+    private func separator() -> NSMenuItem {
+        let item = NSMenuItem.separator()
+        item.view = MenuSeparatorView(style: style)
         return item
     }
 

@@ -26,7 +26,7 @@ final class CaptureBadgeView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         alphaValue = 0
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         label.lineBreakMode = .byTruncatingTail
         [iconView, label].forEach(addSubview)
         setAccessibilityElement(true)
@@ -104,7 +104,9 @@ final class CaptureBadgeView: NSView {
     override func layout() {
         super.layout()
         let side = iconSide
-        iconView.frame = NSRect(x: 0, y: ((bounds.height - side) / 2).rounded(), width: side, height: side)
+        iconView.frame = style.theme.symbolFrame(
+            NSRect(x: 0, y: ((bounds.height - side) / 2).rounded(), width: side, height: side)
+        )
         let labelX = side > 0 ? side + style.theme.component(.iconGap) : 0
         label.frame = style.labelFrame(
             label, textX: labelX, textWidth: bounds.width - labelX, centeredIn: bounds.height

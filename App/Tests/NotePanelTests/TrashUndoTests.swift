@@ -133,55 +133,40 @@ import Testing
         try coordinator.open(first.id, focus: false)
         #expect(coordinator.allowsKeyWindows == false)
         let panel = try #require(coordinator.controllers[first.id]).panel
-        let press = try mouseDown(in: panel)
-        #expect(!panel.canBecomeKey(during: press))
+        #expect(!panel.canBecomeKey)
         coordinator.allowsKeyWindows = true
-        #expect(panel.canBecomeKey(during: press))
+        #expect(panel.canBecomeKey)
 
         coordinator.allowsKeyWindows = false
         let second = try coordinator.createNote()
 
-        #expect(!panel.canBecomeKey(during: press))
+        #expect(!panel.canBecomeKey)
         #expect(coordinator.controllers[second]?.panel.allowsKey == false)
         #expect(coordinator.keyNoteID == nil)
     }
 
-    private func mouseDown(in window: NSWindow, type: NSEvent.EventType = .leftMouseDown) throws -> NSEvent {
-        try #require(NSEvent.mouseEvent(
-            with: type, location: NSPoint(x: 20, y: 20), modifierFlags: [], timestamp: 0,
-            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
-        ))
-    }
-
-    /// 노트 창은 앱이 앞에 있지 않아도 키 창이 된다. 그래서 사용자가 그 창을 눌렀을 때와 앱이 일부러
-    /// 시켰을 때만 키 창이 된다. 앱을 켜며 되살린 창이 다른 앱에 치던 글자를 가져오지 않는다.
-    @Test func noteWindowBecomesKeyOnlyWhenPressedOrAsked() throws {
+    /// 노트 창은 보통 앱 창처럼 누르면 앱을 앞으로 가져오는 창이다(D-025). 키 창은 앱이 앞에 있을 때만 키 입력을
+    /// 받으므로 언제 키 창이 되는지를 막지 않는다(손쉬운 사용 도구의 포커스 요청도 그대로 받는다).
+    /// 앱이 뒤로 가도 숨지 않고, 모든 Spaces와 전체 화면 앱 위에 보인다.
+    @Test func noteWindowIsAnActivatingWindowThatStaysVisible() {
         let panel = NotePanelWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 100))
-        let other = NotePanelWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 100))
-        defer {
-            panel.close()
-            other.close()
-        }
+        defer { panel.close() }
+        #expect(!panel.styleMask.contains(.nonactivatingPanel))
+        #expect(panel.canBecomeKey)
         #expect(!panel.canBecomeMain)
-        // 아무 일도 없을 때, 키를 누르는 중일 때, 다른 창을 누르는 중일 때는 되지 않는다.
-        #expect(!panel.canBecomeKey(during: nil))
-        #expect(!panel.canBecomeKey)
-        let keyDown = try #require(NSEvent.keyEvent(
-            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: panel.windowNumber,
-            context: nil, characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0
-        ))
-        #expect(!panel.canBecomeKey(during: keyDown))
-        #expect(!panel.canBecomeKey(during: try mouseDown(in: other)))
-        #expect(!panel.canBecomeKey(during: try mouseDown(in: panel, type: .leftMouseUp)))
-        // 이 창을 누르는 중에는 된다.
-        #expect(panel.canBecomeKey(during: try mouseDown(in: panel)))
-        #expect(panel.canBecomeKey(during: try mouseDown(in: panel, type: .rightMouseDown)))
-        // 꺼 두면 눌러도 되지 않는다.
+        #expect(!panel.hidesOnDeactivate)
+        #expect(!panel.becomesKeyOnlyIfNeeded)
+        #expect(panel.collectionBehavior.contains(.canJoinAllSpaces))
+        #expect(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+        panel.setPinned(true)
+        #expect(panel.level == .floating)
+        panel.setPinned(false)
+        #expect(panel.level == .normal)
         panel.allowsKey = false
-        #expect(!panel.canBecomeKey(during: try mouseDown(in: panel)))
+        #expect(!panel.canBecomeKey)
     }
 
-    /// 창을 띄우기만 해서는(되살리기, 앞으로 가져오기) 키 창이 될 수 없고, 커서를 두라고 시킬 때만 된다.
+    /// 창을 띄우기만 해서는(되살리기, 앞으로 가져오기) 키 창을 시키지 않는다. 커서를 두라고 할 때만 시킨다.
     @Test func openingWithoutFocusNeverAsksForKey() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
@@ -190,7 +175,7 @@ import Testing
         try coordinator.open(note.id, focus: false)
         let panel = try #require(coordinator.controllers[note.id]).panel
 
-        #expect(!panel.canBecomeKey)
+        #expect(panel.keyRequestCount == 0)
         #expect(!panel.isKeyWindow)
         #expect(coordinator.keyNoteID == nil)
         coordinator.allowsKeyWindows = false

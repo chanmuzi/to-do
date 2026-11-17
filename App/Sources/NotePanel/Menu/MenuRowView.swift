@@ -24,14 +24,14 @@ final class MenuRowView: NSView {
         highlightView.wantsLayer = true
         iconView.image = symbolName.flatMap { style.symbol($0, size: .iconLarge) }
         iconView.contentTintColor = style.color(isDimmed ? .text3 : .text2)
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         label.stringValue = title
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
         label.textColor = style.color(isDimmed ? .text3 : .text)
         label.lineBreakMode = .byTruncatingTail
         stateView.image = isOn ? style.symbol("checkmark", size: .iconSmall) : nil
         stateView.contentTintColor = style.color(.text3)
-        stateView.imageScaling = .scaleProportionallyDown
+        stateView.imageScaling = .scaleNone
         [highlightView, iconView, label, stateView].forEach(addSubview)
     }
 
@@ -54,9 +54,9 @@ final class MenuRowView: NSView {
         }
         highlightView.frame = bounds.insetBy(dx: edge, dy: 0)
         let contentX = edge + theme.space(.sp2)
-        iconView.frame = centered(x: contentX, width: icon, height: icon)
+        iconView.frame = theme.symbolFrame(centered(x: contentX, width: icon, height: icon))
         let stateX = bounds.width - contentX - state
-        stateView.frame = centered(x: stateX, width: state, height: state)
+        stateView.frame = theme.symbolFrame(centered(x: stateX, width: state, height: state))
         let labelX = contentX + icon + theme.space(.sp2)
         label.frame = centered(
             x: labelX, width: max(0, stateX - theme.space(.sp2) - labelX),
@@ -65,7 +65,10 @@ final class MenuRowView: NSView {
     }
 
     /// 메뉴가 고른 줄을 바꾸면 다시 그리라는 요청이 온다. 그때 바탕을 `dur` 동안 바꾼다.
+    /// 줄의 바탕은 불투명한 `surface`다. 메뉴의 반투명 재질이 뒤의 노트(흰 노트, 색 노트)를 비춰 글자가
+    /// 바래 보이지 않게 한다(라이트와 다크 모두).
     override func updateLayer() {
+        layer?.backgroundColor = style.cgColor(.surface, in: self)
         highlightView.layer?.cornerRadius = style.theme.shape(.chipRadius)
         let highlighted = enclosingMenuItem?.isHighlighted == true && enclosingMenuItem?.isEnabled == true
         guard highlighted != isShowingHighlight else { return }
@@ -73,6 +76,12 @@ final class MenuRowView: NSView {
         style.animate {
             highlightView.layer?.backgroundColor = highlighted ? style.cgColor(.hover, in: self) : CGColor.clear
         }
+    }
+
+    /// 줄 안의 글자와 아이콘이 누름을 가로채지 않게 줄이 통째로 받는다(글자 칸은 제 누름 처리로 뗀 이벤트를 삼킬 수 있다).
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, frame.contains(point) else { return nil }
+        return self
     }
 
     override func mouseUp(with event: NSEvent) {

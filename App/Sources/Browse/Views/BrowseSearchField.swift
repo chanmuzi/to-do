@@ -1,7 +1,7 @@
 import AppKit
 import Theme
 
-/// 검색 칸(spec 8): 높이 26, `surface-3` 바탕, 12pt 돋보기, 자리 글자 "노트 찾기".
+/// 검색 칸(spec 8): 높이 26, `surface-2` 바탕과 `line` 테두리, 12pt 돋보기, 자리 글자 "노트 찾기".
 final class BrowseSearchField: NSView {
     static let placeholder = "노트 찾기"
 
@@ -25,7 +25,7 @@ final class BrowseSearchField: NSView {
         scrollView.horizontalScrollElasticity = .none
         scrollView.verticalScrollElasticity = .none
 
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         iconView.setAccessibilityElement(false)
         placeholderLabel.wantsLayer = true
         placeholderLabel.setAccessibilityElement(false)
@@ -101,9 +101,13 @@ final class BrowseSearchField: NSView {
 
     override var wantsUpdateLayer: Bool { true }
 
+    /// 칸은 `surface-2` 바탕에 1px `line` 테두리다. 고른 줄(`hover`가 겹친 바탕)과 노트 찾기 바탕(`surface`)이
+    /// 같은 회색으로 보이지 않게 테두리로 칸을 가른다(라이트와 다크 모두).
     override func updateLayer() {
         layer?.cornerRadius = style.theme.shape(.controlRadius)
-        layer?.backgroundColor = style.cgColor(.surface3, in: self)
+        layer?.backgroundColor = style.cgColor(.surface2, in: self)
+        layer?.borderWidth = style.theme.shape(.borderWidth)
+        layer?.borderColor = style.cgColor(.line, in: self)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -130,9 +134,10 @@ final class BrowseSearchField: NSView {
         func centered(_ size: NSSize, x: CGFloat) -> NSRect {
             NSRect(x: x, y: ((bounds.height - size.height) / 2).rounded(), width: size.width, height: size.height)
         }
-        iconView.frame = centered(NSSize(width: icon, height: icon), x: padding)
+        let slot = centered(NSSize(width: icon, height: icon), x: padding)
+        iconView.frame = theme.symbolFrame(slot)
 
-        let inputX = iconView.frame.maxX + theme.component(.browseGap)
+        let inputX = slot.maxX + theme.component(.browseGap)
         let lineHeight = textView.layoutManager?.defaultLineHeight(for: style.plainFont).rounded(.up)
             ?? theme.lineHeight(.row)
         let inputFrame = centered(

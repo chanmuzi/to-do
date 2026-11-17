@@ -17,9 +17,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         builder = StatusMenuBuilder(theme: theme)
         self.areNotesHidden = areNotesHidden
         self.perform = perform
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // 이웃한 아이콘처럼 그림 너비에 맞춘다. 정사각(`squareLength`)은 메뉴 막대 높이만큼 넓어 양옆이 비어 보였다.
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         statusItem.button?.image = icon
+        statusItem.button?.imagePosition = .imageOnly
         statusItem.button?.setAccessibilityLabel("플로팅 노트")
         menu.delegate = self
         statusItem.menu = menu
@@ -48,6 +50,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         return menu.items.map { ($0.isSeparatorItem ? "" : $0.title, $0.keyEquivalent) }
     }
 
+    /// 확인용: 메뉴 막대에서 차지하는 너비 방식(`NSStatusItem.variableLength`이어야 한다).
+    var length: CGFloat { statusItem.length }
+
     /// 확인용: 메뉴 막대 아이콘이 놓인 창의 번호(그 창만 찍을 때 쓴다).
     var windowNumber: Int { statusItem.button?.window?.windowNumber ?? 0 }
 
@@ -57,6 +62,11 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             guard case .item(let title, let symbol, _) = entry else { return nil }
             return MenuBarRowView(theme: builder.theme, title: title, symbolName: symbol)
         }
+    }
+
+    /// 확인용: 메뉴 막대 아이콘을 누른 것처럼 메뉴를 연다(메뉴가 닫힐 때까지 돌아오지 않는다).
+    func openMenuForVerification() {
+        statusItem.button?.performClick(nil)
     }
 
     private func refill() {

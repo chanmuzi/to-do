@@ -16,10 +16,11 @@ final class ColorSwatchRowView: NSView {
         super.init(frame: NSRect(
             x: 0, y: 0, width: theme.component(.menuWidth), height: theme.component(.rowHeight)
         ))
+        wantsLayer = true
         autoresizingMask = [.width]
         iconView.image = style.symbol("drop", size: .iconLarge)
         iconView.contentTintColor = style.color(.text2)
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         iconView.setAccessibilityLabel("노트 색")
         addSubview(iconView)
         for (swatch, entry) in zip(swatches, entries) {
@@ -37,6 +38,12 @@ final class ColorSwatchRowView: NSView {
     }
 
     override var isFlipped: Bool { true }
+    override var wantsUpdateLayer: Bool { true }
+
+    /// 다른 줄처럼 불투명한 `surface` 바탕(`MenuRowView`).
+    override func updateLayer() {
+        layer?.backgroundColor = style.cgColor(.surface, in: self)
+    }
 
     override func layout() {
         super.layout()
@@ -44,7 +51,9 @@ final class ColorSwatchRowView: NSView {
         let icon = theme.component(.iconLarge)
         let size = theme.component(.swatchSize)
         let contentX = theme.space(.sp1) + theme.space(.sp2)
-        iconView.frame = NSRect(x: contentX, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+        iconView.frame = style.theme.symbolFrame(
+            NSRect(x: contentX, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
+        )
         let firstX = contentX + icon + theme.space(.sp2)
         let outset = SwatchView.outset(style)
         for (index, swatch) in swatches.enumerated() {

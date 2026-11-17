@@ -14,7 +14,7 @@ final class SpaceBadgeView: NSView {
         self.style = style
         super.init(frame: .zero)
         wantsLayer = true
-        iconView.imageScaling = .scaleProportionallyDown
+        iconView.imageScaling = .scaleNone
         nameLabel.lineBreakMode = .byTruncatingTail
         [iconView, emojiLabel, nameLabel].forEach(addSubview)
         setAccessibilityElement(true)
@@ -74,7 +74,7 @@ final class SpaceBadgeView: NSView {
             NSRect(x: x, y: ((bounds.height - height) / 2).rounded(), width: width, height: height)
         }
         let icon = style.theme.component(.iconMedium)
-        iconView.frame = centered(icon, icon, x: 0)
+        iconView.frame = style.theme.symbolFrame(centered(icon, icon, x: 0))
         emojiLabel.frame = centered(iconWidth, emojiLabel.intrinsicContentSize.height.rounded(.up), x: 0)
         let nameX = iconWidth > 0 ? iconWidth + style.theme.space(.sp1) : 0
         nameLabel.frame = centered(

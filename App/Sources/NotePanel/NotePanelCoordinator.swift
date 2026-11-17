@@ -62,13 +62,25 @@ public final class NotePanelCoordinator {
     /// 켤 때 지난번의 창을 되살리는 중이다. 사용자가 연 것이 아니므로 "마지막으로 연 때"를 적지 않는다.
     private var isRestoring = false
     /// 방금 휴지통으로 보낸 노트. "바로 뒤"가 끝나면 비운다(`endTrashUndo()`를 부르는 곳들, D-024).
-    private var lastTrashed: TrashedNote?
+    private var lastTrashed: TrashedNote? {
+        didSet { if lastTrashed == nil, oldValue != nil, !isHoldingTrashUndo { onTrashUndoEnded?() } }
+    }
+    /// 키 창을 돌려주는 동안(`returnKey`) 되돌리기를 잠깐 비웠다 되돌린다. 그사이에는 끝났다고 알리지 않는다.
+    private var isHoldingTrashUndo = false
+
+    /// 노트를 휴지통으로 보냈다(되돌릴 수 있게 된 뒤에 불린다). 그 노트의 창이 있던 화면을 함께 넘긴다.
+    /// App이 "되돌리기"가 붙은 짧은 알림을 띄운다(D-041).
+    public var onMovedToTrash: ((NoteID, NSScreen?) -> Void)?
+    /// 휴지통 되돌리기가 끝났다(되살렸거나, "바로 뒤"가 지났다). 알림을 거둔다.
+    public var onTrashUndoEnded: (() -> Void)?
     /// 지금 휴지통으로 보내는 중인 노트. 그 창이 내려갈 때 키 입력을 어디에 둘지 정하는 데 쓴다.
     private var trashInProgress: NoteID?
     /// 그 창이 키 창인지. 시험은 실제 키 창을 만들지 않으므로(사용자의 키 입력을 가져온다) 바꿔 넣는다.
     var isKeyPanel: (NSWindow) -> Bool = { $0.isKeyWindow }
     /// 앱을 앞으로 가져온다. 시험에서 바꿔 넣는다.
     var activateApp: () -> Void = { NSApplication.shared.activate() }
+    /// 앱이 앞에 있는지. 시험에서 바꿔 넣는다.
+    var isAppActive: () -> Bool = { NSApplication.shared.isActive }
 
     /// - Parameters:
     ///   - router: 노트 창이 다른 기능을 부를 때(노트 찾기, 새 노트, AI 패널 등) 보내는 곳.
@@ -157,10 +169,35 @@ public final class NotePanelCoordinator {
     }
 
     /// 창만 내린다. 노트는 남는다. 미뤄 둔 변경을 쓰지 못하면 창을 남기고 상단 줄에 표시한다.
+    /// 아무것도 적지 않은 노트(`Note.isBlank`)는 창과 함께 지운다(휴지통을 거치지 않는다, D-040).
     public func closeWindow(_ id: NoteID) {
         guard let controller = controllers[id], controller.flushBeforeClosing() else { return }
+        let isBlank = controller.isBlankAndSettled
         recorder.recordClosed(id)
         discard(id)
+        if isBlank { deleteBlankNote(id) }
+    }
+
+    /// 떠 있는 노트 가운데 아무것도 적지 않은 것을 지운다(D-040). 앱을 끝낼 때, 미뤄 둔 저장을 다 쓴 뒤에 부른다.
+    /// 창은 그대로 둔다(앱이 곧 끝난다). 지운 노트를 돌려준다.
+    @discardableResult
+    public func deleteBlankNotes() -> [NoteID] {
+        order.filter { controllers[$0]?.isBlankAndSettled == true }.filter(deleteBlankNote)
+    }
+
+    /// 빈 노트의 파일을 지운다. 창 상태는 저장소의 `.removed` 알림을 받아 잊는다.
+    @discardableResult
+    private func deleteBlankNote(_ id: NoteID) -> Bool {
+        do {
+            // 지우기 직전에 저장소의 지금 값으로 한 번 더 본다. 그사이 무엇이 적혔으면 지우지 않는다.
+            guard try notes.load(id).isBlank, !notes.hasPendingChanges(id) else { return false }
+            try notes.delete(id)
+            recorder.forget(id)
+            return true
+        } catch {
+            log("빈 노트를 지우지 못했습니다(\(id)): \(error)")
+            return false
+        }
     }
 
     /// 노트를 휴지통으로 보내고 창을 내린다. 확인 창을 띄우지 않는다(spec 5.3).
@@ -168,6 +205,7 @@ public final class NotePanelCoordinator {
     public func moveToTrash(_ id: NoteID) {
         // 편집기가 아직 알리지 않은 글까지 받아 둔다. 저장소가 옮기기 전에 그것을 쓴다.
         controllers[id]?.flushPendingEdits()
+        let screen = controllers[id]?.panel.screen
         let trashed = TrashedNote(id: id, windowState: recorder.savedState(for: id))
         trashInProgress = id
         defer { trashInProgress = nil }
@@ -185,6 +223,7 @@ public final class NotePanelCoordinator {
         // 창이 내려가며 다음 노트가 키 창을 이어받았다면 그것은 사용자가 다른 노트로 옮겨 간 것이 아니다.
         // 이어받기가 끝난 여기서 적어, 그 키 창 알림이 되돌리기를 끝내지 않게 한다.
         lastTrashed = trashed
+        onMovedToTrash?(id, screen)
     }
 
     /// 방금 휴지통으로 보낸 노트를 되돌릴 수 있는지(spec 5.3의 "바로 뒤라면 ⌘Z").
@@ -266,8 +305,10 @@ public final class NotePanelCoordinator {
     public func returnKey(to id: NoteID) -> Bool {
         guard !areNotesHidden, let controller = controllers[id], controller.panel.isVisible else { return false }
         let trashed = lastTrashed
+        isHoldingTrashUndo = true
         controller.takeKey()
         lastTrashed = trashed
+        isHoldingTrashUndo = false
         return true
     }
 
@@ -332,6 +373,13 @@ public final class NotePanelCoordinator {
     }
 
     // MARK: - 안쪽
+
+    /// 사용자가 노트 창의 버튼을 누르기 시작했다. 보통 창을 누른 것처럼 앱이 앞으로 온다(D-025).
+    /// 키 창을 끈 확인용 실행과 시험(`allowsKeyWindows`)에서는 앱을 앞으로 가져오지 않는다.
+    func noteButtonPressed() {
+        guard allowsKeyWindows else { return }
+        if !isAppActive() { activateApp() }
+    }
 
     /// 휴지통 되돌리기의 "바로 뒤"가 끝났다: 사용자가 글을 고쳤거나, 새 노트를 만들었거나, 노트 창을 눌렀거나,
     /// 다른 노트가 키 창이 되었다(`canUndoTrash`).
