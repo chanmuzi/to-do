@@ -8,6 +8,7 @@ enum MoreMenuAction: Hashable {
     case togglePin
     /// 팔레트 키. 색 없음이면 `nil`.
     case setColor(String?)
+    case openLibrary
     case findNote
     case openAIPanel
     case closeWindow
@@ -48,6 +49,7 @@ struct NoteMenuBuilder {
             colorRow(selectedPaletteID: selectedPaletteID) { handler(.setColor($0)) },
             separator(),
             row("노트 찾기", symbol: "magnifyingglass") { handler(.findNote) },
+            row("라이브러리", symbol: "rectangle.split.2x1", isEnabled: isAvailable(.openLibrary)) { handler(.openLibrary) },
             row("AI 패널 열기", symbol: "sparkle", isEnabled: isAvailable(.openAIPanel)) { handler(.openAIPanel) },
             separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
