@@ -14,6 +14,7 @@ SwiftUI + AppKit, 개인용. 아직 개발 중이며 진행 상황은 `docs/road
 ```sh
 git clone https://github.com/chanmuzi/to-do.git
 cd to-do
+scripts/create-signing-identity.sh # 처음 한 번: 이 Mac에서 계속 쓸 서명 인증서
 scripts/install-app.sh
 ```
 
@@ -21,7 +22,20 @@ scripts/install-app.sh
   `sudo`는 쓰지 않는다.
 - 이미 실행 중이면 먼저 정상 종료를 요청하고(저장하지 못한 노트가 있으면 앱이 묻는다) 끝난 뒤 바꿔 넣는다.
 - 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱·Finder·Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `FloatingNotes.app`이다.
-- 서명하지 않은 개인용 빌드다. 다른 Mac으로 복사하면 Gatekeeper가 막을 수 있다.
+- `create-signing-identity.sh`는 로그인 키체인에 `Float Local Code Signing` 자체 서명 인증서와 개인 키를 넣는다.
+  유효기간은 10년(3,650일), 용도는 코드 서명이다. 이미 해당 이름의 인증서가 있으면 아무것도 바꾸지 않는다.
+  **보통 암호를 묻지 않으며, 키체인이 잠겨 있으면 macOS의 `security`가 직접 묻는다.**
+  스크립트가 로그인 암호를 직접 읽거나 명령 인자로 전달하지 않는다. 관리자 암호나 신뢰 등록은 필요하지 않다.
+  임시 개인 키 파일은 작업 종료 시 지운다. Apple 개발자 계정은 필요 없다.
+  마지막 확인에서 `Matching identities`에 인증서가 나오면 된다. `CSSMERR_TP_NOT_TRUSTED`와 `0 valid identities`는 신뢰 등록을 하지 않은 자체 서명에서 예상되는 표시다.
+- 같은 인증서와 번들 ID를 계속 사용하면 빌드 내용이 바뀌어도 지정 요구사항이 유지된다.
+  인증서를 삭제·재생성하면 달라지므로 업데이트할 때는 생성 스크립트를 다시 실행할 필요가 없다.
+  임시 서명에서 처음 전환할 때의 권한 재승인과 실제 EventKit 권한 유지 여부는 별도 확인이 필요하다.
+- Apple 공증을 받지 않은 개인용 빌드다. 다른 Mac으로 복사하면 Gatekeeper가 막을 수 있다.
+
+신뢰 설정을 바꾸지 않는 근거는 [Apple 코드 서명 가이드](https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html)의
+`anchor trusted`를 요구하지 않는 지정 요구사항 검증 규칙이다.
+권한과 지정 요구사항의 관계는 [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)을 따른다.
 
 ### 업데이트
 
@@ -79,6 +93,13 @@ swift test --package-path App
 - 모듈 구조: `docs/architecture.md`
 
 확인용 묶음을 실행 중인 앱과 분리하려면 `FLOATING_NOTES_APP_DIR=/원하는/폴더 scripts/build-app.sh debug`를 사용합니다. `scripts/run.sh`도 같은 변수를 따르며 기본은 `build/`입니다.
+
+서명은 `FLOATING_NOTES_SIGN_IDENTITY`로 이름(또는 SHA-1 지문)을 지정할 수 있다. `-`를 지정하면 임시 서명을 쓴다.
+지정하지 않으면 키체인의 `Float Local Code Signing`을 사용하고, 없으면 한 줄 경고 후 임시 서명으로 빌드한다.
+명시한 인증서의 서명 실패는 그대로 실패로 보고한다. Hardened Runtime은 켜지 않는다.
+생성·빌드 스크립트 모두 `FLOATING_NOTES_KEYCHAIN=/임시/키체인.keychain-db`로 확인용 키체인을 지정할 수 있으며 검색 목록을 바꾸지 않는다.
+자동 확인에만 `FLOATING_NOTES_KEYCHAIN_PASSWORD`로 명시한 임시 키체인(`/private/tmp` 또는 `/private/var/folders` 아래)의 암호를 넘길 수 있다.
+보조 스크립트 `scripts/signing-keychain.swift`가 Security API로 잠금 상태를 확인하고 임시 키체인을 연다. 임시 암호도 명령 인자로 전달하지 않으며, 로그인·시스템 키체인 및 그곳으로 향하는 심볼릭 링크는 이 경로에서 거부한다.
 
 ### 브랜드 에셋
 
