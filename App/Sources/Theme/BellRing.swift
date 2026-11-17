@@ -1,12 +1,11 @@
 import AppKit
-import Theme
 
 /// 임박한 리마인더의 종이 흔들리는 움직임(spec 15). 주기, 흔들리는 구간, 각도, 축, 곡선은
 /// `tokens.json`의 `motion.bell-*`에서 온다(`BellMotion`).
-enum BellRing {
-    static let animationKey = "panel.bell-ring"
+public enum BellRing {
+    public static let animationKey = "panel.bell-ring"
 
-    static func animation(for layer: CALayer, motion: BellMotion) -> CAKeyframeAnimation {
+    public static func animation(for layer: CALayer, motion: BellMotion) -> CAKeyframeAnimation {
         let size = layer.bounds.size
         let pivotY = layer.isGeometryFlipped
             ? size.height * motion.pivotFromTop

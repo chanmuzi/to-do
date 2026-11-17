@@ -24,7 +24,7 @@ import Theme
     @Test func scheduledShowsTheClockInTheChromeColor() {
         let shown = presentation(date(16, 15), now: date(16, 9))
         #expect(shown.status == .scheduled)
-        #expect(shown.text == "3:00 PM")
+        #expect(shown.text == "오후 3:00")
         #expect(shown.symbolName == "clock")
         #expect(shown.color == .text2)
         #expect(shown.textStyle == .ui)
@@ -44,7 +44,7 @@ import Theme
     @Test func overdueStaysInWarnWithTheClockAndRegularWeight() {
         let shown = presentation(date(16, 9, 30), now: date(16, 15))
         #expect(shown.status == .overdue)
-        #expect(shown.text == "9:30 AM")
+        #expect(shown.text == "오전 9:30")
         #expect(shown.symbolName == "clock")
         #expect(shown.color == .warn)
         #expect(shown.textStyle == .ui)
@@ -52,10 +52,10 @@ import Theme
 
     @Test func otherDaysGetADayPrefix() {
         let now = date(16, 9)
-        #expect(presentation(date(17, 10), now: now).text == "내일 10:00 AM")
-        #expect(presentation(date(18, 14), now: now).text == "수 2:00 PM")
-        #expect(presentation(date(15, 14), now: now).text == "어제 2:00 PM")
-        #expect(presentation(date(30, 8, 5), now: now).text == "11/30 8:05 AM")
+        #expect(presentation(date(17, 10), now: now).text == "내일 오전 10:00")
+        #expect(presentation(date(18, 14), now: now).text == "수 오후 2:00")
+        #expect(presentation(date(15, 14), now: now).text == "어제 오후 2:00")
+        #expect(presentation(date(30, 8, 5), now: now).text == "11/30 오전 8:05")
     }
 
     @Test func clockFormats() {

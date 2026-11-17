@@ -26,8 +26,11 @@ if [ ! -w "$DEST_DIR" ]; then
 fi
 DEST="$DEST_DIR/$APP_NAME"
 
-BUILD_LOG="$(mktemp -t floating-notes-build)"
-if ! "$ROOT/scripts/build-app.sh" release > "$BUILD_LOG" 2>&1; then
+# 실행 중인 build/ 묶음은 빌드 과정에서도 건드리지 않는다.
+BUILD_WORK="$(mktemp -d "${TMPDIR:-/tmp}/floating-notes-install.XXXXXX")"
+trap 'rm -rf "$BUILD_WORK"' EXIT
+BUILD_LOG="$BUILD_WORK/build.log"
+if ! FLOATING_NOTES_APP_DIR="$BUILD_WORK/app" "$ROOT/scripts/build-app.sh" release > "$BUILD_LOG" 2>&1; then
   cat "$BUILD_LOG" >&2
   echo "빌드에 실패했습니다. 설치하지 않았습니다." >&2
   rm -f "$BUILD_LOG"

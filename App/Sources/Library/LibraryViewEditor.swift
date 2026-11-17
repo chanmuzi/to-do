@@ -22,7 +22,7 @@ struct LibraryViewEditor: View {
                 Text("마지막으로 본 보기").tag(Optional<LibrarySelection>.none)
                 ForEach(model.settings.visibleViews, id: \.self) { Text(model.title($0)).tag(Optional($0)) }
             }
-        }.tint(model.theme.libraryColor(.accent)).font(model.theme.font(.body)).padding(model.theme.space(.sp3))
+        }.focusEffectDisabled().tint(model.theme.libraryColor(.accent)).font(model.theme.font(.body)).padding(model.theme.space(.sp3))
             .frame(width: model.theme.component(.iconPickerWidth))
     }
 }
