@@ -45,6 +45,7 @@ import Testing
         h.caret(at: 3)
         h.type("!")
         h.undo()
+        #expect(h.editor.text == "가\n나")
         h.editor.applyOutsideChange(to: "앞줄\n가\n나")
         h.redo()
         #expect(h.editor.text == "앞줄\n가\n나!")

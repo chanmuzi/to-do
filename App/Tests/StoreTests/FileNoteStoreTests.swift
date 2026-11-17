@@ -12,6 +12,25 @@ import Models
 
     private let sampleBody = "첫 줄\n- [ ] 투두\n\t- 하위  \n==형광펜=={2}\n\n```\ncode\n```\n끝에 줄바꿈 없음"
 
+    @Test(arguments: ["\n", "\r", "\r\n", "\u{0085}", "\u{2028}", "\u{2029}"])
+    func allTitleWritesStaySingleLine(separator: String) throws {
+        defer { temporary.cleanUp() }
+        let store = try makeStore()
+        let created = try store.create(NoteDraft(title: "첫" + separator + "제목", body: sampleBody))
+        #expect(created.title == "첫 제목")
+        #expect(try makeStore().load(created.id).title == "첫 제목")
+        let updated = try store.update(created.id) { $0.title = "다음" + separator + "제목" }
+        #expect(updated.title == "다음 제목")
+        #expect(try makeStore().load(created.id).title == "다음 제목")
+        let pending = try store.scheduleUpdate(created.id) { $0.title = "자동" + separator + "저장" }
+        #expect(pending.title == "자동 저장")
+        #expect(try store.load(created.id).title == "자동 저장")
+        try store.flushPendingSaves()
+        let reloaded = try makeStore().load(created.id)
+        #expect(reloaded.title == "자동 저장")
+        #expect(Array(reloaded.body.utf8) == Array(sampleBody.utf8))
+    }
+
     @Test func createWritesOneMarkdownFileWithFrontmatter() throws {
         defer { temporary.cleanUp() }
         let store = try makeStore()

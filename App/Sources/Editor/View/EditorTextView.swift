@@ -139,7 +139,15 @@ final class EditorTextView: NSTextView {
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
-        super.insertText(string, replacementRange: replacementRange)
+        let text = (string as? NSAttributedString)?.string ?? (string as? String)
+        if let text, editor?.separatesCommittedTrigger(text, replacementRange: replacementRange) == true {
+            // 기호를 확정한 뒤 Space를 보낸다. 조합이 없는 입력과 조합 중간 변경에는 적용하지 않는다.
+            super.insertText(String(text.dropLast()), replacementRange: replacementRange)
+            editor?.compositionDidChange()
+            super.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
+        } else {
+            super.insertText(string, replacementRange: replacementRange)
+        }
         editor?.compositionDidChange()
     }
 

@@ -119,6 +119,14 @@ final class BrowseNoteRowView: BrowseEntryView {
     override func layout() {
         super.layout()
         let theme = style.theme
+        // 셀 상자의 가운데는 글꼴마다 다르다. 제목의 기준선을 한 줄의 공통 기준선으로 쓴다.
+        let titleHeight = style.fittingSize(of: titleLabel).height
+        let baseline = ((bounds.height - titleHeight) / 2).rounded() + titleLabel.firstBaselineOffsetFromTop
+        func textFrame(_ label: NSTextField, x: CGFloat, width: CGFloat) -> NSRect {
+            var frame = style.labelFrame(label, textX: x, textWidth: width, centeredIn: bounds.height)
+            frame.origin.y = baseline - label.firstBaselineOffsetFromTop
+            return frame
+        }
         let gap = theme.component(.browseGap)
         let lead = style.leadWidth
         let leading = style.rowPadding
@@ -144,9 +152,7 @@ final class BrowseNoteRowView: BrowseEntryView {
         if model.reminder != nil {
             let labelWidth = style.textWidth(of: reminderLabel)
             let reminderIcon = theme.component(.iconSmall)
-            reminderLabel.frame = style.labelFrame(
-                reminderLabel, textX: contentEnd - labelWidth, textWidth: labelWidth, centeredIn: bounds.height
-            )
+            reminderLabel.frame = textFrame(reminderLabel, x: contentEnd - labelWidth, width: labelWidth)
             let reminderSlot = centered(
                 width: reminderIcon, height: reminderIcon,
                 x: contentEnd - labelWidth - theme.component(.iconGap) - reminderIcon
@@ -158,15 +164,11 @@ final class BrowseNoteRowView: BrowseEntryView {
         // 제목은 제 너비만큼, 남는 자리는 본문 첫머리(시안의 칸 나눔). 자리가 모자라면 본문 첫머리가 먼저 줄어든다.
         let contentStart = leading + lead + gap
         let titleWidth = min(style.textWidth(of: titleLabel), max(0, contentEnd - contentStart))
-        titleLabel.frame = style.labelFrame(
-            titleLabel, textX: contentStart, textWidth: titleWidth, centeredIn: bounds.height
-        )
+        titleLabel.frame = textFrame(titleLabel, x: contentStart, width: titleWidth)
 
         let previewX = contentStart + titleWidth + gap
         let previewWidth = contentEnd - previewX
-        previewLabel.frame = style.labelFrame(
-            previewLabel, textX: previewX, textWidth: previewWidth, centeredIn: bounds.height
-        )
+        previewLabel.frame = textFrame(previewLabel, x: previewX, width: previewWidth)
         previewLabel.isHidden = model.row.preview.isEmpty || previewWidth <= 0
     }
 }

@@ -9,7 +9,7 @@ import Testing
         let tokens = try ThemeTokens.bundled()
         #expect(tokens.symbolScale("pin.fill") < 1)
         #expect(tokens.symbolScale("trash") < 1)
-        #expect(tokens.symbolScale("xmark") == 1)
+        #expect(tokens.symbolScale("xmark") < 1)
     }
 
     /// 아이콘은 예전(크기 토큰의 네모 칸에 맞춰 줄여 그림)보다 커지지 않는다: 그림의 긴 변이 칸 안에 든다.
@@ -21,7 +21,7 @@ import Testing
             "sidebar.left", "keyboard", "slider.horizontal.3", "apple.terminal",
         ]
         for name in names {
-            for role in [ComponentToken.iconSmall, .iconMedium, .iconLarge] {
+            for role in [ComponentToken.iconSmall, .iconMedium, .iconLarge, .menuIcon] {
                 guard let image = theme.symbolImage(name, size: role) else { continue }
                 #expect(max(image.size.width, image.size.height) <= theme.component(role) + 0.01, "\(name) \(role)")
             }

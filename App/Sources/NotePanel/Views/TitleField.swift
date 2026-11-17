@@ -1,4 +1,5 @@
 import AppKit
+import Models
 import Theme
 
 /// 상단 줄의 제목 칸(규칙 12: 본문과 별개). 평소에는 글자만 보이고, 누르면 그 자리에서 고친다.
@@ -19,6 +20,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     init(style: PanelStyle) {
         self.style = style
         super.init(frame: .zero)
+        cell = PlainTextInputCell(textCell: "")
         wantsLayer = true
         isBordered = false
         isBezeled = false
@@ -26,7 +28,10 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         isEditable = false
         isSelectable = false
         focusRingType = .none
-        usesSingleLineMode = true
+        // 단일 줄 셀의 축약된 글꼴 메트릭과 필드 편집기의 TextKit 메트릭이 달라
+        // Pretendard에서 편집을 시작할 때 기준선이 움직였다. 같은 줄 배치를 사용한다.
+        usesSingleLineMode = false
+        maximumNumberOfLines = 1
         lineBreakMode = .byTruncatingTail
         cell?.truncatesLastVisibleLine = true
         cell?.isScrollable = true
@@ -78,10 +83,10 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     func beginEditing(title: String) {
         guard !isEditing, let window else { return }
         isEditing = true
-        titleBeforeEditing = title
+        titleBeforeEditing = NoteTitle.singleLine(title)
         isEditable = true
         isSelectable = true
-        stringValue = title
+        stringValue = titleBeforeEditing
         font = style.theme.nsFont(.title)
         textColor = style.color(.text)
         placeholderAttributedString = NSAttributedString(
@@ -95,7 +100,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         window.makeFirstResponder(self)
         if let editor = currentEditor() as? NSTextView {
             editor.insertionPointColor = style.color(.accent)
-            editor.setSelectedRange(NSRange(location: (title as NSString).length, length: 0))
+            editor.setSelectedRange(NSRange(location: (stringValue as NSString).length, length: 0))
         }
     }
 
@@ -105,7 +110,28 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     }
 
     func controlTextDidChange(_ notification: Notification) {
-        onChange?(stringValue)
+        // 조합 범위를 고쳐 쓰면 입력기가 끊긴다. 확정/편집 종료 때 한 줄로 정리한다.
+        guard (currentEditor() as? NSTextView)?.hasMarkedText() != true else { return }
+        onChange?(normalizeTitle())
+    }
+
+    @discardableResult
+    private func normalizeTitle() -> String {
+        let editor = currentEditor() as? NSTextView
+        let text = editor?.string ?? stringValue
+        let title = NoteTitle.singleLine(text)
+        guard title != text else { return title }
+        let selection = editor?.selectedRange()
+        stringValue = title
+        if let editor, let selection, selection.location != NSNotFound {
+            // CRLF가 한 글자로 줄어도 UTF-16 선택 위치를 보존한다(이모지 포함).
+            let source = text as NSString
+            let start = NoteTitle.singleLine(source.substring(to: min(selection.location, source.length))).utf16.count
+            let end = NoteTitle.singleLine(source.substring(to: min(NSMaxRange(selection), source.length))).utf16.count
+            editor.string = title
+            editor.setSelectedRange(NSRange(location: start, length: end - start))
+        }
+        return title
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
@@ -116,7 +142,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         placeholderAttributedString = nil
         // 조합 중이던 글자는 편집이 끝나면서 확정되는데, 그때는 글자가 바뀌었다는 알림이 오지 않는다.
         // 칸에 보이는 마지막 값을 넘겨 저장소가 화면과 같은 제목을 갖게 한다.
-        onChange?(stringValue)
+        onChange?(normalizeTitle())
         onEditingChange?(false)
     }
 
@@ -127,7 +153,10 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             onChange?(titleBeforeEditing)
             endEditing()
             return true
-        case #selector(NSResponder.insertNewline(_:)):
+        case #selector(NSResponder.insertNewline(_:)),
+             #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
+             #selector(NSResponder.insertLineBreak(_:)),
+             #selector(NSResponder.insertParagraphSeparator(_:)):
             endEditing()
             onReturn?()
             return true

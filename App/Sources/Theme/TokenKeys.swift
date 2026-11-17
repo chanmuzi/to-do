@@ -115,6 +115,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case iconSmall = "icon-s"
     case iconMedium = "icon-m"
     case iconLarge = "icon-l"
+    /// 노트 메뉴의 그림 크기. 정렬 칸은 iconLarge를 유지한다.
+    case menuIcon = "menu-icon"
     /// 나란히 놓인 아이콘 버튼 사이(spec 5.3).
     case iconButtonGap = "icon-btn-gap"
     /// 노트 색 칸(spec 5.4): 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리.

@@ -4,6 +4,18 @@ import AppKit
 // 자리를 만들고, 조합이 글자 없이 끝나면 만들어 둔 것을 치운다.
 
 extension EditorController {
+    /// 입력기가 기호와 마지막 Space를 한 번에 확정하면 delegate가 아직 marked text를 보고
+    /// 변환을 건너뛴다. 변환 가능한 줄 머리에 한해 확정과 Space를 나눠 기존 입력 경로로 보낸다.
+    func separatesCommittedTrigger(_ text: String, replacementRange: NSRange) -> Bool {
+        guard textView.hasMarkedText(), text.hasSuffix(" "), !isApplyingEdit, !isReplayingUndo else { return false }
+        let range = replacementRange.location == NSNotFound ? textView.markedRange() : replacementRange
+        guard range.location != NSNotFound, range.location >= 0, NSMaxRange(range) <= document.length else { return false }
+        let prefix = String(text.dropLast())
+        let committed = (document.text as NSString).replacingCharacters(in: range, with: prefix)
+        let candidate = MarkdownDocument(committed)
+        return EditorCommands.spaceTrigger(candidate, selection: NSRange(location: range.location + prefix.utf16.count, length: 0)) != nil
+    }
+
     /// 조합이 시작되기 직전. 조합 중에는 원문을 고쳐 쓸 수 없으므로(조합이 끊긴다) 그 전에 자리를 만든다:
     /// 선택을 덮어쓰는 조합이면 선택을 먼저 기호와 함께 지우고, 정해 둔 서식이 있으면 빈 기호 쌍을 넣는다.
     func prepareForComposition() {

@@ -371,6 +371,12 @@ public final class NotePanelCoordinator {
         controller.popUpMoreMenu()
     }
 
+    /// 확인용: 시스템 메뉴를 띄우지 않고 실제 메뉴 행을 그릴 때 쓴다.
+    @_spi(Verification)
+    public func moreMenuForVerification(for id: NoteID) -> NSMenu? {
+        controllers[id]?.makeMoreMenu()
+    }
+
     /// 확인용: 마우스 위치와 상관없이 호버 상태를 정한다. `nil`이면 마우스를 따른다.
     public func setHoverOverride(_ hovered: Bool?, for id: NoteID) {
         controllers[id]?.hoverOverride = hovered

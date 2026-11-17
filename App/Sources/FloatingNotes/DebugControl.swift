@@ -48,6 +48,12 @@ extension NotePanelCoordinator {
 /// - `capture`: 빠른 캡처를 요청한다(`Route.openCapture`). `browse [<붙일 노트 id>]`: 노트 찾기를 요청한다.
 /// - `panel …`: 떠 있는 캡처 바나 노트 찾기에 글자와 키를 넣는다(`DebugQuickPanels`의 주석).
 /// - `panel-snapshot capture|browse <파일 이름>`: 그 화면의 내용을 앱 안에서 그려 PNG로 쓴다(`snapshot`과 같다).
+/// - `menu-rows-snapshot <id> <파일 이름>`: 실제 메뉴 행 전체를 키 창이 되지 않는 확인용 창에 그린다.
+/// - `caret-preview <id>`: passive 실행에서 키 창 없이 본문 커서만 보여 준다.
+/// - `title-edit|title-end <id>`: 키 창을 만들 수 없는 passive 실행에서도 제목의 필드 편집기를 확인한다.
+/// - `input-key <id> [|]|"|space`: 본문의 `keyDown`에 앱 내부 이벤트 하나를 보낸다.
+/// - `input-mark|input-commit <id|title:id|capture|browse|library> <글자>`: 조합/확정 입력.
+/// - `input-check <같은 대상> <파일 이름>`: 자동 입력 설정과 조합 상태를 JSON으로 쓴다.
 /// - `quit`
 ///
 /// 파일 이름은 출력 폴더 바로 아래의 이름이어야 한다. 경로를 주면 쓰지 않는다.
@@ -188,6 +194,10 @@ final class DebugControl {
         case ("pin", let id?, let state?): notePanels.setPinned(state == "on", for: id)
         case ("color", let id?, let key?):
             notePanels.setColor(key == "none" ? nil : PaletteID(rawValue: key), for: id)
+        case ("menu-rows-snapshot", let id?, let name?):
+            guard let menu = notePanels.moreMenuForVerification(for: id), let url = output(named: name) else { return }
+            do { try DebugMenuSnapshot.write(menu, to: url) }
+            catch { AppLog.warning("메뉴 행을 그리지 못했습니다: \(error)") }
         case ("menu", let id?, let name?):
             guard let url = output(named: name) else { return }
             showMoreMenu(for: id, snapshotURL: url)
@@ -210,6 +220,31 @@ final class DebugControl {
         case ("dump", _, _):
             guard let url = output(named: String(command.dropFirst("dump ".count))) else { return }
             dump(to: url)
+        case ("input-check", let target?, let name?):
+            guard let view = verificationInput(target.rawValue), let url = output(named: name) else { return }
+            write(json: DebugInputVerification.state(of: view), to: url)
+        case ("input-mark", let target?, let text?):
+            guard let view = verificationInput(target.rawValue) else { return }
+            view.setMarkedText(text, selectedRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        case ("input-commit", let target?, let text?):
+            verificationInput(target.rawValue)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+        case ("title-edit", let id?, _): notePanels.beginTitleEditing(for: id)
+        case ("title-end", let id?, _): notePanels.window(for: id)?.makeFirstResponder(nil)
+        case ("caret-preview", let id?, _):
+            guard let editor = editor(of: id) else { return }
+            editor.focus()
+            editor.forcesActiveAppearance = true
+        case ("input-key", let id?, let text?):
+            guard let editor = editor(of: id) else { return }
+            let chars = text == "space" ? " " : text
+            let codes: [String: UInt16] = ["[": 33, "]": 30, "\"": 39, " ": 49]
+            guard let code = codes[chars], let event = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: chars == "\"" ? .shift : [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: editor.textView.window?.windowNumber ?? 0,
+                context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code
+            ) else { return }
+            editor.textView.window?.makeFirstResponder(editor.textView)
+            editor.textView.keyDown(with: event)
         case ("type", let id?, let text?): insert(text, into: id)
         case ("fold", let id?, let line?): setFolded(true, line: Int(line), in: id)
         case ("unfold", let id?, let line?): setFolded(false, line: Int(line), in: id)
@@ -405,6 +440,21 @@ final class DebugControl {
         }
     }
 
+    private func verificationInput(_ target: String) -> NSTextView? {
+        if target == "capture" || target == "browse" { return quickPanels.input(named: target) }
+        if target == "library", let root = library?.window?.contentView,
+           let field = DebugInputVerification.searchField(in: root) {
+            field.window?.makeFirstResponder(field)
+            return field.currentEditor() as? NSTextView
+        }
+        if target.hasPrefix("title:") {
+            let id = NoteID(rawValue: String(target.dropFirst("title:".count)))
+            notePanels.beginTitleEditing(for: id)
+            return notePanels.window(for: id)?.firstResponder as? NSTextView
+        }
+        return editor(of: NoteID(rawValue: target))?.textView
+    }
+
     private func setFolded(_ folded: Bool, line: Int?, in id: NoteID) {
         guard let editor = editor(of: id), let line else { return }
         let lines = editor.text.components(separatedBy: "\n")
@@ -423,6 +473,13 @@ final class DebugControl {
         view.window?.contentView?.layoutSubtreeIfNeeded()
         write(json: [
             "text": editor.text,
+            "selectedRange": NSStringFromRange(editor.selectedRange),
+            "markedRange": NSStringFromRange(editor.textView.markedRange()),
+            "automaticQuotes": editor.textView.isAutomaticQuoteSubstitutionEnabled,
+            "automaticReplacement": editor.textView.isAutomaticTextReplacementEnabled,
+            "font": editor.textView.font?.fontName ?? "",
+            "fontSize": editor.textView.font?.pointSize ?? 0,
+            "caretFrame": editor.caretFrame.map(NSStringFromRect) ?? "",
             "foldedLines": editor.foldedLines.sorted(),
             "contentHeight": editor.contentHeight,
             "documentViewHeight": view.frame.height,

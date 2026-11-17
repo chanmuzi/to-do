@@ -255,6 +255,10 @@ final class NoteWindowController: NSObject {
 
     /// 더 보기 메뉴(spec 5.4). 단축키로 열 때는 `anchor` 없이 부른다.
     func popUpMoreMenu(from anchor: NSView? = nil) {
+        popUp(makeMoreMenu(), from: anchor ?? root.topRow.moreAnchor)
+    }
+
+    func makeMoreMenu() -> NSMenu {
         let router = environment.router
         let id = noteID
         let menu = NoteMenuBuilder(style: environment.style).moreMenu(
@@ -280,7 +284,7 @@ final class NoteWindowController: NSObject {
             case .moveToTrash: self?.coordinator?.moveToTrash(id)
             }
         }
-        popUp(menu, from: anchor ?? root.topRow.moreAnchor)
+        return menu
     }
 
     private func popUpProblemMenu(from anchor: NSView) {

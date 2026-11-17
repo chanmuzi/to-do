@@ -83,7 +83,7 @@ public final class FileNoteStore: NoteStoring {
         }
         let now = NoteFileCodec.truncatedToSeconds(Date())
         let text = NoteFileCodec.encode(NoteFileContent(
-            title: draft.title, spaceID: draft.spaceID, colorID: draft.colorID,
+            title: NoteTitle.singleLine(draft.title), spaceID: draft.spaceID, colorID: draft.colorID,
             reminder: draft.reminder.map(NoteFileCodec.truncatedToSeconds), created: now, body: draft.body
         ))
         try files.write(text, id)
@@ -229,6 +229,7 @@ public final class FileNoteStore: NoteStoring {
         }
         var note = entry.note
         mutate(&note)
+        note.title = NoteTitle.singleLine(note.title)
         note.modified = entry.note.modified
         if note.reminder != entry.note.reminder {
             note.reminder = note.reminder.map(NoteFileCodec.truncatedToSeconds)

@@ -13,7 +13,7 @@ struct LibrarySidebar: View {
     private var theme: Theme { model.theme }
     var body: some View {
         VStack(spacing: theme.space(.sp2)) {
-            TextField("검색", text: $model.query).textFieldStyle(.plain)
+            LibrarySearchField(text: $model.query, theme: theme)
                 .font(theme.font(.body)).padding(.horizontal, theme.space(.sp2))
                 .frame(height: theme.component(.browseFindHeight))
                 .background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))

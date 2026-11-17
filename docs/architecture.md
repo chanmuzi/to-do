@@ -88,6 +88,7 @@ scripts/
   - 저장된 덮어쓰기를 읽을 때는 던지지 않는다. 없어진 키나 잘못된 값은 버리고, 깨진 파일은 `theme-overrides.json.corrupt`로 옮긴 뒤 기본 테마로 시작하며, 버린 것을 `loadWarnings`에 적는다.
 - `ThemeTokens` (`Sendable` 값): `tokens.json`을 푼 것. `Theme` 없이 쓸 수 있다. `color(_:_:)`, `textStyle(_:)`, `noteBackground(paletteID:_:)`, `rowTint(paletteID:)`, `applying(_: ThemeOverrides) throws`(엄격), `applyingValid(_:) -> (tokens, accepted, rejected: [ThemeError])`(쓸 수 있는 것만 얹음).
 - 토큰 값 검증: 수는 십진 표기만 받는다(`nan`, `inf`, `0x10`, `1e3` 거부). 글자 크기·줄 높이는 0보다 커야 하고, 간격·모서리·치수·여백·흐림은 0 이상, 굵기는 1~1000, 불투명도는 0~1, 섞는 비율은 0~100%여야 한다. `tokens.json`과 덮어쓰기에 똑같이 적용된다.
+- `TextInputPolicy.apply(to:)`: AppKit 입력의 자동 변경·완성·예측을 끄고 조합 장식을 숨긴다. `PlainTextInputCell`은 제목/라이브러리 검색의 재사용 필드 편집기에 매번 적용한다. Features가 Core의 이 정책을 함께 사용한다(D-057).
 - `ThemeOverrides`: `[구역.키: 값]` 사전. 키 예 `color.light.accent`, `type.fs-body`, `palette.tint-1`. 값 표기는 `tokens.json`과 같다. `ThemeOverrideStore(url:)`가 JSON 파일로 읽고 쓴다(`stateDirectory/theme-overrides.json`).
 - `TransitionTimer.after(_ duration:, _ work:) -> Task<Void, Never>?` (`@MainActor`): 전환이 끝날 때 해야 하는 일을 전환 시간 뒤에 잡는다. 시간이 0이면("동작 줄이기") 그 자리에서 하고 `nil`을 돌려주며, 돌려받은 것을 취소하면 하지 않는다. 움직임이 끝났다는 알림에 상태를 걸지 않기 위한 한 곳이다(아래 "그 밖"의 "움직임과 상태").
 - 입력 커서(D-042). 시스템의 커서 표시(`NSTextInsertionIndicator`)는 너비와 높이를 정할 수 없어 쓰지 않고, 텍스트 뷰 위에 작은 뷰 하나로 얇은 커서를 그린다.
