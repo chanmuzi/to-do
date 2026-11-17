@@ -159,6 +159,15 @@ public final class FileNoteStore: NoteStoring {
         emit(StoreChange(id: id, kind: .removed, origin: .local))
     }
 
+    public func delete(_ id: NoteID) throws {
+        guard files.noteExists(id, in: location.notesDirectory) else { throw StoreError.noteNotFound(id) }
+        try files.delete(id)
+        discardPending(id)
+        known[id] = nil
+        snapshot[id] = nil
+        emit(StoreChange(id: id, kind: .removed, origin: .local))
+    }
+
     @discardableResult
     public func restoreFromTrash(_ id: NoteID) throws -> Note {
         guard files.noteExists(id, in: location.trashDirectory) else { throw StoreError.noteNotFound(id) }
