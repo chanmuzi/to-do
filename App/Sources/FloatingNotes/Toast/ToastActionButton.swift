@@ -17,6 +17,9 @@ final class ToastActionButton: NSView {
         label.stringValue = title
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size, weight: theme.tokens.textStyle(.title).weight)
         label.textColor = theme.nsColor(.text)
+        // 옆의 안내 글(`ToastView`)과 같은 한 줄 모드로 그린다. 모드가 다르면 같은 자리에 두어도 글자가 2pt 높게 그려진다.
+        label.maximumNumberOfLines = 1
+        label.cell?.usesSingleLineMode = true
         addSubview(label)
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
