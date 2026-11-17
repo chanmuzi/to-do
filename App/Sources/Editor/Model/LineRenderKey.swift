@@ -6,6 +6,8 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var level: Int
     /// 안내선을 그릴 단계(부모 항목이 있는 단계만, D-043).
     var guideLevels: [Int] = []
+    /// 다음 보이는 줄로 이어지지 않아 이 줄의 글자 하단에서 끝나는 안내선.
+    var endingGuideLevels: [Int] = []
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
     /// 접힌 토글 자신.
@@ -36,9 +38,16 @@ nonisolated enum LinePresentation {
         let hidden = FoldState.hiddenLines(doc, folded: folded)
         let trailingCode = trailingCodeLine(in: doc) != nil
         let guides = ListStructure.guideLevels(in: doc)
+        var endings = [[Int]](repeating: [], count: doc.lines.count)
+        var nextVisibleGuides: [Int] = []
+        for index in doc.lines.indices.reversed() where !hidden.contains(index) {
+            endings[index] = guides[index].filter { !nextVisibleGuides.contains($0) }
+            nextVisibleGuides = guides[index]
+        }
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
             var key = LineRenderKey(kind: line.kind, level: line.level, guideLevels: guides[index])
+            key.endingGuideLevels = endings[index]
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)
             key.childCount = line.kind == .toggle ? line.childCount : 0

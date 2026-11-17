@@ -20,6 +20,7 @@ import Testing
         #expect(h.document.lines[0].kind == .quote)
         // 되돌리면 친 기호가 보통 글자로 남는다.
         h.undo()
+        #expect(h.editor.text == "> ")
         h.undo()
         #expect(h.editor.text == trigger)
     }

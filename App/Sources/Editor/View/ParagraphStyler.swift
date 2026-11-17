@@ -49,6 +49,7 @@ nonisolated enum ParagraphStyler {
             self.key = key
             self.style = style
             self.decoration = FragmentDecoration(style: style)
+            self.decoration.endingGuideLevels = key.endingGuideLevels
         }
 
         private var full: NSRange { NSRange(location: 0, length: out.length) }

@@ -122,14 +122,23 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         return min(layoutFragmentFrame.height, last.typographicBounds.minY)
     }
 
-    private func drawGuides(_ decoration: FragmentDecoration, in context: CGContext) {
-        guard !decoration.guideLevels.isEmpty else { return }
+    /// 블록의 마지막 안내선은 마지막 시각적 줄의 글꼴 하단에서 멈춘다.
+    /// 줄바꿈·접힘에도 글자와 같은 메트릭을 쓰므로 별도의 고정 여백이 필요하지 않다.
+    var guideRects: [CGRect] {
+        guard let decoration, !decoration.isCollapsed else { return [] }
         let style = decoration.style
-        context.setFillColor(style.guide.cgColor)
-        for level in decoration.guideLevels {
+        let font = decoration.lineFont ?? style.body.font
+        let textBottom = contentLines.last.map { baseline(of: $0, decoration) - font.descender } ?? ownHeight
+        return decoration.guideLevels.map { level in
             let x = CGFloat(level) * style.indent + EditorMetrics.guideOffset - layoutFragmentFrame.minX
-            context.fill(CGRect(x: x, y: 0, width: style.borderWidth, height: ownHeight))
+            let height = decoration.endingGuideLevels.contains(level) ? min(ownHeight, max(0, textBottom)) : ownHeight
+            return CGRect(x: x, y: 0, width: style.borderWidth, height: height)
         }
+    }
+
+    private func drawGuides(_ decoration: FragmentDecoration, in context: CGContext) {
+        context.setFillColor(decoration.style.guide.cgColor)
+        for rect in guideRects { context.fill(rect) }
     }
 
     /// 인용문의 왼쪽 막대. 문단의 위아래 끝까지 칠해 이어지는 인용문 줄의 막대가 하나로 보인다.
