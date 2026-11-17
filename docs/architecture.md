@@ -72,6 +72,10 @@ scripts/
 - Features와 App 타깃은 기본 격리가 MainActor다(`.defaultIsolation(MainActor.self)`). AppKit·SwiftUI 코드에 `@MainActor`를 일일이 붙이지 않는다. 메인 밖에서 돌릴 코드만 `nonisolated`로 표시한다.
 - Core 타깃은 기본 격리가 없다. 값 타입은 `Sendable`이고, 상태를 가진 클래스(`Theme`, `FileNoteStore` 등)에만 `@MainActor`를 붙였다.
 - 테스트는 Swift Testing(`import Testing`)으로 쓴다.
+- 앱 묶음은 `scripts/build-app.sh [debug|release]`가 만들고 `FLOATING_NOTES_APP_DIR`로 출력 폴더를 분리한다.
+- 로컬 고정 서명(D-063): 사용자가 `scripts/create-signing-identity.sh`를 한 번 실행해 로그인 키체인에 `Float Local Code Signing` 자체 서명 인증서(3,650일, EKU codeSigning)를 만든다. 기존 인증서는 바꾸지 않고 개인 키 임시 파일은 종료 시 지운다. `security import -T /usr/bin/codesign`으로 해당 키 접근을 허용하며 신뢰 설정과 다른 키의 ACL은 바꾸지 않는다.
+- 빌드 서명 우선순위는 `FLOATING_NOTES_SIGN_IDENTITY` → 키체인의 위 identity → 경고 후 임시 서명(`-`)이다. 명시한 identity의 실패는 숨기지 않는다. 자체 서명은 신뢰되지 않아도 사용할 수 있으므로 `security find-identity`에 `-v`를 붙이지 않는다. 생성·빌드는 `FLOATING_NOTES_KEYCHAIN`으로 임시 키체인을 지정할 수 있고 검색 목록은 바꾸지 않는다.
+- Hardened Runtime은 켜지 않는다. 켜면 EventKit 캘린더 접근에 `com.apple.security.personal-information.calendars` 엔타이틀먼트가 필요하다. 고정 인증서로 지정 요구사항을 유지하지만 실제 TCC 권한 유지는 6단계에서 권한 요청과 함께 확인한다.
 
 ## Core 공개 API
 
