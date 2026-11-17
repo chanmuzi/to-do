@@ -1,7 +1,9 @@
+import Foundation
 import Editor
 import Models
 import NotePanel
 import Store
+import DateTime
 
 /// 본문 편집기의 표시 방식. 설정 화면이 생기면 거기서 바꾼다. 기본값은 `tokens.json`의 `display.defaults`와 같다.
 struct NoteEditorOptions: Hashable {
@@ -40,6 +42,8 @@ final class NoteEditorFactory {
         }
     }
 
+    var onAcceptDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
+    var onDateError: (Error) -> Void = { _ in }
     private let folds: NoteFoldStore
     private var editors: [NoteID: WeakEditor] = [:]
 
@@ -59,6 +63,11 @@ final class NoteEditorFactory {
             editor: MarkdownEditor(theme: context.theme, configuration: configuration),
             noteID: context.noteID, folds: folds
         )
+        adapter.editor.onAcceptDate = { [weak self] request in
+            guard let accept = self?.onAcceptDate else { throw CocoaError(.featureUnsupported) }
+            return try accept(context.noteID, request)
+        }
+        adapter.editor.onDateError = { [weak self] error in self?.onDateError(error) }
         editors = editors.filter { $0.value.editor != nil }
         editors[context.noteID] = WeakEditor(editor: adapter)
         return adapter

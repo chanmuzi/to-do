@@ -56,6 +56,7 @@ extension NotePanelCoordinator {
 /// - `input-key <id> [|]|"|space`: 본문의 `keyDown`에 앱 내부 이벤트 하나를 보낸다.
 /// - `input-mark|input-commit <id|title:id|capture|browse|library> <글자>`: 조합/확정 입력.
 /// - `input-check <같은 대상> <파일 이름>`: 자동 입력 설정과 조합 상태를 JSON으로 쓴다.
+/// - `date-preview <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`: 자기 입력 칸의 날짜 제안·키 경로 확인.
 /// - `quit`
 ///
 /// 파일 이름은 출력 폴더 바로 아래의 이름이어야 한다. 경로를 주면 쓰지 않는다.
@@ -259,6 +260,18 @@ final class DebugControl {
             guard let editor = editor(of: id) else { return }
             editor.focus()
             editor.forcesActiveAppearance = true
+        case ("date-preview", let id?, let offset):
+            guard let editor = editor(of: id) else { return }
+            editor.forcesActiveAppearance = true
+            editor.focus()
+            editor.selectedRange = NSRange(location: min(editor.text.utf16.count, max(0, offset.flatMap(Int.init) ?? editor.text.utf16.count)), length: 0)
+            editor.refreshDateSuggestion()
+        case ("input-command", let target?, let command?):
+            guard let view = verificationInput(target.rawValue) else { return }
+            let selectors = ["tab": "insertTab:", "escape": "cancelOperation:"]
+            if let selector = selectors[command] { view.doCommand(by: NSSelectorFromString(selector)) }
+            else if command == "undo" { view.undoManager?.undo() }
+            else if command == "redo" { view.undoManager?.redo() }
         case ("input-key", let id?, let text?):
             guard let editor = editor(of: id) else { return }
             let chars = text == "space" ? " " : text
@@ -498,6 +511,7 @@ final class DebugControl {
         view.window?.contentView?.layoutSubtreeIfNeeded()
         write(json: [
             "text": editor.text,
+            "dateSuggestion": editor.dateSuggestionText ?? "",
             "selectedRange": NSStringFromRange(editor.selectedRange),
             "markedRange": NSStringFromRange(editor.textView.markedRange()),
             "automaticQuotes": editor.textView.isAutomaticQuoteSubstitutionEnabled,

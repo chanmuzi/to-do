@@ -10,6 +10,7 @@ final class NoteRootView: NSView {
     var onHoverChange: ((Bool) -> Void)?
     /// 배치가 끝난 뒤. 배치 도중에 알게 된 내용 높이를 이때 창에 반영한다.
     var onLayout: (() -> Void)?
+    var onDatePreviewHeightChange: (() -> Void)?
     /// 배치하는 중. 이 동안에는 창 틀을 바꾸지 않는다(배치 안에서 다시 배치가 돌면 본문 자리가 어긋난다).
     private(set) var isLayingOut = false
 
@@ -28,6 +29,10 @@ final class NoteRootView: NSView {
         separator.wantsLayer = true
         configureScrollView(bodyView)
         [background, scrollView, separator, topRow, cornerButtons].forEach(addSubview)
+        topRow.onDatePreviewHeightChange = { [weak self] in
+            self?.needsLayout = true
+            self?.onDatePreviewHeightChange?()
+        }
     }
 
     @available(*, unavailable)
@@ -49,7 +54,7 @@ final class NoteRootView: NSView {
 
     /// 상단 줄과 그 아래 선의 높이.
     var chromeHeight: CGFloat {
-        style.theme.shape(.chromeHeight) + style.theme.shape(.borderWidth)
+        style.theme.shape(.chromeHeight) + style.theme.shape(.borderWidth) + topRow.datePreviewHeight
     }
 
     func setHoverControlsAlpha(_ alpha: Double, animated: Bool) {
@@ -104,7 +109,7 @@ final class NoteRootView: NSView {
 
     private func placeSubviews() {
         let theme = style.theme
-        let rowHeight = theme.shape(.chromeHeight)
+        let rowHeight = theme.shape(.chromeHeight) + topRow.datePreviewHeight
         background.frame = bounds
         topRow.frame = NSRect(x: 0, y: 0, width: bounds.width, height: rowHeight)
         separator.frame = NSRect(x: 0, y: rowHeight, width: bounds.width, height: theme.shape(.borderWidth))

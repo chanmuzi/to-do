@@ -21,6 +21,7 @@ nonisolated struct UndoRecord: Equatable, Sendable {
     var foldsAfter: Set<Int>?
     /// 글자를 그대로 친 편집 하나. 이어 친 글자는 한 단계로 묶는다.
     var isTyping = false
+    var dateEffect: UUID?
 }
 
 /// 편집기의 되돌리기 기록. 텍스트 뷰의 것을 쓰지 않고 직접 든다: 바깥이 원문을 바꿨을 때 적어 둔

@@ -15,7 +15,7 @@ extension NoteWindowController: NSWindowDelegate {
         let top = liveResizeTop ?? panel.frame.maxY
         let visible = (panel.screen ?? NSScreen.main)?.visibleFrame
         let target = environment.sizePolicy.frame(
-            current: panel.frame, top: top, contentHeight: contentHeight,
+            current: panel.frame, top: top, contentHeight: contentHeight + root.topRow.datePreviewHeight,
             screenHeight: visible?.height ?? .greatestFiniteMagnitude,
             roomBelowTop: visible.map { top - $0.minY } ?? .greatestFiniteMagnitude
         )

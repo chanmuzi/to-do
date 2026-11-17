@@ -1,5 +1,6 @@
 import AppKit
 import Theme
+import DateTime
 
 /// 노트 창의 상단 줄(spec 5.1, 5.2). 요소 자리는 `TopRowLayout`이, 내용과 색은 `TopRowState`가 정한다.
 /// 이 줄을 끌면 창이 움직이고(spec 4.1), 제목을 누르면 그 자리에서 고친다.
@@ -16,6 +17,8 @@ final class TopRowView: NSView {
     }
 
     var actions = Actions()
+    var onDatePreviewHeightChange: (() -> Void)?
+    var datePreviewHeight: CGFloat { title.datePreviewHeight }
 
     private let style: PanelStyle
     private let spaceBadge: SpaceBadgeView
@@ -64,6 +67,10 @@ final class TopRowView: NSView {
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
         reminderBadge.onPress = { [unowned self] in actions.reminder() }
         pinButton.onPress = { [unowned self] in actions.pin() }
+        title.onDatePreviewHeightChange = { [weak self] in
+            self?.needsLayout = true
+            self?.onDatePreviewHeightChange?()
+        }
         title.onChange = { [unowned self] in actions.titleChanged($0) }
         title.onReturn = { [unowned self] in actions.titleReturned() }
         title.onEditingChange = { [unowned self] in
@@ -72,6 +79,14 @@ final class TopRowView: NSView {
         }
     }
 
+    var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)? {
+        get { title.onAcceptDate }
+        set { title.onAcceptDate = newValue }
+    }
+    var onDateError: (Error) -> Void {
+        get { title.onDateError }
+        set { title.onDateError = newValue }
+    }
     var isEditingTitle: Bool { title.isEditing }
     /// 더 보기 메뉴를 띄울 기준(단축키로 열 때도 쓴다).
     var moreAnchor: NSView { moreButton }
@@ -158,7 +173,7 @@ final class TopRowView: NSView {
                 showsProblem: holdsProblemSlot
             ),
             metrics: TopRowLayout.Metrics(
-                height: bounds.height,
+                height: style.theme.shape(.chromeHeight),
                 paddingLeading: theme.space(.sp3),
                 // 핀 아이콘의 오른쪽 끝이 제목의 왼쪽 여백과 같은 거리에 오게 한다(좌우 균형).
                 paddingTrailing: max(0, theme.space(.sp3) - pinButton.glyphSideInset),
@@ -170,7 +185,7 @@ final class TopRowView: NSView {
         spaceBadge.frame = frames.space ?? .zero
         let titleHeight = title.idealHeight
         title.frame = NSRect(
-            x: frames.title.minX, y: ((bounds.height - titleHeight) / 2).rounded(),
+            x: frames.title.minX, y: datePreviewHeight + ((style.theme.shape(.chromeHeight) - titleHeight) / 2).rounded(),
             width: frames.title.width, height: titleHeight
         )
         moreButton.frame = frames.more
@@ -179,6 +194,10 @@ final class TopRowView: NSView {
         if let problem = frames.problem { problemButton.frame = problem }
         if let reminder = frames.reminder { reminderBadge.frame = reminder }
         pinButton.frame = frames.pin
+        for view in [spaceBadge, moreButton, addButton, problemButton, reminderBadge, pinButton] {
+            view.frame.origin.y += datePreviewHeight
+        }
+        title.layoutDateHint()
     }
 
     // MARK: - 끌기와 제목 누르기

@@ -27,6 +27,7 @@ extension EditorController {
 
     /// 열린 단계를 닫는다. 조합 중이면 조합이 끝난 뒤에 닫는다(조합 하나가 한 단계다).
     func closeUndoRecord() {
+        defer { pruneDateEffects() }
         selectionBeforeEdit = nil
         guard let record = history.open, !textView.hasMarkedText() else { return }
         if openRecordIsComposition, record.edits.count > 1 { squashOpenRecord() }
@@ -95,6 +96,10 @@ extension EditorController {
             onReplayMismatch("되돌리기 기록이 원문과 어긋났다(\(redo ? "다시 하기" : "되돌리기")). 기록을 버린다")
             return
         }
+        if let token = record.dateEffect, let effect = dateEffects[token] {
+            do { if redo { try effect.redo() } else { try effect.undo() } }
+            catch { onDateError(error); onRejectedEdit(); return }
+        }
         if redo { history.redoStack.removeLast() } else { history.undoStack.removeLast() }
         if linkSession != nil { cancelLinkEditing() }
         typingMarks = nil
@@ -128,6 +133,8 @@ extension EditorController {
         textView.didChangeText()
         selectionVersion = documentVersion
         undoDidReplay()
+        dismissedDate = (text, selectedRange)
+        updateDateSuggestion()
         textView.scrollRangeToVisible(textView.selectedRange())
     }
 

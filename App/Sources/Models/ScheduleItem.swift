@@ -17,6 +17,7 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     public var isDateOnly: Bool
     public var isCompleted: Bool
     public var title: String
+    public var inlineSource: InlineScheduleSource?
     public var todo: TodoAnchor?
     public var link: Link?
     public var modified: Date
@@ -38,21 +39,23 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
 
     public init(id: String = UUID().uuidString, start: Date, end: Date? = nil,
                 isDateOnly: Bool = false, isCompleted: Bool = false, title: String = "",
-                todo: TodoAnchor? = nil, link: Link? = nil, modified: Date = Date(),
+                todo: TodoAnchor? = nil, inlineSource: InlineScheduleSource? = nil, link: Link? = nil, modified: Date = Date(),
                 syncedAt: Date? = nil, syncBaseline: Value? = nil, syncError: String? = nil, isDeleted: Bool = false) {
+        self.inlineSource = inlineSource
         self.id = id; self.start = start; self.end = end; self.isDateOnly = isDateOnly
         self.isCompleted = isCompleted; self.title = title; self.todo = todo; self.link = link
         self.modified = modified; self.syncedAt = syncedAt; self.syncBaseline = syncBaseline; self.syncError = syncError; self.isDeleted = isDeleted
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, start, end, isDateOnly, isCompleted, title, todo, link, modified, syncedAt, syncBaseline, syncError, isDeleted
+        case id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
     }
     private enum KindKey: String, CodingKey { case kind }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id); try c.encode(start, forKey: .start); try c.encodeIfPresent(end, forKey: .end)
         try c.encode(isDateOnly, forKey: .isDateOnly); try c.encode(isCompleted, forKey: .isCompleted)
+        try c.encodeIfPresent(inlineSource, forKey: .inlineSource)
         try c.encode(title, forKey: .title); try c.encodeIfPresent(todo, forKey: .todo); try c.encodeIfPresent(link, forKey: .link)
         try c.encode(modified, forKey: .modified); try c.encodeIfPresent(syncedAt, forKey: .syncedAt)
         try c.encodeIfPresent(syncBaseline, forKey: .syncBaseline)
@@ -72,6 +75,10 @@ public struct TodoAnchor: Hashable, Codable, Sendable {
     public var line: Int
     public var text: String
     public init(line: Int, text: String) { self.line = line; self.text = text }
+    public init?(line: Int, sourceLine: String) {
+        guard let parts = Self.parts(sourceLine) else { return nil }
+        self.init(line: line, text: parts.text)
+    }
 
     public func locate(in body: String) -> Int? {
         let lines = body.components(separatedBy: "\n")

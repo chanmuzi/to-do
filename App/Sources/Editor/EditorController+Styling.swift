@@ -13,12 +13,21 @@ extension EditorController: NSTextContentStorageDelegate {
         // 원문과 풀어 둔 줄이 어긋나 있으면(있어서는 안 된다) 꾸미지 않은 문단을 쓴다.
         guard line.fullRange == range else { return nil }
         let keys = currentKeys()
-        return NSTextParagraph(attributedString: ParagraphStyler.display(
+        let display = NSMutableAttributedString(attributedString: ParagraphStyler.display(
             source: storage.attributedSubstring(from: range),
             line: line,
             key: keys[index],
             style: style
         ))
+        if let suggestion = dateSuggestion, index == dateSuggestionLine {
+            for local in suggestion.expression.ranges {
+                let marked = NSRange(location: line.contentStart + local.location - range.location, length: local.length)
+                if NSMaxRange(marked) <= display.length {
+                    display.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: style.text], range: marked)
+                }
+            }
+        }
+        return NSTextParagraph(attributedString: display)
     }
 }
 
@@ -28,7 +37,12 @@ extension EditorController: NSTextLayoutManagerDelegate {
         textLayoutFragmentFor location: any NSTextLocation,
         in textElement: NSTextElement
     ) -> NSTextLayoutFragment {
-        MarkdownLayoutFragment(textElement: textElement, range: textElement.elementRange)
+        let fragment = MarkdownLayoutFragment(textElement: textElement, range: textElement.elementRange)
+        let offset = contentStorage.offset(from: contentStorage.documentRange.location, to: location)
+        if dateSuggestionAbove, document.lineIndex(at: offset) == dateSuggestionLine {
+            fragment.datePreviewMargin = dateHint.preferredSize.height + theme.space(.sp2)
+        }
+        return fragment
     }
 }
 
@@ -143,7 +157,7 @@ extension EditorController {
     }
 
     /// 그 줄들의 문단을 다시 만들게 한다. 원문의 글자는 건드리지 않는다(속성이 바뀌었다고만 알린다).
-    private func invalidate(lines: Range<Int>) {
+    func invalidate(lines: Range<Int>) {
         guard let storage = textView.textStorage, !lines.isEmpty else { return }
         let start = document.lines[lines.lowerBound].start
         let end = NSMaxRange(document.lines[lines.upperBound - 1].fullRange)
@@ -191,6 +205,8 @@ extension EditorController {
     func focusDidChange() {
         // 포커스가 바뀌면 정해 둔 서식은 버린다.
         typingMarks = nil
+        dismissedDate = (text, selectedRange)
+        updateDateSuggestion()
     }
 
     func windowDidChange() {
@@ -199,6 +215,7 @@ extension EditorController {
     }
 
     func widthDidChange() {
+        updateDateSuggestion()
         reportContentHeight()
         layoutCopyButton()
         layoutLinkField()

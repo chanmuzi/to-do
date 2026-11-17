@@ -170,6 +170,7 @@ extension EditorController {
         onTextChange?(text)
         reportContentHeight()
         layoutCopyButton()
+        updateDateSuggestion()
     }
 
     /// 바깥이 지금 알려 달라고 했다(창을 닫기 직전 등). 편집이나 되돌리기가 진행 중이면 그것이 끝나며 알린다.
@@ -200,7 +201,10 @@ extension EditorController: NSTextViewDelegate {
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         // 조합 중인 글자가 있으면 입력기가 먼저 처리하게 둔다.
-        guard !textView.hasMarkedText() else { return false }
+        if textView.hasMarkedText() {
+            // 입력기가 처리한 뒤에도 조합이 남아 있으면 Tab이 조합 글자를 덮어쓰지 않게 한다.
+            return onAcceptDate != nil && (selector == #selector(NSResponder.insertTab(_:)) || selector == #selector(NSResponder.insertBacktab(_:)))
+        }
         let selection = clamped(textView.selectedRange())
         let swallows = swallowsCodeTriggerKey
         swallowsCodeTriggerKey = false
@@ -208,7 +212,10 @@ extension EditorController: NSTextViewDelegate {
         codeTag = nil
         absorbRun = nil
         switch selector {
+        case #selector(NSResponder.cancelOperation(_:)) where dateSuggestion != nil:
+            return dismissDateSuggestion()
         case #selector(NSResponder.insertTab(_:)):
+            if acceptDateSuggestion() { return true }
             apply(EditorCommands.indent(document, selection: selection, folded: folded))
             return true
         case #selector(NSResponder.insertBacktab(_:)):
@@ -485,6 +492,7 @@ extension EditorController: NSTextViewDelegate {
         }
         selectionVersion = documentVersion
         refreshStyling()
+        updateDateSuggestion()
     }
 
     func textDidChange(_ notification: Notification) {

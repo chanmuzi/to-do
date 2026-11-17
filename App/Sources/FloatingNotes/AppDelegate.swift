@@ -85,6 +85,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                             makeBridge: makeBridge, log: AppLog.warning)
             try schedules.start()
             self.schedules = schedules
+            let inlineWriter = InlineScheduleWriter(notes: environment.notes, service: schedules)
+            editors.onAcceptDate = { id, request in try inlineWriter.accept(request, in: id) }
+            editors.onDateError = { AppLog.warning("본문 예정 저장 실패: \($0)") }
+            notePanels.onAcceptTitleDate = { id, request in try inlineWriter.accept(request, in: id) }
             reminderEditor.onSave = { [weak schedules] id, itemID, isNew in
                 schedules?.register(id, itemID: itemID, requestPermission: isNew)
             }

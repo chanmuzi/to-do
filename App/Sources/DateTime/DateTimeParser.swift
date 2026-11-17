@@ -13,8 +13,8 @@ import Foundation
 /// - 맨 앞 표현이 날만 적은 것이고 글의 다른 곳에 시각이 꼭 하나 있으면 둘을 합친다(`내일 회의 3시`).
 ///   글에 표현이 시각 하나와 날 하나뿐일 때는 시각이 앞이어도 합친다(`3시 회의 내일`). 이때 차지한 글자는 두 곳이다.
 /// - 표현이 여럿이면 맨 앞의 것 하나만 읽는다.
-nonisolated enum DateTimeParser {
-    static func firstExpression(in text: String, now: Date, calendar: Calendar) -> DateTimeExpression? {
+public nonisolated enum DateTimeParser {
+    public static func firstExpression(in text: String, now: Date, calendar: Calendar) -> DateTimeExpression? {
         let normalized = NormalizedText(text)
         let resolver = DateTimeResolver(now: now, calendar: calendar)
         for candidate in candidates(in: normalized.text) {

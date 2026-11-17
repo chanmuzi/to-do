@@ -76,6 +76,7 @@ final class NoteWindowController: NSObject {
         panel.onButtonPress = nil
         root.onHoverChange = nil
         root.onLayout = nil
+        root.onDatePreviewHeightChange = nil
     }
 
     var isHovered: Bool { hoverOverride ?? isPointerInside }
@@ -220,12 +221,21 @@ final class NoteWindowController: NSObject {
                 applyContentHeight(animated: true)
             }
         }
+        root.onDatePreviewHeightChange = { [unowned self] in
+            if root.isLayingOut { heightChangedDuringLayout = true }
+            else { applyContentHeight(animated: true) }
+        }
         root.onLayout = { [unowned self] in
             guard heightChangedDuringLayout else { return }
             heightChangedDuringLayout = false
             applyContentHeight(animated: false)
         }
 
+        root.topRow.onAcceptDate = { [weak self] request in
+            guard let self, let accept = coordinator?.onAcceptTitleDate else { throw CocoaError(.featureUnsupported) }
+            return try accept(noteID, request)
+        }
+        root.topRow.onDateError = { [weak self] error in self?.environment.log("제목 예정 저장 실패: \(error)") }
         let router = environment.router
         let id = noteID
         root.topRow.actions = TopRowView.Actions(

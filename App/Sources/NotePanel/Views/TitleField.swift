@@ -1,6 +1,7 @@
 import AppKit
 import Models
 import Theme
+import DateTime
 
 /// 상단 줄의 제목 칸(규칙 12: 본문과 별개). 평소에는 글자만 보이고, 누르면 그 자리에서 고친다.
 /// 고칠 때도 상자는 없고 글자가 `text`가 되며 커서만 생긴다(spec 5.2).
@@ -10,10 +11,23 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     var onEditingChange: ((Bool) -> Void)?
     /// Return으로 끝냈을 때.
     var onReturn: (() -> Void)?
+    var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
+    var onDateError: (Error) -> Void = { _ in }
+    var dateSuggestion: InlineDateProposal?
+    var dismissedDate: (text: String, selection: NSRange)?
+    var dateObserver: NSObjectProtocol?
+    var datePreviewHeight: CGFloat = 0
+    var onDatePreviewHeightChange: (() -> Void)?
+    var isLayingOutDateHint = false
+    lazy var dateHint = DateSuggestionView(theme: style.theme)
 
-    private let style: PanelStyle
+    isolated deinit {
+        if let dateObserver { NotificationCenter.default.removeObserver(dateObserver) }
+    }
+
+    let style: PanelStyle
     private(set) var isEditing = false
-    private var titleBeforeEditing = ""
+    var titleBeforeEditing = ""
     private var isPlaceholder = false
     private var colorToken: ColorToken = .text3
 
@@ -99,6 +113,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         onEditingChange?(true)
         window.makeFirstResponder(self)
         if let editor = currentEditor() as? NSTextView {
+            observeDateSelection(editor)
             editor.insertionPointColor = style.color(.accent)
             editor.setSelectedRange(NSRange(location: (stringValue as NSString).length, length: 0))
         }
@@ -111,8 +126,9 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
 
     func controlTextDidChange(_ notification: Notification) {
         // 조합 범위를 고쳐 쓰면 입력기가 끊긴다. 확정/편집 종료 때 한 줄로 정리한다.
-        guard (currentEditor() as? NSTextView)?.hasMarkedText() != true else { return }
+        guard (currentEditor() as? NSTextView)?.hasMarkedText() != true else { hideDateSuggestion(); return }
         onChange?(normalizeTitle())
+        updateDateSuggestion()
     }
 
     @discardableResult
@@ -137,6 +153,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     func controlTextDidEndEditing(_ notification: Notification) {
         guard isEditing else { return }
         isEditing = false
+        hideDateSuggestion()
         isEditable = false
         isSelectable = false
         placeholderAttributedString = nil
@@ -147,8 +164,19 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     }
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if textView.hasMarkedText() {
+            hideDateSuggestion()
+            return onAcceptDate != nil && (selector == #selector(NSResponder.insertTab(_:)) || selector == #selector(NSResponder.insertBacktab(_:)))
+        }
         switch selector {
+        case #selector(NSResponder.insertTab(_:)) where dateSuggestion != nil:
+            return acceptDateSuggestion(in: textView)
         case #selector(NSResponder.cancelOperation(_:)):
+            if dateSuggestion != nil {
+                dismissedDate = (textView.string, textView.selectedRange())
+                updateDateSuggestion()
+                return true
+            }
             stringValue = titleBeforeEditing
             onChange?(titleBeforeEditing)
             endEditing()
