@@ -17,6 +17,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/FloatingNotes"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
+# 원본 DisplayName은 파일명과 맞추고, 시스템 표시 이름은 지역화 리소스에서 읽는다(D-062).
+cp -R "$RESOURCES/ko.lproj" "$RESOURCES/en.lproj" "$APP/Contents/Resources/"
 cp "$RESOURCES/tokens.json" "$APP/Contents/Resources/tokens.json"
 cp -R "$RESOURCES/Fonts" "$APP/Contents/Resources/Fonts"
 cp -R "$RESOURCES/SpaceImages" "$APP/Contents/Resources/SpaceImages"
