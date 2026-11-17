@@ -42,6 +42,7 @@ UI를 새로 만들거나 고칠 때는 `docs/spec/02-rules.md`(21줄)를 함께
 
 ## 정본 위치
 
+- 진행 상황과 다음 할 일(새 세션은 여기부터): `docs/roadmap.md`
 - 명세: `docs/spec/` (장별 파일, 목차는 `index.md`)
 - 결정 기록: `docs/decisions.md`
 - 모듈 구조: `docs/architecture.md`
