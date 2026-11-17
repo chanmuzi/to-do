@@ -39,6 +39,20 @@ import Theme
         #expect(try paragraphStyle(h, line: 0).headIndent == 19)
     }
 
+    @Test func decorationMetricsFollowLiveTokenOverrides() throws {
+        let h = try EditorHarness("본문\n## 제목\n- 목록")
+        #expect(h.controller.style.metrics.bulletDot == h.theme.component(.editorBulletDot))
+        try h.theme.setOverrides(ThemeOverrides(values: [
+            "component.editor-bullet-dot": "7px",
+            "component.editor-heading2-before": "10px",
+        ]))
+        #expect(h.controller.style.metrics.bulletDot == 7)
+        #expect(try paragraphStyle(h, line: 1).paragraphSpacingBefore == 10)
+        try h.theme.setOverrides(ThemeOverrides())
+        #expect(h.controller.style.metrics.bulletDot == 5)
+        #expect(try paragraphStyle(h, line: 1).paragraphSpacingBefore == 6)
+    }
+
     /// 체크박스와 글머리표는 줄이 넘어간 문단에서도 첫 줄의 세로 가운데에 놓인다.
     @Test func gutterGlyphsCenterOnTheFirstLineOfAWrappedParagraph() throws {
         let h = try EditorHarness("[ ] " + String(repeating: "길게 이어지는 할 일 ", count: 8) + "\n- 짧은 항목", width: 220)

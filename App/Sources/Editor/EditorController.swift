@@ -34,7 +34,7 @@ final class EditorController: NSObject {
     let theme: Theme
     var style: EditorStyle
     let contentStorage = NSTextContentStorage()
-    let layoutManager = NSTextLayoutManager()
+    let layoutManager = SelectionLayoutManager()
     let textContainer = NSTextContainer(size: CGSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
     let textView: EditorTextView
     let scrollView = NSScrollView()
