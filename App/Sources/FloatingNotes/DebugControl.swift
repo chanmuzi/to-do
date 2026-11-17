@@ -62,6 +62,9 @@ final class DebugControl {
     private let currentStatusItem: () -> StatusItemController?
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
+    /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    var toastWindow: () -> NSWindow? = { nil }
+    var toastAction: () -> Void = {}
     private var statusItem: StatusItemController? { currentStatusItem() }
     private let hotKeys: GlobalHotKeys?
     private var observer: (any NSObjectProtocol)?
@@ -140,6 +143,18 @@ final class DebugControl {
         case ("menu", let id?, let name?):
             guard let url = output(named: name) else { return }
             showMoreMenu(for: id, snapshotURL: url)
+        case ("screen-menu", let id?, let name?):
+            guard let url = output(named: name) else { return }
+            DebugWindowCapture.captureMenu(to: url) { notePanels.popUpMoreMenu(for: id) }
+        case ("screen-status-menu", _, _):
+            guard let url = output(named: words.dropFirst().first ?? "") else { return }
+            DebugWindowCapture.captureMenu(to: url) { statusItem?.openMenuForVerification() }
+        case ("screen-toast", _, _):
+            guard let url = output(named: words.dropFirst().first ?? ""),
+                  let number = toastWindow()?.windowNumber
+            else { return }
+            DebugWindowCapture.capture(windowNumber: number, to: url)
+        case ("toast-action", _, _): toastAction()
         case ("snapshot", let id?, let name?):
             guard let url = output(named: name) else { return }
             let number = notePanels.snapshot(of: id)?.windowNumber
@@ -502,6 +517,8 @@ final class DebugControl {
             "lastKeyHandled": lastKeyHandled.map { $0 ? "yes" : "no" } ?? "",
             "unavailableCommands": commands.unavailable.map(\.rawValue),
             "quickPanels": quickPanels.dump(),
+            "toastWindowNumber": toastWindow()?.isVisible == true ? toastWindow()?.windowNumber ?? 0 : 0,
+            "statusItemLength": statusItem?.length ?? 0,
         ]
         write(json: document, to: url)
     }

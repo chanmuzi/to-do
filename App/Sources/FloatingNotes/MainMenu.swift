@@ -21,22 +21,23 @@ enum MainMenu {
             visible.representedObject = command.rawValue
             return [visible] + hiddenItems(for: [command], in: table, dispatcher: dispatcher)
         }
-        let listed: Set<AppCommand> = [.newNote, .findNote, .closeWindow, .settings, .shortcuts]
+        let listed: Set<AppCommand> = [.newNote, .findNote, .closeWindow, .settings, .shortcuts, .nextNote]
         let unlisted = table.entries(in: .noteWindow).compactMap(\.command).filter { !listed.contains($0) }
         let undo = #selector(AppCommandDispatcher.undoOrRestoreTrash(_:))
 
+        // 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 이 메뉴가 보인다(D-025). 차례는 시안 화면 1의 메뉴 막대다.
         let menu = KeyCodeMenu(title: "")
         // 메뉴 막대 메뉴의 항목은 여기에도 모두 있다. 메뉴 막대 아이콘을 꺼 두어도 같은 기능을 쓸 수 있다.
         menu.addItem(submenu(
             title: appName,
-            items: command("설정", .settings) + command("단축키", .shortcuts) + [.separator()]
+            items: [plain("\(appName)에 관하여", #selector(NSApplication.orderFrontStandardAboutPanel(_:)))]
+                + [.separator()] + command("설정", .settings) + [.separator()]
                 + standard("\(appName) 종료", #selector(NSApplication.terminate(_:)), KeyChord(.q, .command))
         ))
         menu.addItem(submenu(
             title: "파일",
             items: command("새 노트", .newNote) + command("빠른 캡처", .quickCapture) + [.separator()]
                 + command("노트 찾기", .findNote) + command("라이브러리", .library) + command("AI 패널", .aiPanel)
-                + [.separator()] + command(StatusMenuModel.hideAllTitle, .toggleNotesHidden)
                 + [.separator()] + command("창 닫기", .closeWindow)
                 + hiddenItems(for: unlisted, in: table, dispatcher: dispatcher)
         ))
@@ -50,6 +51,9 @@ enum MainMenu {
                 + standard("붙여넣기", #selector(NSText.paste(_:)), KeyChord(.v, .command))
                 + standard("모두 선택", #selector(NSText.selectAll(_:)), KeyChord(.a, .command))
         ))
+        menu.addItem(submenu(title: "보기", items: command(StatusMenuModel.hideAllTitle, .toggleNotesHidden)))
+        menu.addItem(submenu(title: "창", items: command("다음 노트로", .nextNote)))
+        menu.addItem(submenu(title: "도움말", items: command("단축키", .shortcuts)))
         return menu
     }
 
@@ -77,6 +81,11 @@ enum MainMenu {
         let visible = NSMenuItem(title: title, action: action, keyEquivalent: "")
         visible.target = target
         return [visible, keyOnlyItem(title, action, chord, target: target)]
+    }
+
+    /// 단축키가 없는 보이는 항목.
+    private static func plain(_ title: String, _ action: Selector) -> NSMenuItem {
+        NSMenuItem(title: title, action: action, keyEquivalent: "")
     }
 
     private static func keyOnlyItem(

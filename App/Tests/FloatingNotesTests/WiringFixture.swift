@@ -31,7 +31,7 @@ final class WiringFixture {
     /// 캡처 바와 노트 찾기가 듣는 알림 센터. 시험이 "키 창에서 물러났다"를 여기로 보낸다(`resignKey(_:)`).
     let panelNotifications = NotificationCenter()
     /// 앱이 앞에 있는 것으로 칠지.
-    var isAppActive = false
+    var isAppActive = true
     /// 지금 처리 중인 것으로 칠 이벤트의 종류(`beginPress()`, `releasePress()`, `endPress()`가 바꾼다).
     var currentEventType: NSEvent.EventType?
     /// 실패 알림이 떠 있는 동안 할 일(알림 창이 키 창을 가져가는 것을 흉내 낸다).

@@ -30,6 +30,10 @@ final class AppRouter: Routing {
     weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
+    /// 앱을 앞으로 가져온다. 사용자가 노트를 열거나 새로 만들라고 한 뒤에 부른다(D-025): 다른 앱이 앞에 있을 때
+    /// 메뉴 막대 메뉴, 캡처 바의 ⌘↵, 노트 찾기, 알림의 "열기"로 연 노트에 곧바로 글을 쓸 수 있게 한다.
+    /// 기본은 아무것도 하지 않는다(시험이 사용자의 앱을 뒤로 보내지 않게). `AppDelegate`가 넣는다.
+    var activateApp: () -> Void = {}
     /// 아직 연결되지 않아 기록만 한 요청.
     private(set) var unhandled: [Route] = []
 
@@ -43,8 +47,12 @@ final class AppRouter: Routing {
         guard route.isConnected, let notePanels else { return logUnhandled(route) }
         do {
             switch route {
-            case .openNote(let id): try notePanels.open(id)
-            case .newNote(let request): try notePanels.createNote(request)
+            case .openNote(let id):
+                try notePanels.open(id)
+                activateApp()
+            case .newNote(let request):
+                try notePanels.createNote(request)
+                activateApp()
             case .closeNoteWindow(let id): notePanels.closeWindow(id)
             case .toggleAllNotesHidden: notePanels.toggleAllHidden()
             case .openCapture:
