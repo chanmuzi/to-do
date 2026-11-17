@@ -124,6 +124,12 @@ final class DebugControl {
         let id = words.count > 1 ? NoteID(rawValue: words[1]) : nil
         let argument = words.count > 2 ? words[2] : nil
         switch (words.first, id, argument) {
+        case ("library-mouse", let point?, let action?):
+            guard let window = library?.window else { return }
+            DebugLibraryInput.mouse(window: window, point: point.rawValue, action: action)
+        case ("library-key", let key?, _):
+            guard let window = library?.window else { return }
+            DebugLibraryInput.key(window: window, key: key.rawValue)
         case ("library", _, _): router.route(.openLibrary)
         case ("library-close", _, _): library?.close()
         case ("reopen", _, _): reopen()
@@ -152,7 +158,10 @@ final class DebugControl {
                 "archiveMonths": library.model.index.archiveMonths,
                 "upcoming": library.model.index.upcoming.count,
                 "error": library.model.error ?? "", "keyWindow": library.window?.isKeyWindow == true,
-                "pid": ProcessInfo.processInfo.processIdentifier]
+                "pid": ProcessInfo.processInfo.processIdentifier,
+                "selection": String(describing: library.model.selection),
+                "selectedNote": library.model.selectedNoteID?.rawValue ?? "",
+                "input": DebugLibraryInput.state(window: library.window)]
             do { try JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]).write(to: url) }
             catch { AppLog.warning("라이브러리 확인 상태 저장 실패: \(error)") }
         case ("library-import", let id?, let name?):
