@@ -71,6 +71,8 @@ final class NotePanelWindow: NSPanel {
     private func deliverToButton(_ event: NSEvent) -> Bool {
         switch event.type {
         case .leftMouseDown:
+            // 앞선 누름의 뗌이 이 창에 오지 않았을 수 있다(창이 내려감 등). 남은 버튼을 먼저 잊는다.
+            pressedButton = nil
             guard let button = button(at: event.locationInWindow) else { return false }
             pressedButton = button
             if allowsKey, !isKeyWindow { makeKeyAndOrderFront(nil) }
@@ -78,11 +80,14 @@ final class NotePanelWindow: NSPanel {
             button.mouseDown(with: event)
             return true
         case .leftMouseDragged:
-            guard let button = pressedButton else { return false }
+            guard let button = pressedButton, button.window === self else { return false }
             button.mouseDragged(with: event)
             return true
         case .leftMouseUp:
-            guard let button = pressedButton else { return false }
+            guard let button = pressedButton, button.window === self else {
+                pressedButton = nil
+                return false
+            }
             pressedButton = nil
             button.mouseUp(with: event)
             return true

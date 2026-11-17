@@ -171,6 +171,27 @@ import Theme
         coordinator.allowsKeyWindows = false
     }
 
+    /// 버튼을 누른 뒤 뗌이 오지 않았어도(창이 내려가는 등), 다음 누름은 그 버튼으로 가지 않는다.
+    @Test func aLostReleaseDoesNotLeaveTheButtonPressed() throws {
+        let (coordinator, controller) = try openHoveredNote()
+        defer { fixture.cleanUp(coordinator) }
+        let pin = try #require(buttons(in: controller.root).first { $0.accessibilityLabel() == "항상 위에 고정" })
+        var pressed = 0
+        pin.onPress = { pressed += 1 }
+        let window = controller.panel
+        let onPin = pin.convert(NSPoint(x: pin.bounds.midX, y: pin.bounds.midY), to: nil)
+        window.sendEvent(RealClick.event(.leftMouseDown, at: onPin, in: window))
+        // 뗌을 잃는다. 다음은 버튼이 아닌 상단 줄의 빈 곳을 누르고, 핀 위에서 뗀다.
+        let row = controller.root.topRow
+        let empty = row.convert(NSPoint(x: row.bounds.midX - 40, y: row.bounds.midY), to: nil)
+        window.sendEvent(RealClick.event(.leftMouseDown, at: empty, in: window))
+        window.sendEvent(RealClick.event(.leftMouseUp, at: onPin, in: window))
+        #expect(pressed == 0)
+        // 그 뒤의 보통 누름은 그대로 한 번 동작한다.
+        RealClick.click(pin)
+        #expect(pressed == 1)
+    }
+
     /// 버튼이 아닌 곳(상단 줄의 빈 곳, 본문)으로 가는 누름은 창이 그대로 처리한다(끌기, 글자 선택).
     @Test func pressesOutsideButtonsAreLeftToTheWindow() throws {
         let (coordinator, controller) = try openHoveredNote()
