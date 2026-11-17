@@ -105,6 +105,14 @@ final class DemoDelegate: NSObject, NSApplicationDelegate {
         output += "FOLDED \(editor.foldedLines.sorted().map(String.init).joined(separator: ","))\n"
         FileHandle.standardOutput.write(Data(output.utf8))
 
+        if let seconds = options.quitAfter {
+            // 화면에 띄워 볼 때: 키 창이 된 뒤의 커서를 적고(시스템의 커서 표시가 생겼으면 그것도), 그만큼 뒤에 끝낸다.
+            DispatchQueue.main.asyncAfter(deadline: .now() + min(1, seconds / 2)) { [weak self] in
+                FileHandle.standardOutput.write(Data("KEY \(self?.window?.isKeyWindow == true)\n".utf8))
+                self?.reportCaret()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { NSApp.terminate(nil) }
+        }
         if let path = options.snapshotPath {
             // 그리기가 한 번 끝난 뒤에 찍는다.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
@@ -115,18 +123,15 @@ final class DemoDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 입력 커서(시스템이 그리는 뷰)의 크기와 색을 적는다. 창이 키 창일 때만 있다.
+    /// 입력 커서의 틀(텍스트 뷰 좌표)을 적는다. 시스템의 커서 표시 뷰가 남아 있으면 그것도 적는다(없어야 한다).
     private func reportCaret() {
         guard let editor else { return }
         func find(_ view: NSView) -> NSTextInsertionIndicator? {
             if let indicator = view as? NSTextInsertionIndicator { return indicator }
             return view.subviews.lazy.compactMap(find).first
         }
-        guard let indicator = find(editor.textView) else {
-            FileHandle.standardOutput.write(Data("CARET none\n".utf8))
-            return
-        }
-        let line = "CARET width=\(indicator.frame.width) height=\(indicator.frame.height) color=\(String(describing: indicator.color)) mode=\(indicator.displayMode.rawValue)\n"
+        var line = editor.caretFrame.map { "CARET x=\($0.minX) y=\($0.minY) width=\($0.width) height=\($0.height)\n" } ?? "CARET none\n"
+        if let indicator = find(editor.textView) { line += "SYSTEM-CARET \(indicator.frame)\n" }
         FileHandle.standardOutput.write(Data(line.utf8))
     }
 
