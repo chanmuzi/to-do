@@ -61,6 +61,8 @@ public struct MotionTokens: Hashable, Sendable {
     public let duration: TimeInterval
     public let curve: BezierCurve
     public let bell: BellMotion
+    /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(초).
+    public let caretBlink: TimeInterval
 }
 
 /// 임박한 리마인더의 종이 흔들리는 움직임(spec 15).

@@ -173,4 +173,6 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case bellAngle3 = "bell-angle-3"
     case bellPivot = "bell-pivot"
     case bellEase = "bell-ease"
+    /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(`TextCaret`).
+    case caretBlink = "caret-blink"
 }
