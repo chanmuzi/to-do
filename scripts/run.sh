@@ -6,4 +6,4 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 "$ROOT/scripts/build-app.sh" "${CONFIGURATION:-release}"
-exec "$ROOT/build/FloatingNotes.app/Contents/MacOS/FloatingNotes" "$@"
+exec "${FLOATING_NOTES_APP_DIR:-$ROOT/build}/FloatingNotes.app/Contents/MacOS/FloatingNotes" "$@"

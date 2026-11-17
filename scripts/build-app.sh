@@ -7,7 +7,8 @@ CONFIGURATION="${1:-release}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE="$ROOT/App"
 RESOURCES="$PACKAGE/Resources"
-APP="$ROOT/build/FloatingNotes.app"
+# FLOATING_NOTES_APP_DIR로 묶음을 둘 폴더를 바꾼다(기본 build/). 실행 중인 묶음과 분리할 때 사용.
+APP="${FLOATING_NOTES_APP_DIR:-$ROOT/build}/FloatingNotes.app"
 
 swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatingNotes
 BINARY="$(swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --show-bin-path)/FloatingNotes"
@@ -18,6 +19,7 @@ cp "$BINARY" "$APP/Contents/MacOS/FloatingNotes"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
 cp "$RESOURCES/tokens.json" "$APP/Contents/Resources/tokens.json"
 cp -R "$RESOURCES/Fonts" "$APP/Contents/Resources/Fonts"
+cp -R "$RESOURCES/SpaceImages" "$APP/Contents/Resources/SpaceImages"
 cp "$RESOURCES/menubar-icon.pdf" "$APP/Contents/Resources/menubar-icon.pdf"
 
 # 앱 아이콘: appiconset의 PNG를 iconutil이 받는 이름으로 옮겨 .icns로 만든다.
