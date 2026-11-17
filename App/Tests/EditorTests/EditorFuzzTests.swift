@@ -132,9 +132,9 @@ import Testing
         return nil
     }
 
-    private func run(seed: UInt64, sequences: Int, steps: Int, wild: Bool) throws {
+    private func run(seed: UInt64, sequences: Int, steps: Int, wild: Bool, honoursEnvironment: Bool = true) throws {
         // 더 많이 돌릴 때: EDITOR_FUZZ_SEED(씨앗에 더할 값), EDITOR_FUZZ_SEQUENCES(씨앗마다의 차례 수).
-        let environment = ProcessInfo.processInfo.environment
+        let environment = honoursEnvironment ? ProcessInfo.processInfo.environment : [:]
         let seed = seed &+ (environment["EDITOR_FUZZ_SEED"].flatMap(UInt64.init) ?? 0)
         let sequences = environment["EDITOR_FUZZ_SEQUENCES"].flatMap(Int.init) ?? sequences
         var random = Generator(state: seed)
@@ -201,5 +201,17 @@ import Testing
     @Test(arguments: [11, 12, 13, 14] as [UInt64])
     func arbitraryTypingKeepsFencesBalancedAndUndoExact(seed: UInt64) throws {
         try run(seed: seed, sequences: 12, steps: 50, wild: true)
+    }
+
+    /// 이슈 #9에서 줄 머리 안에 커서를 남겼던 씨앗(`EDITOR_FUZZ_SEED=312`, `404`를 기본 씨앗에 더한 것).
+    /// 404는 기본 씨앗 13과 더한 417의 108번째 차례에서 실패했다(줄 종류를 바꾼 뒤 ⇧←). 312의 실패 차례는
+    /// 그 뒤의 수정으로 더는 나오지 않지만, 어느 기본 씨앗이었는지 남아 있지 않아 네 씨앗 모두 41번째 차례까지 돈다.
+    @Test(arguments: [
+        (13 + 404, 110, true),
+        (11 + 312, 45, true), (12 + 312, 45, true), (13 + 312, 45, true), (14 + 312, 45, true),
+        (1 + 312, 45, false), (2 + 312, 45, false), (3 + 312, 45, false), (4 + 312, 45, false),
+    ] as [(UInt64, Int, Bool)])
+    func seedsFromIssue9KeepTheCaretOutOfLinePrefixes(seed: UInt64, sequences: Int, wild: Bool) throws {
+        try run(seed: seed, sequences: sequences, steps: 50, wild: wild, honoursEnvironment: false)
     }
 }

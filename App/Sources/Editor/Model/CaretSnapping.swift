@@ -201,7 +201,8 @@ nonisolated enum CaretSnapping {
         if textChanged {
             if let marker = doc.line(at: start).marker(enclosing: start) { start = marker.range.location }
             if let marker = doc.line(at: end).marker(enclosing: end) { end = NSMaxRange(marker.range) }
-            return NSRange(location: start, length: max(0, end - start))
+            guard end > start else { return NSRange(location: collapsed(start, in: doc), length: 0) }
+            return NSRange(location: start, length: end - start)
         }
 
         // 한쪽 끝만 움직였고 지난 것이 감춘 기호뿐이면, 기호를 건너뛰고 보이는 글자 하나를 지난다.
@@ -222,10 +223,19 @@ nonisolated enum CaretSnapping {
         if !endLine.kind.isCode, end >= endLine.contentStart { end = endLine.visualStart(from: end) }
         guard end > start else {
             let line = doc.line(at: start)
-            let position = line.kind.isCode || start < line.contentStart ? start : canonical(start, in: line)
+            let position = line.kind.isCode || start < line.contentStart ? collapsed(start, in: doc) : canonical(start, in: line)
             return NSRange(location: position, length: 0)
         }
         return NSRange(location: start, length: end - start)
+    }
+
+    /// 선택이 줄어 커서가 되었을 때의 자리. 줄 맨 앞(감춘 줄 머리의 앞)은 선택의 끝으로만 쓰는 자리여서
+    /// 커서는 그 줄의 보이는 시작으로 옮긴다(줄 종류를 바꾼 뒤 ⇧←로 선택이 줄 머리 안에서 접히는 경우, #9).
+    /// 코드 블록의 ``` 줄은 따로 다룬다(`fencePosition`).
+    private static func collapsed(_ position: Int, in doc: MarkdownDocument) -> Int {
+        let line = doc.line(at: position)
+        guard line.kind != .fenceOpen, line.kind != .fenceClose, position < line.caretStart else { return position }
+        return line.caretStart
     }
 
     private static func steppedEnd(from old: Int, to new: Int, in doc: MarkdownDocument) -> Int {
