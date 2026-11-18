@@ -1,15 +1,15 @@
 import Foundation
 
 /// 줄 안에서 화면에 보이지 않는 인라인 기호 하나(`**`, `~~`, `==`, `=={2}`, `` ` ``, `[`, `](주소)`).
-nonisolated struct InlineMarker: Hashable, Sendable {
-    var range: NSRange
+nonisolated package struct InlineMarker: Hashable, Sendable {
+    package var range: NSRange
     /// 여는 기호면 `true`, 닫는 기호면 `false`.
-    var isOpen: Bool
-    var span: InlineSpan
+    package var isOpen: Bool
+    package var span: InlineSpan
 }
 
 // 감춘 기호는 너비가 없다. 같은 자리에 겹쳐 보이는 원문 위치들 사이를 오가는 데 쓰는 계산이다.
-nonisolated extension MarkdownLine {
+nonisolated package extension MarkdownLine {
     /// 기호가 있는 서식 구간(주소만 적은 링크는 기호가 없다). 백슬래시로 막은 글자는 서식이 아니므로 뺀다.
     var markedSpans: [InlineSpan] {
         spans.filter { $0.range.length > $0.contentRange.length && $0.kind != .escape }
@@ -103,7 +103,7 @@ nonisolated extension MarkdownLine {
     }
 }
 
-nonisolated extension MarkdownDocument {
+nonisolated package extension MarkdownDocument {
     func line(at location: Int) -> MarkdownLine {
         lines[lineIndex(at: location)]
     }

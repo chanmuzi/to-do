@@ -1,7 +1,7 @@
 import Foundation
 
 /// 들여쓰기 뒤의 글자를 보고 줄의 종류와 기호 길이를 정한다.
-nonisolated enum LineClassifier {
+nonisolated package enum LineClassifier {
     private static let space: unichar = 0x20
     private static let tab: unichar = 0x09
     private static let hash: unichar = 0x23
@@ -12,7 +12,7 @@ nonisolated enum LineClassifier {
     private static let backtick: unichar = 0x60
 
     /// 줄 앞 들여쓰기. 탭 하나 또는 공백 둘이 한 단계다.
-    static func indent(_ u: [unichar], from start: Int, to end: Int) -> (length: Int, level: Int) {
+    package static func indent(_ u: [unichar], from start: Int, to end: Int) -> (length: Int, level: Int) {
         var i = start
         var tabs = 0
         var spaces = 0
@@ -23,17 +23,17 @@ nonisolated enum LineClassifier {
         return (i - start, tabs + spaces / 2)
     }
 
-    static func isFence(_ u: [unichar], from start: Int, to end: Int) -> Bool {
+    package static func isFence(_ u: [unichar], from start: Int, to end: Int) -> Bool {
         start + 3 <= end && u[start] == backtick && u[start + 1] == backtick && u[start + 2] == backtick
     }
 
     /// 닫는 줄은 ``` 뒤에 공백만 있어야 한다.
-    static func isClosingFence(_ u: [unichar], from start: Int, to end: Int) -> Bool {
+    package static func isClosingFence(_ u: [unichar], from start: Int, to end: Int) -> Bool {
         guard isFence(u, from: start, to: end) else { return false }
         return !(start + 3..<end).contains { u[$0] != space && u[$0] != tab }
     }
 
-    static func classify(_ u: [unichar], from start: Int, to end: Int) -> (kind: LineKind, markerLength: Int) {
+    package static func classify(_ u: [unichar], from start: Int, to end: Int) -> (kind: LineKind, markerLength: Int) {
         guard start < end else { return (.paragraph, 0) }
         let c = u[start]
         if c == hash {

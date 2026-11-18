@@ -3,17 +3,17 @@ import Foundation
 /// 원문을 줄 단위로 푼 것. 원문은 바꾸지 않는다(같은 글자를 그대로 들고 있다).
 /// 줄 경계는 TextKit의 문단 경계(`\n`, `\r`, `\r\n`, U+2029)와 같다.
 /// 편집기는 원문을 넣기 전에 줄바꿈을 `\n`으로 맞추므로(`LineEndings`) 편집기 안에서는 `\n`만 나온다.
-nonisolated struct MarkdownDocument: Sendable {
+nonisolated package struct MarkdownDocument: Sendable {
     /// 하위 계층은 이 단계까지만 받는다.
-    static let maxLevel = 8
+    package static let maxLevel = 8
 
-    let text: String
-    let units: [unichar]
-    private(set) var lines: [MarkdownLine]
+    package let text: String
+    package let units: [unichar]
+    package private(set) var lines: [MarkdownLine]
 
-    var length: Int { units.count }
+    package var length: Int { units.count }
 
-    init(_ text: String) {
+    package init(_ text: String) {
         self.text = text
         self.units = Array(text.utf16)
         self.lines = []
@@ -22,14 +22,14 @@ nonisolated struct MarkdownDocument: Sendable {
         linkStructure()
     }
 
-    func string(in range: NSRange) -> String {
+    package func string(in range: NSRange) -> String {
         let lower = max(0, min(range.location, units.count))
         let upper = max(lower, min(NSMaxRange(range), units.count))
         return String(utf16CodeUnits: Array(units[lower..<upper]), count: upper - lower)
     }
 
     /// 그 위치가 속한 줄 번호. 문서 끝은 마지막 줄이다.
-    func lineIndex(at location: Int) -> Int {
+    package func lineIndex(at location: Int) -> Int {
         var low = 0
         var high = lines.count - 1
         while low < high {
@@ -40,7 +40,7 @@ nonisolated struct MarkdownDocument: Sendable {
     }
 
     /// 선택이 걸친 줄. 선택이 다음 줄 맨 앞에서 끝나면 그 줄은 넣지 않는다.
-    func lineRange(for selection: NSRange) -> ClosedRange<Int> {
+    package func lineRange(for selection: NSRange) -> ClosedRange<Int> {
         let first = lineIndex(at: selection.location)
         var last = lineIndex(at: NSMaxRange(selection))
         if selection.length > 0, last > first, NSMaxRange(selection) == lines[last].start { last -= 1 }
@@ -48,7 +48,7 @@ nonisolated struct MarkdownDocument: Sendable {
     }
 
     /// 줄바꿈 글자(없으면 빈 문자열).
-    func terminator(of line: MarkdownLine) -> String {
+    package func terminator(of line: MarkdownLine) -> String {
         string(in: NSRange(location: line.end, length: NSMaxRange(line.fullRange) - line.end))
     }
 
