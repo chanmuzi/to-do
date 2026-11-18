@@ -62,7 +62,7 @@ let package = Package(
 
         .target(name: "Reminders", dependencies: ["Theme", "Models", "Store", "DateTime"], swiftSettings: uiSettings),
 
-        .target(name: "FloatSettings", dependencies: ["Models", "Theme", "Scheduling"], swiftSettings: uiSettings),
+        .target(name: "FloatSettings", dependencies: ["Models", "Theme", "Scheduling", "AgentRunner", "Store"], swiftSettings: uiSettings),
 
         .executableTarget(name: "FloatMCP"),
 

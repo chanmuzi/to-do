@@ -6,13 +6,15 @@ package struct DestinationPicker: View {
     let title: String
     let choices: [CalendarChoice]
     let current: ScheduleDestination?
+    let inSettings: Bool
     let includesDefault: Bool
     let selectedID: String?
     let theme: Theme
     let choose: (String?) -> Void
 
     package init(title: String, choices: [CalendarChoice], current: ScheduleDestination?, selectedID: String?,
-                 includesDefault: Bool = true, theme: Theme, choose: @escaping (String?) -> Void) {
+                 includesDefault: Bool = true, inSettings: Bool = false, theme: Theme, choose: @escaping (String?) -> Void) {
+        self.inSettings = inSettings
         self.title = title
         self.choices = choices
         self.current = current
@@ -25,7 +27,7 @@ package struct DestinationPicker: View {
     package var body: some View {
         let destination = choices.first { $0.id == selectedID }?.destination ?? current
         ValuePopup(label: title, value: destination?.name ?? "시스템 기본값",
-                   dot: destination?.color.map { Self.dot($0, theme: theme) }, theme: theme,
+                   dot: destination?.color.map { Self.dot($0, theme: theme) }, theme: theme, inSettings: inSettings,
                    makeMenu: makeMenu) { item in choose(item.representedObject as? String) }
     }
 

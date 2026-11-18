@@ -7,6 +7,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface3 = "surface-3"
     case connectFill = "connect-fill"
     case selected
+    case settingsSelection = "settings-selection"
     case rowTitle = "row-title"
     case hover
     case text
@@ -174,6 +175,13 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case badgeDot = "badge-dot"
     case badgeGap = "badge-gap"
     case badgePad = "badge-pad"
+    case settingsSidebarWidth = "settings-sidebar-w"
+    case settingsBodyInset = "settings-body-inset"
+    case settingsTop = "settings-top"
+    case settingsCloseIcon = "settings-close-icon"
+    case settingsPopupGap = "settings-popup-gap"
+    case settingsChevronWidth = "settings-chevron-w"
+    case settingsChevronHeight = "settings-chevron-h"
     case settingsRow = "settings-row"
     case segmentHeight = "segment-h"
     case segmentItem = "segment-item-h"
