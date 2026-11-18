@@ -13,6 +13,7 @@ let package = Package(
     defaultLocalization: "ko",
     platforms: [.macOS(.v26)],
     products: [
+        .executable(name: "FloatMCP", targets: ["FloatMCP"]),
         .executable(name: "FloatingNotes", targets: ["FloatingNotes"]),
     ],
     targets: [
@@ -23,6 +24,7 @@ let package = Package(
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
         ),
+        .target(name: "AgentRunner", dependencies: ["Store"]),
         .target(name: "Models"),
         .target(name: "MarkdownSyntax"),
         .target(name: "DateTime", dependencies: ["Models"]),
@@ -62,11 +64,13 @@ let package = Package(
 
         .target(name: "FloatSettings", dependencies: ["Models", "Theme", "Scheduling"], swiftSettings: uiSettings),
 
+        .executableTarget(name: "FloatMCP"),
+
         // MARK: App
         .executableTarget(
             name: "FloatingNotes",
             dependencies: [
-                "Theme", "Models", "Store", "Routing",
+                "Theme", "Models", "Store", "Routing", "AgentRunner",
                 "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders", "DateTime", "FloatSettings",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
@@ -89,6 +93,8 @@ let package = Package(
         ),
 
         // MARK: Tests
+        .testTarget(name: "AgentRunnerTests", dependencies: ["AgentRunner"]),
+        .testTarget(name: "FloatMCPTests", dependencies: ["FloatMCP"]),
         .testTarget(name: "SchedulingTests", dependencies: ["FieldTestSupport", "Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),
         .testTarget(name: "LibraryTests", dependencies: ["FieldTestSupport", "Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
         .target(name: "FieldTestSupport", dependencies: ["Theme"], path: "Tests/ThemeTests/Support"),
