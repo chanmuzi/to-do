@@ -1,19 +1,16 @@
 ## 18. 에셋
 
-### 18.1 Float 앱 아이콘 (`App/Resources/`, D-062)
+### 18.1 Float 앱 아이콘 (D-124)
 
-흑백 C2 체크 카드: 진한 바탕 위 밝은 카드에 체크한 투두 한 줄과 글 두 줄.
+종이 노트 창 원본은 `scripts/generate-brand-icons.swift`에 있다. 앱 표시 이름은 Float다.
 
-| 파일 | 쓰임 |
+| 자산 | 쓰임 |
 | --- | --- |
-| `app-icon-1024.svg` | 1024px 원본. 본체 824px(80.46875%), 사방 여백 100px, 둥근 모서리와 그림자 |
-| `AppIcon.appiconset/` | 16, 32, 64, 128, 256, 512, 1024px PNG. 빌드 시 iconutil로 ICNS 생성 |
-| `menubar-icon.svg`, `.pdf` | 18pt C2 템플릿. 15×13pt 카드에서 체크, 글 줄을 투명하게 뚫은 벡터. 앱은 PDF 사용 |
+| `AppIcon.icon` | 바탕, 그림자, 노트 창 순서의 세 겹. 라이트와 다크 원본을 분리하고 색조는 시스템이 렌더링한다. 빌드에서 actool로 Assets.car를 만들고 CFBundleIconName으로 지정한다. |
+| `AppIcon.appiconset` | 1024 캔버스의 824 타일, 사방 여백 100. 16, 32에서는 글 줄을 덜어 낸다. iconutil로 AppIcon.icns도 함께 넣는다. |
+| `menubar-icon.svg`, `menubar-icon.pdf` | 18pt 캔버스에 16pt 노트 창, 선 1.5pt. 런타임은 템플릿 PDF의 투명한 좌우 열을 자른다. |
 
-- `swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 같은 도형 정의에서 SVG, PNG, PDF를 만든다. 외부 패키지는 필요 없다.
-- 본체 비율 근거: 이 Mac의 `/System/Applications/Notes.app/Contents/Resources/AppIcon.icns`를 iconutil로 추출한 256px 이미지에서, 중앙 행, 열의 알파 128 이상 범위가 25..<231(206px)이다. 그림자를 제외한 본체 206/256을 1024에 적용했다.
-- 메뉴 막대 PDF의 구멍은 흰 칠이 아니라 even-odd 벡터 채움으로 투명하다. `isTemplate = true`로 시스템이 색을 입힌다.
-- D-054의 투명한 좌우 열 자르기를 유지한다. 배율과 18pt 세로 캔버스는 바꾸지 않는다. 알파를 읽는 렌더 배율에 따라 폭은 15~16pt이고, 반투명 가장자리는 보존한다. 이 Mac의 AppKit 경로에서는 15×18pt로 읽혔다.
+`swift scripts/generate-brand-icons.swift <미리보기 폴더>`는 앱 리소스를 갱신하고 PNG 미리보기를 지정한 폴더에 쓴다.
 
 ### 18.2 화면 아이콘 (`assets/symbols/`)
 

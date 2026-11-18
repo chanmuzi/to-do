@@ -18,6 +18,7 @@
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui` 400 |
 | 임박한 리마인더 | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui-strong` 600 |
 | 날짜, 보조 숫자 | D2Coding | `fs-micro` 12px / `lh-micro` 14px | `fw-ui` 400 |
+| 라이브러리 사이드바 시작 시각과 개수, 목록 진행 수 | Pretendard, 같은 폭 숫자 | `fs-micro` 12px | `fw-body` 400 |
 | 인라인 코드 | D2Coding | `fs-code` 12.5px / `lh-body` 24px | `fw-body` 400 |
 | 코드 블록 | D2Coding | `fs-code` 12.5px / `lh-code` 20px | `fw-body` 400 |
 | 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 24px | `fw-body` 400 |
@@ -123,7 +124,7 @@
 | 구성 요소 | `codeblock-gap` | `5px` | 코드 블록의 위아래 바깥 간격 |
 | 구성 요소 | `link-field-w` | `220px` | 링크 주소를 적는 칸의 너비 |
 | 구성 요소 | `icon-btn` | `24px` | 테두리 없는 아이콘 버튼 크기 |
-| 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 약 13pt) |
+| 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 16pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |
 | 구성 요소 | `chrome-gap` | `6px` | 노트 상단 줄의 요소 사이 |
 | 구성 요소 | `chrome-pad-end` | `6px` | 노트 상단 줄의 오른쪽 여백 (왼쪽은 `sp-3`) |
