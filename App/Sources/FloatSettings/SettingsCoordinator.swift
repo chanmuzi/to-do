@@ -29,7 +29,10 @@ package final class SettingsCoordinator {
             panel.center()
         }
         resize()
-        if allowsKeyWindows { window?.makeKeyAndOrderFront(nil) }
+        if allowsKeyWindows {
+            window?.makeKeyAndOrderFront(nil)
+            window?.makeMain()
+        }
         else { window?.orderFrontRegardless() }
     }
 

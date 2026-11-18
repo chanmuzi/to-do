@@ -43,6 +43,7 @@ final class AppRouter: Routing {
     var activateApp: () -> Void = {}
     var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?
     /// 아직 연결되지 않아 기록만 한 요청.
+    private(set) var isRouting = false
     private(set) var unhandled: [Route] = []
 
     func isConnected(_ route: Route) -> Bool {
@@ -53,6 +54,9 @@ final class AppRouter: Routing {
     @discardableResult
     func route(_ route: Route) -> RouteResult {
         guard route.isConnected, let notePanels else { return logUnhandled(route) }
+        let wasRouting = isRouting
+        isRouting = true
+        defer { isRouting = wasRouting }
         do {
             switch route {
             case .openNote(let id):

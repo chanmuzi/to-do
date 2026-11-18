@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var editors: NoteEditorFactory?
     private var commands: AppCommandDispatcher?
     private var menuBarIcon: MenuBarIconSwitch<StatusItemController>?
+    private var requestedWindowActivation = false
     private var activationFocus = ActivationFocusPolicy()
     private var hotKeys: GlobalHotKeys?
     private var pointerPresses: PointerPressMonitor?
@@ -46,7 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             environment.launchWarnings.forEach(AppLog.warning)
 
             let router = AppRouter()
-            router.activateApp = { if !application.isActive { application.activate() } }
+            router.activateApp = { [weak self] in
+                guard !application.isActive else { return }
+                self?.requestedWindowActivation = true
+                if !NSRunningApplication.current.activate(options: []) {
+                    self?.requestedWindowActivation = false
+                }
+            }
             // 본문은 Markdown 편집기(Editor 모듈)다. 노트 창은 편집기를 모르고, 여기서 어댑터로 잇는다.
             let editors = NoteEditorFactory(windowStates: environment.windowStates, log: AppLog.warning)
             // 체크박스 모양과 인라인 코드 글자색은 저장된 설정을 따른다(바뀌면 떠 있는 편집기에 바로 반영).
@@ -114,10 +121,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
             library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
             library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
-            library.model.openCalendarEvent = { [weak library, usesFake = options.usesFakeCalendar] event in
-                guard !usesFake else { return }
-                guard let url = event.calendarURL,
-                      let calendarApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else {
+            library.model.openCalendarEvent = { [weak library, fakeCalendar] event in
+                guard let url = event.calendarURL else {
+                    library?.model.error = "캘린더 일정에 연결된 식별자가 없습니다"
+                    return
+                }
+                if let fakeCalendar { fakeCalendar.open(url); return }
+                guard let calendarApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else {
                     library?.model.error = "캘린더 일정을 열 수 없습니다"
                     return
                 }
@@ -193,28 +203,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 다른 프로그램이 제자리에서 고친 노트 파일은 폴더 감시가 잡지 못한다. 앱이 앞으로 올 때 다시 훑는다.
-    ///
-    /// 사용자가 앱을 앞으로 가져왔는데(⌘Tab, Dock) 키 창인 노트가 없으면 맨 앞 노트가 키 창이 되어 키보드만으로
-    /// 이어 쓴다. 노트를 눌러 앞으로 온 것이면 그 누름이 그 노트를 키 창으로 만든다. 누름은 이 알림 뒤에 처리되므로
-    /// 한 차례 미뤄 본다: 그때 키 창인 노트가 있으면 아무것도 하지 않는다. 켜면서 오는 활성화는 뺀다(D-025).
+    func applicationWillBecomeActive(_ notification: Notification) {
+        let target = requestedWindowActivation || router?.isRouting == true || NSEvent.pressedMouseButtons != 0
+            || NSApp.modalWindow != nil || quickPanels?.isAnyVisible == true
+        requestedWindowActivation = false
+        if activationFocus.shouldShowLibrary(activatedAt: ProcessInfo.processInfo.systemUptime, hasExplicitTarget: target) {
+            library?.bringForward()
+        }
+    }
+
+    /// 다른 프로그램이 제자리에서 고친 파일도 앞으로 올 때 다시 읽는다.
     func applicationDidBecomeActive(_ notification: Notification) {
         refreshSettingsCalendars()
         do {
             try environment?.notes.refresh()
         } catch {
             AppLog.warning("노트 폴더를 다시 읽지 못했습니다: \(error)")
-        }
-        // 알림 창이나 캡처 바, 노트 찾기가 키 입력을 받는 중이면 노트가 그것을 가져가지 않는다.
-        let isKeyHeldElsewhere = NSApplication.shared.modalWindow != nil || quickPanels?.isAnyVisible == true
-        guard activationFocus.shouldFocusNote(
-            activatedAt: ProcessInfo.processInfo.systemUptime, isKeyHeldElsewhere: isKeyHeldElsewhere
-        ) else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self, NSApplication.shared.isActive, NSApplication.shared.keyWindow == nil,
-                  quickPanels?.isAnyVisible != true
-            else { return }
-            notePanels?.focusFrontmostNote()
         }
     }
 
@@ -253,12 +257,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// Dock 아이콘을 눌렀을 때: 숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 하나를 띄우고, 맨 앞 노트가
-    /// 키 창이 된다. 띄우지 못하면 알림 창으로 까닭을 보여 준다(`FallbackNotePresenter`).
+    /// Dock, Spotlight의 재열기는 라이브러리 한 창만 대상으로 한다.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if notePanels?.areNotesHidden == true { notePanels?.toggleAllHidden() }
-        if notePanels?.openNoteIDs.isEmpty != false { router?.route(.openLibrary) }
-        else { notePanels?.focusFrontmostNote() }
+        library?.bringForward()
         return false
     }
 
@@ -351,6 +352,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         control.setScheduleDateFormat = { [weak self] value in
             do { try self?.environment?.settings.update { $0.scheduleDateFormat = value } }
             catch { AppLog.warning("표시 설정 저장 실패: \(error)") }
+        }
+        control.simulateActivation = { [weak self] in
+            self?.applicationWillBecomeActive(Notification(name: NSApplication.willBecomeActiveNotification))
+            self?.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
         }
         control.reopen = { [weak self] in _ = self?.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false) }
         control.toastWindow = { [unowned self] in toasts?.presenter.window }

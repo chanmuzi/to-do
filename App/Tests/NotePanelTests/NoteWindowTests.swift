@@ -734,3 +734,76 @@ import Theme
         #expect(controller.note.title == "tㅎ")
     }
 }
+
+extension NoteWindowTests {
+    @Test func trackingResamplesPointerAfterGeometryChanges() throws {
+        let panels = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(panels) }
+        let note = try fixture.notes.create(NoteDraft(title: "호버"))
+        try panels.open(note.id, focus: false)
+        let controller = try #require(panels.controllers[note.id])
+        let root = controller.root
+        for update in [
+            { root.updateTrackingAreas() },
+            { controller.windowDidMove(Notification(name: NSWindow.didMoveNotification)) },
+            { controller.windowDidResize(Notification(name: NSWindow.didResizeNotification)) }
+        ] {
+            root.onHoverChange?(!root.containsPointer)
+            update()
+            #expect(controller.isHovered == root.containsPointer)
+        }
+        #expect(!controller.panel.isKeyWindow)
+    }
+}
+
+extension NoteWindowTests {
+    @Test func orderedOutNotesCannotBecomeActivationTargets() throws {
+        let panels = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(panels) }
+        let note = try fixture.notes.create(NoteDraft(title: "숨김"))
+        try panels.open(note.id, focus: false)
+        let panel = try #require(panels.controllers[note.id]?.panel)
+        panels.toggleAllHidden()
+        // 이미 내린 창의 자격만 확인한다. 키 창이나 앱 활성화를 요청하지 않는다.
+        panel.allowsKey = true
+        #expect(!panel.canBecomeMain && !panel.canBecomeKey)
+        panel.allowsKey = false
+        panels.toggleAllHidden()
+        panels.closeWindow(note.id)
+        panel.allowsKey = true
+        #expect(!panel.canBecomeMain && !panel.canBecomeKey)
+    }
+}
+
+extension NoteWindowTests {
+    @Test func hoverFollowsCurrentLocationEvenWithLateBoundaryEvents() throws {
+        final class PointerWindow: NSWindow {
+            var point = NSPoint.zero
+            override var mouseLocationOutsideOfEventStream: NSPoint { point }
+        }
+        let window = PointerWindow(contentRect: NSRect(x: -4000, y: -4000, width: 300, height: 140),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = NoteRootView(style: PanelStyle(theme: fixture.theme), bodyView: NSView())
+        window.contentView = root
+        var inside = false
+        root.onHoverChange = { inside = $0 }
+        window.point = NSPoint(x: 20, y: 20)
+        window.orderFront(nil)
+        root.updateTrackingAreas()
+        #expect(!window.isKeyWindow && inside)
+        let area = try #require(root.trackingAreas.first { $0.owner === root })
+        #expect(area.options.contains([.activeAlways, .mouseEnteredAndExited, .mouseMoved, .inVisibleRect]))
+        let event = try #require(NSEvent.enterExitEvent(with: .mouseExited, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 0, trackingNumber: 0, userData: nil))
+        root.mouseExited(with: event)
+        #expect(inside)
+        window.point = NSPoint(x: -1, y: -1)
+        root.mouseEntered(with: event)
+        #expect(!inside)
+        window.point = NSPoint(x: 25, y: 25)
+        root.mouseMoved(with: RealClick.event(.mouseMoved, at: window.point, in: window))
+        #expect(inside)
+    }
+}

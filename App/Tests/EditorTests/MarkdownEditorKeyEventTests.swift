@@ -41,6 +41,29 @@ import Testing
         #expect(h.editor.text == "**글자**")
     }
 
+    @Test func formattingTableShortcutsDispatchFromTextView() throws {
+        typealias Key = EditorShortcuts.Key
+        let shortcuts: [(UInt16, String, NSEvent.ModifierFlags, String)] = [
+            (Key.x, "X", [.shift, .command], "~~글자~~"),
+            (Key.h, "H", [.shift, .command], "==글자=="),
+            (Key.e, "e", .command, "`글자`"),
+            (Key.c, "c", [.option, .command], "```\n글자\n```"),
+            (Key.one, "1", [.option, .command], "# 글자"),
+            (Key.two, "2", [.option, .command], "## 글자"),
+            (Key.three, "3", [.option, .command], "### 글자")
+        ]
+        for (code, character, modifiers, expected) in shortcuts {
+            let h = try EditorHarness.at("|글자|")
+            let event = try keyEvent(h, code: code, characters: character, modifiers: modifiers)
+            h.step { #expect(h.view.performKeyEquivalent(with: event)) }
+            #expect(h.editor.text == expected)
+        }
+        let h = try EditorHarness.at("|글자|")
+        let event = try keyEvent(h, code: Key.l, characters: "l", modifiers: .command)
+        #expect(h.view.performKeyEquivalent(with: event))
+        #expect(h.controller.linkSession != nil)
+    }
+
     @Test func otherShortcutsPassThrough() throws {
         let h = try EditorHarness("글자")
         // ⌘W(창 닫기) 같은 노트 창의 단축키는 편집기가 먹지 않는다.

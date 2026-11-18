@@ -147,7 +147,7 @@ extension EditorController {
         }
         guard trailing != appliedTrailingStyle else { return }
         appliedTrailingStyle = trailing
-        textView.defaultParagraphStyle = trailing
+        setInputParagraph(trailing ?? style.bodyParagraph)
         // 빈 줄 조각이 붙어 있는 마지막 문단을 다시 놓게 한다.
         if document.lines.count >= 2 { invalidate(lines: (document.lines.count - 2)..<(document.lines.count - 1)) }
     }

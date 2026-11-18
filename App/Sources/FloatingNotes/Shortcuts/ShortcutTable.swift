@@ -137,7 +137,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         row(.editing, "현재 줄 날짜 제안 받기", [.tab]),
         row(.editing, "날짜 제안만 닫기", [.escape]),
         row(.editing, "들여쓰기 (날짜 제안이 없을 때)", [.tab]),
-        row(.editing, "내어쓰기", [.tab], [.shift]),
+        row(.editing, "내어쓰기 / 본문 처음에서 제목으로", [.tab], [.shift]),
         row(.editing, "투두로 바꾸기", [.nine], [.shift, .command]),
         row(.editing, "완료 표시", [.returnKey], [.command]),
         row(.editing, "줄 위로, 아래로 옮기기", [.up, .down], [.control, .command]),

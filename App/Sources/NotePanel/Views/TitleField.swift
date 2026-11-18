@@ -185,7 +185,8 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             onChange?(titleBeforeEditing)
             endEditing()
             return true
-        case #selector(NSResponder.insertNewline(_:)),
+        case #selector(NSResponder.insertTab(_:)),
+             #selector(NSResponder.insertNewline(_:)),
              #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
              #selector(NSResponder.insertLineBreak(_:)),
              #selector(NSResponder.insertParagraphSeparator(_:)):

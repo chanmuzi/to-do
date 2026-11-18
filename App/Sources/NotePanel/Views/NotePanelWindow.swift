@@ -48,11 +48,11 @@ final class NotePanelWindow: NSPanel {
     /// 노트 창은 앱을 앞으로 가져오는 보통 창이라, 키 창이어도 앱이 뒤에 있는 동안에는 키 입력을 받지 않는다.
     /// 그래서 언제 키 창이 되는지를 따로 막지 않는다. 다른 앱의 입력을 가져오지 않는 일은 앱을 앞으로 가져오는
     /// 쪽이 지킨다: 켤 때 되살린 창, "노트 모두 보이기"로 돌아온 창, 마우스만 올린 창은 앱을 앞으로 가져오지 않는다.
-    override var canBecomeKey: Bool { allowsKey }
+    override var canBecomeKey: Bool { allowsKey && isVisible }
 
     // 노트는 보조 도구가 아니라 편집 문서다. main을 라이브러리에 남겨 두면
     // 버튼이 앱을 활성화할 때 AppKit이 이전 main 창(라이브러리)도 앞으로 가져온다.
-    override var canBecomeMain: Bool { allowsKey }
+    override var canBecomeMain: Bool { allowsKey && isVisible }
 
     override func becomeKey() {
         super.becomeKey()
@@ -60,7 +60,7 @@ final class NotePanelWindow: NSPanel {
     }
 
     private func requestMain() {
-        guard allowsKey else { return }
+        guard canBecomeMain else { return }
         mainRequestCount += 1
         makeMain()
     }

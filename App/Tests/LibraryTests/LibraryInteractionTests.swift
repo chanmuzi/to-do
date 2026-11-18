@@ -119,20 +119,42 @@ import SpaceIcons
         #expect(try notes.listTrash().notes.isEmpty)
     }
 
-    @Test func sidebarReminderSelectsThenReturnOpensWhileTrashStaysUntouched() throws {
+    @Test func sidebarReminderOpensOnOneClickWhileTrashStaysUntouched() throws {
         let f = try Fixture(); defer { try? f.close() }
         let note = try f.notes.create(NoteDraft(title: "다가옴", reminder: Date().addingTimeInterval(3600)))
         let trash = try f.notes.create(NoteDraft(title: "휴지통")); try f.notes.moveToTrash(trash.id)
+        // 외부에서 노트 파일을 되살려 휴지통과 현재 노트의 ID가 겹친 상태.
+        let location = StoreLocation.isolated(notesDirectory: f.root)
+        try FileManager.default.copyItem(at: location.notesDirectory.appendingPathComponent(note.id.rawValue + ".md"),
+            to: location.trashDirectory.appendingPathComponent(note.id.rawValue + ".md"))
         f.coordinator.allowsKeyWindows = false; f.coordinator.show(); f.model.select(.trash); settle()
         let window = try #require(f.coordinator.window)
         let root = try #require(window.contentView)
         let row = try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }
             .first { $0.bounds.height == f.model.theme.component(.rowHeight) })
         try click(window, at: row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil))
-        #expect(f.model.selectedNoteID == note.id); #expect(f.routes.isEmpty)
-        try key(row, code: 36, characters: "\r")
+        #expect(f.model.selectedNoteID == note.id)
         #expect(f.routes == [.openNote(note.id)])
-        #expect(try f.notes.listTrash().notes.map(\.id) == [trash.id])
+        try key(row, code: 36, characters: "\r")
+        #expect(row.accessibilityPerformPress())
+        #expect(f.routes == Array(repeating: .openNote(note.id), count: 3))
+        #expect(f.model.error == nil)
+        #expect(Set(try f.notes.listTrash().notes.map(\.id)) == [trash.id, note.id])
+    }
+
+    @Test func bringingLibraryForwardKeepsTrashSelection() throws {
+        let f = try Fixture(); defer { try? f.close() }
+        let note = try f.notes.create(NoteDraft(title: "버린 노트"))
+        try f.notes.moveToTrash(note.id)
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        f.model.select(.trash)
+        f.model.activate(note)
+        let window = try #require(f.coordinator.window)
+        f.coordinator.bringForward()
+        #expect(f.coordinator.window === window)
+        #expect(window.isVisible && f.model.selectedNoteID == note.id)
+        #expect(f.routes.isEmpty)
     }
 
     @Test func calendarOnlyRowOpensItsEventOnOneClick() throws {

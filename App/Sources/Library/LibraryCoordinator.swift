@@ -44,11 +44,29 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
             }
             self.window = window
         }
-        if allowsKeyWindows { window?.makeKeyAndOrderFront(nil) } else { window?.orderFront(nil) }
+        orderLibraryFront()
         timer?.invalidate()
         // 자정과 리마인더가 지나면 열린 라이브러리의 분류도 갱신한다.
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.model.refreshCalendar() }
+        }
+    }
+    /// 앱 전환은 사용자가 보고 있던 구획과 선택을 보존한다.
+    public func bringForward() {
+        if let window, window.isVisible || window.isMiniaturized {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            orderLibraryFront()
+        } else {
+            show()
+        }
+    }
+
+    private func orderLibraryFront() {
+        if allowsKeyWindows {
+            window?.makeKeyAndOrderFront(nil)
+            window?.makeMain()
+        } else {
+            window?.orderFront(nil)
         }
     }
     #if DEBUG

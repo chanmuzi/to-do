@@ -53,6 +53,7 @@ extension NoteWindowController {
     /// 저장소의 지금 값을 받아들인다(이 앱의 저장, 다른 프로그램이 고친 파일, 파일의 내용으로 되돌리기).
     /// 본문은 편집기와 주고받은 것과 다를 때만 편집기에 넣는다. 다시 읽으면 저장소의 충돌 기준도 갱신된다.
     private func adoptStoreNote() {
+        let previous = note
         do {
             note = try environment.notes.load(noteID)
         } catch {
@@ -60,6 +61,10 @@ extension NoteWindowController {
             return
         }
         syncEditorBody()
+        let remaining = Set(note.schedules.filter { !$0.isDeleted }.map(\.id))
+        for item in previous.schedules where !item.isDeleted && !remaining.contains(item.id) {
+            if let line = item.inlineSource?.line, line >= 0 { editor.scheduleRemoved(fromBodyLine: line) }
+        }
         refreshChrome(animated: true)
     }
 

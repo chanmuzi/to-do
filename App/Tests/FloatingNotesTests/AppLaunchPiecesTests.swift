@@ -73,103 +73,55 @@ import Testing
         #expect(icon.item == 2)
     }
 
-    // MARK: - Dock 아이콘 누르기
-
-    /// 검토에서 나온 문제: Dock 아이콘을 눌렀는데 노트를 띄우지 못하면 기록만 남고 아무 일도 없어 보였다.
-    /// 새 노트를 만들지 못했을 때와 같은 알림으로 까닭을 보여 준다.
-    @Test func reopenThatCannotShowANoteTellsTheUser() throws {
-        let fixture = try AppFixture()
-        var shown: [(title: String, error: Error)] = []
-        var warnings: [String] = []
-        let presenter = FallbackNotePresenter(
-            notes: fixture.notes, notePanels: fixture.notePanels, warn: { warnings.append($0) },
-            presentFailure: { shown.append((title: $0, error: $1)) }
-        )
-        // 노트가 하나도 없고 노트 폴더에 쓸 수 없다: 빈 노트를 만들지 못한다.
-        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: fixture.root.path)
-        defer {
-            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fixture.root.path)
-            fixture.cleanUp()
-        }
-
-        presenter.handleReopen()
-
-        #expect(shown.count == 1)
-        #expect(shown.first?.title == "노트를 띄우지 못했습니다")
-        #expect(shown.first?.error is StoreError)
-        #expect(warnings.count == 1)
-        #expect(fixture.notePanels.openNoteIDs.isEmpty)
-    }
-
-    @Test func reopenShowsHiddenNotesOrTheMostRecentNoteWithoutAnAlert() throws {
-        let fixture = try AppFixture()
-        defer { fixture.cleanUp() }
-        var shown: [String] = []
-        let presenter = FallbackNotePresenter(
-            notes: fixture.notes, notePanels: fixture.notePanels, warn: { _ in },
-            presentFailure: { title, _ in shown.append(title) }
-        )
-        let note = try fixture.notes.create(NoteDraft(title: "가장 최근 노트"))
-
-        presenter.handleReopen()
-        #expect(fixture.notePanels.openNoteIDs == [note.id])
-
-        fixture.notePanels.toggleAllHidden()
-        presenter.handleReopen()
-        #expect(!fixture.notePanels.areNotesHidden)
-        #expect(fixture.notePanels.openNoteIDs == [note.id])
-        #expect(shown.isEmpty)
-    }
-
     // MARK: - 앱이 앞으로 왔을 때
 
-    /// 켜면서 온 활성화는 노트를 키 창으로 만들지 않는다. 그 뒤에 사용자가 앞으로 가져오면 만든다.
-    @Test func launchActivationIsIgnoredAndLaterActivationsFocusTheNote() {
+    /// 첫 실행의 복원을 지키고 다음 앱 전환에서 라이브러리를 연다.
+    @Test func launchActivationIsIgnoredAndLaterActivationsShowTheLibrary() {
         var policy = ActivationFocusPolicy()
         // 다 켜기 전에 온 활성화.
-        let whileLaunching = policy.shouldFocusNote(activatedAt: 9)
+        let whileLaunching = policy.shouldShowLibrary(activatedAt: 9)
         policy.launchFinished(at: 10)
-        let afterwards = policy.shouldFocusNote(activatedAt: 10.2)
+        let afterwards = policy.shouldShowLibrary(activatedAt: 10.2)
         #expect(!whileLaunching)
         #expect(afterwards)
 
         var foreground = ActivationFocusPolicy()
         foreground.launchFinished(at: 10)
         // 다 켠 직후의 첫 활성화는 켜면서 온 것이다.
-        let launchActivation = foreground.shouldFocusNote(activatedAt: 10.05)
+        let launchActivation = foreground.shouldShowLibrary(activatedAt: 10.05)
         // 곧바로 다시 앞으로 가져와도(⌘Tab) 그것은 사용자가 한 것이다.
-        let userActivation = foreground.shouldFocusNote(activatedAt: 10.4)
+        let userActivation = foreground.shouldShowLibrary(activatedAt: 10.4)
         #expect(!launchActivation)
         #expect(userActivation)
     }
 
     /// 알림 창이나 캡처 바, 노트 찾기가 키 입력을 받는 중에 앱이 앞으로 오면(실패를 알리는 알림 창은 스스로
-    /// 앱을 앞으로 가져온다) 노트가 키 창을 가져가지 않는다. 그 활성화도 본 것으로 친다.
-    @Test func activationWhileAnotherScreenHoldsKeyDoesNotFocusANote() {
+    /// 앱을 앞으로 가져온다) 요청된 창의 포커스를 지킨다. 그 활성화도 본 것으로 친다.
+    @Test func activationWhileAnotherScreenHoldsKeyPreservesTheTarget() {
         var policy = ActivationFocusPolicy()
         policy.launchFinished(at: 10)
 
-        let duringAlert = policy.shouldFocusNote(activatedAt: 500, isKeyHeldElsewhere: true)
-        let afterwards = policy.shouldFocusNote(activatedAt: 501, isKeyHeldElsewhere: false)
+        let duringAlert = policy.shouldShowLibrary(activatedAt: 500, hasExplicitTarget: true)
+        let afterwards = policy.shouldShowLibrary(activatedAt: 501, hasExplicitTarget: false)
         #expect(!duringAlert)
         #expect(afterwards)
 
         // 다 켠 직후에 알림 창과 함께 온 활성화 다음의 활성화는 사용자의 것이다.
         var early = ActivationFocusPolicy()
         early.launchFinished(at: 10)
-        let first = early.shouldFocusNote(activatedAt: 10.1, isKeyHeldElsewhere: true)
-        let second = early.shouldFocusNote(activatedAt: 10.3)
+        let first = early.shouldShowLibrary(activatedAt: 10.1, hasExplicitTarget: true)
+        let second = early.shouldShowLibrary(activatedAt: 10.3)
         #expect(!first)
         #expect(second)
     }
 
     /// 뒤에서 켠 실행(로그인 항목, `open -g`)에는 켜면서 오는 활성화가 없다. 첫 활성화가 사용자의 것이다.
-    @Test func firstActivationLongAfterABackgroundLaunchFocusesTheNote() {
+    @Test func firstActivationLongAfterABackgroundLaunchShowsTheLibrary() {
         var policy = ActivationFocusPolicy()
         policy.launchFinished(at: 10)
 
-        let first = policy.shouldFocusNote(activatedAt: 10 + ActivationFocusPolicy.launchGrace)
-        let later = policy.shouldFocusNote(activatedAt: 500)
+        let first = policy.shouldShowLibrary(activatedAt: 10 + ActivationFocusPolicy.launchGrace)
+        let later = policy.shouldShowLibrary(activatedAt: 500)
         #expect(first)
         #expect(later)
     }

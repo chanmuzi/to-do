@@ -8,18 +8,20 @@ struct LibraryRowInput: NSViewRepresentable {
     let model: LibraryModel
     let note: Note
     let label: String
+    let isUpcoming: Bool
     let hover: (Bool) -> Void
 
     func makeNSView(context: Context) -> LibraryRowInputView { LibraryRowInputView() }
     func updateNSView(_ view: LibraryRowInputView, context: Context) {
         view.model = model
         view.note = note
+        view.isUpcoming = isUpcoming
         view.hover = hover
         view.setAccessibilityLabel(label)
         view.setAccessibilityValue(model.selectedNoteID == note.id ? "선택됨" : "")
         view.setAccessibilityCustomActions([
-            NSAccessibilityCustomAction(name: model.index.trash.contains { $0.id == note.id } ? "복원 후 열기" : "열기") {
-                model.open(note)
+            NSAccessibilityCustomAction(name: view.restoresTrash ? "복원 후 열기" : "열기") { [weak view] in
+                view?.openNote()
                 return true
             }
         ])
@@ -29,6 +31,7 @@ struct LibraryRowInput: NSViewRepresentable {
 final class LibraryRowInputView: NSView {
     var model: LibraryModel?
     var note: Note?
+    var isUpcoming = false
     var hover: (Bool) -> Void = { _ in }
     private var tracking: NSTrackingArea?
     private var pressed = false
@@ -71,11 +74,16 @@ final class LibraryRowInputView: NSView {
     override func mouseUp(with event: NSEvent) {
         defer { pressed = false }
         guard pressed, bounds.contains(convert(event.locationInWindow, from: nil)), let note else { return }
-        model?.activate(note, clickCount: clickCount)
+        if isUpcoming {
+            if clickCount == 1 { openNote() }
+        } else {
+            model?.activate(note, clickCount: clickCount)
+        }
     }
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 36, 76: model?.openSelected()
+        case 36, 76:
+            if isUpcoming { openNote() } else { model?.openSelected() }
         case 125: model?.moveSelection(by: 1)
         case 126: model?.moveSelection(by: -1)
         case 49: if let note { model?.activate(note) }
@@ -84,8 +92,8 @@ final class LibraryRowInputView: NSView {
     }
     override func accessibilityPerformPress() -> Bool {
         guard let model, let note else { return false }
-        model.activate(note)
         window?.makeFirstResponder(self)
+        if isUpcoming { openNote() } else { model.activate(note) }
         return true
     }
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -93,7 +101,7 @@ final class LibraryRowInputView: NSView {
         model.activate(note)
         window?.makeFirstResponder(self)
         let menu = NSMenu()
-        let trash = model.index.trash.contains { $0.id == note.id }
+        let trash = restoresTrash
         let open = NSMenuItem(title: trash ? "되돌리기" : "열기", action: #selector(openNote), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
@@ -104,7 +112,15 @@ final class LibraryRowInputView: NSView {
         }
         return menu
     }
-    @objc private func openNote() { if let note { model?.open(note) } }
+    fileprivate var restoresTrash: Bool {
+        guard !isUpcoming, let note, let model else { return false }
+        return model.index.trash.contains { $0.id == note.id }
+    }
+
+    @objc fileprivate func openNote() {
+        guard let model, let note else { return }
+        if isUpcoming { model.router.route(.openNote(note.id)) } else { model.open(note) }
+    }
     @objc private func moveNote() { if let note { model?.router.route(.openSpacePicker(note.id)) } }
 }
 
@@ -112,6 +128,7 @@ struct LibrarySelectableRow<Content: View>: View {
     let model: LibraryModel
     let note: Note
     let label: String
+    var isUpcoming = false
     var highlightInsets = EdgeInsets()
     @ViewBuilder let content: () -> Content
     @State private var hovered = false
@@ -124,7 +141,7 @@ struct LibrarySelectableRow<Content: View>: View {
                     .fill(selected ? model.theme.libraryColor(.selected) : hovered ? model.theme.libraryColor(.hover) : .clear)
                     .padding(highlightInsets)
             }
-            .overlay { LibraryRowInput(model: model, note: note, label: label) { hovered = $0 } }
+            .overlay { LibraryRowInput(model: model, note: note, label: label, isUpcoming: isUpcoming) { hovered = $0 } }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : model.theme.motion.animation, value: hovered)
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : model.theme.motion.animation, value: model.selectedNoteID)
     }

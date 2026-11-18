@@ -1,13 +1,6 @@
 import Foundation
 
-/// 앱이 앞으로 왔을 때 맨 앞 노트를 키 창으로 만들지(D-025).
-///
-/// 사용자가 앱을 일부러 앞으로 가져오면(⌘Tab, Dock) 맨 앞 노트가 키 창이 되어 키보드만으로 이어 쓸 수 있다.
-/// 켜는 중에 오는 활성화는 뺀다: 켤 때 되살린 창은 키 창이 되지 않는다는 약속을 지킨다.
-///
-/// AppKit은 "켜면서 온 활성화"와 "나중에 사용자가 한 활성화"를 가려 주지 않는다(같은 알림이고, 뒤에서
-/// 켠 실행에서는 켜면서 오는 활성화가 아예 없다). 그래서 다 켠 뒤 `launchGrace` 안에 온 첫 활성화만
-/// 켜면서 온 것으로 본다.
+/// 첫 실행의 창 복원과 실행 중의 앱 전환을 구분한다.
 struct ActivationFocusPolicy {
     /// 다 켠 뒤 이 시간 안에 온 첫 활성화는 켜면서 온 것으로 본다(초). 화면 값이 아니라 판단 기준이다.
     static let launchGrace: TimeInterval = 1
@@ -20,13 +13,10 @@ struct ActivationFocusPolicy {
         launchFinishedAt = time
     }
 
-    /// 앱이 앞으로 왔다. 맨 앞 노트를 키 창으로 만들어도 되면 참.
-    /// - Parameter isKeyHeldElsewhere: 키 입력을 받아야 하는 다른 화면이 떠 있다(알림 창, 캡처 바, 노트 찾기).
-    ///   그때 노트를 키 창으로 만들면 그 화면이 입력을 잃는다. 실패를 알리는 알림 창은 스스로 앱을 앞으로
-    ///   가져오므로 이 경우가 실제로 생긴다.
-    mutating func shouldFocusNote(activatedAt time: TimeInterval, isKeyHeldElsewhere: Bool = false) -> Bool {
+    /// 직접 고른 창이나 모달에 입력을 주는 활성화는 라이브러리로 돌리지 않는다.
+    mutating func shouldShowLibrary(activatedAt time: TimeInterval, hasExplicitTarget: Bool = false) -> Bool {
         defer { hasSeenActivation = true }
-        guard !isKeyHeldElsewhere else { return false }
+        guard !hasExplicitTarget else { return false }
         // 아직 켜는 중이다.
         guard let launchFinishedAt else { return false }
         if !hasSeenActivation, time - launchFinishedAt < Self.launchGrace { return false }
