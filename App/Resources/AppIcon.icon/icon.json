@@ -1,11 +1,11 @@
 {
   "groups": [
     {
-      "name": "1-background",
+      "name": "3-note-window",
       "layers": [
         {
-          "name": "1-background light",
-          "image-name": "light-1-background.png",
+          "name": "3-note-window light",
+          "image-name": "light-3-note-window.png",
           "glass": false,
           "hidden-specializations": [
             {
@@ -18,8 +18,8 @@
           ]
         },
         {
-          "name": "1-background dark",
-          "image-name": "dark-1-background.png",
+          "name": "3-note-window dark",
+          "image-name": "dark-3-note-window.png",
           "glass": false,
           "hidden-specializations": [
             {
@@ -83,11 +83,11 @@
       }
     },
     {
-      "name": "3-note-window",
+      "name": "1-background",
       "layers": [
         {
-          "name": "3-note-window light",
-          "image-name": "light-3-note-window.png",
+          "name": "1-background light",
+          "image-name": "light-1-background.png",
           "glass": false,
           "hidden-specializations": [
             {
@@ -100,8 +100,8 @@
           ]
         },
         {
-          "name": "3-note-window dark",
-          "image-name": "dark-3-note-window.png",
+          "name": "1-background dark",
+          "image-name": "dark-1-background.png",
           "glass": false,
           "hidden-specializations": [
             {

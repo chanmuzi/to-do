@@ -6,7 +6,7 @@ public struct CommandTextField: NSViewRepresentable {
     @Binding var text: String
     let theme: Theme
     let placeholder: String
-    let style: TextStyle
+    let font: NSFont
     let ranges: [NSRange]
     let focusToken: Int
     let submit: () -> Void
@@ -14,10 +14,10 @@ public struct CommandTextField: NSViewRepresentable {
     let move: (Int) -> Void
     let moveDay: ((Int) -> Void)?
     let tab: ((Bool) -> Void)?
-    public init(text: Binding<String>, theme: Theme, placeholder: String, style: TextStyle = .body,
+    public init(text: Binding<String>, theme: Theme, placeholder: String, style: TextStyle = .body, font: NSFont? = nil,
                 ranges: [NSRange] = [], focusToken: Int = 0, submit: @escaping () -> Void, cancel: @escaping () -> Void,
                 move: @escaping (Int) -> Void = { _ in }, moveDay: ((Int) -> Void)? = nil, tab: ((Bool) -> Void)? = nil) {
-        _text = text; self.theme = theme; self.placeholder = placeholder; self.style = style
+        _text = text; self.theme = theme; self.placeholder = placeholder; self.font = font ?? theme.nsFont(style)
         self.moveDay = moveDay
         self.tab = tab
         self.focusToken = focusToken
@@ -40,8 +40,8 @@ public struct CommandTextField: NSViewRepresentable {
             context.coordinator.focusToken = focusToken
             DispatchQueue.main.async { [weak field] in if let field { field.window?.makeFirstResponder(field) } }
         }
-        field.font = theme.nsFont(style); field.textColor = theme.nsColor(.text)
-        field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.foregroundColor: theme.nsColor(.text3, on: .surface3)])
+        field.font = font; field.textColor = theme.nsColor(.text)
+        field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.font: font, .foregroundColor: theme.nsColor(.text3, on: .surface3)])
         if field.stringValue != text, !((field.currentEditor() as? NSTextView)?.hasMarkedText() ?? false) {
             field.stringValue = text
             (field.currentEditor() as? NSTextView)?.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
@@ -49,7 +49,7 @@ public struct CommandTextField: NSViewRepresentable {
         if let editor = field.currentEditor() as? NSTextView, !editor.hasMarkedText() {
             context.coordinator.decorate(editor)
         } else if field.currentEditor() == nil {
-            let value = NSMutableAttributedString(string: text, attributes: [.font: theme.nsFont(style), .foregroundColor: theme.nsColor(.text)])
+            let value = NSMutableAttributedString(string: text, attributes: [.font: font, .foregroundColor: theme.nsColor(.text)])
             for range in ranges where NSMaxRange(range) <= value.length { value.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range) }
             field.attributedStringValue = value
         }

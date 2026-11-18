@@ -38,9 +38,8 @@ struct LibraryRootView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         if model.rows.isEmpty {
-                            Button(model.query.isEmpty ? (!model.showsNewNote ? "전체 노트" : "새 노트") : "검색 지우기") {
-                                if !model.query.isEmpty { model.query = "" }
-                                else if !model.showsNewNote { model.select(.all) }
+                            Button(model.showsNewNote ? "새 노트" : "전체 노트") {
+                                if !model.showsNewNote { model.select(.all) }
                                 else {
                                     var draft = NoteDraft()
                                     switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
@@ -73,10 +72,8 @@ struct LibraryRootView: View {
                 if let id = model.upcomingID, let anchor = anchors[id],
                    let entry = model.index.upcoming.first(where: { $0.id == id }) {
                     let rect = geometry[anchor]
-                    if model.upcomingPinned {
-                        Color.clear.contentShape(Rectangle()).onTapGesture { model.upcomingID = nil }
-                    }
                     UpcomingDetail(model: model, entry: entry)
+                        .background(UpcomingDetailBounds(model: model))
                         .offset(x: theme.component(.librarySidebarWidth) + theme.space(.sp1),
                                 y: min(rect.minY, max(0, geometry.size.height - theme.component(.upcomingDetailHeight))))
                 }

@@ -35,10 +35,5 @@ enum DebugInputVerification {
             "keyWindow": view.window?.isKeyWindow ?? false,
         ]
     }
-
-    static func searchField(in view: NSView) -> NSTextField? {
-        if let field = view as? NSTextField, field.accessibilityLabel() == "검색" { return field }
-        return view.subviews.lazy.compactMap { searchField(in: $0) }.first
-    }
 }
 #endif

@@ -145,10 +145,48 @@ import SpaceIcons
         #expect(Set(try f.notes.listTrash().notes.map(\.id)) == [trash.id, note.id])
     }
 
+    @Test func upcomingToggleFollowsLastVisibleRowInBothStates() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let now = Date()
+        for hour in 1...7 {
+            _ = try f.notes.create(NoteDraft(title: "일정 \(hour)", reminder: now.addingTimeInterval(Double(hour) * 3600)))
+        }
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        settle()
+        let window = try #require(f.coordinator.window)
+        let root = try #require(window.contentView)
+        let theme = f.model.theme
+        let labels = f.model.index.upcoming.map { $0.id + " 호버" }
+
+        func visibleRows() -> [NSRect] {
+            descendants(root).filter { labels.contains($0.accessibilityLabel() ?? "") }
+                .map { $0.convert($0.bounds, to: nil) }.sorted { $0.midY > $1.midY }
+        }
+        func clickBelowLastRow(_ rows: [NSRect]) throws {
+            let last = try #require(rows.last)
+            try click(window, at: NSPoint(x: last.minX + theme.space(.sp6) + theme.space(.sp2),
+                                          y: last.minY - theme.component(.librarySidebarRowGap) - theme.lineHeight(.title) / 2))
+        }
+
+        let collapsed = visibleRows()
+        #expect(collapsed.count == 5)
+        try clickBelowLastRow(collapsed)
+        let expanded = visibleRows()
+        #expect(expanded.count == 7)
+        for (upper, lower) in zip(expanded, expanded.dropFirst()) {
+            #expect(upper.minY - lower.maxY == theme.component(.librarySidebarRowGap))
+        }
+        try clickBelowLastRow(expanded)
+        #expect(visibleRows().count == 5)
+    }
+
     @Test func upcomingHoverCancelsOnExitAndClickPersistsUntilOutside() async throws {
         let f = try Fixture()
         defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "다가옴", reminder: Date().addingTimeInterval(3600)))
+        _ = try f.notes.create(NoteDraft(title: "두 번째", reminder: Date().addingTimeInterval(7200)))
         f.coordinator.allowsKeyWindows = false
         f.coordinator.show()
         settle()
@@ -169,6 +207,15 @@ import SpaceIcons
         try clickAction(entry.id, in: root, window: window)
         hover.changed(false)
         #expect(f.model.upcomingID == entry.id && f.model.upcomingPinned)
+        let second = try #require(f.model.index.upcoming.last)
+        let nextHover = try #require(descendants(root).compactMap { $0 as? SidebarHoverView }
+            .first { $0.accessibilityLabel() == second.id + " 호버" })
+        nextHover.changed(true)
+        try await Task.sleep(for: .seconds(pause * 1.5))
+        #expect(f.model.upcomingID == second.id && !f.model.upcomingPinned)
+        hover.changed(false)
+        #expect(f.model.upcomingID == second.id)
+        try clickAction(second.id, in: root, window: window)
         try click(window, at: NSPoint(x: root.bounds.maxX - 25, y: root.bounds.midY))
         #expect(f.model.upcomingID == nil)
     }
@@ -330,14 +377,13 @@ import SpaceIcons
         #expect(before != after, "노트 수가 바뀌면 보기 오른쪽 개수를 갱신한다")
     }
 
-    @Test func keyboardSelectionClearsWhenViewOrSearchChanges() throws {
+    @Test func keyboardSelectionClearsWhenViewChanges() throws {
         let f = try Fixture(); defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "A")); _ = try f.notes.create(NoteDraft(title: "B"))
         f.model.refresh(); f.model.moveSelection(by: 1)
         #expect(f.model.selectedNoteID == f.model.rows.first?.id)
         f.model.moveSelection(by: 1)
         #expect(f.model.selectedNoteID == f.model.rows.last?.id)
-        f.model.query = "A"; #expect(f.model.selectedNoteID == nil)
         f.model.activate(try #require(f.model.rows.first)); f.model.select(.all)
         #expect(f.model.selectedNoteID == nil)
     }

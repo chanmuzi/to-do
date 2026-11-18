@@ -9,68 +9,62 @@ struct LibrarySidebar: View {
     @State private var deleting: Space?
     private var theme: Theme { model.theme }
     var body: some View {
-        VStack(spacing: theme.space(.sp2)) {
-            HStack(spacing: theme.space(.sp1)) {
-                LibrarySymbol(theme: theme, name: "magnifyingglass", size: .iconMedium)
-                    .foregroundStyle(theme.libraryColor(.text3))
-                LibrarySearchField(text: $model.query, theme: theme)
-            }
-                .font(theme.font(.body)).padding(.horizontal, theme.space(.sp2))
-                .frame(height: theme.component(.browseFindHeight))
-                .background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-                .padding(.top, theme.component(.libraryHeaderHeight))
-            ScrollView {
-                VStack(alignment: .leading, spacing: theme.component(.sectionGap)) {
-                    VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                        sectionHeader("보기", symbol: "slider.horizontal.3", label: "보기 편집") { model.editingViews = true }
-                            .popover(isPresented: $model.editingViews) { LibraryViewEditor(model: model) }
-                        ForEach(model.settings.visibleViews, id: \.self) { item in row(item, symbol: symbol(item)) }
-                    }
-                    VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                        sectionHeader("스페이스", symbol: "plus", label: "새 스페이스") { model.beginSpaceEditing() }
-                        ForEach(model.spaceList) { space in
-                            if model.editingSpace && model.renamingSpaceID == space.id {
-                                spaceInput
-                            } else {
-                                LibrarySpaceRow(model: model, space: space,
-                                    rename: { model.beginSpaceEditing(space.id) }, delete: { deleting = space })
-                            }
-                            if model.expanded.contains(space.id) {
-                                ForEach(model.index.days(in: space.id), id: \.self) { day in
-                                    row(.day(space.id, day), symbol: nil, indented: true)
-                                        .overlay(alignment: .leading) {
-                                            theme.libraryColor(.guide).frame(width: theme.shape(.borderWidth))
-                                                .padding(.leading, theme.space(.sp4)).allowsHitTesting(false)
-                                        }
-                                }
-                            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: theme.component(.sectionGap)) {
+                VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                    sectionHeader("보기", symbol: "slider.horizontal.3", label: "보기 편집") { model.editingViews = true }
+                        .popover(isPresented: $model.editingViews) { LibraryViewEditor(model: model) }
+                    ForEach(model.settings.visibleViews, id: \.self) { item in row(item, symbol: symbol(item)) }
+                }
+                VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                    sectionHeader("스페이스", symbol: "plus", label: "새 스페이스") { model.beginSpaceEditing() }
+                    ForEach(model.spaceList) { space in
+                        if model.editingSpace && model.renamingSpaceID == space.id {
+                            spaceInput
+                        } else {
+                            LibrarySpaceRow(model: model, space: space,
+                                rename: { model.beginSpaceEditing(space.id) }, delete: { deleting = space })
                         }
-                        if model.editingSpace && model.renamingSpaceID == nil { spaceInput }
-                    }
-                    VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                        sectionHeader("아카이브")
-                        row(.archived, symbol: "archivebox")
-                        row(.trash, symbol: "trash")
-                    }
-                    let upcoming = model.index.upcoming
-                    if !upcoming.isEmpty {
-                        VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                            sectionHeader("다가오는 일정")
-                            ForEach(model.showAllUpcoming ? upcoming : Array(upcoming.prefix(5))) { entry in
-                                UpcomingButton(model: model, entry: entry)
-                            }
-                            if upcoming.count > 5 && !model.showAllUpcoming {
-                                Button("모두 보기") { model.showAllUpcoming = true }
-                                    .font(theme.font(.title, weight: theme.tokens.textStyle(.body).weight))
-                                    .foregroundStyle(theme.libraryColor(.text3)).buttonStyle(.plain)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.leading, theme.space(.sp6))
+                        if model.expanded.contains(space.id) {
+                            ForEach(model.index.days(in: space.id), id: \.self) { day in
+                                row(.day(space.id, day), symbol: nil, indented: true)
+                                    .overlay(alignment: .leading) {
+                                        theme.libraryColor(.guide).frame(width: theme.shape(.borderWidth))
+                                            .padding(.leading, theme.space(.sp4)).allowsHitTesting(false)
+                                    }
                             }
                         }
                     }
-                }.padding(.top, theme.space(.sp2))
-            }
+                    if model.editingSpace && model.renamingSpaceID == nil { spaceInput }
+                }
+                VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                    sectionHeader("아카이브")
+                    row(.archived, symbol: "archivebox")
+                    row(.trash, symbol: "trash")
+                }
+                let upcoming = model.index.upcoming
+                let collapsedLimit = 5
+                if !upcoming.isEmpty {
+                    VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                        sectionHeader("다가오는 일정")
+                        ForEach(upcoming.prefix(model.showAllUpcoming ? upcoming.count : collapsedLimit)) { entry in
+                            UpcomingButton(model: model, entry: entry)
+                        }
+                        if upcoming.count > collapsedLimit {
+                            Button(model.showAllUpcoming ? "간단히 보기" : "모두 보기") {
+                                model.showAllUpcoming.toggle()
+                                model.dismissUpcoming()
+                            }
+                            .font(theme.font(.title, weight: theme.tokens.textStyle(.body).weight))
+                            .foregroundStyle(theme.libraryColor(.text3)).buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, theme.space(.sp6))
+                        }
+                    }
+                }
+            }.padding(.top, theme.space(.sp2))
         }
+        .padding(.top, theme.component(.libraryHeaderHeight))
         .padding(.horizontal, theme.space(.sp2))
         .padding(.bottom, theme.space(.sp2))
         .frame(width: theme.component(.librarySidebarWidth))
@@ -92,7 +86,9 @@ struct LibrarySidebar: View {
                 .popover(isPresented: $model.choosingDraftIcon) { IconPickerView(model: model) }
                 .onChange(of: model.choosingDraftIcon) { _, open in if !open { model.draftFocus += 1 } }
         } content: {
-            CommandTextField(text: $model.spaceName, theme: theme, placeholder: "스페이스 이름", focusToken: model.draftFocus,
+            CommandTextField(text: $model.spaceName, theme: theme, placeholder: "스페이스 이름",
+                             font: theme.spaceNameFont(selected: model.renamingSpaceID.map { model.selection == .space($0) } ?? false),
+                             focusToken: model.draftFocus,
                              submit: model.submitSpaceEditing, cancel: model.cancelSpaceEditing)
         }.padding(.trailing, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
             .background(theme.libraryColor(.selected), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
@@ -172,7 +168,7 @@ private struct LibrarySpaceRow: View {
                 SidebarColumns(theme: theme) {
                     SidebarSpaceIcon(model: model, icon: space.icon)
                 } content: {
-                    Text(space.name).font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
+                    Text(space.name).font(Font(theme.spaceNameFont(selected: selected) as CTFont))
                         .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
@@ -241,4 +237,10 @@ private struct SpaceInputBounds: NSViewRepresentable {
         return view
     }
     func updateNSView(_ view: NSView, context: Context) {}
+}
+
+private extension Theme {
+    func spaceNameFont(selected: Bool) -> NSFont {
+        nsFont(selected ? .selected : .body, size: tokens.textStyle(.ui).size)
+    }
 }
