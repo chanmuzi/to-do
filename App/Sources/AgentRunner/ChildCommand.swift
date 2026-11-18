@@ -123,6 +123,14 @@ extension AgentCommand {
         }
     }
 
+    /// 연결 화면에서 만든 로그인 명령의 종료를 기다린다. 출력에 포함될 수 있는 인증 정보는 보관하지 않는다.
+    package func waitForLogin() async throws {
+        try await onWorker {
+            let status = try execute(timeout: .seconds(600)) { _ in }
+            guard status == 0 else { throw AgentError.failed(status) }
+        }
+    }
+
     func capture(mergeDiagnostics: Bool = false) throws -> (Int32, Data) {
         var data = Data()
         let status = try execute(timeout: .seconds(10), mergeDiagnostics: mergeDiagnostics) {
