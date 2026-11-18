@@ -88,8 +88,8 @@ import Theme
 
         controller.hoverOverride = false
         let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
-        // 더 보기, 새 노트, 꺼진 핀(돋보기는 더 보기 메뉴로 옮겼다).
-        #expect(buttons.count == 4)
+        // 더 보기, 닫기, 꺼진 핀.
+        #expect(buttons.count == 3)
         #expect(buttons.allSatisfy { $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 
@@ -100,7 +100,7 @@ import Theme
         #expect(coordinator.snapshot(of: note.id)?.isHovered == true)
         // 알파가 실제로 1이 되고(`dur` 동안), 자리와 창 크기는 그대로다.
         #expect(await fixture.wait {
-            buttons.allSatisfy { $0.alphaValue == 1 } && controller.root.cornerButtons.alphaValue == 1
+            buttons.allSatisfy { $0.alphaValue == 1 } && controller.root.cornerButtons.alphaValue == 0
         })
         controller.root.layoutSubtreeIfNeeded()
         #expect([controller.root.cornerButtons.frame, controller.panel.frame] == frames)
@@ -438,15 +438,17 @@ import Theme
     @Test func buttonsSendRoutesInsteadOfCallingOtherFeatures() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
-        let note = try fixture.notes.create(NoteDraft())
+        let space = SpaceID(rawValue: "menu-space")
+        let note = try fixture.notes.create(NoteDraft(spaceID: space))
         try coordinator.open(note.id, focus: false)
         let actions = try #require(coordinator.controllers[note.id]).root.topRow.actions
 
-        actions.add()
+        let menu = try #require(coordinator.controllers[note.id]).makeMoreMenu()
+        menu.performActionForItem(at: menu.indexOfItem(withTitle: "새 노트"))
         actions.reminder()
 
         #expect(fixture.routes == [
-            .newNote(NewNoteRequest(nextTo: note.id)),
+            .newNote(NewNoteRequest(draft: NoteDraft(spaceID: space), nextTo: note.id)),
             .openReminderEditor(note.id),
         ])
     }
@@ -567,7 +569,7 @@ import Theme
         let all = descendants(of: controller.root)
         let pressable = all.filter { $0 is IconButton || $0 is ReminderBadgeView }
         // 상단 줄의 버튼 넷(더 보기, 새 노트, 저장 문제 표시, 핀)과 리마인더, 오른쪽 아래의 휴지통과 닫기.
-        #expect(pressable.filter { !$0.isHidden }.count == 6)
+        #expect(pressable.filter { !$0.isHidden }.count == 4)
         let clickables = pressable.compactMap { $0 as? ClickableView }
         #expect(clickables.count == pressable.count)
         for view in clickables {
@@ -578,7 +580,7 @@ import Theme
         // 휴지통과 닫기는 본문(글자 칸) 위에 겹쳐 있다.
         let body = try #require(controller.editor.view.enclosingScrollView)
         #expect(body.frame.intersects(controller.root.cornerButtons.frame))
-        #expect(controller.root.cornerButtons.subviews.filter { !$0.isHidden } == [controller.root.cornerButtons.trashButton])
+        #expect(controller.root.cornerButtons.subviews.filter { !$0.isHidden } == [])
     }
 
     /// 저장 문제 표시는 `dur` 동안 나타나고 사라지며, 자리를 미리 차지하는 것들을 밀지 않는다(규칙 7, 8).

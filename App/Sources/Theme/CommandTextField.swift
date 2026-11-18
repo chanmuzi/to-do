@@ -23,25 +23,21 @@ public struct CommandTextField: NSViewRepresentable {
         self.focusToken = focusToken
         self.ranges = ranges; self.submit = submit; self.cancel = cancel; self.move = move
     }
-    public func makeNSView(context: Context) -> NSTextField {
-        let field = CommandField()
-        field.cell = PlainTextInputCell(textCell: "")
-        field.isEditable = true; field.isSelectable = true
-        field.isBordered = false; field.isBezeled = false; field.drawsBackground = false
-        field.focusRingType = .none; field.maximumNumberOfLines = 1; field.cell?.isScrollable = true
+    public func makeNSView(context: Context) -> CommandInputField {
+        let field = CommandField(theme: theme)
         field.delegate = context.coordinator
         field.setAccessibilityLabel(placeholder)
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         return field
     }
-    public func updateNSView(_ field: NSTextField, context: Context) {
+    public func updateNSView(_ field: CommandInputField, context: Context) {
         context.coordinator.parent = self
         if context.coordinator.focusToken != focusToken {
             context.coordinator.focusToken = focusToken
             DispatchQueue.main.async { [weak field] in if let field { field.window?.makeFirstResponder(field) } }
         }
-        field.font = font; field.textColor = theme.nsColor(.text)
-        field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.font: font, .foregroundColor: theme.nsColor(.text3, on: .surface3)])
+        field.apply(font: font, ink: theme.nsColor(.text), placeholder: placeholder,
+                    placeholderInk: theme.nsColor(.text3, on: .surface3))
         if field.stringValue != text, !((field.currentEditor() as? NSTextView)?.hasMarkedText() ?? false) {
             field.stringValue = text
             (field.currentEditor() as? NSTextView)?.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
@@ -98,7 +94,7 @@ public struct CommandTextField: NSViewRepresentable {
         }
     }
 }
-private final class CommandField: NSTextField {
+private final class CommandField: CommandInputField {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let window { DispatchQueue.main.async { [weak self, weak window] in

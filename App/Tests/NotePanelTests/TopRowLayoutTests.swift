@@ -32,8 +32,7 @@ import Theme
         #expect(frames.reminder?.midY == frames.close.midY)
         #expect(frames.reminder?.maxX == frames.pin.minX - metrics.gap)
         #expect(frames.reminder?.width == 57)
-        #expect(frames.pin.maxX + metrics.buttonGap == frames.add.minX)
-        #expect(frames.add.maxX + metrics.buttonGap == frames.more.minX)
+        #expect(frames.pin.maxX + metrics.buttonGap == frames.more.minX)
     }
 
     @Test func clockReplacesAbsentChip() {
@@ -72,7 +71,6 @@ import Theme
         #expect((with.problem?.maxX ?? 0) + metrics.buttonGap == with.reminder?.minX)
         #expect(with.problem?.width == metrics.iconButton)
         #expect(with.more == without.more)
-        #expect(with.add == without.add)
         #expect(with.pin == without.pin)
         #expect(with.reminder == without.reminder)
         #expect(with.title.minX == without.title.minX)

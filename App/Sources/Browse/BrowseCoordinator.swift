@@ -17,6 +17,7 @@ public final class BrowseCoordinator {
     private let spaces: SpaceStore
     private let router: any Routing
     private let windowStates: WindowStateStore?
+    public var onSetPinned: ((NoteID, Bool) -> Void)?
     private let log: @MainActor (String) -> Void
     private let style: BrowseStyle
 
@@ -59,9 +60,6 @@ public final class BrowseCoordinator {
     /// 열려 있는 동안 다시 읽다가 난 실패는 기록만 하고 보이던 목록을 그대로 둔다.
     public var onFailure: (@MainActor (Error) -> Void)?
 
-    /// 확인용: 지금 시각과 달력을 바꿔 끼운다.
-    @_spi(Verification) public var now: @MainActor () -> Date = { Date() }
-    @_spi(Verification) public var calendar: Calendar = .current
     /// 확인용: 거짓이면 띄울 때 키 창으로 만들지 않는다(다른 앱의 입력을 빼앗지 않는다).
     @_spi(Verification) public var takesKeyOnShow = true
     /// 확인용: 거짓이면 창을 화면에 올리되 완전히 투명하게 두고 마우스도 받지 않는다(테스트가 쓰는 사람의 화면을 가리지 않게).
@@ -117,6 +115,7 @@ public final class BrowseCoordinator {
         ].compactMap { $0 }
 
         let textView = rootView.searchField.textView
+        rootView.searchField.input.stringValue = ""
         textView.string = ""
         textView.undoManager?.removeAllActions()
         place(on: window?.screen ?? preferredScreen ?? Self.screenWithMouse(), anchor: window)
@@ -129,7 +128,7 @@ public final class BrowseCoordinator {
         } else {
             panel.orderFrontRegardless()
         }
-        panel.makeFirstResponder(textView)
+        panel.makeFirstResponder(rootView.searchField.input)
         panel.ignoresMouseEvents = !isShownOpaque
         if isShownOpaque { style.animate { panel.animator().alphaValue = 1 } }
         if let failure { reportFailure(failure) }
@@ -144,7 +143,7 @@ public final class BrowseCoordinator {
         staysOpenWithoutKey = false
         guard let panel, let rootView, panel.isVisible, !isClosing, takesKeyOnShow else { return }
         panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(rootView.searchField.textView)
+        panel.makeFirstResponder(rootView.searchField.input)
     }
 
     /// `dur` 동안 흐려진 뒤 내려간다. 포커스를 열기 전의 자리로 돌려줄 때라고 `onDismiss`로 알린다(spec 17).
@@ -158,7 +157,7 @@ public final class BrowseCoordinator {
     @_spi(Verification) public var inputView: NSTextView? { rootView?.searchField.textView }
     @_spi(Verification) public var showsPlaceholder: Bool { rootView?.searchField.isPlaceholderVisible ?? false }
     /// 목록 안에 실제로 놓인 뷰의 수와, 목록에 걸려 있는 전환(겹쳐 넘기기)의 수. 옛 줄이 남아 겹쳐 보이지 않는지 볼 때 쓴다.
-    @_spi(Verification) public var drawnRowCount: Int { rootView?.listView.subviews.count ?? 0 }
+    @_spi(Verification) public var drawnRowCount: Int { rootView?.listView.entryViews.count ?? 0 }
     @_spi(Verification) public var listTransitionCount: Int { rootView?.listView.layer?.animationKeys()?.count ?? 0 }
     /// 창이 가려는 틀(움직이는 중이어도 끝의 값).
     @_spi(Verification) public var settledFrame: CGRect { targetFrame }
@@ -180,7 +179,7 @@ public final class BrowseCoordinator {
             let rowView = view as? BrowseNoteRowView
             let parts = [
                 "note \(row.id)", rowView?.titleText ?? "", rowView?.previewText.string ?? "",
-                rowView?.reminderText ?? "-", rowView?.showsPin == true ? "pin" : "-",
+                "-", row.isFloating ? "pin" : "-",
             ]
             return parts.joined(separator: " | ")
         }
@@ -297,7 +296,7 @@ public final class BrowseCoordinator {
         do {
             let listing = try notes.list()
             listing.failures.forEach { log("노트 찾기: 읽지 못한 노트 \($0.id): \($0.error)") }
-            indexedNotes = listing.notes.filter { !$0.isArchived }.map(BrowseIndexedNote.init)
+            indexedNotes = listing.notes.map(BrowseIndexedNote.init)
         } catch {
             log("노트 찾기: 노트 목록을 읽지 못했습니다: \(error)")
             failure = error
@@ -336,7 +335,6 @@ public final class BrowseCoordinator {
         )
         let views = content.entries.map(makeView(for:))
         let selection = BrowseSelection.index(keeping: selected, in: content.entries)
-        rootView.searchField.updatePlaceholder(animated: animated)
         rootView.listView.setEntries(content.entries, views: views, selected: selection)
 
         let frame = BrowsePlacement.frame(
@@ -385,24 +383,15 @@ public final class BrowseCoordinator {
                 style: style, symbolName: "plus", title: "“\(query)” 새 노트 만들기", textColor: .text2
             )
         case .note(let row):
-            return BrowseNoteRowView(style: style, model: model(for: row))
+            let space = row.spaceID.flatMap(spaces.space(for:))
+            let view = BrowseNoteRowView(style: style, row: row, space: space, directory: spaces.imageDirectory)
+            view.onOpen = { [weak self, weak view] in
+                guard let view, let index = self?.rootView?.listView.entryViews.firstIndex(of: view) else { return }
+                self?.activate(index)
+            }
+            view.onPin = { [weak self] in self?.onSetPinned?(row.id, !row.isFloating) }
+            return view
         }
-    }
-
-    /// 이미지 아이콘은 Library 단계에서 만든다. 그때까지는 아이콘 자리를 비운다.
-    private func model(for row: BrowseNoteRow) -> BrowseNoteRowView.Model {
-        let space = row.spaceID.flatMap(spaces.space(for:))
-        var model = BrowseNoteRowView.Model(
-            row: row, spaceName: space?.name,
-            reminder: row.reminder.map { BrowseReminder(reminder: $0, now: now(), calendar: calendar) }
-        )
-        switch space?.icon {
-        case .symbol(let name, _): model.spaceSymbol = name
-        case .emoji(let emoji): model.spaceEmoji = emoji
-        case .customSymbol(let name, _): model.spaceSymbol = name
-        case .some(.none), .image, nil: break
-        }
-        return model
     }
 
     // MARK: - 동작

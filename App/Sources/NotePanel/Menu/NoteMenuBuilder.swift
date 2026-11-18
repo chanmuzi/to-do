@@ -10,7 +10,7 @@ enum MoreMenuAction: Hashable {
     case setColor(String?)
     case openLibrary
     case findNote
-    case openAIPanel
+    case newNote
     case closeWindow
     case toggleArchive
     case moveToTrash
@@ -42,6 +42,8 @@ struct NoteMenuBuilder {
     ) -> NSMenu {
         let menu = makeMenu()
         menu.items = [
+            row("새 노트", symbol: "doc.badge.plus") { handler(.newNote) },
+            separator(),
             row("리마인더 설정", symbol: "bell", isEnabled: isAvailable(.setReminder)) { handler(.setReminder) },
             row("스페이스 옮기기", symbol: "briefcase", isEnabled: isAvailable(.moveToSpace)) {
                 handler(.moveToSpace)
@@ -51,7 +53,6 @@ struct NoteMenuBuilder {
             separator(),
             row("노트 찾기", symbol: "magnifyingglass") { handler(.findNote) },
             row("라이브러리", symbol: "rectangle.split.2x1", isEnabled: isAvailable(.openLibrary)) { handler(.openLibrary) },
-            row("AI 패널 열기", symbol: "sparkle", isEnabled: isAvailable(.openAIPanel)) { handler(.openAIPanel) },
             separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
             row(isArchived ? "되돌리기" : "보관함으로", symbol: "archivebox") { handler(.toggleArchive) },

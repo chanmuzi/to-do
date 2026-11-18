@@ -204,6 +204,7 @@ import Testing
         let vanished = try fixture.notes.create(NoteDraft(title: "없어질 노트")).id
         fixture.pretendKey(writing)
         fixture.commands.perform(.findNote)
+        try type("없어질", into: fixture.browse.inputView)
         #expect(fixture.browseTitles == ["없어질 노트"])
         fixture.pretendKey(nil)
         // 목록을 읽은 뒤에 다른 프로그램이 파일을 지웠다.
@@ -295,7 +296,7 @@ import Testing
         #expect(fixture.router.route(.openLibrary) == .unconnected)
 
         fixture.router.route(.openBrowse(anchor: nil))
-        #expect(fixture.browse.rowDescriptions.count == 4)
+        #expect(fixture.browse.rowDescriptions == ["*library 라이브러리 열기"])
         #expect(fixture.browse.rowDescriptions.contains { $0.contains("library") })
         try type("없는 말", into: fixture.browse.inputView)
         #expect(fixture.browse.rowDescriptions == ["*create “없는 말” 새 노트 만들기", " separator", " library 라이브러리 열기"])

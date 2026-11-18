@@ -51,7 +51,7 @@ let package = Package(
         ),
         .target(
             name: "Browse",
-            dependencies: ["Theme", "Models", "Store", "Routing"],
+            dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
             swiftSettings: uiSettings
         ),
 
@@ -89,15 +89,16 @@ let package = Package(
         ),
 
         // MARK: Tests
-        .testTarget(name: "SchedulingTests", dependencies: ["Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),
-        .testTarget(name: "LibraryTests", dependencies: ["Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
-        .testTarget(name: "ThemeTests", dependencies: ["Theme"]),
+        .testTarget(name: "SchedulingTests", dependencies: ["FieldTestSupport", "Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),
+        .testTarget(name: "LibraryTests", dependencies: ["FieldTestSupport", "Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
+        .target(name: "FieldTestSupport", dependencies: ["Theme"], path: "Tests/ThemeTests/Support"),
+        .testTarget(name: "ThemeTests", dependencies: ["Theme", "FieldTestSupport"], exclude: ["Support"]),
         .testTarget(name: "ModelsTests", dependencies: ["Models"]),
         .testTarget(name: "StoreTests", dependencies: ["Store", "Models"]),
         .testTarget(name: "RoutingTests", dependencies: ["Routing", "Models"]),
         .testTarget(
             name: "NotePanelTests",
-            dependencies: ["NotePanel", "Theme", "Models", "Store", "Routing"]
+            dependencies: ["FieldTestSupport", "NotePanel", "Theme", "Models", "Store", "Routing"]
         ),
         .testTarget(
             name: "FloatingNotesTests",
@@ -106,15 +107,15 @@ let package = Package(
             ],
             swiftSettings: uiSettings
         ),
-        .testTarget(name: "EditorTests", dependencies: ["Editor", "Theme"]),
+        .testTarget(name: "EditorTests", dependencies: ["FieldTestSupport", "Editor", "Theme"]),
         .testTarget(
             name: "CaptureTests",
-            dependencies: ["Capture", "Theme", "Models", "Store", "Routing", "DateTime"],
+            dependencies: ["FieldTestSupport", "Capture", "Theme", "Models", "Store", "Routing", "DateTime"],
             swiftSettings: uiSettings
         ),
         .testTarget(
             name: "BrowseTests",
-            dependencies: ["Browse", "Theme", "Models", "Store", "Routing"],
+            dependencies: ["FieldTestSupport", "Browse", "Theme", "Models", "Store", "Routing"],
             swiftSettings: uiSettings
         ),
     ],

@@ -96,14 +96,13 @@ final class NoteWindowController: NSObject {
     // MARK: - 띄우고 내리기
 
     /// 창을 맨 앞에 띄운다. 앱을 앞으로 가져오지 않는다.
-    /// - Parameter recordsOpening: 사용자가 이 노트를 연 것이다(마지막으로 연 때를 적는다). 켤 때 되살리는 창은 아니다.
-    func show(focus: Bool, recordsOpening: Bool = true) {
+    func show(focus: Bool) {
         orderFront()
         if !isShown {
             isShown = true
             environment.recorder.recordOpened(noteID, frame: panel.frame, isPinned: isPinned)
         }
-        environment.recorder.recordFronted(noteID, openedAt: recordsOpening ? environment.now() : nil)
+        environment.recorder.recordFronted(noteID)
         if focus { focusBody() }
     }
 
@@ -183,7 +182,7 @@ final class NoteWindowController: NSObject {
         let visible = formatting != nil && (mode == .always || (mode == .editing && formatting?.isEditingBody == true))
         let changed = visible != root.cornerButtons.showsFormats
         root.cornerButtons.apply(visible: visible, active: visible ? formatting?.activeFormats ?? [] : [])
-        root.setHoverControlsAlpha(visible || isHovered ? 1 : 0, animated: animated)
+        root.setHoverControlsAlpha(visible ? 1 : 0, animated: animated)
         if changed { root.needsLayout = true }
     }
 
@@ -259,7 +258,6 @@ final class NoteWindowController: NSObject {
         let id = noteID
         root.topRow.actions = TopRowView.Actions(
             more: { [unowned self] anchor in popUpMoreMenu(from: anchor) },
-            add: { router.route(.newNote(NewNoteRequest(nextTo: id))) },
             reminder: { router.route(.openReminderEditor(id)) },
             pin: { [unowned self] in setPinned(!isPinned) },
             problem: { [unowned self] anchor in
@@ -271,7 +269,6 @@ final class NoteWindowController: NSObject {
             titleReturned: { [unowned self] in editor.focus() }
         )
         root.topRow.closeButton.onPress = { router.route(.closeNoteWindow(id)) }
-        root.cornerButtons.trashButton.onPress = { [unowned self] in coordinator?.moveToTrash(noteID) }
     }
 
     func setPinned(_ pinned: Bool) {
@@ -301,7 +298,7 @@ final class NoteWindowController: NSObject {
                 switch action {
                 case .setReminder: note.schedules.contains { !$0.isDeleted && !$0.isCompleted } && router.isConnected(.openReminderEditor(id))
                 case .moveToSpace: router.isConnected(.openSpacePicker(id))
-                case .openAIPanel: router.isConnected(.openAIPanel(context: id))
+                case .newNote: true
                 case .openLibrary: router.isConnected(.openLibrary)
                 case .findNote: router.isConnected(.openBrowse(anchor: id))
                 case .toggleArchive, .togglePin, .setColor, .closeWindow, .moveToTrash: true
@@ -315,7 +312,7 @@ final class NoteWindowController: NSObject {
             case .setColor(let paletteID): self?.setColor(paletteID)
             case .openLibrary: router.route(.openLibrary)
             case .findNote: router.route(.openBrowse(anchor: id))
-            case .openAIPanel: router.route(.openAIPanel(context: id))
+            case .newNote: router.route(.newNote(NewNoteRequest(draft: NoteDraft(spaceID: self?.note.spaceID), nextTo: id)))
             case .closeWindow: router.route(.closeNoteWindow(id))
             case .toggleArchive: self?.mutate(deferred: false) { $0.isArchived.toggle() }
             case .moveToTrash: self?.coordinator?.moveToTrash(id)

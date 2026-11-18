@@ -113,9 +113,8 @@ final class BrowseFixture {
             ofItemAtPath: url.path
         )
         try notes.refresh()
-        if floating {
-            try windowStates.set(NoteWindowState(isOpen: true, stackOrder: created), for: note.id)
-        }
+        let focus = Date(timeIntervalSince1970: 1_700_000_000 + Double(created) * 60)
+        try windowStates.set(NoteWindowState(isOpen: floating, stackOrder: created, lastOpened: focus), for: note.id)
         return note.id
     }
 
@@ -135,8 +134,6 @@ final class BrowseFixture {
         )
         coordinator.takesKeyOnShow = false
         coordinator.isShownOpaque = false
-        coordinator.now = { TestClock.now }
-        coordinator.calendar = TestClock.calendar
         return coordinator
     }
 

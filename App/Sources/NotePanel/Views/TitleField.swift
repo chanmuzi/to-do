@@ -5,7 +5,7 @@ import DateTime
 
 /// 상단 줄의 제목 칸(규칙 12: 본문과 별개). 평소에는 글자만 보이고, 누르면 그 자리에서 고친다.
 /// 고칠 때도 상자는 없고 글자가 `text`가 되며 커서만 생긴다(spec 5.2).
-final class TitleField: NSTextField, NSTextFieldDelegate {
+final class TitleField: CommandInputField, NSTextFieldDelegate {
     /// 고치는 중에 글자가 바뀔 때마다.
     var onChange: ((String) -> Void)?
     var onEditingChange: ((Bool) -> Void)?
@@ -32,25 +32,15 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     let style: PanelStyle
     private(set) var isEditing = false
     var titleBeforeEditing = ""
-    private var isPlaceholder = false
     var paletteID: String?
     private var colorToken: ColorToken = .text3
 
     init(style: PanelStyle) {
         self.style = style
-        super.init(frame: .zero)
-        cell = PlainTextInputCell(textCell: "")
+        super.init(theme: style.theme)
         wantsLayer = true
-        isBordered = false
-        isBezeled = false
-        drawsBackground = false
         isEditable = false
         isSelectable = false
-        focusRingType = .none
-        // 단일 줄 셀의 축약된 글꼴 메트릭과 필드 편집기의 TextKit 메트릭이 달라
-        // Pretendard에서 편집을 시작할 때 기준선이 움직였다. 같은 줄 배치를 사용한다.
-        usesSingleLineMode = false
-        maximumNumberOfLines = 1
         lineBreakMode = .byTruncatingTail
         cell?.truncatesLastVisibleLine = true
         cell?.isScrollable = true
@@ -73,13 +63,12 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     }
 
     /// 고치는 중에는 글자를 건드리지 않고 색만 맞춘다.
-    func show(title: String, isPlaceholder: Bool, color: ColorToken, animated: Bool) {
+    func show(title: String, color: ColorToken, animated: Bool) {
         let colorChanged = color != colorToken
         colorToken = color
         if !isEditing {
-            self.isPlaceholder = isPlaceholder
             if stringValue != title { stringValue = title }
-            font = displayFont
+            font = style.theme.nsFont(.title)
         }
         if colorChanged && animated { style.crossfade(self) }
         textColor = style.theme.noteTextColor(isEditing ? .text : color, paletteID: paletteID)
@@ -87,15 +76,8 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
 
     func refreshTheme() {
         applyInputStyle()
-        font = isEditing ? style.theme.nsFont(.title) : displayFont
+        font = style.theme.nsFont(.title)
         textColor = style.theme.noteTextColor(isEditing ? .text : colorToken, paletteID: paletteID)
-    }
-
-    /// "제목 없음"은 보통 굵기로 보인다(spec 5.2).
-    private var displayFont: NSFont {
-        isPlaceholder
-            ? style.theme.nsFont(.title, weight: style.theme.tokens.textStyle(.body).weight)
-            : style.theme.nsFont(.title)
     }
 
     var titleCursor: NSCursor { isEditing && window?.isKeyWindow == true ? .iBeam : .arrow }
@@ -117,7 +99,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         placeholderAttributedString = NSAttributedString(
             string: TopRowState.untitled,
             attributes: [
-                .font: style.theme.nsFont(.title, weight: style.theme.tokens.textStyle(.body).weight),
+                .font: style.theme.nsFont(.title),
                 .foregroundColor: style.theme.noteTextColor(.text3, paletteID: paletteID),
             ]
         )

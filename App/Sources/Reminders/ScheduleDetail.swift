@@ -38,9 +38,11 @@ struct ScheduleDetail: View {
             HStack(spacing: theme.component(.scheduleInset)) {
                 Circle().fill(markerColor).frame(width: theme.component(.scheduleInset), height: theme.component(.scheduleInset))
                     .frame(width: theme.component(.iconLarge))
-                TextField("제목", text: Binding(get: { model.title }, set: model.changeTitle))
-                    .textFieldStyle(.plain).font(theme.font(.scheduleTitle)).focused($focus, equals: .title)
-                    .onSubmit { focus = .day; model.showDates() }
+                CommandTextField(text: Binding(get: { model.title }, set: model.changeTitle),
+                                 theme: theme, placeholder: "제목", style: .scheduleTitle,
+                                 submit: { focus = .day; model.showDates() },
+                                 cancel: { model.select(nil) })
+                    .focused($focus, equals: .title)
             }.padding(.horizontal, theme.component(.scheduleInset)).padding(.top, theme.component(.chromePaddingEnd))
                 .padding(.bottom, theme.component(.scheduleInset))
             row("clock") {

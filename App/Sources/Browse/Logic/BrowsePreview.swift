@@ -3,13 +3,11 @@ import Foundation
 /// 본문을 한 줄로 편 글(spec 8의 "본문 첫머리"). 줄 머리의 기호(들여쓰기, 투두, 글머리표, 토글 `+ `, 인용문 `> `, 제목)와
 /// 인라인 기호(굵게, 취소선, 형광펜, 코드)를 떼고, 빈 줄을 건너뛰어 쉼표로 잇는다. 찾기도 이 글에서 한다.
 nonisolated enum BrowsePreview {
-    /// 한 줄로 펼 때 읽는 본문의 길이 한도(글자). 아주 긴 노트의 뒤쪽은 노트 찾기에서 찾지 않는다.
-    static let scanLimit = 20000
-    /// 줄에 보일 글의 길이 한도. 넘는 것은 어차피 잘려 보인다.
-    static let displayLimit = 160
+    private static let contextLength = 8
+    private static let maximumLeadingContext = 12
 
     static func flatten(_ body: String) -> String {
-        body.prefix(scanLimit)
+        body
             .split(whereSeparator: \.isNewline)
             .compactMap { line -> String? in
                 let text = stripInline(stripLineMarker(String(line)))
@@ -18,11 +16,32 @@ nonisolated enum BrowsePreview {
             .joined(separator: ", ")
     }
 
-    /// 줄에 보일 글. `match`(펴 놓은 글에서 맞은 자리)가 있으면 그 자리에서 시작한다.
+    /// 일치한 글자 주위의 문맥을 보여 주고, 앞을 생략했으면 말줄임표까지 세어 강조 범위를 돌려준다.
     static func display(_ flattened: String, match: Range<Int>?) -> (text: String, highlight: Range<Int>?) {
-        guard let match else { return (String(flattened.prefix(displayLimit)), nil) }
-        let text = String(flattened.dropFirst(match.lowerBound).prefix(displayLimit))
-        return (text, 0..<min(match.count, text.count))
+        guard let match else { return ("", nil) }
+        let hit = flattened.index(flattened.startIndex, offsetBy: match.lowerBound)
+        let start = contextStart(in: flattened[..<hit])
+        let omission = start == flattened.startIndex ? "" : "…"
+        let before = omission + flattened[start..<hit]
+        let text = before + flattened[hit...].prefix(match.count + contextLength)
+        return (text, before.count..<(before.count + match.count))
+    }
+
+    private static func contextStart(in prefix: Substring) -> String.Index {
+        let preferred = prefix.suffix(contextLength).startIndex
+        guard preferred != prefix.startIndex else { return preferred }
+        let earliest = prefix.suffix(maximumLeadingContext).startIndex
+
+        func isSeparator(_ character: Character) -> Bool { character.isWhitespace || character == "," }
+        func isWordStart(_ index: String.Index) -> Bool {
+            !isSeparator(prefix[index]) && (index == prefix.startIndex || isSeparator(prefix[prefix.index(before: index)]))
+        }
+
+        if !isSeparator(prefix[preferred]),
+           let start = prefix[earliest...preferred].indices.reversed().first(where: isWordStart) {
+            return start
+        }
+        return prefix[preferred...].indices.first(where: isWordStart) ?? prefix.endIndex
     }
 
     private static let lineMarker = regex(#"^\s*(?:(?:[-*]\s+)?\[[ xX]\]\s+|[-*+]\s+|>\s*|#{1,3}\s+|```.*$)?"#)

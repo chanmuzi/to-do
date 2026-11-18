@@ -57,9 +57,10 @@ struct IconPickerView: View {
     }
     private var searchable: some View {
         VStack(alignment: .leading, spacing: theme.space(.sp2)) {
-            TextField(tab == 0 ? "기호 검색" : "이모지 검색", text: $query).textFieldStyle(.plain)
+            CommandTextField(text: $query, theme: theme, placeholder: tab == 0 ? "기호 검색" : "이모지 검색",
+                             submit: { searchFocused = false }, cancel: close)
                 .focused($searchFocused).padding(.horizontal, theme.space(.sp2))
-                .frame(height: theme.component(.browseFindHeight)).background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+                .frame(height: theme.component(.pickerFindHeight)).background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             Text("고정").font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text3))
             grid(model.settings.pinnedIcons.filter(matchesTab))
             HStack {

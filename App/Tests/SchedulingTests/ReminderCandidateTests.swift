@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Foundation
 import Testing
+import FieldTestSupport
 import Models
 import Store
 import Theme
@@ -21,6 +22,22 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
+    @Test func scheduleFieldGeometry() throws {
+        _ = FontRegistrar.registerBundledFonts()
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "")
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            let theme = try Theme.bundled()
+            try FieldGeometry.verifyHosted(NSHostingView(rootView: ScheduleDetail(model: model, item: item, theme: theme)),
+                                           labels: ["제목", "시작", "끝"])
+            let state = ScheduleDateSelection(selected: now, now: now, calendar: calendar)
+            try FieldGeometry.verifyHosted(NSHostingView(rootView: ScheduleDatePicker(state: state, model: model, theme: theme)),
+                                           labels: ["날짜를 입력하세요"])
+        }
+    }
+
     @Test func schedulePopoverDismissesOnExternalFocusAndFinishesTitleComposition() async throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("dismissal-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

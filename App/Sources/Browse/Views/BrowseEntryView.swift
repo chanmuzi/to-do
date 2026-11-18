@@ -24,7 +24,7 @@ class BrowseEntryView: NSView {
     }
 
     /// 줄의 높이.
-    var height: CGFloat { style.theme.component(.rowHeight) }
+    var height: CGFloat { style.theme.component(.browseRowHeight) }
 
     /// `selected` 바탕을 `dur` 동안 겹치거나 걷는다(규칙 8).
     func setHighlighted(_ highlighted: Bool, animated: Bool) {
@@ -38,9 +38,6 @@ class BrowseEntryView: NSView {
         style.animate { highlightView.animator().alphaValue = alpha }
     }
 
-    /// 줄 바탕에 깔리는 색(색을 입힌 노트). 없으면 `nil`.
-    var tint: NSColor? { nil }
-
     func refreshTheme() {
         needsDisplay = true
         needsLayout = true
@@ -49,11 +46,10 @@ class BrowseEntryView: NSView {
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
-        let radius = style.theme.shape(.chipRadius)
+        let radius = style.theme.component(.browseRowRadius)
         layer?.cornerRadius = radius
-        layer?.backgroundColor = tint.map { style.cgColor($0, in: self) } ?? CGColor.clear
         highlightView.layer?.cornerRadius = radius
-        highlightView.layer?.backgroundColor = style.cgColor(.selected, in: self)
+        highlightView.layer?.backgroundColor = style.cgColor(.menuHighlight, in: self)
     }
 
     override func viewDidChangeEffectiveAppearance() {

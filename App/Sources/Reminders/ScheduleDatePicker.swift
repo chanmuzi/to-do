@@ -70,7 +70,7 @@ struct ScheduleDatePicker: View {
         }.font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
             .foregroundStyle(theme.color(.text)).padding(theme.component(.chromePaddingEnd))
             .frame(width: theme.component(.datePickerWidth)).fixedSize(horizontal: false, vertical: true)
-            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.browseRadius)))
+            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.pickerRadius)))
             .focusEffectDisabled().onExitCommand { model.datePicker = nil }
     }
 

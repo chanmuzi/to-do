@@ -60,6 +60,13 @@ final class QuickPanels {
         )
         currentKeyNote = { [unowned notePanels] in notePanels.keyNoteID }
         returnKey = { [unowned notePanels] in notePanels.returnKey(to: $0) }
+        browse.onSetPinned = { [weak self] id, pinned in
+            guard let self else { return }
+            do {
+                if pinned, notePanels.window(for: id) == nil { try notePanels.open(id, focus: false) }
+                notePanels.setPinned(pinned, for: id)
+            } catch { self.presentFailure("노트를 고정하지 못했습니다", error) }
+        }
         capture.onDismiss = { [unowned self] in panelDismissed(returnsFocus: $0) }
         browse.onDismiss = { [unowned self] in
             // 바깥을 눌러 닫혔다(포커스를 돌려주지 않는 닫힘이 누름 중에 왔다). 그 누름이 돋보기였는지는

@@ -11,7 +11,7 @@ import Testing
         floating: [NoteID] = Sample.floating, excluding: String? = nil
     ) -> BrowseContent {
         BrowseContent(
-            notes: notes, floating: floating, query: BrowseQuery(query, isComposing: composing),
+            notes: notes, floating: floating, lastOpened: Dictionary(uniqueKeysWithValues: notes.map { ($0.note.id, TestClock.now) }), query: BrowseQuery(query, isComposing: composing),
             excluding: excluding.map(NoteID.init(rawValue:))
         )
     }
@@ -25,133 +25,37 @@ import Testing
 
     // MARK: - 글자를 치기 전
 
-    @Test func floatingNotesComeFirstThenRecentOnes() {
-        #expect(content().entries.map(\.label) == [
-            "# 떠 있는 노트", "today", "home", "scratch",
-            "# 최근에 연 노트", "release", "untitled", "meeting", "api",
-            "---", "library",
-        ])
+    @Test func recentRequiresFocusAndExcludesArchivedAndCurrent() {
+        var archived = Sample.notes[1].note
+        archived.isArchived = true
+        let notes = Sample.notes
+        let times = Dictionary(uniqueKeysWithValues: notes.prefix(4).enumerated().map {
+            ($0.element.note.id, TestClock.now.addingTimeInterval(Double($0.offset)))
+        })
+        let recent = BrowseContent(notes: [notes[0], BrowseIndexedNote(archived)] + notes.dropFirst(2),
+                                   floating: Sample.floating, lastOpened: times, query: BrowseQuery(""),
+                                   excluding: notes[2].note.id)
+        #expect(recent.entries.map(\.label) == ["# 최근", "release", "today", "---", "library"])
+        #expect(row("today", in: recent)?.isFloating == true)
+        #expect(row("today", in: recent)?.preview == "")
+        #expect(BrowseContent(notes: notes, floating: [], query: BrowseQuery(""), excluding: nil).entries == [.library])
     }
 
-    /// 떠 있는 노트는 앞에 있는 창부터, 최근에 연 노트는 받은 차례(최근에 고친 것이 앞) 그대로다.
-    @Test func floatingOrderFollowsTheWindowOrder() {
-        let floating = ["scratch", "today"].map(NoteID.init(rawValue:))
-        #expect(content(floating: floating).entries.map(\.label) == [
-            "# 떠 있는 노트", "scratch", "today",
-            "# 최근에 연 노트", "home", "release", "untitled", "meeting", "api",
-            "---", "library",
-        ])
-        // 노트가 없어진 창 상태는 건너뛴다.
-        let stale = ["gone", "today"].map(NoteID.init(rawValue:))
-        #expect(content(floating: stale).entries.prefix(3).map(\.label) == ["# 떠 있는 노트", "today", "# 최근에 연 노트"])
+    @Test func recentLimitIncludesPinnedRowsAndSearchIncludesEveryMatch() {
+        let notes = (1...12).map { Sample.note("n\($0)", title: "노트") }
+        let floating = notes.map(\.note.id)
+        #expect(content(notes: notes, floating: floating).entries.count == 8 + 3)
+        #expect(content("노트", notes: notes, floating: floating).entries.count == 12 + 3)
     }
 
-    /// "최근에 연 노트"는 마지막으로 연 때가 가까운 것이 앞이다(D-033). 연 때를 적은 적이 없는 노트는
-    /// 고친 시각으로 견주고, 때가 같으면 받은 차례를 지킨다.
-    @Test func recentNotesAreOrderedByWhenTheyWereLastOpened() {
-        func note(_ id: String, modifiedMinutesAgo minutes: Double) -> BrowseIndexedNote {
-            BrowseIndexedNote(Note(
-                id: NoteID(rawValue: id), title: id, body: "", created: TestClock.now,
-                modified: TestClock.now.addingTimeInterval(-minutes * 60)
-            ))
-        }
-        // 받은 차례는 최근에 고친 것이 앞이다.
-        let notes = [
-            note("edited-now", modifiedMinutesAgo: 0), note("edited-10m", modifiedMinutesAgo: 10),
-            note("edited-1h", modifiedMinutesAgo: 60), note("edited-1d", modifiedMinutesAgo: 1440),
-        ]
-        func labels(_ opened: [String: Double]) -> [String] {
-            let times = Dictionary(uniqueKeysWithValues: opened.map {
-                (NoteID(rawValue: $0.key), TestClock.now.addingTimeInterval(-$0.value * 60))
-            })
-            return BrowseContent(
-                notes: notes, floating: [], lastOpened: times, query: BrowseQuery("", isComposing: false),
-                excluding: nil
-            ).entries.compactMap { entry in
-                if case .note(let row) = entry { row.id.rawValue } else { nil }
-            }
-        }
-
-        // 적힌 것이 없으면 고친 차례 그대로다.
-        #expect(labels([:]) == ["edited-now", "edited-10m", "edited-1h", "edited-1d"])
-        // 오래전에 고쳤어도 방금 연 노트가 맨 앞이고, 방금 고쳤어도 연 지 오래된 노트는 뒤로 간다.
-        #expect(labels(["edited-1d": 1, "edited-now": 120]) == ["edited-1d", "edited-10m", "edited-1h", "edited-now"])
-        // 연 적이 없는 노트는 고친 시각으로 그 사이에 낀다.
-        #expect(labels(["edited-1h": 5, "edited-1d": 30]) == ["edited-now", "edited-1h", "edited-10m", "edited-1d"])
-    }
-
-    /// 떠 있는 노트의 차례와 검색 결과의 차례는 연 때를 따르지 않는다.
-    @Test func lastOpenedTimesOnlyOrderTheRecentSection() {
-        let later = TestClock.now.addingTimeInterval(60)
-        let times = [NoteID(rawValue: "api"): later, NoteID(rawValue: "scratch"): later]
-        let sections = BrowseContent(
-            notes: Sample.notes, floating: Sample.floating, lastOpened: times,
-            query: BrowseQuery("", isComposing: false), excluding: nil
-        )
-        #expect(sections.entries.map(\.label) == [
-            "# 떠 있는 노트", "today", "home", "scratch",
-            "# 최근에 연 노트", "api", "release", "untitled", "meeting",
-            "---", "library",
-        ])
-        let unordered = content("배포").entries.map(\.label)
-        let ordered = BrowseContent(
-            notes: Sample.notes, floating: Sample.floating, lastOpened: times,
-            query: BrowseQuery("배포", isComposing: false), excluding: nil
-        ).entries.map(\.label)
-        #expect(ordered == unordered)
-    }
-
-    @Test func emptySectionsHaveNoHeader() {
-        #expect(content(floating: []).entries.map(\.label) == [
-            "# 최근에 연 노트", "today", "home", "scratch", "release", "untitled", "meeting", "api",
-            "---", "library",
-        ])
-        let onlyFloating = Array(Sample.notes.prefix(2))
-        #expect(content(notes: onlyFloating).entries.map(\.label) == ["# 떠 있는 노트", "today", "home", "---", "library"])
-        // 노트가 하나도 없으면 라이브러리 열기만 남는다. 안내 문장도 구분선도 없다.
-        #expect(content(notes: [], floating: []).entries == [.library])
-    }
-
-    /// 최근에 연 노트는 여덟 줄까지만 보인다(spec 16). 떠 있는 노트에는 한도가 없다.
-    @Test func recentNotesAreLimitedToEight() {
-        let many = (1...12).map { Sample.note("n\($0)", title: "노트 \($0)") }
-        let floating = (1...2).map { NoteID(rawValue: "n\($0)") }
-        let labels = content(notes: many, floating: floating).entries.map(\.label)
-        #expect(labels == ["# 떠 있는 노트", "n1", "n2", "# 최근에 연 노트"]
-            + (3...10).map { "n\($0)" } + ["---", "library"])
-        // 찾을 때는 한도가 없다.
-        #expect(content("노트", notes: many, floating: floating).entries.count == 12 + 3)
-    }
-
-    @Test func currentNoteIsExcluded() {
-        #expect(content(excluding: "today").entries.map(\.label) == [
-            "# 떠 있는 노트", "home", "scratch",
-            "# 최근에 연 노트", "release", "untitled", "meeting", "api",
-            "---", "library",
-        ])
-        #expect(content(excluding: "release").entries.map(\.label).contains("release") == false)
-        // 찾을 때도 빠진다.
-        #expect(content("배포", excluding: "today").entries.map(\.label) == ["release", "+ 배포", "---", "library"])
-        // 떠 있는 노트가 지금 노트뿐이면 그 구획은 없다.
-        let onlyCurrent = [NoteID(rawValue: "today")]
-        #expect(content(floating: onlyCurrent, excluding: "today").entries.first?.label == "# 최근에 연 노트")
-    }
-
-    @Test func rowCarriesWhatTheLineShows() throws {
-        let rows = content()
-        let today = try #require(row("today", in: rows))
-        #expect(today.title == "오늘 할 일")
-        #expect(today.preview == "PR #482 리뷰, 배포 체크리스트 확인")
-        #expect(today.previewHighlight == nil)
-        #expect(today.isFloating)
-        #expect(today.spaceID == Sample.work)
-        #expect(today.reminder == TestClock.date(11, 16, 14, 12))
-        let home = try #require(row("home", in: rows))
-        #expect(home.colorID == PaletteID(rawValue: "tint-5"))
-        let untitled = try #require(row("untitled", in: rows))
-        #expect(untitled.title.isEmpty)
-        #expect(untitled.preview == "주말 장보기 목록")
-        #expect(!untitled.isFloating)
+    @Test func archivedMatchesFollowActiveAndFocusOrdersEachGroup() {
+        var archived = Sample.note("archive", title: "회의").note
+        archived.isArchived = true
+        let notes = [BrowseIndexedNote(archived), Sample.note("first", title: "회의"),
+                     Sample.note("second", title: "회의"), Sample.note("body", title: "", body: "오늘 회의 준비")]
+        let results = BrowseContent(notes: notes, floating: [], lastOpened: [notes[2].note.id: TestClock.now],
+                                    query: BrowseQuery("회의"), excluding: nil)
+        #expect(results.entries.map(\.label) == ["second", "first", "body", "archive", "+ 회의", "---", "library"])
     }
 
     // MARK: - 찾는 중
@@ -161,12 +65,12 @@ import Testing
         let found = content("배포")
         #expect(found.entries.map(\.label) == ["today", "release", "+ 배포", "---", "library"])
         let today = try #require(row("today", in: found))
-        #expect(today.preview == "배포 체크리스트 확인")
-        #expect(today.previewHighlight == 0..<2)
+        #expect(today.preview.contains("리뷰, 배포"))
+        #expect(today.previewHighlight == 10..<12)
         #expect(today.isFloating)
         let release = try #require(row("release", in: found))
-        #expect(release.preview == "배포 순서 확인")
-        #expect(release.previewHighlight == 0..<2)
+        #expect(release.preview.hasSuffix("배포 순서 확인"))
+        #expect(release.previewHighlight == 8..<10)
     }
 
     /// 제목에서 맞은 노트가 먼저, 본문에서만 맞은 노트가 다음이다. 제목에서만 맞으면 본문 첫머리는 그대로다.
@@ -180,18 +84,18 @@ import Testing
         let found = content("회의", notes: notes, floating: [])
         #expect(found.entries.map(\.label) == ["title-only", "both", "body-only", "+ 회의", "---", "library"])
         let titleOnly = try #require(row("title-only", in: found))
-        #expect(titleOnly.preview == "디자인 싱크")
+        #expect(titleOnly.preview.isEmpty && titleOnly.titleHighlight == 0..<2)
         #expect(titleOnly.previewHighlight == nil)
         let both = try #require(row("both", in: found))
-        #expect(both.preview == "회의 안건")
-        #expect(both.previewHighlight == 0..<2)
+        #expect(both.preview.isEmpty && both.titleHighlight == 3..<5)
+        #expect(both.previewHighlight == nil)
     }
 
     @Test func searchIsCaseInsensitiveAndHandlesDecomposedHangul() throws {
         let english = content("retry")
         #expect(english.entries.map(\.label) == ["api", "+ retry", "---", "library"])
         // 굵게 표시하는 `**`는 본문 첫머리에서 빠진다.
-        #expect(try #require(row("api", in: english)).preview == "Retry policy")
+        #expect(try #require(row("api", in: english)).preview.hasSuffix("Retry policy"))
         #expect(content("API").entries.first?.label == "api")
         #expect(content("api notes").entries.first?.label == "api")
 
@@ -201,8 +105,8 @@ import Testing
         )]
         #expect(content("회의", notes: decomposed, floating: []).entries.first?.label == "nfd")
         let inBody = try #require(row("nfd", in: content("순서", notes: decomposed, floating: [])))
-        #expect(inBody.preview.precomposedStringWithCanonicalMapping == "순서")
-        #expect(inBody.previewHighlight == 0..<2)
+        #expect(inBody.preview.precomposedStringWithCanonicalMapping == "배포 순서")
+        #expect(inBody.previewHighlight == 3..<5)
     }
 
     /// 조합 중인 글자("뱊")로도 결과가 끊기지 않는다.
@@ -219,7 +123,24 @@ import Testing
         #expect(content("xyz").entries == [.create(query: "xyz"), .separator, .library])
         #expect(content("  xyz ").entries.first == .create(query: "xyz"))
         // 공백뿐인 검색어는 찾지 않는 것과 같다.
-        #expect(content("   ").entries.first == .header(BrowseContent.floatingTitle))
+        #expect(content("   ").entries.first == .header(BrowseContent.recentTitle))
+    }
+
+    @Test(arguments: [
+        ("목요일에는 첫 번째 시안을 살펴보기", "목요일에는 첫 번째 시안을 살펴보기"),
+        ("지난주,목요일에는 첫 번째 시안을 살펴보기", "…목요일에는 첫 번째 시안을 살펴보기"),
+        ("이전,abcdefghijkl시안", "…abcdefghijkl시안"),
+        ("길고긴공백없는하나의낱말뒤에는,,  다음 시안", "…다음 시안"),
+        ("abcdefghijklmnop 다음 시안 확인", "…다음 시안 확인"),
+        ("공백도쉼표도전혀없는아주긴낱말시안", "…시안"),
+        ("👩🏽‍💻가 쓴 시안", "👩🏽‍💻가 쓴 시안"),
+    ])
+    func previewStartsAtAWordAndHighlightsTheOriginalMatch(body: String, expected: String) throws {
+        let match = try #require(BrowseMatcher.firstMatch(of: BrowseQuery("시안"), in: body))
+        let result = BrowsePreview.display(body, match: match)
+        #expect(result.text == expected)
+        let highlight = try #require(result.highlight)
+        #expect(String(result.text.dropFirst(highlight.lowerBound).prefix(highlight.count)) == "시안")
     }
 
     // MARK: - 본문 첫머리
@@ -244,7 +165,7 @@ import Testing
     /// "라이브러리 열기"를 두지 않을 때는 그 위의 구분선도 없다. 줄이 하나도 없으면 목록이 빈다.
     @Test func libraryRowAndItsSeparatorCanBeLeftOut() {
         let listed = BrowseContent(
-            notes: Sample.notes, floating: Sample.floating, query: BrowseQuery(""), excluding: nil,
+            notes: Sample.notes, floating: Sample.floating, lastOpened: [Sample.notes.last!.note.id: TestClock.now], query: BrowseQuery(""), excluding: nil,
             showsLibrary: false
         ).entries
         #expect(listed.last?.label == "api")

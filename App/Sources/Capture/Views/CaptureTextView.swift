@@ -1,4 +1,5 @@
 import AppKit
+import Theme
 
 /// 캡처 바에서 키로 하는 동작(spec 7, 13).
 enum CaptureCommand: Hashable {
@@ -23,10 +24,9 @@ enum CaptureCommand: Hashable {
 /// 스스로 받아 명령을 보내지 않는다. 남아 있다면 아직 고르는 중이다).
 ///
 /// 조합 중에도 글이 바뀔 때마다 `onTextChange`를 부르되 글 저장소는 건드리지 않으므로(밑줄은 임시 속성) 조합이 끊기지 않는다.
-final class CaptureTextView: NSTextView {
+final class CaptureTextView: ThinCaretFieldEditor {
     var onCommand: ((CaptureCommand) -> Void)?
     var onTextChange: (() -> Void)?
-    var caretWidth: CGFloat = 1
 
     /// 확인용: 입력기 흉내. 넣으면 시스템 입력기 대신 이것이 키 입력을 푼다(테스트가 쓰는 사람의 입력기에 기대지 않게).
     var inputContextOverride: NSTextInputContext?
@@ -141,17 +141,4 @@ final class CaptureTextView: NSTextView {
     }
 
     private static let lineBreaksAndTabs = CharacterSet.newlines.union(CharacterSet(charactersIn: "\t"))
-
-    // MARK: - 커서
-
-    /// 얇은 일반 커서(규칙 15).
-    override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
-        var thin = rect
-        thin.size.width = caretWidth
-        super.drawInsertionPoint(in: thin, color: color, turnedOn: flag)
-    }
-
-    override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
-        super.setNeedsDisplay(rect.insetBy(dx: -caretWidth, dy: 0), avoidAdditionalLayout: flag)
-    }
 }

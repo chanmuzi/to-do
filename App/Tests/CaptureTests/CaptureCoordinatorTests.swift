@@ -3,6 +3,7 @@ import Models
 import Routing
 import Store
 import Testing
+import FieldTestSupport
 @_spi(Verification) @testable import Capture
 
 /// 캡처 바를 실제로 띄우고 입력 경로(`insertText`, `setMarkedText`, `doCommand(by:)`)로 움직여 본다.
@@ -18,6 +19,13 @@ import Testing
     init() throws {
         fixture = try CaptureFixture()
         capture = fixture.makeCoordinator()
+    }
+
+    @Test func captureFieldGeometry() throws {
+        defer { fixture.cleanUp() }
+        capture.show()
+        let root = try #require(capture.window?.contentView)
+        try FieldGeometry.verify(#require(FieldGeometry.fields(in: root).first))
     }
 
     private func input() throws -> NSTextView {

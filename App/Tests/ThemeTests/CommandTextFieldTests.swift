@@ -1,9 +1,23 @@
 import AppKit
 import SwiftUI
 import Testing
+import FieldTestSupport
 @testable import Theme
 
 @Suite(.serialized) @MainActor struct CommandTextFieldTests {
+    @Test func placeholderAndFirstGlyphStayAligned() throws {
+        _ = FontRegistrar.registerBundledFonts()
+        let root = NSHostingView(rootView: CommandTextField(text: .constant(""), theme: try Theme.bundled(),
+            placeholder: "입력", submit: {}, cancel: {}))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 30),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = root
+        root.layoutSubtreeIfNeeded()
+        try FieldGeometry.verify(#require(FieldGeometry.fields(in: root).first))
+    }
+
     @Test func editableFieldOwnsReturnArrowsAndEscapeWithoutFocusRing() throws {
         _ = NSApplication.shared
         let theme = try Theme.bundled()

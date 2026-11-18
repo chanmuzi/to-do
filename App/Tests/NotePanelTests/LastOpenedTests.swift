@@ -18,7 +18,7 @@ import Testing
         Date(timeIntervalSince1970: 1_800_000_000 + seconds)
     }
 
-    @Test func openingANoteRecordsWhenItWasOpened() throws {
+    @Test func passiveOpeningDoesNotRecordFocus() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
         var clock = date(0)
@@ -29,16 +29,16 @@ import Testing
         try coordinator.open(first, focus: false)
         clock = date(60)
         try coordinator.open(second, focus: false)
-        #expect(try fixture.windowState(for: first)?.lastOpened == date(0))
-        #expect(try fixture.windowState(for: second)?.lastOpened == date(60))
+        #expect(try fixture.windowState(for: first)?.lastOpened == nil)
+        #expect(try fixture.windowState(for: second)?.lastOpened == nil)
 
         // 떠 있는 노트를 다시 고르면(노트 찾기에서) 그때로 바뀐다. 이미 맨 앞이어도 적는다.
         clock = date(120)
         try coordinator.open(second, focus: false)
-        #expect(try fixture.windowState(for: second)?.lastOpened == date(120))
+        #expect(try fixture.windowState(for: second)?.lastOpened == nil)
         // 창을 닫아도 남는다.
         coordinator.closeWindow(first)
-        #expect(try fixture.windowState(for: first)?.lastOpened == date(0))
+        #expect(try fixture.windowState(for: first)?.lastOpened == nil)
         #expect(try fixture.windowState(for: first)?.isOpen == false)
     }
 
@@ -66,6 +66,7 @@ import Testing
         first.now = { opened }
         let id = try fixture.notes.create(NoteDraft(title: "하나")).id
         try first.open(id, focus: false)
+        first.controllers[id]?.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification))
         first.controllers.values.forEach { $0.discardWindow() }
 
         let relaunched = try fixture.makeCoordinator()

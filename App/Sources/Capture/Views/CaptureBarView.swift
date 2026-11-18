@@ -6,8 +6,7 @@ final class CaptureBarView: NSView {
     private let style: CaptureStyle
     private let background: CaptureBackgroundView
     private let promptLabel = NSTextField(labelWithString: ">")
-    private let placeholderLabel = NSTextField(labelWithString: CaptureBarView.placeholder)
-    private let scrollView = NSScrollView()
+    let input: CommandInputField
     let textView: CaptureTextView
     private let spaceBadge: CaptureBadgeView
     private let reminderBadge: CaptureBadgeView
@@ -18,7 +17,8 @@ final class CaptureBarView: NSView {
     init(style: CaptureStyle) {
         self.style = style
         background = CaptureBackgroundView(style: style)
-        textView = Self.makeTextView()
+        textView = CaptureTextView(theme: style.theme)
+        input = CommandInputField(theme: style.theme, editor: textView)
         spaceBadge = CaptureBadgeView(style: style)
         reminderBadge = CaptureBadgeView(style: style)
         super.init(frame: .zero)
@@ -26,19 +26,9 @@ final class CaptureBarView: NSView {
         background.autoresizingMask = [.width, .height]
         addSubview(background)
 
-        scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.documentView = textView
-        scrollView.horizontalScrollElasticity = .none
-        scrollView.verticalScrollElasticity = .none
-
-        placeholderLabel.wantsLayer = true
-        placeholderLabel.setAccessibilityElement(false)
         promptLabel.setAccessibilityElement(false)
-        [promptLabel, placeholderLabel, scrollView, spaceBadge, reminderBadge].forEach(addSubview)
-        textView.setAccessibilityLabel("빠른 캡처")
+        [promptLabel, input, spaceBadge, reminderBadge].forEach(addSubview)
+        input.setAccessibilityLabel("빠른 캡처")
         textView.setAccessibilityPlaceholderValue(Self.placeholder)
         refreshTheme()
     }
@@ -46,28 +36,6 @@ final class CaptureBarView: NSView {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("코드로만 만든다")
-    }
-
-    /// 한 줄짜리 텍스트 뷰. 긴 글은 줄을 바꾸지 않고 옆으로 흐른다.
-    private static func makeTextView() -> CaptureTextView {
-        let view = CaptureTextView(frame: .zero)
-        view.isRichText = false
-        view.importsGraphics = false
-        view.allowsUndo = true
-        view.drawsBackground = false
-        TextInputPolicy.apply(to: view)
-        view.textContainerInset = .zero
-        view.isVerticallyResizable = false
-        view.isHorizontallyResizable = true
-        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        view.textContainer?.lineFragmentPadding = 0
-        view.textContainer?.widthTracksTextView = false
-        view.textContainer?.maximumNumberOfLines = 1
-        view.textContainer?.lineBreakMode = .byClipping
-        view.textContainer?.size = NSSize(
-            width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude
-        )
-        return view
     }
 
     // MARK: - 내용
@@ -82,13 +50,12 @@ final class CaptureBarView: NSView {
         spaceBadge.apply(space, animated: animated)
         reminderBadge.apply(reminder, animated: animated)
         underline(timeRanges)
-        setPlaceholderVisible(textView.string.isEmpty, animated: animated)
         needsLayout = true
     }
 
     var spaceContent: CaptureBadgeView.Content? { spaceBadge.alphaValue > 0 ? spaceBadge.content : nil }
     var reminderContent: CaptureBadgeView.Content? { reminderBadge.alphaValue > 0 ? reminderBadge.content : nil }
-    var isPlaceholderVisible: Bool { placeholderLabel.alphaValue > 0 }
+    var isPlaceholderVisible: Bool { textView.string.isEmpty }
     var timeUnderlineRanges: [NSRange] { underlinedRanges }
 
     /// 알아들은 시간 표현에 밑줄을 긋는다. 날과 시각을 떨어뜨려 적었으면 두 곳이다.
@@ -107,30 +74,12 @@ final class CaptureBarView: NSView {
         }
     }
 
-    /// 자리 글자는 나타날 때만 `dur` 동안 움직인다. 글자를 치기 시작하면 바로 비킨다(친 글자와 겹쳐 보이지 않게).
-    private func setPlaceholderVisible(_ visible: Bool, animated: Bool) {
-        let alpha: CGFloat = visible ? 1 : 0
-        guard placeholderLabel.alphaValue != alpha else { return }
-        guard animated, visible else {
-            placeholderLabel.alphaValue = alpha
-            return
-        }
-        style.animate { placeholderLabel.animator().alphaValue = alpha }
-    }
-
     func refreshTheme() {
-        let theme = style.theme
         background.refreshTheme()
         promptLabel.font = style.promptFont
         promptLabel.textColor = style.color(.text3)
-        placeholderLabel.font = style.inputFont
-        placeholderLabel.textColor = style.color(.text3)
-        textView.font = style.inputFont
-        textView.textColor = style.color(.text)
-        textView.typingAttributes = [.font: style.inputFont, .foregroundColor: style.color(.text)]
-        textView.insertionPointColor = style.color(.accent)
-        textView.caretWidth = theme.component(.caretWidth)
-        textView.selectedTextAttributes = [.backgroundColor: style.color(.hover)]
+        input.apply(font: style.inputFont, ink: style.color(.text), placeholder: Self.placeholder,
+                    placeholderInk: style.color(.text3))
         spaceBadge.refresh()
         reminderBadge.refresh()
         underline(underlinedRanges)
@@ -171,18 +120,8 @@ final class CaptureBarView: NSView {
         }
 
         let inputX = padding + promptWidth + gap
-        let lineHeight = textView.layoutManager?.defaultLineHeight(for: style.inputFont).rounded(.up)
-            ?? theme.lineHeight(.capture)
-        let inputFrame = centered(NSSize(width: max(0, trailing - inputX), height: lineHeight), x: inputX)
-        scrollView.frame = inputFrame
-        textView.minSize = inputFrame.size
-        if textView.frame.height != lineHeight || textView.frame.width < inputFrame.width {
-            textView.frame.size = NSSize(width: max(textView.frame.width, inputFrame.width), height: lineHeight)
-        }
-        // 자리 글자는 입력한 글자가 놓일 자리에서 시작한다.
-        placeholderLabel.frame = style.labelFrame(
-            placeholderLabel, textX: inputX,
-            textWidth: min(style.textWidth(of: placeholderLabel), inputFrame.width), centeredIn: bounds.height
-        )
+        let height = ceil(input.intrinsicContentSize.height)
+        input.frame = centered(NSSize(width: max(0, trailing - inputX), height: height),
+                               x: inputX - CaptureStyle.labelInset)
     }
 }

@@ -129,8 +129,8 @@ struct UpcomingDetail: View {
                     .padding(.horizontal, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
             }.buttonStyle(LibraryButtonStyle(theme: theme, hoverName: "일정 연결 열기"))
         }.padding(theme.space(.sp3)).frame(width: theme.component(.upcomingWidth))
-            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.browseRadius)))
-            .overlay { RoundedRectangle(cornerRadius: theme.component(.browseRadius)).strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)) }
+            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.pickerRadius)))
+            .overlay { RoundedRectangle(cornerRadius: theme.component(.pickerRadius)).strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)) }
             .shadow(color: near?.color.color ?? .clear, radius: (near?.blur ?? 0) / 2, x: near?.x ?? 0, y: near?.y ?? 0)
             .shadow(color: far?.color.color ?? .clear, radius: (far?.blur ?? 0) / 2, x: far?.x ?? 0, y: far?.y ?? 0)
     }

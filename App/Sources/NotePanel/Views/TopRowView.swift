@@ -7,7 +7,6 @@ import DateTime
 final class TopRowView: NSView {
     struct Actions {
         var more: (NSView) -> Void = { _ in }
-        var add: () -> Void = {}
         var reminder: () -> Void = {}
         var pin: () -> Void = {}
         var problem: (NSView) -> Void = { _ in }
@@ -28,7 +27,6 @@ final class TopRowView: NSView {
     }
     private let title: TitleField
     private let moreButton: IconButton
-    private let addButton: IconButton
     private let problemButton: IconButton
     private let reminderBadge: ReminderBadgeView
     private let pinButton: IconButton
@@ -45,7 +43,6 @@ final class TopRowView: NSView {
         clockButton = IconButton(style: style, symbolName: "clock", iconSize: .iconMedium, label: "이 노트의 일정")
         title = TitleField(style: style)
         moreButton = IconButton(style: style, symbolName: "ellipsis", iconSize: .iconMedium, label: "더 보기")
-        addButton = IconButton(style: style, symbolName: "plus", iconSize: .iconMedium, label: "새 노트")
         problemButton = IconButton(
             style: style, symbolName: "exclamationmark.triangle", iconSize: .iconMedium, label: ""
         )
@@ -55,7 +52,7 @@ final class TopRowView: NSView {
         )
         super.init(frame: .zero)
         divider.wantsLayer = true
-        [closeButton, clockButton, divider, title, moreButton, addButton, problemButton, reminderBadge, pinButton]
+        [closeButton, clockButton, divider, title, moreButton, problemButton, reminderBadge, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
         problemButton.alphaValue = 0
@@ -70,7 +67,6 @@ final class TopRowView: NSView {
     private func connect() {
         clockButton.onPress = { [unowned self] in actions.reminder() }
         moreButton.onPress = { [unowned self] in actions.more(moreButton) }
-        addButton.onPress = { [unowned self] in actions.add() }
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
         reminderBadge.onPress = { [unowned self] in actions.reminder() }
         pinButton.onPress = { [unowned self] in actions.pin() }
@@ -117,7 +113,7 @@ final class TopRowView: NSView {
         title.paletteID = state.paletteID
         reminderBadge.paletteID = state.paletteID
         title.show(
-            title: state.title, isPlaceholder: state.isTitlePlaceholder, color: state.titleColor,
+            title: state.title, color: state.titleColor,
             animated: animated
         )
         reminderBadge.apply(state.reminder, count: state.additionalSchedules, animated: animated)
@@ -129,7 +125,7 @@ final class TopRowView: NSView {
         let alphas: [(NSView, Double)] = [
             (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
             (clockButton, state.hasSchedules && state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
-            (addButton, state.hoverControlsAlpha), (pinButton, state.pin.alpha),
+            (pinButton, state.pin.alpha),
         ]
         if animated {
             style.animate { alphas.forEach { $0.0.animator().alphaValue = $0.1 } }
@@ -163,7 +159,7 @@ final class TopRowView: NSView {
     func refreshTheme() {
         title.refreshTheme()
         reminderBadge.refresh()
-        [moreButton, addButton, problemButton, pinButton, closeButton, clockButton].forEach { $0.refresh() }
+        [moreButton, problemButton, pinButton, closeButton, clockButton].forEach { $0.refresh() }
         needsLayout = true
     }
 
@@ -206,7 +202,6 @@ final class TopRowView: NSView {
             width: frames.title.width, height: titleHeight
         )
         moreButton.frame = frames.more
-        addButton.frame = frames.add
         // 사라지는 중인 것은 자리가 없어져도 마지막 자리에서 사라진다.
         if let problem = frames.problem { problemButton.frame = problem }
         if let reminder = frames.reminder { reminderBadge.frame = reminder }
