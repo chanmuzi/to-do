@@ -76,7 +76,6 @@ import SpaceIcons
         root.layoutSubtreeIfNeeded()
         #expect(descendants(root).allSatisfy { $0.focusRingType == .none })
         let rows = descendants(root).compactMap { $0 as? LibraryRowInputView }
-            .filter { $0.bounds.height == f.model.theme.component(.libraryRowHeight) }
         #expect(rows.count == 2)
         for row in rows {
             for x in [1.0, row.bounds.midX, row.bounds.width - 1] {
@@ -149,7 +148,7 @@ import SpaceIcons
         let root = try #require(window.contentView)
         let entry = try #require(f.model.index.upcoming.first)
         try clickAction(entry.id, in: root, window: window)
-        #expect(f.model.upcomingID == entry.id && f.model.upcomingPinned)
+        #expect(f.model.upcomingID == entry.id)
         #expect(f.routes.isEmpty)
         try clickAction("일정 연결 열기", in: root, window: window)
         #expect(f.routes == [.openNote(note.id)])
@@ -178,8 +177,8 @@ import SpaceIcons
         }
         func clickBelowLastRow(_ rows: [NSRect]) throws {
             let last = try #require(rows.last)
-            try click(window, at: NSPoint(x: last.minX + theme.space(.sp6) + theme.space(.sp2),
-                                          y: last.minY - theme.component(.librarySidebarRowGap) - theme.lineHeight(.title) / 2))
+            try click(window, at: NSPoint(x: last.maxX - theme.space(.sp2) - theme.space(.sp3),
+                                          y: last.minY - theme.component(.librarySidebarRowGap) - theme.component(.libraryMoreSize) / 2))
         }
 
         let collapsed = visibleRows()
@@ -194,7 +193,7 @@ import SpaceIcons
         #expect(visibleRows().count == 5)
     }
 
-    @Test func upcomingHoverCancelsOnExitAndClickPersistsUntilOutside() async throws {
+    @Test func upcomingDetailFollowsClicksAndDismissesOnRepeatOrOutside() throws {
         let f = try Fixture()
         defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "다가옴", reminder: Date().addingTimeInterval(3600)))
@@ -207,27 +206,17 @@ import SpaceIcons
         let entry = try #require(f.model.index.upcoming.first)
         let hover = try #require(descendants(root).compactMap { $0 as? SidebarHoverView }
             .first { $0.accessibilityLabel() == entry.id + " 호버" })
-        let pause = f.model.theme.motion.upcomingHover
         hover.changed(true)
-        try await Task.sleep(for: .seconds(pause / 2))
-        #expect(f.model.upcomingID == nil)
-        try await Task.sleep(for: .seconds(pause))
-        #expect(f.model.upcomingID == entry.id && !f.model.upcomingPinned)
-        hover.changed(false)
-        settle()
         #expect(f.model.upcomingID == nil)
         try clickAction(entry.id, in: root, window: window)
         hover.changed(false)
-        #expect(f.model.upcomingID == entry.id && f.model.upcomingPinned)
+        #expect(f.model.upcomingID == entry.id)
         let second = try #require(f.model.index.upcoming.last)
-        let nextHover = try #require(descendants(root).compactMap { $0 as? SidebarHoverView }
-            .first { $0.accessibilityLabel() == second.id + " 호버" })
-        nextHover.changed(true)
-        try await Task.sleep(for: .seconds(pause * 1.5))
-        #expect(f.model.upcomingID == second.id && !f.model.upcomingPinned)
-        hover.changed(false)
+        try clickAction(second.id, in: root, window: window)
         #expect(f.model.upcomingID == second.id)
         try clickAction(second.id, in: root, window: window)
+        #expect(f.model.upcomingID == nil)
+        try clickAction(entry.id, in: root, window: window)
         try click(window, at: NSPoint(x: root.bounds.maxX - 25, y: root.bounds.midY))
         #expect(f.model.upcomingID == nil)
     }
@@ -280,8 +269,8 @@ import SpaceIcons
         root.layoutSubtreeIfNeeded()
         let theme = f.model.theme
         let boxes = descendants(root).compactMap { $0 as? SpaceIconNSView }.map { $0.convert($0.bounds, to: root) }
-        let side = theme.component(.iconLarge)
-        let center = theme.space(.sp2) + theme.space(.sp1) + theme.component(.controlHeight) / 2
+        let side = theme.component(.iconMedium)
+        let center = theme.component(.librarySidebarInset) + theme.component(.iconGap) + theme.component(.controlHeight) / 2
         #expect(boxes.count == 2)
         for box in boxes {
             #expect(box.size == NSSize(width: side, height: side))
@@ -290,7 +279,7 @@ import SpaceIcons
         let field = try #require(descendants(root).compactMap { $0 as? NSTextField }
             .first { $0.accessibilityLabel() == "스페이스 이름" })
         let fieldStart = field.convert(field.bounds, to: root).minX + field.alignmentRectInsets.left
-        let textStart = center + theme.component(.controlHeight) / 2 + theme.space(.sp1)
+        let textStart = center + theme.component(.controlHeight) / 2 + theme.component(.iconGap)
         #expect(fieldStart == textStart)
         #expect(!field.drawsBackground && !field.isBordered)
     }
@@ -307,13 +296,31 @@ import SpaceIcons
         let folder = try #require(descendants(root).compactMap { $0 as? SpaceIconNSView }.first)
         let center = folder.convert(folder.bounds, to: nil)
         let theme = f.model.theme
-        let right = theme.component(.librarySidebarWidth) - theme.space(.sp2) - theme.space(.sp1)
+        let right = center.midX + theme.component(.controlHeight) / 2
         let control = theme.component(.controlHeight)
         #expect(!f.model.expanded.contains(space.id))
         try click(window, at: NSPoint(x: right - control + 1, y: center.midY))
         #expect(f.model.expanded.contains(space.id))
         try click(window, at: NSPoint(x: right - 1, y: center.midY))
         #expect(!f.model.expanded.contains(space.id))
+    }
+
+    @Test func spaceMenuCreatesInItsOwnSpaceAndAllCommandsHaveIcons() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let space = try f.model.spaces.create(name: "작업실")
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        settle()
+        let root = try #require(f.coordinator.window?.contentView)
+        let button = try #require(descendants(root).compactMap { $0 as? SpaceMenuButton }.first { !$0.contextOnly })
+        let menu = try #require(button.menu)
+        #expect(menu.items.map { $0.isSeparatorItem ? "-" : $0.title } ==
+                ["이 스페이스에 새 노트", "-", "아이콘 바꾸기", "이름 바꾸기", "-", "스페이스 지우기"])
+        #expect(menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.image != nil && $0.view is MenuBarRowView })
+        menu.performActionForItem(at: 0)
+        guard case .newNote(let request) = f.routes.last else { Issue.record("새 노트 요청 누락"); return }
+        #expect(request.draft.spaceID == space.id)
     }
 
     @Test func noteMarkerUsesOnlyItsLinkedCalendarOrReminderList() throws {
@@ -371,7 +378,7 @@ import SpaceIcons
         #expect(!unchanged(width / 2, height / 2))
     }
 
-    @Test func sidebarUpdatesWhenNoteCountsChange() throws {
+    @Test func sidebarStaysUnchangedWhenOnlyNoteCountsChange() throws {
         let f = try Fixture(); defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "첫째"))
         f.coordinator.allowsKeyWindows = false; f.coordinator.show(); settle()
@@ -386,7 +393,7 @@ import SpaceIcons
         let before = try sidebar()
         _ = try f.notes.create(NoteDraft(title: "둘째")); f.model.refresh(); settle()
         let after = try sidebar()
-        #expect(before != after, "노트 수가 바뀌면 보기 오른쪽 개수를 갱신한다")
+        #expect(before == after, "노트 개수만 바뀌면 사이드바는 그대로 표시한다")
     }
 
     @Test func keyboardSelectionClearsWhenViewChanges() throws {

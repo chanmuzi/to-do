@@ -62,7 +62,6 @@ public struct MotionTokens: Hashable, Sendable {
     public let curve: BezierCurve
     public let bell: BellMotion
     /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(초).
-    public let upcomingHover: TimeInterval
     public let caretBlink: TimeInterval
     /// 짧은 알림(토스트)이 떠 있는 시간(초).
     public let toastHold: TimeInterval

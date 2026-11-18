@@ -76,6 +76,7 @@ public final class LibraryModel {
         perform {
             let listing = try notes.list(), trash = try notes.listTrash()
             index = LibraryIndex(notes: listing.notes, trash: trash.notes, windows: windows.all, events: calendarEvents, now: now, calendar: calendar)
+            if let upcomingID, !index.upcoming.contains(where: { $0.id == upcomingID }) { dismissUpcoming() }
             spaceList = spaces.spaces
             let failures = listing.failures + trash.failures
             if !failures.isEmpty { error = failures.map { $0.error.description }.joined(separator: "\n") }
@@ -127,41 +128,27 @@ public final class LibraryModel {
         selection = target
         changeSettings { $0.lastSelection = target }
     }
-    private var upcomingDetail: (id: String, pinned: Bool)?
-    var upcomingID: String? { upcomingDetail?.id }
-    var upcomingPinned: Bool { upcomingDetail?.pinned == true }
+    private(set) var upcomingID: String?
+    @ObservationIgnored weak var upcomingSourceView: NSView?
     @ObservationIgnored weak var upcomingDetailView: NSView?
-    @ObservationIgnored private var pendingHover: Task<Void, Never>?
-    @ObservationIgnored private var hoveringUpcomingID: String?
 
-    package func pinUpcoming(_ id: String) {
-        pendingHover?.cancel()
-        upcomingDetail = (id, true)
+    package func toggleUpcoming(_ id: String) {
+        upcomingID = upcomingID == id ? nil : id
     }
 
-    func hoverUpcoming(_ id: String, inside: Bool) {
-        if inside {
-            pendingHover?.cancel()
-            hoveringUpcomingID = id
-            guard upcomingID != id else { return }
-            let delay = theme.motion.upcomingHover
-            pendingHover = Task { [weak self] in
-                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
-                self?.upcomingDetail = (id, false)
-            }
-        } else {
-            if hoveringUpcomingID == id {
-                pendingHover?.cancel()
-                hoveringUpcomingID = nil
-            }
-            if upcomingID == id && !upcomingPinned { upcomingDetail = nil }
+    func dismissUpcoming() { upcomingID = nil }
+
+    func newNote(in space: SpaceID?) {
+        var draft = NoteDraft()
+        draft.spaceID = space
+        router.route(.newNote(NewNoteRequest(draft: draft)))
+    }
+
+    func newNoteInSelection() {
+        switch selection {
+        case .space(let id), .day(let id, _): newNote(in: id)
+        default: newNote(in: nil)
         }
-    }
-
-    func dismissUpcoming() {
-        pendingHover?.cancel()
-        hoveringUpcomingID = nil
-        upcomingDetail = nil
     }
 
     var showAllUpcoming = false
