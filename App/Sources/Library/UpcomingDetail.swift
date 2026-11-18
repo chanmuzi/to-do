@@ -58,14 +58,12 @@ private extension UpcomingRow {
 struct UpcomingButton: View {
     let model: LibraryModel
     let entry: UpcomingRow
-    @State private var hovered = false
     private var theme: Theme { model.theme }
 
     var body: some View {
         let selected = model.upcomingID == entry.id
         Button {
-            model.upcomingPinned = true
-            model.upcomingID = entry.id
+            model.pinUpcoming(entry.id)
         } label: {
             HStack(spacing: theme.space(.sp2)) {
                 Circle().fill(entry.item.kind == .event ? entry.color(model) : .clear)
@@ -83,16 +81,9 @@ struct UpcomingButton: View {
         }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected))
             .anchorPreference(key: UpcomingBounds.self, value: .bounds) { [entry.id: $0] }
             .background(LibrarySidebarHover(name: entry.id) { inside in
-                hovered = inside
-                if !inside && selected && !model.upcomingPinned { model.upcomingID = nil }
+                model.hoverUpcoming(entry.id, inside: inside)
             })
-            .task(id: hovered) {
-                guard hovered else { return }
-                do { try await Task.sleep(for: .seconds(theme.motion.upcomingHover)) } catch { return }
-                guard !(model.upcomingPinned && model.upcomingID != nil) else { return }
-                model.upcomingPinned = false
-                model.upcomingID = entry.id
-            }
+            .onDisappear { model.hoverUpcoming(entry.id, inside: false) }
     }
 }
 
@@ -117,7 +108,7 @@ struct UpcomingDetail: View {
             }
             theme.color(.line).frame(height: theme.shape(.borderWidth))
             Button {
-                model.upcomingID = nil
+                model.dismissUpcoming()
                 switch entry {
                 case .note(let note, _): _ = model.router.route(.openNote(note.id))
                 case .calendar(let event): model.openCalendarEvent(event)
@@ -143,4 +134,15 @@ struct UpcomingDetail: View {
             .shadow(color: near?.color.color ?? .clear, radius: (near?.blur ?? 0) / 2, x: near?.x ?? 0, y: near?.y ?? 0)
             .shadow(color: far?.color.color ?? .clear, radius: (far?.blur ?? 0) / 2, x: far?.x ?? 0, y: far?.y ?? 0)
     }
+}
+
+/// 바깥 클릭을 판별하되 다른 행의 클릭과 호버는 그대로 전달한다.
+struct UpcomingDetailBounds: NSViewRepresentable {
+    let model: LibraryModel
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        model.upcomingDetailView = view
+        return view
+    }
+    func updateNSView(_ view: NSView, context: Context) {}
 }

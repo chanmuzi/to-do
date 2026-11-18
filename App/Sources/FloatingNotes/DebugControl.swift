@@ -56,7 +56,7 @@ extension NotePanelCoordinator {
 /// - `caret-preview <id>`: passive 실행에서 키 창 없이 본문 커서만 보여 준다.
 /// - `title-edit|title-end <id>`: 키 창을 만들 수 없는 passive 실행에서도 제목의 필드 편집기를 확인한다.
 /// - `input-key <id> [|]|"|space`: 본문의 `keyDown`에 앱 내부 이벤트 하나를 보낸다.
-/// - `input-mark|input-commit <id|title:id|capture|browse|library> <글자>`: 조합/확정 입력.
+/// - `input-mark|input-commit <id|title:id|capture|browse> <글자>`: 조합/확정 입력.
 /// - `input-check <같은 대상> <파일 이름>`: 자동 입력 설정과 조합 상태를 JSON으로 쓴다.
 /// - `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`: 자기 입력 칸의 날짜 제안, 키 경로 확인.
 /// - `quit`
@@ -256,8 +256,9 @@ final class DebugControl {
             if let url = output(named: name.rawValue) { write(reminderEditor?.model?.pickerWindow, to: url) }
         case ("upcoming-detail", _, _):
             if let model = library?.model {
-                model.upcomingPinned = true
-                model.upcomingID = model.index.upcoming.first { if case .note = $0 { true } else { false } }?.id
+                if let entry = model.index.upcoming.first(where: { if case .note = $0 { true } else { false } }) {
+                    model.pinUpcoming(entry.id)
+                }
             }
         case ("reminder-close", _, _): reminderEditor?.close()
         case ("reminder-snapshot", let name?, _):
@@ -694,11 +695,6 @@ final class DebugControl {
 
     private func verificationInput(_ target: String) -> NSTextView? {
         if target == "capture" || target == "browse" { return quickPanels.input(named: target) }
-        if target == "library", let root = library?.window?.contentView,
-           let field = DebugInputVerification.searchField(in: root) {
-            field.window?.makeFirstResponder(field)
-            return field.currentEditor() as? NSTextView
-        }
         if target.hasPrefix("title:") {
             let id = NoteID(rawValue: String(target.dropFirst("title:".count)))
             notePanels.beginTitleEditing(for: id)

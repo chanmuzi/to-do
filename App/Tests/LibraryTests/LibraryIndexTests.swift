@@ -77,16 +77,9 @@ import Testing
         let pinned = note("pin", day: 1), today = note("today", day: 17)
         let index = LibraryIndex(notes: [old, pinned, today], windows: [pinned.id: .init(isPinned: true)],
                                  now: now, calendar: calendar)
-        let groups = index.sections(for: .all, query: "")
+        let groups = index.sections(for: .all)
         #expect(groups.map(\.id) == ["고정됨", "오늘", "2026년 10월"])
         #expect(groups.flatMap(\.notes).map(\.id) == [pinned.id, today.id, old.id])
-    }
-    @Test func searchAndCountsUseSameRows() {
-        var a = note("계획", day: 17, space: nil); a.body = "Swift 배포"
-        let index = LibraryIndex(notes: [a, note("b", day: 17)], now: now, calendar: calendar)
-        #expect(index.rows(for: .all, query: "swift").map(\.id) == [a.id])
-        #expect(index.rows(for: .space(nil)).count == 1)
-        #expect(index.rows(for: .all, query: "없음").isEmpty)
     }
     @Test func upcomingMergesOccurrencesDeduplicatesLinksWithoutTruncating() {
         let interval = LibraryIndex.upcomingInterval(now: now, calendar: calendar)

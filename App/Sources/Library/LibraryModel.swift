@@ -18,7 +18,6 @@ public final class LibraryModel {
     public private(set) var index = LibraryIndex(notes: [])
     public private(set) var spaceList: [Space] = []
     public var selection: LibrarySelection = .today
-    public var query = "" { didSet { if query != oldValue { selectedNoteID = nil } } }
     public private(set) var selectedNoteID: NoteID?
     public var displayOptions = NoteDisplayOptions()
     public var error: String?
@@ -124,19 +123,54 @@ public final class LibraryModel {
         case .space(nil): target = .all
         default: target = value
         }
-        upcomingID = nil
+        dismissUpcoming()
         selection = target
         changeSettings { $0.lastSelection = target }
     }
-    package var upcomingID: String?
-    package var upcomingPinned = false
+    private var upcomingDetail: (id: String, pinned: Bool)?
+    var upcomingID: String? { upcomingDetail?.id }
+    var upcomingPinned: Bool { upcomingDetail?.pinned == true }
+    @ObservationIgnored weak var upcomingDetailView: NSView?
+    @ObservationIgnored private var pendingHover: Task<Void, Never>?
+    @ObservationIgnored private var hoveringUpcomingID: String?
+
+    package func pinUpcoming(_ id: String) {
+        pendingHover?.cancel()
+        upcomingDetail = (id, true)
+    }
+
+    func hoverUpcoming(_ id: String, inside: Bool) {
+        if inside {
+            pendingHover?.cancel()
+            hoveringUpcomingID = id
+            guard upcomingID != id else { return }
+            let delay = theme.motion.upcomingHover
+            pendingHover = Task { [weak self] in
+                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+                self?.upcomingDetail = (id, false)
+            }
+        } else {
+            if hoveringUpcomingID == id {
+                pendingHover?.cancel()
+                hoveringUpcomingID = nil
+            }
+            if upcomingID == id && !upcomingPinned { upcomingDetail = nil }
+        }
+    }
+
+    func dismissUpcoming() {
+        pendingHover?.cancel()
+        hoveringUpcomingID = nil
+        upcomingDetail = nil
+    }
+
     var showAllUpcoming = false
-    var sections: [LibraryIndex.Section] { index.sections(for: selection, query: query) }
+    var sections: [LibraryIndex.Section] { index.sections(for: selection) }
     public var showsNewNote: Bool { selection != .trash && selection != .archived }
     func toggleArchive(_ note: Note) {
         perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
     }
-    public var rows: [Note] { index.rows(for: selection, query: query) }
+    public var rows: [Note] { index.rows(for: selection) }
 
     /// 한 번 클릭은 선택만 한다. 더블 클릭과 키보드 열기는 구분한다.
     public func activate(_ note: Note, clickCount: Int = 1) {

@@ -81,8 +81,8 @@ public struct LibraryIndex: Sendable {
         var notes: [Note]
     }
 
-    func sections(for selection: LibrarySelection, query: String) -> [Section] {
-        let rows = rows(for: selection, query: query)
+    func sections(for selection: LibrarySelection) -> [Section] {
+        let rows = rows(for: selection)
         var groups: [Section] = []
         var pinned: [Note] = []
         for note in rows {
@@ -107,7 +107,7 @@ public struct LibraryIndex: Sendable {
         return groups
     }
 
-    public func rows(for selection: LibrarySelection, query: String = "") -> [Note] {
+    public func rows(for selection: LibrarySelection) -> [Note] {
         let source = selection == .trash ? trash : notes
         return source.filter { note in
             if note.isArchived {
@@ -127,8 +127,7 @@ public struct LibraryIndex: Sendable {
                 included = note.spaceID == id && !note.isArchived && calendar.isDate(note.created, inSameDayAs: day)
             case .archive(let month): included = note.isArchived && self.month(of: note.created) == month
             }
-            return included && (query.isEmpty || (note.title + "\n" + note.body)
-                .localizedStandardContains(query))
+            return included
         }.sorted {
             if $0.modified != $1.modified { return $0.modified > $1.modified }
             return $0.id.rawValue < $1.id.rawValue
