@@ -29,11 +29,13 @@ if [ -z "$IDENTITY" ]; then
 fi
 
 swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatingNotes
-BINARY="$(swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --show-bin-path)/FloatingNotes"
+swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatMCP
+BIN_DIR="$(swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BINARY" "$APP/Contents/MacOS/FloatingNotes"
+cp "$BIN_DIR/FloatMCP" "$APP/Contents/MacOS/FloatMCP"
+cp "$BIN_DIR/FloatingNotes" "$APP/Contents/MacOS/FloatingNotes"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
 # 원본 DisplayName은 파일명과 맞추고, 시스템 표시 이름은 지역화 리소스에서 읽는다(D-062).
 cp -R "$RESOURCES/ko.lproj" "$RESOURCES/en.lproj" "$APP/Contents/Resources/"
@@ -68,6 +70,7 @@ rm -rf "$ICON_WORK"
 # Hardened Runtime은 켜지 않는다: 켜면 EventKit 캘린더 접근에 별도
 # com.apple.security.personal-information.calendars 엔타이틀먼트가 필요하다(D-063).
 # 명시한 identity가 잘못됐거나 서명에 실패하면 임시 서명으로 숨기지 않고 실패한다.
+"${SIGN_COMMAND[@]}" --sign "$IDENTITY" "$APP/Contents/MacOS/FloatMCP"
 "${SIGN_COMMAND[@]}" --sign "$IDENTITY" "$APP"
 
 echo "$APP"
