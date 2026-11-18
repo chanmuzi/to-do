@@ -34,7 +34,7 @@ Core         모든 기능이 공유하는 바탕
 | Features | `Browse` | 노트 찾기 | 08 |
 | Features | `Library` | 라이브러리, 스페이스 아이콘 고르기 | 09, 10 |
 | Features | `Reminders` | 리마인더 설정, 표시, 알림 | |
-| Features | `Settings` | 테마 설정, 단축키 표 | 12, 13 |
+| Features | `FloatSettings` | 테마 설정, 단축키 표 | 12, 13 |
 | Features | `Agent` | AI 패널과 에이전트 연결. 연결 대상(Claude, Codex)은 같은 프로토콜의 구현으로 추가한다 | 11 |
 
 ## 규칙
@@ -497,3 +497,9 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - 디버그 `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`는 자기 프로세스 입력 칸만 사용한다. `editor` 덤프에 dateSuggestionHelp 접근성 도움말을 포함한다. 실제 계정, 시스템 이벤트, 클립보드는 사용하지 않는다.
 
 - L1과 E2(D-086~D-088): Theme.CommandTextField가 조합 보호, 밑줄, Return과 Escape를 제공한다. LibraryPreview는 목록 표시 제목과 본문을 만들며 저장 제목은 바꾸지 않는다. Models.ScheduleDestination은 외부 캘린더의 이름과 sRGB 색 값만 담는다. CalendarBridge.destination은 권한 요청 없이 조회하고 App이 ScheduleService를 통해 ReminderEditorCoordinator에 주입한다. AppSettings.scheduleDateFormat은 열린 NotePanel, Library, Reminders에 동시에 전달한다.
+
+## 7단계 설정
+
+- Feature `FloatSettings`는 Theme, Models, Scheduling에 의존한다. SettingsValues는 저장 형식, SettingsModel은 저장 콜백과 권한별 대상 선택, SettingsCoordinator는 단일 창을 맡는다. 다른 Feature를 import하지 않는다.
+- AppSettingsStore가 JSON을 원자적으로 쓴 뒤 SettingsApplication과 NoteEditorFactory가 이미 열린 화면을 갱신한다. AppDelegate가 ShortcutTable의 표시 행, 저장소, ScheduleService를 주입한다.
+- CalendarBridge가 권한 상태, 쓰기 가능한 대상, 시스템 기본값을 제공한다. ID 선택은 새 항목 생성과 E2가 공유하고 연결된 항목은 기존 대상을 유지한다.
