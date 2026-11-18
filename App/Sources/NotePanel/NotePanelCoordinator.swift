@@ -65,7 +65,6 @@ public final class NotePanelCoordinator {
     private var observers: [any NSObjectProtocol] = []
     private var isRefreshingStore = false
     /// 켤 때 지난번의 창을 되살리는 중이다. 사용자가 연 것이 아니므로 "마지막으로 연 때"를 적지 않는다.
-    private var isRestoring = false
     /// 방금 휴지통으로 보낸 노트. "바로 뒤"가 끝나면 비운다(`endTrashUndo()`를 부르는 곳들, D-024).
     private var lastTrashed: TrashedNote? {
         didSet { if lastTrashed == nil, oldValue != nil, !isHoldingTrashUndo { onTrashUndoEnded?() } }
@@ -127,8 +126,6 @@ public final class NotePanelCoordinator {
     /// 그사이 없어진 노트는 상태에서 지우고 넘어간다.
     @discardableResult
     public func restoreOpenNotes() -> [NoteID] {
-        isRestoring = true
-        defer { isRestoring = false }
         return recorder.openNoteIDs.filter { id in
             do {
                 try open(id, focus: false)
@@ -151,7 +148,7 @@ public final class NotePanelCoordinator {
     public func open(_ id: NoteID, nextTo: NoteID? = nil, focus: Bool = true) throws {
         setAllHidden(false)
         if let controller = controllers[id] {
-            controller.show(focus: focus, recordsOpening: !isRestoring)
+            controller.show(focus: focus)
             return
         }
         // 편집용으로 열 때는 목록의 값이 아니라 load의 값을 쓴다(충돌 기준이 여기서 잡힌다).
@@ -165,7 +162,7 @@ public final class NotePanelCoordinator {
         controller.panel.allowsKey = allowsKeyWindows
         controllers[id] = controller
         order.append(id)
-        controller.show(focus: focus, recordsOpening: !isRestoring)
+        controller.show(focus: focus)
     }
 
     /// 새 노트를 만들어 지금 노트 옆에 띄운다. 핀이 켜진 채로 뜬다(spec 4.1).

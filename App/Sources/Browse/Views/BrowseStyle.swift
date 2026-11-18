@@ -87,33 +87,15 @@ struct BrowseStyle {
 
     private var regularWeight: CGFloat { theme.tokens.textStyle(.body).weight }
 
-    /// 줄 제목: `fs-row`, 굵기 600.
-    var titleFont: NSFont { theme.nsFont(.row) }
-    /// "제목 없음", 검색 칸, 새 노트 만들기, 라이브러리 열기: `fs-row`, 보통 굵기.
-    var plainFont: NSFont { theme.nsFont(.row, weight: regularWeight) }
-    /// 본문 첫머리: `fs-row-sub`.
-    var previewFont: NSFont { theme.nsFont(.rowSub) }
-    /// 본문에서 맞은 낱말: 같은 크기에 굵기 600.
-    var previewMatchFont: NSFont { theme.nsFont(.rowSub, weight: theme.tokens.textStyle(.title).weight) }
-    /// 구획 이름: Pretendard를 `fs-micro` 크기로.
-    var headerFont: NSFont { theme.nsFont(.body, size: theme.tokens.textStyle(.micro).size) }
-    /// 리마인더: D2Coding `fs-micro`. 임박은 굵게.
-    func reminderFont(strong: Bool) -> NSFont {
-        strong ? theme.nsFont(.micro, weight: theme.tokens.textStyle(.uiStrong).weight) : theme.nsFont(.micro)
+    var plainFont: NSFont { theme.nsFont(.title, weight: regularWeight) }
+    var titleFont: NSFont { theme.nsFont(.title) }
+    var previewFont: NSFont { theme.nsFont(.body, size: theme.tokens.textStyle(.micro).size) }
+    var previewMatchFont: NSFont {
+        theme.nsFont(.body, size: previewFont.pointSize, weight: theme.tokens.textStyle(.title).weight)
     }
-
-    // MARK: - 치수
-
-    /// 줄 안쪽 좌우 여백(`sp-2`).
-    var rowPadding: CGFloat { theme.space(.sp2) }
-    /// 줄 맨 앞과 맨 뒤의 아이콘 칸 너비.
-    var leadWidth: CGFloat { theme.component(.iconLarge) }
-    /// 구획 이름의 높이: 위 `sp-2`, 글자 `lh-micro`, 아래 검색 칸 아래와 같은 틈.
-    var headerHeight: CGFloat {
-        theme.space(.sp2) + theme.lineHeight(.micro) + theme.component(.browseFindGap)
-    }
-    /// 구분선 자리의 높이: 선 위아래로 안쪽 여백만큼.
-    var separatorHeight: CGFloat {
-        theme.component(.browsePadding) * 2 + theme.shape(.borderWidth)
-    }
+    var headerFont: NSFont { theme.nsFont(.librarySection, weight: regularWeight) }
+    var rowPadding: CGFloat { theme.component(.browseGap) }
+    var leadWidth: CGFloat { theme.component(.iconSmall) }
+    var headerHeight: CGFloat { theme.component(.browseHeaderHeight) }
+    var separatorHeight: CGFloat { theme.component(.browsePadding) * 2 + theme.shape(.borderWidth) }
 }

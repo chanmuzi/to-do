@@ -28,7 +28,7 @@ final class BrowseActionRowView: BrowseEntryView {
     var title: String { label.stringValue }
 
     override func refreshTheme() {
-        iconView.image = style.symbol(symbolName, size: .iconLarge)
+        iconView.image = style.symbol(symbolName, size: .iconSmall)
         iconView.contentTintColor = style.color(.text2)
         label.font = style.plainFont
         label.textColor = style.color(textColor)
@@ -70,14 +70,8 @@ final class BrowseHeaderView: BrowseEntryView {
 
     override func layout() {
         super.layout()
-        let theme = style.theme
-        let size = style.fittingSize(of: label)
-        let lineHeight = theme.lineHeight(.micro)
-        label.frame = NSRect(
-            x: style.rowPadding - BrowseStyle.labelInset,
-            y: theme.space(.sp2) + ((lineHeight - size.height) / 2).rounded(),
-            width: max(0, bounds.width - style.rowPadding * 2) + BrowseStyle.labelInset * 2, height: size.height
-        )
+        label.frame = style.labelFrame(label, textX: style.rowPadding,
+                                       textWidth: bounds.width - style.rowPadding * 2, centeredIn: bounds.height)
     }
 }
 

@@ -16,10 +16,10 @@ struct TopRowState: Hashable {
 
     var paletteID: String?
     var title: String
-    /// 제목이 비어 "제목 없음"을 보통 굵기로 보이는 중.
+    /// 제목이 비어 "제목 없음"을 표시하는 중.
     var isTitlePlaceholder: Bool
     var titleColor: ColorToken
-    /// 호버로 나타나는 것(아이콘 셋, 휴지통, 닫기)의 알파. 자리는 늘 차지한다(규칙 7).
+    /// 상단 호버 버튼의 알파. 자리는 늘 차지한다(규칙 7).
     var hoverControlsAlpha: Double
     var hasSchedules: Bool
     var additionalSchedules = 0

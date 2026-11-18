@@ -55,6 +55,29 @@ import Testing
         #expect(fixture.shownFailures.isEmpty)
     }
 
+    @Test func pinButtonOpensClosedNoteWithoutKeyAndUnpinsInPlace() async throws {
+        defer { fixture.cleanUp() }
+        let note = try fixture.notes.create(NoteDraft(title: "핀 시험")).id
+        fixture.router.route(.openBrowse(anchor: nil))
+        try type("핀 시험", into: fixture.browse.inputView)
+        let root = try #require(fixture.browse.window?.contentView)
+        func pin(in view: NSView) -> NSButton? {
+            if let button = view as? NSButton, button.accessibilityLabel() == "항상 위에 고정" { return button }
+            return view.subviews.lazy.compactMap { pin(in: $0) }.first
+        }
+        func togglePin() throws {
+            let button = try #require(pin(in: root))
+            #expect(button.sendAction(button.action, to: button.target))
+        }
+        try togglePin()
+        #expect(await fixture.wait { fixture.browseTitles == ["핀 시험(핀)"] })
+        #expect(fixture.notePanels.snapshot(of: note)?.isPinned == true)
+        try togglePin()
+        #expect(await fixture.wait { fixture.browseTitles == ["핀 시험"] })
+        #expect(fixture.notePanels.snapshot(of: note)?.isPinned == false)
+        #expect(fixture.browse.isVisible && fixture.keyRequests(note) == 0)
+    }
+
     /// 숨긴 중에 고르면 숨김이 풀리고 그 노트가 키 창이 된다.
     @Test func choosingANoteWhileNotesAreHiddenRevealsThem() throws {
         defer { fixture.cleanUp() }
@@ -157,8 +180,7 @@ import Testing
 
     // MARK: - 열려 있는 목록이 노트 창을 따라가는지
 
-    /// 노트 찾기가 열려 있는 동안 노트 창이 뜨고 내려가면 "떠 있는 노트"가 따라가고, 방금 닫은 노트가
-    /// "최근에 연 노트"의 맨 앞에 온다(고친 시각은 더 오래됐어도).
+    /// 포커스 기록이 생기면 최근에 나타나고 닫힌 창은 같은 자리에서 핀만 사라진다.
     @Test func openBrowseListFollowsNoteWindowsAndOrdersRecentNotesByOpenTime() async throws {
         defer { fixture.cleanUp() }
         var clock = Date(timeIntervalSince1970: 1_900_000_000)
@@ -173,14 +195,17 @@ import Testing
         _ = try fixture.notes.create(NoteDraft(title: "방금 고친 노트"))
 
         fixture.router.route(.openBrowse(anchor: nil))
-        #expect(fixture.browseTitles == ["방금 고친 노트", "오래된 노트"])
+        #expect(fixture.browseTitles.isEmpty)
 
         try fixture.notePanels.open(old, focus: false)
-        #expect(await fixture.wait { fixture.browseTitles == ["오래된 노트(핀)", "방금 고친 노트"] })
+        var state = try #require(fixture.windowStates.state(for: old))
+        state.lastOpened = clock
+        try fixture.windowStates.set(state, for: old)
+        #expect(await fixture.wait { fixture.browseTitles == ["오래된 노트(핀)"] })
 
         clock = clock.addingTimeInterval(60)
         fixture.notePanels.closeWindow(old)
-        #expect(await fixture.wait { fixture.browseTitles == ["오래된 노트", "방금 고친 노트"] })
-        #expect(fixture.browse.rowDescriptions.first == " header 최근에 연 노트")
+        #expect(await fixture.wait { fixture.browseTitles == ["오래된 노트"] })
+        #expect(fixture.browse.rowDescriptions.first == " header 최근")
     }
 }

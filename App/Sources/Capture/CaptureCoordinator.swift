@@ -98,6 +98,7 @@ public final class CaptureCoordinator {
         selectedSpace = CaptureSpaceCycle.initial(
             remembered: hasSelectedSpace ? .some(selectedSpace) : nil, in: spaces.spaces
         )
+        barView.input.stringValue = ""
         barView.textView.string = ""
         barView.textView.undoManager?.removeAllActions()
 
@@ -115,7 +116,7 @@ public final class CaptureCoordinator {
         } else {
             panel.orderFrontRegardless()
         }
-        panel.makeFirstResponder(barView.textView)
+        panel.makeFirstResponder(barView.input)
         panel.ignoresMouseEvents = !isShownOpaque
         // 떠오르며 나타난다: 자리와 투명도가 함께 `dur`, `ease`로 바뀐다. 바 안의 요소는 창과 함께 움직일 뿐 서로의 자리는 그대로다.
         let resting = restingFrame
@@ -379,7 +380,7 @@ public final class CaptureCoordinator {
     private func reclaimKey() {
         guard let panel, let barView, panel.isVisible, !isClosing, takesKeyOnShow else { return }
         panel.makeKeyAndOrderFront(nil)
-        panel.makeFirstResponder(barView.textView)
+        panel.makeFirstResponder(barView.input)
     }
 
     /// ⌘↵: 적은 글을 제목으로 한 새 노트를 띄운다(임시, D-026). 만들고 띄우는 일은 App이 한다.

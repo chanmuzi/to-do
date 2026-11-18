@@ -4,7 +4,7 @@ import Models
 nonisolated enum BrowseFloating {
     static func ids(from states: [NoteID: NoteWindowState]) -> [NoteID] {
         states
-            .filter(\.value.isOpen)
+            .filter { $0.value.isOpen && $0.value.isPinned }
             .sorted { first, second in
                 let orders = (first.value.stackOrder ?? Int.min, second.value.stackOrder ?? Int.min)
                 return orders.0 != orders.1 ? orders.0 > orders.1 : first.key.rawValue < second.key.rawValue

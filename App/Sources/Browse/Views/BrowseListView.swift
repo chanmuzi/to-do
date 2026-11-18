@@ -2,10 +2,14 @@ import AppKit
 
 /// 목록: 줄을 위에서부터 쌓는다. 고른 줄 하나에 `selected` 바탕이 깔리고, 마우스를 올린 줄이 고른 줄이 된다(spec 8).
 final class BrowseListView: NSView {
+    private let scroll = NSScrollView()
+    private let results = FlippedResultsView()
+    private var resultCount = 0
     private let style: BrowseStyle
     private(set) var entryViews: [BrowseEntryView] = []
     private(set) var entries: [BrowseEntry] = []
     private(set) var selectedIndex: Int?
+    private weak var pressedPin: NSButton?
     private var trackingArea: NSTrackingArea?
 
     /// 마우스가 줄 위로 옮겨 갔다(그 줄을 고른다).
@@ -17,6 +21,12 @@ final class BrowseListView: NSView {
         self.style = style
         super.init(frame: .zero)
         wantsLayer = true
+        scroll.drawsBackground = false
+        scroll.borderType = .noBorder
+        scroll.scrollerStyle = .overlay
+        scroll.autohidesScrollers = true
+        scroll.documentView = results
+        addSubview(scroll)
     }
 
     @available(*, unavailable)
@@ -33,14 +43,31 @@ final class BrowseListView: NSView {
         entryViews.forEach { $0.removeFromSuperview() }
         entries = newEntries
         entryViews = views
-        views.forEach(addSubview)
+        resultCount = entries.prefix { entry in
+            switch entry { case .note, .header: true; default: false }
+        }.count
+        for (index, view) in views.enumerated() {
+            (index < resultCount ? results : self).addSubview(view)
+        }
+        scroll.contentView.scroll(to: .zero)
         selectedIndex = nil
         select(selected, animated: false)
-        frame.size.height = contentHeight
         needsLayout = true
+        layoutSubtreeIfNeeded()
+        revealSelection()
     }
 
     var contentHeight: CGFloat { entryViews.reduce(0) { $0 + $1.height } }
+
+    var visibleHeight: CGFloat {
+        let excess = entries.prefix(resultCount).filter { if case .note = $0 { true } else { false } }.count
+            - BrowseContent.recentLimit
+        return contentHeight - CGFloat(max(0, excess)) * style.theme.component(.browseRowHeight)
+    }
+
+    private func revealSelection() {
+        if let index = selectedIndex, index < resultCount { results.scrollToVisible(entryViews[index].frame) }
+    }
 
     func select(_ index: Int?, animated: Bool) {
         guard index != selectedIndex else { return }
@@ -50,7 +77,7 @@ final class BrowseListView: NSView {
         selectedIndex = index
         guard let index, entryViews.indices.contains(index) else { return }
         entryViews[index].setHighlighted(true, animated: animated)
-        scrollToVisible(entryViews[index].frame)
+        revealSelection()
     }
 
     func refreshTheme() {
@@ -61,11 +88,21 @@ final class BrowseListView: NSView {
 
     override func layout() {
         super.layout()
+        let footerHeight = entryViews.dropFirst(resultCount).reduce(CGFloat.zero) { $0 + $1.height }
+        let resultHeight = contentHeight - footerHeight
+        scroll.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(0, bounds.height - footerHeight))
+        scroll.hasVerticalScroller = resultHeight > scroll.bounds.height
+        results.frame.size = NSSize(width: scroll.contentSize.width, height: resultHeight)
         var y: CGFloat = 0
-        for view in entryViews {
-            view.frame = NSRect(x: 0, y: y, width: bounds.width, height: view.height)
+        for (index, view) in entryViews.enumerated() {
+            if index == resultCount { y = scroll.frame.maxY }
+            view.frame = NSRect(x: 0, y: y, width: index < resultCount ? results.bounds.width : bounds.width, height: view.height)
             y += view.height
         }
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if scroll.hasVerticalScroller { scroll.scrollWheel(with: event) }
     }
 
     // MARK: - 마우스
@@ -83,17 +120,33 @@ final class BrowseListView: NSView {
 
     /// 줄 안의 글자와 아이콘이 마우스를 가로채지 않게 목록이 직접 받는다.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        super.hitTest(point) == nil ? nil : self
+        let hit = super.hitTest(point)
+        if hit is NSScroller { return hit }
+        return hit == nil ? nil : self
     }
 
     private func selectableIndex(at event: NSEvent) -> Int? {
-        let point = convert(event.locationInWindow, from: nil)
-        return entryViews.indices.first { entries[$0].isSelectable && entryViews[$0].frame.contains(point) }
+        let local = convert(event.locationInWindow, from: nil)
+        return entryViews.indices.first { index in
+            let view = entryViews[index]
+            guard entries[index].isSelectable, index >= resultCount || scroll.frame.contains(local) else { return false }
+            return view.bounds.contains(view.convert(event.locationInWindow, from: nil))
+        }
     }
 
     override func mouseMoved(with event: NSEvent) {
-        if let index = selectableIndex(at: event), index != selectedIndex { onHover?(index) }
+        guard let index = selectableIndex(at: event) else { clearPinHover(); return }
+        if index != selectedIndex { onHover?(index) }
+        if let row = entryViews[index] as? BrowseNoteRowView {
+            row.setPinHover(row.pin.frame.contains(row.convert(event.locationInWindow, from: nil)))
+        }
     }
+
+    private func clearPinHover() {
+        if let selectedIndex { (entryViews[selectedIndex] as? BrowseNoteRowView)?.setPinHover(false) }
+    }
+
+    override func mouseExited(with event: NSEvent) { clearPinHover() }
 
     override func mouseEntered(with event: NSEvent) {
         mouseMoved(with: event)
@@ -101,15 +154,32 @@ final class BrowseListView: NSView {
 
     /// 누른 줄에서 손을 뗐을 때 연다.
     override func mouseUp(with event: NSEvent) {
-        if let index = selectableIndex(at: event) { onActivate?(index) }
+        defer { pressedPin = nil }
+        guard let index = selectableIndex(at: event) else { return }
+        if let pin = pin(at: event, index: index) {
+            if pressedPin === pin { (entryViews[index] as? BrowseNoteRowView)?.onPin?() }
+        } else if pressedPin == nil { onActivate?(index) }
     }
 
     override func mouseDown(with event: NSEvent) {
-        if let index = selectableIndex(at: event), index != selectedIndex { onHover?(index) }
+        pressedPin = nil
+        guard let index = selectableIndex(at: event) else { return }
+        if index != selectedIndex { onHover?(index) }
+        pressedPin = pin(at: event, index: index)
+    }
+
+    private func pin(at event: NSEvent, index: Int) -> NSButton? {
+        guard let row = entryViews[index] as? BrowseNoteRowView, !row.pin.isHidden,
+              row.pin.frame.contains(row.convert(event.locationInWindow, from: nil)) else { return nil }
+        return row.pin
     }
 
     /// 눌러도 검색 칸의 포커스를 가져오지 않는다.
     override var acceptsFirstResponder: Bool { false }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+private final class FlippedResultsView: NSView {
+    override var isFlipped: Bool { true }
 }

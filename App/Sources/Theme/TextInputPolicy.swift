@@ -31,6 +31,10 @@ public enum TextInputPolicy {
 /// 창이 재사용하는 필드 편집기에 매번 정책을 적용한다. 다른 입력 칸의 시스템 설정이 넘어오지 않는다.
 @MainActor
 public final class PlainTextInputCell: NSTextFieldCell {
+    public override func fieldEditor(for controlView: NSView) -> NSTextView? {
+        (controlView as? CommandInputField)?.commandEditor ?? super.fieldEditor(for: controlView)
+    }
+
     public override func setUpFieldEditorAttributes(_ textObj: NSText) -> NSText {
         let editor = super.setUpFieldEditorAttributes(textObj)
         if let view = editor as? NSTextView { TextInputPolicy.apply(to: view) }

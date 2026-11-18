@@ -2,6 +2,7 @@ import AppKit
 import Models
 import Routing
 import Testing
+import FieldTestSupport
 @_spi(Verification) @testable import Browse
 
 /// 노트 찾기의 줄을 실제 마우스 이벤트(누름과 뗌)로 창의 이벤트 길에 넣어 누른다.
@@ -39,6 +40,13 @@ import Testing
         return window.contentView.map(rows) ?? []
     }
 
+    @Test func searchFieldGeometry() throws {
+        defer { fixture.cleanUp() }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let root = try #require(browse.window?.contentView)
+        try FieldGeometry.verify(#require(FieldGeometry.fields(in: root).first))
+    }
+
     /// 줄의 어느 자리(아이콘, 제목, 본문 첫머리, 빈 곳)를 눌러도 그 노트가 한 번 열린다.
     @Test func everyNoteRowOpensItsNoteOnASingleRealPress() throws {
         defer { fixture.cleanUp() }
@@ -48,12 +56,56 @@ import Testing
             window.contentView?.layoutSubtreeIfNeeded()
             let row = noteRows(in: window)[index]
             let target = row.noteRow.id
-            let x = [CGFloat(6), row.bounds.midX, row.bounds.width - 6][index]
+            let x = [CGFloat(6), row.bounds.midX, row.pin.frame.minX - 1][index]
             click(row, at: NSPoint(x: x, y: row.bounds.midY), in: window)
             #expect(fixture.routes.last == .openNote(target))
             #expect(fixture.routes.count == index + 1)
             browse.hide()
         }
+    }
+
+    @Test func pinClickChangesOnlyPinAndKeepsFocusOnSearch() throws {
+        defer { fixture.cleanUp() }
+        var changed: [(NoteID, Bool)] = []
+        browse.onSetPinned = { [fixture] id, pinned in
+            changed.append((id, pinned))
+            var state = fixture.windowStates.state(for: id) ?? NoteWindowState()
+            state.isOpen = true
+            state.isPinned = pinned
+            do { try fixture.windowStates.set(state, for: id) } catch { Issue.record("\(error)") }
+        }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let window = try #require(browse.window)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let row = try #require(noteRows(in: window).first)
+        #expect(!row.pin.isHidden)
+        click(row, at: NSPoint(x: row.pin.frame.midX, y: row.pin.frame.midY), in: window)
+        #expect(changed.count == 1 && changed.first?.0 == row.noteRow.id && changed.first?.1 == true)
+        #expect(fixture.routes.isEmpty && browse.isVisible && window.firstResponder === browse.inputView)
+    }
+
+    @Test func ninthResultScrollsWhileFooterStaysInPlace() async throws {
+        defer { fixture.cleanUp() }
+        for index in 0..<11 { _ = try fixture.add("검색 결과 \(index)", body: "", space: nil) }
+        browse.show(anchoredTo: nil, excluding: nil)
+        let window = try #require(browse.window)
+        let input = try #require(browse.inputView)
+        input.insertText("검색 결과", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let deadline = Date().addingTimeInterval(3)
+        while window.frame != browse.settledFrame, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let root = try #require(window.contentView as? BrowseRootView)
+        root.layoutSubtreeIfNeeded()
+        let rows = noteRows(in: window)
+        try #require(rows.count == 11)
+        let scroll = try #require(rows[0].enclosingScrollView)
+        let footer = try #require(root.listView.entryViews.last)
+        let footerOrigin = footer.convert(NSPoint.zero, to: nil)
+        #expect(scroll.contentView.bounds.height == rows[0].bounds.height * 8)
+        for _ in 0..<8 { input.doCommand(by: #selector(NSResponder.moveDown(_:))) }
+        #expect(rows[8].isHighlighted && scroll.contentView.bounds.contains(rows[8].frame))
+        #expect(footer.convert(NSPoint.zero, to: nil) == footerOrigin)
     }
 
     /// 제목이 없는 노트와 스페이스가 없는 노트의 제목도 아이콘이 있는 줄과 같은 자리에서 시작한다.

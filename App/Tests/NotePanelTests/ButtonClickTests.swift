@@ -52,7 +52,7 @@ import Theme
         defer { fixture.cleanUp(coordinator) }
         let all = buttons(in: controller.root).filter { !$0.isHidden }
         #expect(Set(all.compactMap { $0.accessibilityLabel() }) == [
-            "더 보기", "새 노트", "항상 위에 고정", "휴지통으로 보내기", "창 닫기",
+            "더 보기", "항상 위에 고정", "창 닫기",
         ])
         for button in all {
             var pressed = 0
@@ -106,11 +106,11 @@ import Theme
         let controller = try #require(coordinator.controllers[note.id])
         controller.hoverOverride = false
         controller.root.layoutSubtreeIfNeeded()
-        let add = try #require(buttons(in: controller.root).first { $0.accessibilityLabel() == "새 노트" })
+        let pin = try #require(buttons(in: controller.root).first { $0.accessibilityLabel() == "항상 위에 고정" })
         // 나타나기 시작한 바로 그때 누른다.
         controller.hoverOverride = true
-        RealClick.click(add)
-        #expect(fixture.routes == [.newNote(NewNoteRequest(nextTo: note.id))])
+        RealClick.click(pin)
+        #expect(!controller.isPinned)
     }
 
     /// 글을 친 뒤, 다른 버튼을 막 쓴 뒤에도 버튼이 한 번에 동작한다.
@@ -123,12 +123,12 @@ import Theme
 
         let all = buttons(in: controller.root)
         let pin = try #require(all.first { $0.accessibilityLabel() == "항상 위에 고정" })
-        let add = try #require(all.first { $0.accessibilityLabel() == "새 노트" })
+        let menu = controller.makeMoreMenu()
         let close = try #require(all.first { $0.accessibilityLabel() == "창 닫기" })
 
         RealClick.click(pin)
         #expect(!controller.isPinned)
-        RealClick.click(add)
+        menu.performActionForItem(at: menu.indexOfItem(withTitle: "새 노트"))
         RealClick.click(pin)
         #expect(controller.isPinned)
         RealClick.click(close)
@@ -142,7 +142,8 @@ import Theme
         let (coordinator, controller) = try openHoveredNote()
         defer { fixture.cleanUp(coordinator) }
         let id = controller.noteID
-        RealClick.click(controller.root.cornerButtons.trashButton)
+        let menu = controller.makeMoreMenu()
+        menu.performActionForItem(at: menu.indexOfItem(withTitle: "휴지통으로 보내기"))
         #expect(coordinator.openNoteIDs.isEmpty)
         #expect(FileManager.default.fileExists(atPath: fixture.trashFile(id).path))
         #expect(coordinator.canUndoTrash)
@@ -155,10 +156,10 @@ import Theme
         var activations = 0
         coordinator.activateApp = { activations += 1 }
         coordinator.isAppActive = { false }
-        let add = try #require(buttons(in: controller.root).first { $0.accessibilityLabel() == "새 노트" })
-        add.onPress = {}
+        let pin = try #require(buttons(in: controller.root).first { $0.accessibilityLabel() == "항상 위에 고정" })
+        pin.onPress = {}
 
-        RealClick.click(add)
+        RealClick.click(pin)
         #expect(activations == 0)
 
         coordinator.allowsKeyWindows = true

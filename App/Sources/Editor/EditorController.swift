@@ -41,7 +41,7 @@ final class EditorController: NSObject {
     let scrollView = NSScrollView()
     let editorUndoManager = EditorUndoManager()
     let copyButton = CodeCopyButton()
-    let linkField = LinkField()
+    let linkField: LinkField
     var dateSuggestion: InlineDateProposal?
     var dateSuggestionLine: Int?
     var dateSuggestionLineCount = 0
@@ -148,6 +148,7 @@ final class EditorController: NSObject {
     var codePasteboard: NSPasteboard = .general
 
     init(theme: Theme, configuration: MarkdownEditorConfiguration = MarkdownEditorConfiguration()) {
+        linkField = LinkField(theme: theme)
         self.theme = theme
         self.configuration = configuration
         self.style = EditorStyle(theme: theme, configuration: configuration, increaseContrast: Self.increaseContrast)

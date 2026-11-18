@@ -11,6 +11,9 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case hover
     case text
     case text2 = "text-2"
+    case menuSurface = "menu-surface"
+    case menuHighlight = "menu-highlight"
+    case text4 = "text-4"
     case text3 = "text-3"
     case line
     case outline
@@ -209,6 +212,12 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case captureRise = "capture-rise"
     /// 노트 찾기(spec 8): 안쪽 여백, 모서리, 검색 칸 높이와 그 아래 틈, 줄 안의 요소 사이,
     /// 노트 상단 줄과의 틈, 노트 오른쪽 끝에서 들여 놓는 거리.
+    case browseRowHeight = "browse-row-h"
+    case pickerFindHeight = "picker-find-h"
+    case pickerRadius = "picker-r"
+    case browseRowRadius = "browse-row-r"
+    case browseHeaderHeight = "browse-header-h"
+    case browsePinWidth = "browse-pin-w"
     case browsePadding = "browse-pad"
     case browseRadius = "browse-r"
     case browseFindHeight = "browse-find-h"

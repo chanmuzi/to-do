@@ -8,31 +8,22 @@ struct ScheduleTimeField: NSViewRepresentable {
     let isEnd: Bool
     let theme: Theme
 
-    func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
-        field.cell = PlainTextInputCell(textCell: "")
-        field.isEditable = true
-        field.isSelectable = true
-        field.isBezeled = false
-        field.isBordered = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.maximumNumberOfLines = 1
+    func makeNSView(context: Context) -> CommandInputField {
+        let field = CommandInputField(theme: theme)
         field.delegate = context.coordinator
         field.setAccessibilityLabel(isEnd ? "끝" : "시작")
         if isEnd { model.endField = field } else { model.startField = field }
         return field
     }
-    func updateNSView(_ field: NSTextField, context: Context) {
+    func updateNSView(_ field: CommandInputField, context: Context) {
         context.coordinator.parent = self
-        field.font = theme.nsFont(.body)
-        field.textColor = theme.nsColor(.text)
+        field.apply(font: theme.nsFont(.body), ink: theme.nsColor(.text), placeholderInk: theme.nsColor(.text3))
         if field.currentEditor() == nil { field.stringValue = displayed }
     }
     private var displayed: String {
         ReminderPresentation.clock(isEnd ? model.end : model.start, format: model.displayOptions.clock, calendar: model.calendar)
     }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextField, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: CommandInputField, context: Context) -> CGSize? {
         let sample = model.displayOptions.clock == .twentyFourHour ? "23:59" : "오후 12:59"
         let width = (sample as NSString).size(withAttributes: [.font: theme.nsFont(.body)]).width
         return CGSize(width: ceil(width) + theme.space(.sp1), height: ceil(nsView.intrinsicContentSize.height))

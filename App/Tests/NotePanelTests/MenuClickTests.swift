@@ -39,7 +39,7 @@ import Theme
             #expect(chosen.count == before + 1, "\(row)")
         }
         #expect(chosen == [
-            .setReminder, .moveToSpace, .togglePin, .findNote, .openLibrary, .openAIPanel, .closeWindow, .toggleArchive, .moveToTrash,
+            .newNote, .setReminder, .moveToSpace, .togglePin, .findNote, .openLibrary, .closeWindow, .toggleArchive, .moveToTrash,
         ])
     }
 

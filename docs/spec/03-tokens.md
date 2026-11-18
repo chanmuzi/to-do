@@ -158,3 +158,11 @@
 - 6단계: `component.reminder-editor-w` 320px(설정 팝오버), `component.library-reminder-w` 200px(범위를 담는 예정 열).
 
 - E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 48, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-title, 시간은 font-ui/fs-row-sub/fw-ui를 조합한다(D-088).
+
+### 한 줄 입력칸 토큰 확인 (D-132)
+
+- [ ] 공용 입력칸에 화면 역할의 글꼴 토큰을 한 번 전달한다. 입력값과 자리 글자에 같은 NSFont를 사용한다.
+- [ ] 커서는 ThinCaretFieldEditor의 `caret-w`, `accent`, `caret-blink`를 따른다.
+- [ ] 한 줄 입력칸을 추가할 때 실제 글꼴로 포커스 전후와 첫 입력 전후의 시작점 및 기준선을 검사한다.
+
+노트 찾기는 `browse-w` 300, `browse-r` 12, `browse-pad` 5, `browse-find-h` 30, `browse-header-h` 20, `browse-row-h` 26, `browse-gap` 9, `browse-row-r` 6, `browse-pin-w` 20을 쓴다. 메뉴 바탕은 `menu-surface`, 선택은 `menu-highlight`, 검색 자리 글자는 `text-4`다.

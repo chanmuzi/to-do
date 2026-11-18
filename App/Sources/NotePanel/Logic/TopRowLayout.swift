@@ -26,7 +26,6 @@ struct TopRowLayout: Hashable {
 
     var title: CGRect
     var more: CGRect
-    var add: CGRect
     var problem: CGRect?
     var reminder: CGRect?
     var close: CGRect = .zero
@@ -47,7 +46,6 @@ struct TopRowLayout: Hashable {
         close = input.showsControls ? takeTrailing(metrics.iconButton, gap: 0) : .zero
         divider = input.showsControls ? takeTrailing(metrics.dividerWidth, gap: metrics.gap) : .zero
         more = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.gap) : .zero
-        add = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
         pin = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
         if input.hasSchedules && input.showsControls && input.reminderWidth == nil {
             clock = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)

@@ -117,12 +117,12 @@ import Testing
         let shown = try fixture.open("떠 있는 노트")
 
         fixture.router.route(.openBrowse(anchor: closed))
-        #expect(Set(fixture.browseTitles) == ["닫힌 노트", "떠 있는 노트(핀)"])
+        #expect(Set(fixture.browseTitles) == ["떠 있는 노트(핀)"])
         fixture.browse.hide()
 
         fixture.notePanels.toggleAllHidden()
         fixture.router.route(.openBrowse(anchor: shown))
-        #expect(Set(fixture.browseTitles) == ["닫힌 노트", "떠 있는 노트(핀)"])
+        #expect(Set(fixture.browseTitles) == ["떠 있는 노트(핀)"])
         // 노트 찾기를 여는 것만으로는 숨김이 풀리지 않는다.
         #expect(fixture.notePanels.areNotesHidden)
     }

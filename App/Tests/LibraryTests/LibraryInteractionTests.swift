@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Foundation
 import Testing
+import FieldTestSupport
 import Models
 import Store
 import Theme
@@ -33,6 +34,17 @@ import SpaceIcons
                 preferences: try LibraryPreferencesStore(location: location), router: router)
         }
         func close() throws { coordinator.close(); try FileManager.default.removeItem(at: root) }
+    }
+
+    @Test func libraryFieldGeometry() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        f.model.beginSpaceEditing()
+        try FieldGeometry.verifyHosted(NSHostingView(rootView: LibrarySidebar(model: f.model)), labels: ["스페이스 이름"])
+        for (tab, label) in ["기호 검색", "이모지 검색"].enumerated() {
+            try FieldGeometry.verifyHosted(NSHostingView(rootView: IconPickerView(model: f.model, initialTab: tab)),
+                                           labels: [label])
+        }
     }
 
     func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }

@@ -40,6 +40,16 @@ final class DebugQuickPanels {
               target == "capture" || target == "browse", let verb = rest.first
         else { return false }
         switch (verb, rest.dropFirst().first) {
+        case ("input-focus", let state?):
+            guard let window = window(named: target), !window.isKeyWindow else { return false }
+            if state == "off" { window.makeFirstResponder(nil) }
+            else if state == "on", let root = window.contentView {
+                func field(in view: NSView) -> NSTextField? {
+                    if let field = view as? NSTextField, field.isEditable { return field }
+                    return view.subviews.lazy.compactMap { field(in: $0) }.first
+                }
+                window.makeFirstResponder(field(in: root))
+            } else { return false }
         case ("type", let text?):
             input.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         case ("key", "cmd-return"?) where target == "capture":

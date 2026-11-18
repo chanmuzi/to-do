@@ -2,7 +2,6 @@ import AppKit
 import Theme
 
 final class CornerButtonsView: NSView {
-    let trashButton: IconButton
     private let style: PanelStyle
     private let divider = NSView()
     private let rule = NSView()
@@ -12,7 +11,6 @@ final class CornerButtonsView: NSView {
 
     init(style: PanelStyle) {
         self.style = style
-        trashButton = IconButton(style: style, symbolName: "trash", iconSize: .iconMedium, label: "휴지통으로 보내기")
         super.init(frame: .zero)
         wantsLayer = true
         let items: [(NoteFormat, String, String)] = [
@@ -26,7 +24,7 @@ final class CornerButtonsView: NSView {
             buttons.append((format, button))
             addSubview(button)
         }
-        [rule, divider, trashButton].forEach(addSubview)
+        [rule, divider].forEach(addSubview)
         rule.wantsLayer = true
         divider.wantsLayer = true
         apply(visible: false, active: [])
@@ -49,7 +47,6 @@ final class CornerButtonsView: NSView {
 
     func refreshTheme() {
         buttons.forEach { $0.1.refresh() }
-        trashButton.refresh()
         needsDisplay = true
     }
 
@@ -66,7 +63,6 @@ final class CornerButtonsView: NSView {
         let theme = style.theme, side = theme.component(.iconButton)
         let pad = theme.component(.chromePaddingEnd), gap = theme.component(.iconButtonGap)
         let y = (bounds.height - side) / 2
-        trashButton.frame = CGRect(x: bounds.width - pad - side, y: y, width: side, height: side)
         var x = pad
         for (format, button) in buttons {
             if format == .checklist {

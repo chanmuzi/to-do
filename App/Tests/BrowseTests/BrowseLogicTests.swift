@@ -8,7 +8,7 @@ import Testing
 /// 고른 줄 옮기기, 여는 요청, 떠 있는 노트, 리마인더 글자, 놓이는 자리(spec 4.1, 8).
 @Suite struct BrowseLogicTests {
     private let entries = BrowseContent(
-        notes: Sample.notes, floating: Sample.floating, query: BrowseQuery(""), excluding: nil
+        notes: Sample.notes, floating: Sample.floating, lastOpened: Dictionary(uniqueKeysWithValues: Sample.notes.map { ($0.note.id, TestClock.now) }), query: BrowseQuery(""), excluding: nil
     ).entries
 
     // MARK: - ↑↓
@@ -28,19 +28,19 @@ import Testing
                 : indexed
         }
         let rebuilt = BrowseContent(
-            notes: changed, floating: Sample.floating, query: BrowseQuery(""), excluding: nil
+            notes: changed, floating: Sample.floating, lastOpened: Dictionary(uniqueKeysWithValues: Sample.notes.map { ($0.note.id, TestClock.now) }), query: BrowseQuery(""), excluding: nil
         ).entries
-        let selected = entries[5]
+        let selected = entries[4]
         #expect(selected.label == "release")
         // 줄 전체로 견주면 같은 줄이 없다.
         #expect(!rebuilt.contains(selected))
-        #expect(BrowseSelection.index(keeping: selected, in: rebuilt) == 5)
+        #expect(BrowseSelection.index(keeping: selected, in: rebuilt) == 4)
         // 노트가 아닌 줄은 같은 줄로, 없어진 줄과 고른 것이 없을 때는 맨 윗줄로.
-        #expect(BrowseSelection.index(keeping: .library, in: rebuilt) == 10)
+        #expect(BrowseSelection.index(keeping: .library, in: rebuilt) == 9)
         #expect(BrowseSelection.index(keeping: .create(query: "x"), in: rebuilt) == 1)
         #expect(BrowseSelection.index(keeping: nil, in: rebuilt) == 1)
         let withoutIt = BrowseContent(
-            notes: Sample.notes.filter { $0.note.id.rawValue != "release" }, floating: Sample.floating,
+            notes: Sample.notes.filter { $0.note.id.rawValue != "release" }, floating: Sample.floating, lastOpened: Dictionary(uniqueKeysWithValues: Sample.notes.map { ($0.note.id, TestClock.now) }),
             query: BrowseQuery(""), excluding: nil
         ).entries
         #expect(BrowseSelection.index(keeping: selected, in: withoutIt) == 1)
@@ -48,21 +48,21 @@ import Testing
 
     @Test func arrowsSkipHeadersAndTheSeparatorAndStopAtTheEnds() {
         // 0 이름, 1~3 떠 있는 노트, 4 이름, 5~8 최근, 9 구분선, 10 라이브러리.
-        #expect(entries.count == 11)
+        #expect(entries.count == 10)
         #expect(BrowseSelection.moved(from: 1, by: 1, in: entries) == 2)
-        #expect(BrowseSelection.moved(from: 3, by: 1, in: entries) == 5)
-        #expect(BrowseSelection.moved(from: 5, by: -1, in: entries) == 3)
-        #expect(BrowseSelection.moved(from: 8, by: 1, in: entries) == 10)
-        #expect(BrowseSelection.moved(from: 10, by: -1, in: entries) == 8)
-        #expect(BrowseSelection.moved(from: 10, by: 1, in: entries) == 10)
+        #expect(BrowseSelection.moved(from: 3, by: 1, in: entries) == 4)
+        #expect(BrowseSelection.moved(from: 4, by: -1, in: entries) == 3)
+        #expect(BrowseSelection.moved(from: 7, by: 1, in: entries) == 9)
+        #expect(BrowseSelection.moved(from: 9, by: -1, in: entries) == 7)
+        #expect(BrowseSelection.moved(from: 9, by: 1, in: entries) == 9)
         #expect(BrowseSelection.moved(from: 1, by: -1, in: entries) == 1)
     }
 
     @Test func movingWithoutASelectionStartsFromAnEnd() {
         #expect(BrowseSelection.moved(from: nil, by: 1, in: entries) == 1)
-        #expect(BrowseSelection.moved(from: nil, by: -1, in: entries) == 10)
+        #expect(BrowseSelection.moved(from: nil, by: -1, in: entries) == 9)
         // 고를 수 없는 줄을 가리키고 있어도 같다.
-        #expect(BrowseSelection.moved(from: 4, by: 1, in: entries) == 1)
+        #expect(BrowseSelection.moved(from: 8, by: 1, in: entries) == 1)
         #expect(BrowseSelection.moved(from: 1, by: 1, in: [.header("x")]) == nil)
     }
 
@@ -105,39 +105,8 @@ import Testing
             NoteID(rawValue: "a-unordered"): NoteWindowState(isOpen: true),
         ]
         #expect(BrowseFloating.ids(from: states).map(\.rawValue)
-            == ["front", "middle", "back", "a-unordered", "b-unordered"])
+            == ["front", "back", "a-unordered", "b-unordered"])
         #expect(BrowseFloating.ids(from: [:]).isEmpty)
-    }
-
-    // MARK: - 리마인더
-
-    @Test func reminderShowsTimeAndStatus() {
-        func reminder(_ date: Date) -> BrowseReminder {
-            BrowseReminder(reminder: date, now: TestClock.now, calendar: TestClock.calendar)
-        }
-        let imminent = reminder(TestClock.date(11, 16, 14, 12))
-        #expect(imminent.text == "2:12 PM")
-        #expect(imminent.status == .imminent)
-        #expect(imminent.symbolName == "bell")
-        #expect(imminent.color == .warn)
-        #expect(imminent.isStrong)
-
-        let scheduled = reminder(TestClock.date(11, 17, 10, 0))
-        #expect(scheduled.text == "내일 10:00 AM")
-        #expect(scheduled.status == .scheduled)
-        #expect(scheduled.symbolName == "clock")
-        #expect(scheduled.color == .text2)
-        #expect(!scheduled.isStrong)
-
-        let overdue = reminder(TestClock.date(11, 15, 9, 30))
-        #expect(overdue.text == "어제 9:30 AM")
-        #expect(overdue.status == .overdue)
-        #expect(overdue.color == .warn)
-        #expect(overdue.symbolName == "clock")
-
-        // 15분 전부터 임박이다.
-        #expect(reminder(TestClock.date(11, 16, 14, 15)).status == .imminent)
-        #expect(reminder(TestClock.date(11, 16, 14, 16)).status == .scheduled)
     }
 
     // MARK: - 자리

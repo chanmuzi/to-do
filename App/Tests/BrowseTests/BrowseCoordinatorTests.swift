@@ -37,7 +37,7 @@ import Testing
         let theme = fixture.theme
         let style = BrowseStyle(theme: theme)
         return theme.component(.browsePadding) * 2 + theme.component(.browseFindHeight) + theme.component(.browseFindGap)
-            + style.headerHeight * CGFloat(headers) + theme.component(.rowHeight) * CGFloat(rows) + style.separatorHeight
+            + style.headerHeight * CGFloat(headers) + theme.component(.browseRowHeight) * CGFloat(rows) + style.separatorHeight
     }
 
     private func id(_ key: String) throws -> NoteID {
@@ -77,18 +77,17 @@ import Testing
         #expect(window.firstResponder === browse.inputView)
         #expect(browse.showsPlaceholder)
         #expect(rows == [
-            " header 떠 있는 노트",
-            "*note today | 오늘 할 일 | PR #482 리뷰, 배포 체크리스트 확인 | 2:12 PM | pin",
-            " note home | 개인 | 치과 예약 전화 | - | pin",
-            " header 최근에 연 노트",
-            " note release | 릴리즈 노트 초안 | 2.3 변경 사항 정리, 배포 순서 확인 | 내일 10:00 AM | -",
-            " note untitled | 제목 없음 | 주말 장보기 목록 | - | -",
-            " note api | API Notes | Rate limit and Retry policy | - | -",
+            " header 최근",
+            "*note today | 오늘 할 일 |  | - | pin",
+            " note home | 개인 |  | - | pin",
+            " note release | 릴리즈 노트 초안 |  | - | -",
+            " note untitled | 제목 없음 |  | - | -",
+            " note api | API Notes |  | - | -",
             " separator",
             " library 라이브러리 열기",
         ])
         // 높이는 내용에 맞는다: 여백 6, 검색 칸 26, 틈 2, 구획 이름 24 둘, 줄 26 여섯, 구분선 13, 여백 6.
-        let expectedHeight = panelHeight(rows: 6, headers: 2)
+        let expectedHeight = panelHeight(rows: 6, headers: 1)
         #expect(window.frame.height == expectedHeight)
     }
 
@@ -99,8 +98,8 @@ import Testing
         try input().type("배포")
         #expect(!browse.showsPlaceholder)
         #expect(rows == [
-            "*note today | 오늘 할 일 | 배포 체크리스트 확인 | 2:12 PM | pin",
-            " note release | 릴리즈 노트 초안 | 배포 순서 확인 | 내일 10:00 AM | -",
+            "*note today | 오늘 할 일 | …#482 리뷰, 배포 체크리스트 확 | - | pin",
+            " note release | 릴리즈 노트 초안 | …사항 정리, 배포 순서 확인 | - | -",
             " create “배포” 새 노트 만들기",
             " separator",
             " library 라이브러리 열기",
@@ -111,7 +110,7 @@ import Testing
         // 대소문자를 가리지 않는다.
         try input().selectAll(nil)
         try input().type("RETRY")
-        #expect(rows.first == "*note api | API Notes | Retry policy | - | -")
+        #expect(rows.first == "*note api | API Notes | …limit and Retry policy | - | -")
         #expect(browse.drawnRowCount == rows.count)
         #expect(browse.listTransitionCount == 0)
         // 맞는 노트가 없으면 새 노트 만들기만 남는다.
@@ -121,8 +120,8 @@ import Testing
         // 지우면 처음 목록으로 돌아온다.
         try input().selectAll(nil)
         try press(#selector(NSResponder.deleteBackward(_:)))
-        #expect(rows.count == 9)
-        #expect(browse.drawnRowCount == 9)
+        #expect(rows.count == 8)
+        #expect(browse.drawnRowCount == 8)
         #expect(browse.showsPlaceholder)
         // 높이가 바뀌어도 위쪽 가장자리는 그대로다.
         #expect(try #require(browse.window).frame.maxY == top)
@@ -135,7 +134,7 @@ import Testing
         try input().compose("ㅂ")
         #expect(try input().hasMarkedText())
         // 낱자 "ㅂ"은 그 첫소리로 시작하는 글자("리뷰"의 "뷰")와 맞는다.
-        #expect(rows.first == "*note today | 오늘 할 일 | 뷰, 배포 체크리스트 확인 | 2:12 PM | pin")
+        #expect(rows.first == "*note today | 오늘 할 일 | PR #482 리뷰, 배포 체크리 | - | pin")
         try input().compose("배")
         #expect(try input().hasMarkedText())
         #expect(try input().string == "배")
@@ -211,7 +210,7 @@ import Testing
         #expect(rows.count == 5)
         try input().selectAll(nil)
         try press(#selector(NSResponder.deleteBackward(_:)))
-        #expect(rows.count == 9)
+        #expect(rows.count == 8)
         try input().type("xyz")
         #expect(rows.count == 3)
 
@@ -301,7 +300,7 @@ import Testing
         // 다시 열면 검색어가 비어 있다.
         browse.show(anchoredTo: nil, excluding: nil)
         #expect(try input().string.isEmpty)
-        #expect(rows.count == 9)
+        #expect(rows.count == 8)
     }
 
     @Test func anchorsUnderTheNoteWindowTopRow() throws {
@@ -359,7 +358,7 @@ import Testing
             $0.reminder = TestClock.date(11, 18, 9, 0)
         }
         try await waitForReload(after: reads)
-        #expect(selectedRow?.hasPrefix("*note release | 릴리즈 노트 2.3 | 고친 본문 |") == true)
+        #expect(selectedRow?.hasPrefix("*note release | 릴리즈 노트 2.3 |  |") == true)
         // 그 줄에서 ↵를 누르면 그 노트가 열린다.
         try press(returnKey)
         #expect(fixture.routes == [.openNote(try id("release"))])
@@ -424,7 +423,7 @@ import Testing
         let browse = fixture.makeCoordinator(notes: store)
         browse.show(anchoredTo: nil, excluding: nil)
         let shown = browse.rowDescriptions
-        #expect(shown.count == 9)
+        #expect(shown.count == 8)
         #expect(fixture.logs.isEmpty)
 
         store.failsListing = true
@@ -456,21 +455,20 @@ import Testing
         defer { fixture.cleanUp() }
         browse.show(anchoredTo: nil, excluding: nil)
         #expect(rows[1].hasPrefix("*note today"))
-        #expect(rows.contains(" note api | API Notes | Rate limit and Retry policy | - | -"))
+        #expect(rows.contains(" note api | API Notes |  | - | -"))
 
         // api 노트의 창이 맨 앞에 떴고 home의 창은 내려갔다.
-        try fixture.windowStates.set(NoteWindowState(isOpen: true, stackOrder: 99), for: try id("api"))
-        try fixture.windowStates.set(NoteWindowState(isOpen: false, stackOrder: 4), for: try id("home"))
+        try fixture.windowStates.set(NoteWindowState(isOpen: true, stackOrder: 99, lastOpened: TestClock.now), for: try id("api"))
+        try fixture.windowStates.set(NoteWindowState(isOpen: false, stackOrder: 4, lastOpened: Date(timeIntervalSince1970: 1_700_000_240)), for: try id("home"))
         try await waitForRows { rows.contains { $0.contains("note api") && $0.hasSuffix("| pin") } }
 
         #expect(rows == [
-            " header 떠 있는 노트",
-            " note api | API Notes | Rate limit and Retry policy | - | pin",
-            "*note today | 오늘 할 일 | PR #482 리뷰, 배포 체크리스트 확인 | 2:12 PM | pin",
-            " header 최근에 연 노트",
-            " note home | 개인 | 치과 예약 전화 | - | -",
-            " note release | 릴리즈 노트 초안 | 2.3 변경 사항 정리, 배포 순서 확인 | 내일 10:00 AM | -",
-            " note untitled | 제목 없음 | 주말 장보기 목록 | - | -",
+            " header 최근",
+            " note api | API Notes |  | - | pin",
+            "*note today | 오늘 할 일 |  | - | pin",
+            " note home | 개인 |  | - | -",
+            " note release | 릴리즈 노트 초안 |  | - | -",
+            " note untitled | 제목 없음 |  | - | -",
             " separator",
             " library 라이브러리 열기",
         ])
@@ -484,9 +482,9 @@ import Testing
         // api는 가장 오래전에 고친 노트지만 방금 열었다 닫았다.
         try fixture.windowStates.set(NoteWindowState(isOpen: false, lastOpened: TestClock.now), for: try id("api"))
         browse.show(anchoredTo: nil, excluding: nil)
-        let recent = rows.drop { $0 != " header 최근에 연 노트" }.dropFirst().prefix(3)
+        let recent = rows.drop { $0 != " header 최근" }.dropFirst().prefix(3)
         #expect(recent.map { $0.components(separatedBy: " | ")[0] } == [
-            " note api", " note release", " note untitled",
+            "*note api", " note today", " note home",
         ])
     }
 
@@ -669,7 +667,7 @@ import Testing
         defer { fixture.cleanUp() }
         fixture.unconnectedRoutes = [.openLibrary]
         browse.show(anchoredTo: nil, excluding: nil)
-        #expect(rows.count == 7)
+        #expect(rows.count == 6)
         #expect(!rows.contains { $0.contains("library") })
         #expect(rows.last?.hasPrefix(" note api") == true)
         for _ in 0..<10 { try press(downKey) }

@@ -119,6 +119,9 @@ final class WiringFixture {
     func open(_ title: String, body: String = "") throws -> NoteID {
         let note = try notes.create(NoteDraft(title: title, body: body))
         try notePanels.open(note.id, focus: false)
+        var state = windowStates.state(for: note.id) ?? NoteWindowState()
+        state.lastOpened = Date()
+        try windowStates.set(state, for: note.id)
         return note.id
     }
 

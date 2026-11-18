@@ -1,13 +1,13 @@
 import AppKit
 import Theme
 
-/// 노트 찾기의 내용(spec 8, 화면 9): `surface` 바탕에 `outline` 테두리, 안쪽 여백 6, 모서리 8.
+/// 검색칸, 구분선과 결과 목록을 메뉴 크기로 배치한다.
 /// 위에 검색 칸, 그 아래에 목록. 목록이 높이 한도를 넘으면 스크롤된다.
 final class BrowseRootView: NSView {
     private let style: BrowseStyle
     let searchField: BrowseSearchField
     let listView: BrowseListView
-    private let scrollView = NSScrollView()
+    private let divider = NSView()
 
     init(style: BrowseStyle) {
         self.style = style
@@ -16,15 +16,8 @@ final class BrowseRootView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
 
-        scrollView.drawsBackground = false
-        scrollView.borderType = .noBorder
-        scrollView.hasVerticalScroller = false
-        scrollView.hasHorizontalScroller = false
-        // 스크롤 막대는 스크롤할 때만 보인다(spec 16).
-        scrollView.scrollerStyle = .overlay
-        scrollView.autohidesScrollers = true
-        scrollView.documentView = listView
-        [searchField, scrollView].forEach(addSubview)
+        divider.wantsLayer = true
+        [searchField, divider, listView].forEach(addSubview)
     }
 
     @available(*, unavailable)
@@ -42,9 +35,7 @@ final class BrowseRootView: NSView {
     /// 내용에 맞는 창 높이. `limit`을 넘지 않는다.
     /// 스크롤 막대는 내용이 한도를 넘을 때만 둔다(높이가 내용을 따라가는 동안 잠깐 나타나지 않게).
     func fittingHeight(limit: CGFloat) -> CGFloat {
-        let wanted = chromeHeight + listView.contentHeight
-        scrollView.hasVerticalScroller = wanted > max(limit, chromeHeight)
-        return min(wanted, max(limit, chromeHeight))
+        min(chromeHeight + listView.visibleHeight, max(limit, chromeHeight))
     }
 
     func refreshTheme() {
@@ -58,10 +49,11 @@ final class BrowseRootView: NSView {
 
     override func updateLayer() {
         let theme = style.theme
+        divider.layer?.backgroundColor = style.cgColor(.line, in: self)
         layer?.cornerRadius = theme.component(.browseRadius)
         layer?.borderWidth = theme.shape(.borderWidth)
         layer?.borderColor = style.cgColor(.outline, in: self)
-        layer?.backgroundColor = style.cgColor(.surface, in: self)
+        layer?.backgroundColor = style.cgColor(.menuSurface, in: self)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -77,10 +69,12 @@ final class BrowseRootView: NSView {
         let padding = theme.component(.browsePadding)
         let width = max(0, bounds.width - padding * 2)
         searchField.frame = NSRect(x: padding, y: padding, width: width, height: theme.component(.browseFindHeight))
+        let inset = padding + style.rowPadding
+        divider.frame = NSRect(x: inset, y: searchField.frame.maxY + theme.component(.iconGap),
+                               width: bounds.width - inset * 2, height: theme.shape(.borderWidth))
         let listTop = searchField.frame.maxY + theme.component(.browseFindGap)
-        scrollView.frame = NSRect(
+        listView.frame = NSRect(
             x: padding, y: listTop, width: width, height: max(0, bounds.height - padding - listTop)
         )
-        listView.frame.size = NSSize(width: width, height: listView.contentHeight)
     }
 }
