@@ -341,6 +341,18 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.editor.text == "가**나** 다")
     }
 
+    @Test func toolbarListCommandsDescribeTheEditedLines() throws {
+        let h = try EditorHarness("하나\n둘")
+        h.editor.selectedRange = NSRange(location: 0, length: h.editor.text.utf16.count)
+        h.editor.perform(.toggleBullet)
+        #expect(h.editor.text == "- 하나\n- 둘")
+        #expect(h.editor.formattingState.bullet)
+        h.editor.perform(.toggleTodo)
+        #expect(h.editor.formattingState.checklist && !h.editor.formattingState.bullet)
+        h.editor.perform(.toggleTodo)
+        #expect(h.editor.text == "하나\n둘")
+    }
+
     @Test func formattingStateCombinesCursorAndPendingMarks() throws {
         let h = try EditorHarness.at("**~~가|나~~**")
         #expect(h.editor.formattingState.bold && h.editor.formattingState.strikethrough)

@@ -71,6 +71,14 @@ public struct ThemeTokens: Hashable, Sendable {
         colors[appearance]![token]!
     }
 
+    public func foreground(_ token: ColorToken, _ appearance: ThemeAppearance, on background: ColorToken) -> RGBA {
+        let ink = color(token, appearance)
+        guard appearance == .dark, token == .text2 || token == .text3 else { return ink }
+        let base = color(.surface, appearance)
+        let overlay = color(background, appearance)
+        return ink.readable(on: base.mixed(with: overlay, fraction: overlay.alpha))
+    }
+
     public func shadow(_ token: ShadowToken, _ appearance: ThemeAppearance) -> [ShadowLayer] {
         shadows[appearance]![token]!
     }
@@ -98,6 +106,26 @@ public struct ThemeTokens: Hashable, Sendable {
         let surface = color(.surface, appearance)
         guard let paletteID, let tint = paletteColor(id: paletteID) else { return surface }
         return surface.mixed(with: tint.color, fraction: material.tintMix)
+    }
+
+    /// 반투명 노트에 흰 데스크톱이 비칠 때를 상한으로 잡아 보조 글자를 고른다.
+    public func noteForeground(_ token: ColorToken, paletteID: String?, appearance: ThemeAppearance,
+                               overlay: ColorToken? = nil, selectable: Bool = false) -> RGBA {
+        let ink = color(token, appearance)
+        guard appearance == .dark, token == .text2 || token == .text3 else { return ink }
+        var background = RGBA(red: 1, green: 1, blue: 1).mixed(with: color(.surface, .dark), fraction: material.opacity)
+        if let paletteID, let tint = paletteColor(id: paletteID) {
+            background = background.mixed(with: tint.color, fraction: material.tintMix)
+        }
+        if let overlay {
+            let fill = color(overlay, .dark)
+            background = background.mixed(with: fill, fraction: fill.alpha)
+        }
+        if selectable {
+            let selected = color(.selected, .dark)
+            if selected.luminance > background.luminance { background = selected }
+        }
+        return ink.readable(on: background)
     }
 
     /// 목록 줄 바탕색. 팔레트 색에 `tint-mix-row` 알파. 색 없음이면 `nil`.

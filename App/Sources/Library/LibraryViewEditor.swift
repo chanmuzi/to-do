@@ -1,5 +1,6 @@
 import SwiftUI
 import Models
+import Theme
 
 struct LibraryViewEditor: View {
     @Bindable var model: LibraryModel
@@ -16,11 +17,22 @@ struct LibraryViewEditor: View {
                 })).toggleStyle(.checkbox)
             }
             Divider()
-            Picker("열 때 보여 줄 곳", selection: Binding(get: { model.settings.openingView }, set: { value in
-                model.changeSettings { $0.openingView = value }
-            })) {
-                Text("마지막으로 본 보기").tag(Optional<LibrarySelection>.none)
-                ForEach(model.settings.visibleViews, id: \.self) { Text(model.title($0)).tag(Optional($0)) }
+            let choices: [LibrarySelection?] = [nil] + model.settings.visibleViews.map(Optional.some)
+            HStack(spacing: 0) {
+                Text("열 때 보여 줄 곳")
+                ValuePopup(label: "열 때 보여 줄 곳", value: model.settings.openingView.map(model.title) ?? "마지막으로 본 보기",
+                           theme: model.theme) {
+                    let menu = NSMenu()
+                    menu.autoenablesItems = false
+                    for (index, view) in choices.enumerated() {
+                        let item = menu.addItem(withTitle: view.map(model.title) ?? "마지막으로 본 보기", action: nil, keyEquivalent: "")
+                        item.tag = index
+                        item.state = view == model.settings.openingView ? .on : .off
+                    }
+                    return menu
+                } choose: { item in
+                    if choices.indices.contains(item.tag) { model.changeSettings { $0.openingView = choices[item.tag] } }
+                }
             }
         }.focusEffectDisabled().tint(model.theme.libraryColor(.accent)).font(model.theme.font(.body)).padding(model.theme.space(.sp3))
             .frame(width: model.theme.component(.iconPickerWidth))

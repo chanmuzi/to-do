@@ -25,7 +25,7 @@ public final class LibraryModel {
     public private(set) var settings = LibraryPreferences()
     var expanded: Set<SpaceID> = []
     var iconSpace: SpaceID?
-    var editingViews = false
+    package var editingViews = false
     public private(set) var editingSpace = false
     public private(set) var renamingSpaceID: SpaceID?
     static let defaultSpaceIcon = SpaceIcon.symbol(name: "folder", colorID: nil)

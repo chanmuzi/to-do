@@ -129,7 +129,7 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         textView.padding = theme.docPadding
         textView.insertionPointColor = theme.nsColor(.accent)
         textView.textColor = theme.nsColor(.text)
-        textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.hover)]
+        textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.selected)]
         applyTextAttributes()
         measure()
     }

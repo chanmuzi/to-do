@@ -100,7 +100,7 @@ struct LibrarySidebar: View {
             Text(title).lineLimit(1)
             Spacer(minLength: 0)
             Text(presentation.text ?? "").font(theme.font(.micro)).lineLimit(1)
-                .foregroundStyle(theme.libraryColor(presentation.status == .scheduled ? .text3 : .warn))
+                .foregroundStyle(theme.libraryColor(presentation.status == .scheduled ? .text3 : .warn, on: .selected))
                 .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing)
                 .fixedSize(horizontal: true, vertical: false)
         }.font(theme.font(.body)).frame(maxWidth: .infinity).frame(height: theme.component(.rowHeight))
@@ -143,13 +143,9 @@ struct LibrarySidebar: View {
                     title.padding(.leading, theme.space(.sp6))
                 }
             }
-            .foregroundStyle(theme.libraryColor(isArchive(item) || isPastDay(item) ? .text3 : .text))
+            .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
             .padding(.trailing, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
         }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected, hoverName: model.title(item)))
-    }
-    private func isPastDay(_ item: LibrarySelection) -> Bool {
-        if case .day(_, let day) = item { return !model.index.calendar.isDate(day, inSameDayAs: model.index.now) }
-        return false
     }
     private func isArchive(_ item: LibrarySelection) -> Bool { if case .archive = item { true } else { false } }
     private func symbol(_ item: LibrarySelection) -> String {
@@ -217,7 +213,7 @@ private struct LibrarySpaceRow: View {
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜").accessibilityValue(model.expanded.contains(space.id) ? "펼쳐짐" : "접힘")
         }.padding(.trailing, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
-            .foregroundStyle(theme.libraryColor(.text))
+            .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
             .background(selected ? theme.libraryColor(.selected) : (hovered ? theme.libraryColor(.hover) : .clear),
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
 
@@ -246,7 +242,7 @@ private struct LibrarySectionHeader: View {
     @State private var hovered = false
     var body: some View {
         HStack {
-            Text(title).font(theme.font(.sectionLabel)).foregroundStyle(theme.libraryColor(.text3))
+            Text(title).font(theme.font(.sectionLabel, weight: theme.tokens.textStyle(.selected).weight)).foregroundStyle(theme.libraryColor(.text3))
             Spacer()
             if let symbol {
                 LibraryIconButton(theme: theme, title: label, symbol: symbol, action: action).opacity(hovered ? 1 : 0)

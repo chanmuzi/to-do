@@ -25,7 +25,7 @@ public final class EventKitBridge: CalendarBridge {
         guard access(for: kind) == .available else { return [] }
         return store().calendars(for: kind == .event ? .event : .reminder)
             .filter(\.allowsContentModifications)
-            .map { CalendarChoice(id: $0.calendarIdentifier, destination: destination(for: $0)) }
+            .map { CalendarChoice(id: $0.calendarIdentifier, destination: destination(for: $0), account: $0.source.title) }
             .sorted { $0.destination.name.localizedStandardCompare($1.destination.name) == .orderedAscending }
     }
     private func defaultCalendar(_ kind: ScheduleItem.Kind, in store: EKEventStore) -> EKCalendar? {

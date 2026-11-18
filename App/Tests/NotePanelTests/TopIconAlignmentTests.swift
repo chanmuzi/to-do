@@ -4,7 +4,7 @@ import Theme
 @testable import NotePanel
 
 @MainActor @Suite struct TopIconAlignmentTests {
-    @Test func reminderAndPinShareTheButtonCenterAndIconSlot() throws {
+    @Test func clockAndPinShareTheButtonCenterAndIconSlot() throws {
         let theme = try Theme.bundled()
         let style = PanelStyle(theme: theme)
         let side = theme.component(.iconButton)
@@ -12,9 +12,7 @@ import Theme
         let pin = IconButton(style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "핀")
         pin.frame = frame
         pin.layout()
-        let reminder = ReminderBadgeView(style: style)
-        reminder.apply(ReminderPresentation(reminder: Date().addingTimeInterval(3600), now: Date(),
-            options: NoteDisplayOptions(), calendar: .current), animated: false)
+        let reminder = IconButton(style: style, symbolName: "clock", iconSize: .iconMedium, label: "예정")
         reminder.frame = frame
         reminder.layout()
         for view in [pin, reminder] {

@@ -80,11 +80,11 @@ struct LibraryNoteRow: View {
             HStack(spacing: theme.component(.libraryRowGap)) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(preview.title).font(theme.font(.row, weight: weight))
-                        .foregroundStyle(theme.libraryColor(preview.isEmpty || model.selection == .trash ? .text2 : .rowTitle)).lineLimit(1)
+                        .foregroundStyle(theme.libraryColor(preview.isEmpty || model.selection == .trash ? .text2 : .rowTitle, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
                         .frame(height: theme.lineHeight(.row))
                     if !preview.subtitle.isEmpty {
                         Text(preview.subtitle).font(theme.font(.rowSub))
-                            .foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
+                            .foregroundStyle(theme.libraryColor(.text2, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
                             .frame(height: theme.lineHeight(.rowSub))
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)

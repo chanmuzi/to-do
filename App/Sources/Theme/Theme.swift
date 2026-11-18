@@ -24,6 +24,7 @@ public final class Theme {
 
     private var configuredBodySize: Int?
     public var noteBodySize: CGFloat { configuredBodySize.map { CGFloat($0) } ?? tokens.textStyle(.body).size }
+    public var defaultBodyLineHeight: CGFloat { baseTokens.textStyle(.body).lineHeight }
     public var defaultBodySize: CGFloat { baseTokens.textStyle(.body).size }
 
     @ObservationIgnored private var bodyOverrides = ThemeOverrides()

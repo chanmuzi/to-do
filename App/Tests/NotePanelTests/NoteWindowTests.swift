@@ -44,7 +44,7 @@ import Theme
 
     // MARK: - 크기와 상태 조합
 
-    @Test func windowAndElementFramesAreIdenticalAcrossHoverAndFocus() throws {
+    @Test func windowFrameStaysFixedAsHoverRepositionsTheChip() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft(
@@ -69,14 +69,16 @@ import Theme
             }
         }
         #expect(measured.count == 4)
-        #expect(Set(measured).count == 1)
+        #expect(measured[0] == measured[2] && measured[1] == measured[3])
+        #expect(Set(measured.compactMap(\.first)).count == 1)
+        #expect(measured[0] != measured[1])
         // 호버로 나타나는 것은 보이지 않을 때도 자리를 차지한다.
         #expect(controller.root.topRow.subviews.filter { $0 is IconButton && !$0.isHidden }.allSatisfy {
             $0.frame.width == fixture.theme.component(.iconButton)
         })
     }
 
-    @Test func hoverRevealsControlsByAlphaOnly() async throws {
+    @Test func hoverRevealsControlsWithinTheSameWindow() async throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft(title: "제목"))
@@ -87,12 +89,12 @@ import Theme
         controller.hoverOverride = false
         let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
         // 더 보기, 새 노트, 꺼진 핀(돋보기는 더 보기 메뉴로 옮겼다).
-        #expect(buttons.count == 3)
+        #expect(buttons.count == 5)
         #expect(buttons.allSatisfy { $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 
         controller.root.layoutSubtreeIfNeeded()
-        let frames = buttons.map(\.frame) + [controller.root.cornerButtons.frame, controller.panel.frame]
+        let frames = [controller.root.cornerButtons.frame, controller.panel.frame]
 
         controller.hoverOverride = true
         #expect(coordinator.snapshot(of: note.id)?.isHovered == true)
@@ -101,7 +103,7 @@ import Theme
             buttons.allSatisfy { $0.alphaValue == 1 } && controller.root.cornerButtons.alphaValue == 1
         })
         controller.root.layoutSubtreeIfNeeded()
-        #expect(buttons.map(\.frame) + [controller.root.cornerButtons.frame, controller.panel.frame] == frames)
+        #expect([controller.root.cornerButtons.frame, controller.panel.frame] == frames)
         #expect(buttons.allSatisfy { !$0.isHidden })
 
         controller.hoverOverride = false
@@ -565,7 +567,7 @@ import Theme
         let all = descendants(of: controller.root)
         let pressable = all.filter { $0 is IconButton || $0 is ReminderBadgeView }
         // 상단 줄의 버튼 넷(더 보기, 새 노트, 저장 문제 표시, 핀)과 리마인더, 오른쪽 아래의 휴지통과 닫기.
-        #expect(pressable.count == 7)
+        #expect(pressable.filter { !$0.isHidden }.count == 6)
         let clickables = pressable.compactMap { $0 as? ClickableView }
         #expect(clickables.count == pressable.count)
         for view in clickables {
@@ -576,7 +578,7 @@ import Theme
         // 휴지통과 닫기는 본문(글자 칸) 위에 겹쳐 있다.
         let body = try #require(controller.editor.view.enclosingScrollView)
         #expect(body.frame.intersects(controller.root.cornerButtons.frame))
-        #expect(controller.root.cornerButtons.subviews.allSatisfy { $0 is ClickableView })
+        #expect(controller.root.cornerButtons.subviews.filter { !$0.isHidden } == [controller.root.cornerButtons.trashButton])
     }
 
     /// 저장 문제 표시는 `dur` 동안 나타나고 사라지며, 자리를 미리 차지하는 것들을 밀지 않는다(규칙 7, 8).
@@ -593,8 +595,8 @@ import Theme
         controller.hoverOverride = true
         topRow.layoutSubtreeIfNeeded()
         let buttons = topRow.subviews.compactMap { $0 as? IconButton }
-        let indicator = try #require(buttons.first { $0.isHidden })
-        let reserved = topRow.subviews.filter { ($0 is IconButton && $0 !== indicator) || $0 is ReminderBadgeView }
+        let indicator = try #require(buttons.first { $0.accessibilityLabel() == "" })
+        let reserved = topRow.subviews.filter { !$0.isHidden && (($0 is IconButton && $0 !== indicator) || $0 is ReminderBadgeView) }
         let reservedFrames = reserved.map(\.frame)
         let title = try #require(topRow.subviews.first { $0 is TitleField })
         let titleFrame = title.frame

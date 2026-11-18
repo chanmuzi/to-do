@@ -6,62 +6,64 @@
 
 | 역할 | 글꼴 | 크기 / 줄 높이 | 굵기 |
 | --- | --- | --- | --- |
-| 노트 제목 (상단 줄) | Pretendard | `fs-title` 12px / `lh-ui` 16px | `fw-title` 600 |
-| 본문 제목 1 (#) | Pretendard | `fs-h1` 17px / `lh-h1` 26px | `fw-h1` 700 |
-| 본문 제목 2 (##) | Pretendard | `fs-h2` 15px / `lh-h2` 24px | `fw-h2` 650 |
-| 본문 제목 3 (###) | Pretendard | `fs-h3` 13px / `lh-h3` 22px | `fw-h3` 650 |
-| 본문 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-body` 400 |
-| 본문 굵게 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-strong` 650 |
-| 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 22px | `fw-strong` 650 |
-| 라이브러리 줄 제목 | Pretendard | `fs-row` 12.5px / `lh-row` 18px | `fw-row` 450, 선택 `fw-selected` 500, 빈 제목 `fw-body` 400 |
-| 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 11.5px / `lh-ui` 16px | `fw-body` 400 |
-| 정보 (시간, 개수) | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui` 400 |
-| 임박한 리마인더 | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui-strong` 700 |
-| 날짜, 보조 숫자 | D2Coding | `fs-micro` 11px / `lh-micro` 14px | `fw-ui` 400 |
-| 인라인 코드 | D2Coding | `fs-code` 11.5px / `lh-body` 22px | `fw-body` 400 |
-| 코드 블록 | D2Coding | `fs-code` 11.5px / `lh-code` 20px | `fw-body` 400 |
-| 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 22px | `fw-body` 400 |
+| 노트 제목 (상단 줄) | Pretendard | `fs-title` 13px / `lh-ui` 16px | `fw-title` 600 |
+| 본문 제목 1 (#) | Pretendard | `fs-h1` 21px / `lh-h1` 30px | `fw-h1` 650 |
+| 본문 제목 2 (##) | Pretendard | `fs-h2` 18px / `lh-h2` 27px | `fw-h2` 650 |
+| 본문 제목 3 (###) | Pretendard | `fs-h3` 16px / `lh-h3` 25px | `fw-h3` 600 |
+| 본문 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-body` 400 |
+| 본문 굵게 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-strong` 650 |
+| 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 24px | `fw-title` 600 |
+| 라이브러리 줄 제목 | Pretendard | `fs-row` 13.5px / `lh-row` 18px | `fw-row` 450, 선택 `fw-selected` 500, 빈 제목 `fw-body` 400 |
+| 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 12.5px / `lh-ui` 16px | `fw-body` 400 |
+| 정보 (시간, 개수) | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui` 400 |
+| 임박한 리마인더 | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui-strong` 600 |
+| 날짜, 보조 숫자 | D2Coding | `fs-micro` 12px / `lh-micro` 14px | `fw-ui` 400 |
+| 인라인 코드 | D2Coding | `fs-code` 12.5px / `lh-body` 24px | `fw-body` 400 |
+| 코드 블록 | D2Coding | `fs-code` 12.5px / `lh-code` 20px | `fw-body` 400 |
+| 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 24px | `fw-body` 400 |
 
 - `font-body`: Pretendard. `font-ui`, `font-micro`, `font-mono`: D2Coding.
-- 본문 글꼴과 크기는 사용자가 바꿀 수 있습니다(12장). 크기를 바꾸면 줄 높이는 크기의 약 1.54배를 짝수로 맞춥니다.
+- 본문 글꼴과 크기는 사용자가 바꿀 수 있습니다(12장). 본문 크기는 12~17pt이며 제목과 코드의 크기는 본문에 비례합니다.
 
 ### 3.2 색
 
 | 토큰 | 쓰임 | 라이트 | 다크 |
 | --- | --- | --- | --- |
-| `surface` | 창 바탕 | `#FFFFFF` | `#000000` |
-| `surface-2` | 사이드바, 보조 바탕 | `#F6F6F6` | `#0E0E0E` |
-| `surface-3` | 입력칸 | `#EDEDED` | `#1C1C1C` |
-| `selected` | 고른 줄과 세그먼트 바탕 | `#DEDAD4` | `#373430` |
+| `surface` | 창 바탕 | `#FFFFFF` | `#1E1E1E` |
+| `surface-2` | 사이드바, 보조 바탕 | `#F6F6F6` | `#262626` |
+| `surface-3` | 입력칸 | `#EDEDED` | `#303030` |
+| `selected` | 고른 줄과 세그먼트 바탕 | `#DEDAD4` | `#46423D` |
 | `row-title` | 목록 제목 | `#393632` | `#D5D2CE` |
-| `hover` | 마우스를 올렸을 때의 바탕 효과 (버튼, 줄, 칸 공통. 어떤 바탕색 위에서도 보이도록 반투명) | `rgba(96,76,52,.08)` | `rgba(224,208,186,.10)` |
-| `text` | 본문 글자 | `#000000` | `#F0F0F0` |
-| `text-2` | 보조 글자 | `#6B6B6B` | `#9A9A9A` |
-| `text-3` | 흐린 글자(완료, 자리표시) | `#8F8F8F` | `#6E6E6E` |
-| `line` | 안쪽 구분선 | `rgba(0,0,0,.09)` | `rgba(255,255,255,.10)` |
-| `outline` | 창 테두리 | `rgba(0,0,0,.16)` | `rgba(255,255,255,.20)` |
-| `guide` | 들여쓰기 안내선 | `rgba(0,0,0,.12)` | `rgba(255,255,255,.16)` |
+| `hover` | 마우스를 올렸을 때의 바탕 효과 (버튼, 줄, 칸 공통. 어떤 바탕색 위에서도 보이도록 반투명) | `rgba(96,76,52,.08)` | `rgba(224,208,186,.12)` |
+| `text` | 본문 글자 | `#000000` | `#ECECEC` |
+| `text-2` | 보조 글자 | `#6B6B6B` | `#A3A3A3` |
+| `text-3` | 흐린 글자(완료, 자리표시) | `#8F8F8F` | `#7C7C7C` |
+| `line` | 안쪽 구분선 | `rgba(0,0,0,.09)` | `rgba(255,255,255,.09)` |
+| `outline` | 창 테두리 | `rgba(0,0,0,.10)` | `rgba(255,255,255,.14)` |
+| `guide` | 들여쓰기 안내선 | `rgba(0,0,0,.12)` | `rgba(255,255,255,.18)` |
 | `accent` | 강조색(사용자 변경) | `#000000` | `#FFFFFF` |
 | `on-accent` | 강조색 위 글자 | `#FFFFFF` | `#000000` |
-| `warn` | 리마인더 임박과 지남 (글자, 아이콘 색) | `#E5342B` | `#F2473C` |
-| `hl-1-bg` | 형광펜 1 바탕 | `#FFEB85` | `rgba(255,220,80,.32)` |
-| `hl-1-fg` | 형광펜 1 글자 | `#000000` | `#F0F0F0` |
-| `hl-2-bg` | 형광펜 2 바탕 | `#E4E4E4` | `rgba(255,255,255,.18)` |
-| `hl-2-fg` | 형광펜 2 글자 | `#000000` | `#F0F0F0` |
-| `hl-3-bg` | 형광펜 3 바탕 | `#FFD2CC` | `rgba(255,120,110,.34)` |
-| `hl-3-fg` | 형광펜 3 글자 | `#000000` | `#F0F0F0` |
-| `hl-4-bg` | 형광펜 4 바탕 | `#CFE5FF` | `rgba(110,170,255,.36)` |
-| `hl-4-fg` | 형광펜 4 글자 | `#000000` | `#F0F0F0` |
-| `code-bg` | 인라인 코드 바탕 (테두리 없음) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.13)` |
-| `codeblock-bg` | 코드 블록 바탕 (테두리 없음) | `rgba(0,0,0,.04)` | `rgba(255,255,255,.085)` |
-| `code-fg` | 코드 블록 글자, 인라인 코드 글자("plain") | `#000000` | `#F0F0F0` |
-| `code-accent` | 인라인 코드 글자("accent", 기본. 규칙 1의 예외) | `#C8372E` | `#F47B70` |
-| `link` | 링크 | `#000000` | `#F0F0F0` |
-| `shadow-window` | 노트 창 그림자 | `0 18px 44px -12px rgba(0,0,0,.28),0 4px 12px -2px rgba(0,0,0,.10)` | `0 20px 48px -12px rgba(0,0,0,.80),0 4px 12px -2px rgba(0,0,0,.50)` |
-| `shadow-pop` | 캡처 바, 메뉴 그림자 | `0 28px 70px -16px rgba(0,0,0,.38),0 6px 16px -4px rgba(0,0,0,.12)` | `0 30px 80px -16px rgba(0,0,0,.90),0 6px 16px -4px rgba(0,0,0,.50)` |
+| `warn` | 리마인더 임박과 지남 (글자, 아이콘 색) | `#E5342B` | `#FF796E` |
+| `hl-1-bg` | 형광펜 1 바탕 | `#FFEB85` | `rgba(255,220,80,.19)` |
+| `hl-1-fg` | 형광펜 1 글자 | `#000000` | `#ECECEC` |
+| `hl-2-bg` | 형광펜 2 바탕 | `#E4E4E4` | `rgba(255,255,255,.14)` |
+| `hl-2-fg` | 형광펜 2 글자 | `#000000` | `#ECECEC` |
+| `hl-3-bg` | 형광펜 3 바탕 | `#FFD2CC` | `rgba(255,120,110,.27)` |
+| `hl-3-fg` | 형광펜 3 글자 | `#000000` | `#ECECEC` |
+| `hl-4-bg` | 형광펜 4 바탕 | `#CFE5FF` | `rgba(110,170,255,.28)` |
+| `hl-4-fg` | 형광펜 4 글자 | `#000000` | `#ECECEC` |
+| `code-bg` | 인라인 코드 바탕 (테두리 없음) | `rgba(0,0,0,.065)` | `rgba(255,255,255,.09)` |
+| `codeblock-bg` | 코드 블록 바탕 (테두리 없음) | `rgba(0,0,0,.04)` | `rgba(255,255,255,.065)` |
+| `code-fg` | 코드 블록 글자, 인라인 코드 글자("plain") | `#000000` | `#ECECEC` |
+| `code-accent` | 인라인 코드 글자("accent", 기본. 규칙 1의 예외) | `#C8372E` | `#FFD1C9` |
+| `link` | 링크 | `#000000` | `#ECECEC` |
+| `shadow-window` | 노트 창 그림자 | `0 18px 44px -12px rgba(0,0,0,.28),0 4px 12px -2px rgba(0,0,0,.10)` | `0 20px 48px -12px rgba(0,0,0,.60),0 4px 12px -2px rgba(0,0,0,.32)` |
+| `shadow-pop` | 캡처 바, 메뉴 그림자 | `0 28px 70px -16px rgba(0,0,0,.38),0 6px 16px -4px rgba(0,0,0,.12)` | `0 30px 80px -16px rgba(0,0,0,.70),0 6px 16px -4px rgba(0,0,0,.38)` |
 
 - `accent`는 사용자가 바꿉니다. 프리셋: 잉크(라이트 `#000000`, 다크 `#FFFFFF`), 그린(라이트 `#1A8F4C`, 다크 `#3DDC84`), 앰버(라이트 `#B26A00`, 다크 `#FFB000`), 코발트(라이트 `#1F4FFF`, 다크 `#6E8BFF`), 그래파이트(라이트 `#6B6B6B`, 다크 `#9A9A9A`)
 - 선택 바탕은 불투명하고 호버는 같은 계열의 반투명 색이다. 둘이 겹치면 선택을 우선한다.
+
+다크 D1에서 작은 보조 글자는 지정 토큰을 기준으로 실제 바탕의 WCAG 대비가 4.5:1에 이르는 최소 8비트 회색까지 밝힙니다. 노트에서는 재질, 팔레트, 코드 블록과 선택 바탕도 고려합니다.
 
 ### 3.3 팔레트 (노트 바탕, 스페이스 아이콘 색)
 
@@ -97,21 +99,21 @@
 | 모서리, 높이 | `r-check` | `3px` | 체크박스 |
 | 모서리, 높이 | `r-hl` | `2px` | 형광펜 |
 | 모서리, 높이 | `bw` | `1px` | 테두리 두께 |
-| 모서리, 높이 | `chrome-h` | `28px` | 창 크롬 높이 |
+| 모서리, 높이 | `chrome-h` | `32px` | 창 크롬 높이 |
 | 모서리, 높이 | `r-code` | `4.5px` | 인라인 코드 |
 | 모서리, 높이 | `r-codeblock` | `8px` | 코드 블록 |
-| 구성 요소 | `doc-pad` | `10px 14px 18px` | 노트 본문 안쪽 여백 (위 오른쪽 아래 왼쪽). 아래쪽은 오른쪽 아래 버튼 자리 |
-| 구성 요소 | `gutter` | `19px` | 체크박스, 토글, 글머리표 칸 너비 (D-043) |
-| 구성 요소 | `indent` | `19px` | 하위 계층 한 단계 들여쓰기 (D-043) |
-| 구성 요소 | `check-size` | `13px` | 체크박스 크기 |
+| 구성 요소 | `doc-pad` | `12px 16px 20px` | 노트 본문 안쪽 여백 (위 오른쪽 아래 왼쪽). 아래쪽은 오른쪽 아래 버튼 자리 |
+| 구성 요소 | `gutter` | `21px` | 체크박스, 토글, 글머리표 칸 너비 (D-043) |
+| 구성 요소 | `indent` | `21px` | 하위 계층 한 단계 들여쓰기 (D-043) |
+| 구성 요소 | `check-size` | `14px` | 체크박스 크기 |
 | 구성 요소 | `icon-gap` | `3px` | 아이콘과 바로 옆 글자 사이 |
 | 구성 요소 | `pick-gutter` | `24px` | AI 후보 목록의 체크박스 칸 너비 |
-| 구성 요소 | `ctl-h` | `22px` | 버튼과 선택 칸 높이 |
-| 구성 요소 | `row-h` | `26px` | 사이드바 행 높이 |
+| 구성 요소 | `ctl-h` | `24px` | 버튼과 선택 칸 높이 |
+| 구성 요소 | `row-h` | `28px` | 사이드바 행 높이 |
 | 구성 요소 | `caret-w` | `1.5px` | 입력 커서 너비 (얇은 일반 커서, D-042) |
 | 구성 요소 | `quote-bar-w` | `2px` | 인용문 왼쪽 막대 너비 (D-044) |
 | 구성 요소 | `quote-pad` | `8px` | 인용문 블록 왼쪽 끝에서 글자까지, 막대 뒤 공백 6pt (D-061) |
-| 구성 요소 | `code-pad-x` | `4.5px` | 인라인 코드 상자의 좌우 안쪽 여백 |
+| 구성 요소 | `code-pad-x` | `5px` | 인라인 코드 상자의 좌우 안쪽 여백 |
 | 구성 요소 | `code-gap` | `1.5px` | 인라인 코드 상자의 바깥 간격 |
 | 구성 요소 | `code-h` | `16px` | 인라인 코드 상자의 높이 (본문 줄 22 안에서. 제목에서는 비례해 커짐) |
 | 구성 요소 | `code-drop` | `1px` | 인라인 코드 상자를 줄 가운데에서 아래로 내리는 양 |
@@ -120,13 +122,13 @@
 | 구성 요소 | `codeblock-pad-y` | `9px` | 코드 블록의 위아래 안쪽 여백 |
 | 구성 요소 | `codeblock-gap` | `5px` | 코드 블록의 위아래 바깥 간격 |
 | 구성 요소 | `link-field-w` | `220px` | 링크 주소를 적는 칸의 너비 |
-| 구성 요소 | `icon-btn` | `18px` | 테두리 없는 아이콘 버튼 크기 |
+| 구성 요소 | `icon-btn` | `24px` | 테두리 없는 아이콘 버튼 크기 |
 | 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 약 13pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |
 | 구성 요소 | `chrome-gap` | `6px` | 노트 상단 줄의 요소 사이 |
 | 구성 요소 | `chrome-pad-end` | `6px` | 노트 상단 줄의 오른쪽 여백 (왼쪽은 `sp-3`) |
 | 구성 요소 | `icon-s`, `icon-m`, `icon-l` | `12px`, `13px`, `14px` | 선 아이콘 크기 (18.2의 표) |
-| 구성 요소 | `icon-btn-gap` | `0px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
+| 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
 | 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
 | 구성 요소 | `menu-icon` | `12px` | 노트 메뉴 그림 크기(정렬 칸은 `icon-l` 14, D-058) |
 | 구성 요소 | `menu-w` | `210px` | 메뉴 최소 너비 |
@@ -146,7 +148,7 @@
 
 - `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
 - `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
-- `library-reminder-w`: 200. L1 오른쪽에는 시간과 icon-s 12 핀 칸만 남긴다. 예전 progress-w 토큰은 저장 호환을 위해 남기되 화면에는 사용하지 않는다(D-086).
+- `library-reminder-w`: 200. L1 오른쪽에는 시간과 icon-s 13 핀 칸만 남긴다. 예전 progress-w 토큰은 저장 호환을 위해 남기되 화면에는 사용하지 않는다(D-086).
 - 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다.
 - `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
@@ -154,4 +156,4 @@
 
 - 6단계: `component.reminder-editor-w` 320px(설정 팝오버), `component.library-reminder-w` 200px(범위를 담는 예정 열).
 
-- E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 48, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-strong, 시간은 font-ui/fs-row-sub/fw-ui를 조합한다(D-088).
+- E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 48, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-title, 시간은 font-ui/fs-row-sub/fw-ui를 조합한다(D-088).

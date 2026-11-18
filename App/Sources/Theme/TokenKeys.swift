@@ -5,6 +5,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface
     case surface2 = "surface-2"
     case surface3 = "surface-3"
+    case connectFill = "connect-fill"
     case selected
     case rowTitle = "row-title"
     case hover
@@ -153,6 +154,19 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case codeBlockGap = "codeblock-gap"
     /// 링크 주소를 적는 칸의 너비(spec 6).
     case linkFieldWidth = "link-field-w"
+    case iconStroke = "icon-stroke"
+    case badgeHeight = "badge-h"
+    case badgeDot = "badge-dot"
+    case badgeGap = "badge-gap"
+    case badgePad = "badge-pad"
+    case settingsRow = "settings-row"
+    case segmentHeight = "segment-h"
+    case segmentItem = "segment-item-h"
+    case connectHeight = "connect-h"
+    case connectPadding = "connect-pad"
+    case settingsRuleBefore = "settings-rule-before"
+    case settingsContentHeight = "settings-content-h"
+    case menuDot = "menu-dot"
     case iconButton = "icon-btn"
     case menubarIcon = "menubar-icon"
     case browseWidth = "browse-w"

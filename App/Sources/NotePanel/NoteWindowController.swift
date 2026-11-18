@@ -72,6 +72,9 @@ final class NoteWindowController: NSObject {
     private func disconnect() {
         editor.onTextChange = nil
         editor.onContentHeightChange = nil
+        (editor as? any NoteBodyFormatting)?.onFormattingChange = nil
+        root.cornerButtons.onFormat = nil
+        panel.onResponderChange = nil
         panel.onMouseDown = nil
         panel.onButtonPress = nil
         root.onHoverChange = nil
@@ -152,9 +155,8 @@ final class NoteWindowController: NSObject {
     // MARK: - 상단 줄
 
     func refreshChrome(animated: Bool) {
-        var state = TopRowState(
+        let state = TopRowState(
             note: note,
-            space: note.spaceID.flatMap { environment.spaces.space(for: $0) },
             isPinned: isPinned,
             isHovered: isHovered,
             isEditingTitle: root.topRow.isEditingTitle,
@@ -163,12 +165,26 @@ final class NoteWindowController: NSObject {
             now: Date(),
             calendar: .current
         )
-        state.space?.imageDirectory = environment.spaces.imageDirectory
         root.topRow.apply(state, animated: animated)
-        root.setHoverControlsAlpha(state.hoverControlsAlpha, animated: animated)
+        root.topRow.underlineMarkedText = environment.options().underlineMarkedText
+        if let textView = editor.view as? NSTextView {
+            TextInputPolicy.applyNoteStyle(to: textView, theme: environment.theme, underline: environment.options().underlineMarkedText)
+        }
+        refreshFormatBar(animated: animated)
+        editor.setNotePalette(note.colorID?.rawValue)
         root.background.setPalette(note.colorID?.rawValue, animated: animated)
         panel.title = state.title
         scheduleReminderRefresh()
+    }
+
+    func refreshFormatBar(animated: Bool = false) {
+        let formatting = editor as? any NoteBodyFormatting
+        let mode = environment.options().formatBar
+        let visible = formatting != nil && (mode == .always || (mode == .editing && formatting?.isEditingBody == true))
+        let changed = visible != root.cornerButtons.showsFormats
+        root.cornerButtons.apply(visible: visible, active: visible ? formatting?.activeFormats ?? [] : [])
+        root.setHoverControlsAlpha(visible || isHovered ? 1 : 0, animated: animated)
+        if changed { root.needsLayout = true }
     }
 
     func themeDidChange() {
@@ -184,7 +200,7 @@ final class NoteWindowController: NSObject {
         reminderRefresh?.cancel()
         reminderRefresh = nil
         let now = Date()
-        guard let reminder = note.displayedSchedule(at: now)?.start,
+        guard let reminder = note.schedules.filter({ $0.isUpcoming(at: now) }).map(\.start).min(),
               let next = ReminderPresentation.nextRefresh(
                   reminder: reminder, now: now, options: environment.options(), calendar: .current
               )
@@ -200,6 +216,11 @@ final class NoteWindowController: NSObject {
     // MARK: - 동작
 
     private func connect() {
+        if let formatting = editor as? any NoteBodyFormatting {
+            formatting.onFormattingChange = { [weak self] in self?.refreshFormatBar() }
+            root.cornerButtons.onFormat = { [weak formatting] in formatting?.applyFormat($0) }
+        }
+        panel.onResponderChange = { [weak self] in self?.refreshFormatBar() }
         panel.onMouseDown = { [unowned self] in coordinator?.endTrashUndo() }
         root.onHoverChange = { [unowned self] inside in
             guard isPointerInside != inside else { return }
@@ -249,7 +270,7 @@ final class NoteWindowController: NSObject {
             titleEditingChanged: { [unowned self] _ in refreshChrome(animated: true) },
             titleReturned: { [unowned self] in editor.focus() }
         )
-        root.cornerButtons.closeButton.onPress = { router.route(.closeNoteWindow(id)) }
+        root.topRow.closeButton.onPress = { router.route(.closeNoteWindow(id)) }
         root.cornerButtons.trashButton.onPress = { [unowned self] in coordinator?.moveToTrash(noteID) }
     }
 

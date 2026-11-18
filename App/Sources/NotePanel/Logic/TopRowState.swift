@@ -5,12 +5,6 @@ import Theme
 /// 상단 줄에 무엇을 어떤 색으로 보일지(spec 5.2, 5.5).
 /// 입력에 포커스가 없다. 포커스는 창 모습을 바꾸지 않는다(규칙 5).
 struct TopRowState: Hashable {
-    struct SpaceBadge: Hashable {
-        var name: String?
-        var icon: SpaceIcon = .none
-        var imageDirectory: URL?
-    }
-
     struct Pin: Hashable {
         var symbolName: String
         var alpha: Double
@@ -20,15 +14,14 @@ struct TopRowState: Hashable {
 
     static let untitled = "제목 없음"
 
-    /// 스페이스가 없으면 자리 자체가 없다.
-    var space: SpaceBadge?
-    var spaceColor: ColorToken
+    var paletteID: String?
     var title: String
     /// 제목이 비어 "제목 없음"을 보통 굵기로 보이는 중.
     var isTitlePlaceholder: Bool
     var titleColor: ColorToken
     /// 호버로 나타나는 것(아이콘 셋, 휴지통, 닫기)의 알파. 자리는 늘 차지한다(규칙 7).
     var hoverControlsAlpha: Double
+    var additionalSchedules = 0
     var reminder: ReminderPresentation?
     var pin: Pin
     var problem: NoteProblem?
@@ -36,7 +29,6 @@ struct TopRowState: Hashable {
 
     init(
         note: Note,
-        space: Space?,
         isPinned: Bool,
         isHovered: Bool,
         isEditingTitle: Bool,
@@ -45,32 +37,23 @@ struct TopRowState: Hashable {
         now: Date,
         calendar: Calendar
     ) {
-        self.space = space.flatMap { Self.badge(for: $0, display: options.space) }
-        spaceColor = isHovered ? .text2 : .text3
+        paletteID = note.colorID?.rawValue
         title = note.title.isEmpty ? Self.untitled : note.title
         isTitlePlaceholder = note.title.isEmpty
         titleColor = isHovered || isEditingTitle ? .text : .text3
         hoverControlsAlpha = isHovered ? 1 : 0
         var reminderOptions = options
         reminderOptions.reminder = .time
-        reminder = note.displayedSchedule(at: now, calendar: calendar).map {
+        let upcoming = note.schedules.filter { $0.isUpcoming(at: now, calendar: calendar) }
+        additionalSchedules = max(0, upcoming.count - 1)
+        reminder = upcoming.min { $0.start < $1.start }.map {
             ReminderPresentation(item: $0, now: now, options: reminderOptions, calendar: calendar)
         }
         pin = isPinned
-            ? Pin(symbolName: "pin.fill", alpha: 1, color: isHovered ? .text2 : .text3, isOn: true)
+            ? Pin(symbolName: "pin.fill", alpha: hoverControlsAlpha, color: isHovered ? .text2 : .text3, isOn: true)
             : Pin(symbolName: "pin", alpha: isHovered ? 1 : 0, color: .text2, isOn: false)
         self.problem = problem
         syncFailure = note.schedules.contains { $0.syncError != nil }
         if reminder != nil { reminder?.syncFailed = syncFailure }
-    }
-
-    /// 공용 아이콘 렌더러에 표시할 값을 전달한다. 아이콘이 없으면 이름으로 대신한다.
-    static func badge(for space: Space, display: NotePanelDisplayOptions.SpaceDisplay) -> SpaceBadge? {
-        var badge = SpaceBadge()
-        if display != .name { badge.icon = space.icon }
-        let hasIcon = badge.icon != .none
-        if display != .icon || !hasIcon { badge.name = space.name }
-        if badge.name?.isEmpty == true { badge.name = nil }
-        return hasIcon || badge.name != nil ? badge : nil
     }
 }

@@ -8,6 +8,9 @@ public struct EditorFormattingState: Equatable, Sendable {
     public let strikethrough: Bool
     public let inlineCode: Bool
     public let highlight: Int
+    public var link = false
+    public var checklist = false
+    public var bullet = false
 }
 
 /// 마크다운 본문 편집기(spec 6). 미리 보기 없이 입력한 자리에서 스타일을 입힌다.
@@ -141,6 +144,13 @@ public final class MarkdownEditor {
         get { controller.onOpenLink }
         set { controller.onOpenLink = newValue }
     }
+
+    public var onFormattingChange: (() -> Void)? {
+        get { controller.onFormattingChange }
+        set { controller.onFormattingChange = newValue }
+    }
+
+    public var isEditingBody: Bool { controller.isActive }
 
     public var formattingState: EditorFormattingState { controller.formattingState }
 

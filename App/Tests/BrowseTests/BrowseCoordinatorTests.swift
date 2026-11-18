@@ -33,6 +33,13 @@ import Testing
         browse = fixture.makeCoordinator()
     }
 
+    private func panelHeight(rows: Int, headers: Int) -> CGFloat {
+        let theme = fixture.theme
+        let style = BrowseStyle(theme: theme)
+        return theme.component(.browsePadding) * 2 + theme.component(.browseFindHeight) + theme.component(.browseFindGap)
+            + style.headerHeight * CGFloat(headers) + theme.component(.rowHeight) * CGFloat(rows) + style.separatorHeight
+    }
+
     private func id(_ key: String) throws -> NoteID {
         try #require(ids[key])
     }
@@ -81,7 +88,7 @@ import Testing
             " library 라이브러리 열기",
         ])
         // 높이는 내용에 맞는다: 여백 6, 검색 칸 26, 틈 2, 구획 이름 24 둘, 줄 26 여섯, 구분선 13, 여백 6.
-        let expectedHeight: CGFloat = 257
+        let expectedHeight = panelHeight(rows: 6, headers: 2)
         #expect(window.frame.height == expectedHeight)
     }
 
@@ -213,7 +220,7 @@ import Testing
             try await Task.sleep(for: .milliseconds(10))
         }
         // 여백 6, 검색 칸 26, 틈 2, 새 노트 만들기 26, 구분선 13, 라이브러리 열기 26, 여백 6.
-        let expectedHeight: CGFloat = 105
+        let expectedHeight = panelHeight(rows: 2, headers: 0)
         #expect(window.frame.height == expectedHeight)
         #expect(window.frame.maxY == top)
     }
@@ -309,7 +316,7 @@ import Testing
         browse.show(anchoredTo: note, excluding: nil)
         let frame = try #require(browse.window).frame
         // 위쪽은 상단 줄(28) 아래 2, 오른쪽은 노트 오른쪽 끝에서 24 안쪽.
-        #expect(frame.maxY == note.frame.maxY - 30)
+        #expect(frame.maxY == note.frame.maxY - fixture.theme.shape(.chromeHeight) - fixture.theme.component(.browseAnchorGap))
         #expect(frame.maxX == note.frame.maxX - 24)
         #expect(frame.width == 300)
     }

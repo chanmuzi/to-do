@@ -1,51 +1,88 @@
 import AppKit
 import Theme
 
-/// 오른쪽 아래의 휴지통과 닫기(spec 5.3). 본문 위에 겹쳐 뜨고 본문 크기에 영향을 주지 않는다.
 final class CornerButtonsView: NSView {
     let trashButton: IconButton
-    let closeButton: IconButton
     private let style: PanelStyle
+    private let divider = NSView()
+    private let rule = NSView()
+    private var buttons: [(NoteFormat, IconButton)] = []
+    var onFormat: ((NoteFormat) -> Void)?
+    private(set) var showsFormats = false
 
     init(style: PanelStyle) {
         self.style = style
-        trashButton = IconButton(style: style, symbolName: "trash", iconSize: .iconLarge, label: "휴지통으로 보내기")
-        closeButton = IconButton(style: style, symbolName: "xmark", iconSize: .iconMedium, label: "창 닫기")
+        trashButton = IconButton(style: style, symbolName: "trash", iconSize: .iconMedium, label: "휴지통으로 보내기")
         super.init(frame: .zero)
-        // 알파 전환을 레이어가 맡는다(호버로 나타나고 사라짐).
         wantsLayer = true
-        [trashButton, closeButton].forEach(addSubview)
+        let items: [(NoteFormat, String, String)] = [
+            (.bold, "bold", "굵게"), (.strike, "strikethrough", "취소선"), (.highlight, "highlighter", "형광펜"),
+            (.code, "chevron.left.forwardslash.chevron.right", "인라인 코드"), (.link, "link", "링크"),
+            (.checklist, "checklist", "체크 목록"), (.bullet, "list.bullet", "글머리 목록")
+        ]
+        for (format, symbol, label) in items {
+            let button = IconButton(style: style, symbolName: symbol, iconSize: .iconMedium, label: label)
+            button.onPress = { [weak self] in self?.onFormat?(format) }
+            buttons.append((format, button))
+            addSubview(button)
+        }
+        [rule, divider, trashButton].forEach(addSubview)
+        rule.wantsLayer = true
+        divider.wantsLayer = true
+        apply(visible: false, active: [])
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("코드로만 만든다")
-    }
+    required init?(coder: NSCoder) { fatalError("코드로만 만든다") }
 
-    var preferredSize: NSSize {
-        let button = style.theme.component(.iconButton)
-        return NSSize(width: button * 2 + style.theme.component(.iconButtonGap), height: button)
+    func apply(visible: Bool, active: Set<NoteFormat>) {
+        showsFormats = visible
+        for (format, button) in buttons {
+            button.isHidden = !visible
+            button.isSelected = active.contains(format)
+        }
+        divider.isHidden = !visible
+        rule.isHidden = !visible
+        needsLayout = true
+        needsDisplay = true
     }
 
     func refreshTheme() {
-        [trashButton, closeButton].forEach { $0.refresh() }
-        needsLayout = true
+        buttons.forEach { $0.1.refresh() }
+        trashButton.refresh()
+        needsDisplay = true
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() {
+        layer?.backgroundColor = showsFormats ? style.cgColor(.surface, in: self) : CGColor.clear
+        divider.layer?.backgroundColor = style.cgColor(.line, in: self)
+        rule.layer?.backgroundColor = style.cgColor(.connectFill, in: self)
     }
 
     override var isFlipped: Bool { true }
-
     override func layout() {
         super.layout()
-        let button = style.theme.component(.iconButton)
-        trashButton.frame = NSRect(x: 0, y: 0, width: button, height: button)
-        closeButton.frame = NSRect(
-            x: button + style.theme.component(.iconButtonGap), y: 0, width: button, height: button
-        )
+        let theme = style.theme, side = theme.component(.iconButton)
+        let pad = theme.component(.chromePaddingEnd), gap = theme.component(.iconButtonGap)
+        let y = (bounds.height - side) / 2
+        trashButton.frame = CGRect(x: bounds.width - pad - side, y: y, width: side, height: side)
+        var x = pad
+        for (format, button) in buttons {
+            if format == .checklist {
+                x += theme.component(.iconGap)
+                let h = theme.component(.iconMedium)
+                divider.frame = CGRect(x: x, y: (bounds.height - h) / 2, width: theme.shape(.borderWidth), height: h)
+                x = divider.frame.maxX + theme.component(.iconGap) + gap
+            }
+            button.frame = CGRect(x: x, y: y, width: side, height: side)
+            x += side + gap
+        }
+        rule.frame = CGRect(x: 0, y: 0, width: bounds.width, height: theme.shape(.borderWidth))
     }
 
-    /// 버튼 사이의 틈은 본문이 받는다.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let hit = super.hitTest(point)
-        return hit === self ? nil : hit
+        return hit === self && !showsFormats ? nil : hit
     }
 }

@@ -4,10 +4,21 @@ import AppKit
 /// 시스템 이벤트나 클립보드를 쓰지 않고, 이 프로세스의 입력 칸만 조사한다.
 enum DebugInputVerification {
     static func state(of view: NSTextView) -> [String: Any] {
-        [
+        var selectionColor = ""
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            if let native = view.selectedTextAttributes[.backgroundColor] as? NSColor,
+               let srgb = native.usingColorSpace(.sRGB) {
+                selectionColor = String(format: "#%02X%02X%02X",
+                                        Int(round(srgb.redComponent * 255)), Int(round(srgb.greenComponent * 255)),
+                                        Int(round(srgb.blueComponent * 255)))
+            }
+        }
+        return [
             "text": view.string,
+            "selection": NSStringFromRange(view.selectedRange()),
             "markedRange": NSStringFromRange(view.markedRange()),
             "hasMarkedText": view.hasMarkedText(),
+            "selectionColor": selectionColor,
             "markedAttributes": String(describing: view.markedTextAttributes),
             "quotes": view.isAutomaticQuoteSubstitutionEnabled,
             "dashes": view.isAutomaticDashSubstitutionEnabled,

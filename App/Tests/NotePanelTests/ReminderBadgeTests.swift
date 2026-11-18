@@ -6,23 +6,28 @@ import Theme
 
 @MainActor @Suite struct ReminderBadgeTests {
     @Test(arguments: [false, true], [300.0, 3600.0])
-    func onlyIconWithTimeHelpAndStableSize(event: Bool, seconds: Double) throws {
+    func chipShowsTimeAndAdditionalCount(event: Bool, seconds: Double) throws {
         let theme = try Theme.bundled()
         let badge = ReminderBadgeView(style: PanelStyle(theme: theme))
         let now = Date()
         let item = ScheduleItem(start: now.addingTimeInterval(seconds), end: event ? now.addingTimeInterval(seconds + 3600) : nil)
         let presentation = ReminderPresentation(item: item, now: now, options: NoteDisplayOptions(), calendar: .current)
-        badge.apply(presentation, animated: false)
-        badge.frame = NSRect(x: 0, y: 0, width: badge.fittingWidth!, height: theme.shape(.chromeHeight))
+        badge.apply(presentation, count: 2, animated: false)
+        badge.frame = NSRect(x: 0, y: 0, width: badge.fittingWidth!, height: theme.component(.iconButton))
         badge.layoutSubtreeIfNeeded()
-        #expect(badge.fittingWidth == theme.component(.iconButton))
-        #expect(badge.subviews.allSatisfy { !($0 is NSTextField) })
-        #expect(badge.toolTip == presentation.accessibilityLabel)
-        #expect(badge.accessibilityLabel()?.contains(presentation.text!) == true)
-        let icon = try #require(badge.subviews.compactMap { $0 as? NSImageView }.first)
-        #expect(icon.frame.width == theme.symbolFrame(NSRect(x: 0, y: 0, width: theme.component(.iconMedium), height: theme.component(.iconMedium))).width)
-        #expect(icon.contentTintColor?.usingColorSpace(.deviceRGB) == theme.nsColor(seconds == 300 ? .warn : .text2).usingColorSpace(.deviceRGB))
-        #expect(presentation.symbolName == (event ? "calendar" : seconds == 300 ? "bell" : "clock"))
+        let chip = try #require(badge.subviews.first)
+        #expect(chip.frame.height == theme.component(.badgeHeight))
+        for component in badge.subviews { #expect(component.frame.midY == badge.bounds.midY) }
+        let field = try #require(badge.subviews.compactMap { $0 as? NSTextField }.first)
+        #expect(field.font?.familyName == theme.nsFont(.body).familyName)
+        #expect(field.font?.pointSize == theme.tokens.textStyle(.micro).size)
+        let font = try #require(field.font)
+        let widths = (0...9).map { (String($0) as NSString).size(withAttributes: [.font: font]).width }
+        #expect((widths.max() ?? 0) - (widths.min() ?? 0) < 0.01)
+        let labels = badge.subviews.compactMap { ($0 as? NSTextField)?.stringValue }
+        #expect(labels == [presentation.text ?? "", "+2"])
+        #expect(badge.toolTip == presentation.accessibilityLabel + " +2")
+        #expect((badge.fittingWidth ?? 0) > theme.component(.iconButton))
         var presses = 0
         badge.onPress = { presses += 1 }
         #expect(badge.accessibilityPerformPress())

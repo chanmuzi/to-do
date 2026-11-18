@@ -58,9 +58,9 @@ struct LibraryIconButton: View {
 
 // 대비 증가에서는 흐린 보조 글자와 경계도 읽을 수 있게 한다(spec 17).
 extension Theme {
-    func libraryColor(_ token: ColorToken) -> Color {
-        guard NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast else { return color(token) }
-        return color(token == .text3 ? .text2 : token == .line ? .outline : token)
+    func libraryColor(_ token: ColorToken, on background: ColorToken = .surface2) -> Color {
+        guard NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast else { return color(token, on: background) }
+        return color(token == .text3 ? .text2 : token == .line ? .outline : token, on: background)
     }
 }
 

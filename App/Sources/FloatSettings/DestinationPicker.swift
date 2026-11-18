@@ -4,61 +4,109 @@ import Scheduling
 import SwiftUI
 import Theme
 
-/// 캘린더의 실제 색을 그대로 담은 이미지로 시스템 팝업과 선택된 메뉴 항목을 함께 그린다.
-struct DestinationPicker: NSViewRepresentable {
+struct DestinationPicker: View {
     let title: String
     let menu: DestinationMenu
     let selectedID: String?
     let theme: Theme
     let choose: (String?) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(choose) }
-
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
-        button.isBordered = false
-        button.bezelStyle = .accessoryBarAction
-        button.controlSize = .small
-        button.focusRingType = .none
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.select(_:))
-        button.setContentHuggingPriority(.required, for: .horizontal)
-        return button
+    var body: some View {
+        let destination = menu.choices.first { $0.id == selectedID }?.destination ?? menu.system
+        ValuePopup(label: title, value: destination?.name ?? "시스템 기본값",
+                   dot: destination?.color.map { Self.dot($0, theme: theme) }, theme: theme,
+                   makeMenu: makeMenu) { item in choose(item.representedObject as? String) }
     }
 
-    func updateNSView(_ button: NSPopUpButton, context: Context) {
-        context.coordinator.choose = choose
-        button.font = theme.nsFont(.row)
-        button.setAccessibilityLabel(title)
+    private func makeMenu() -> NSMenu {
         let list = NSMenu()
-        func add(_ title: String, destination: ScheduleDestination?, id: String?) {
+        list.autoenablesItems = false
+        list.minimumWidth = theme.component(.menuWidth)
+        func add(_ title: String, destination: ScheduleDestination?, id: String?, header: Bool = false) {
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.representedObject = id
-            if let color = destination?.color {
-                let size = theme.component(.scheduleReminderCircle)
-                let ink = NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
-                let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-                    ink.setFill()
-                    NSBezierPath(ovalIn: rect).fill()
-                    return true
-                }
-                image.isTemplate = false
-                item.image = image
-            }
+            item.isEnabled = !header
+            let selected = !header && selectedID == id
+            item.state = selected ? .on : .off
+            item.view = DestinationRow(theme: theme, text: title, dot: destination?.color.map { Self.dot($0, theme: theme) },
+                                       header: header, selected: selected)
             list.addItem(item)
         }
-        add(menu.system.map { "시스템 기본값 (\($0.name))" } ?? "시스템 기본값",
-            destination: menu.system, id: nil)
-        if !menu.choices.isEmpty { list.addItem(.separator()) }
-        for choice in menu.choices { add(choice.destination.name, destination: choice.destination, id: choice.id) }
-        button.menu = list
-        button.select(list.items.first { !$0.isSeparatorItem && ($0.representedObject as? String) == selectedID })
-        button.invalidateIntrinsicContentSize()
+        var seen: Set<String> = []
+        let accounts = menu.choices.map(\.account).filter { seen.insert($0).inserted }
+        for account in accounts {
+            if !list.items.isEmpty { list.addItem(.separator()) }
+            if !account.isEmpty { add(account, destination: nil, id: nil, header: true) }
+            for choice in menu.choices where choice.account == account {
+                add(choice.destination.name, destination: choice.destination, id: choice.id)
+            }
+        }
+        if !list.items.isEmpty { list.addItem(.separator()) }
+        add("시스템 기본값", destination: nil, id: nil)
+        return list
     }
 
-    final class Coordinator: NSObject {
-        var choose: (String?) -> Void
-        init(_ choose: @escaping (String?) -> Void) { self.choose = choose }
-        @objc func select(_ sender: NSPopUpButton) { choose(sender.selectedItem?.representedObject as? String) }
+    private static func dot(_ color: ScheduleDestination.Color, theme: Theme) -> NSImage {
+        let size = theme.component(.menuDot)
+        return NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            return true
+        }
+    }
+
+}
+
+private final class DestinationRow: NSView {
+    let theme: Theme
+    let text: String
+    let dot: NSImage?
+    let header: Bool
+    let selected: Bool
+    init(theme: Theme, text: String, dot: NSImage?, header: Bool, selected: Bool) {
+        self.theme = theme
+        self.text = text
+        self.dot = dot
+        self.header = header
+        self.selected = selected
+        super.init(frame: CGRect(x: 0, y: 0, width: theme.component(.menuWidth),
+                                 height: theme.component(header ? .controlHeight : .segmentHeight)))
+        autoresizingMask = [.width]
+    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+    override func draw(_ dirtyRect: NSRect) {
+        theme.nsColor(.surface).setFill()
+        bounds.fill()
+        fillEnclosingMenuBackground(with: theme.nsColor(.surface).cgColor)
+        let inset = theme.component(.badgeGap)
+        if !header, enclosingMenuItem?.isHighlighted == true {
+            theme.nsColor(.selected).setFill()
+            let radius = theme.shape(.controlRadius)
+            NSBezierPath(roundedRect: bounds.insetBy(dx: inset, dy: 0), xRadius: radius, yRadius: radius).fill()
+        }
+        let gap = theme.space(.sp2)
+        var x = inset + gap
+        if !header {
+            if selected, let check = theme.symbolImage("checkmark", size: .menuIcon)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [theme.nsColor(.text)])) {
+                check.draw(at: NSPoint(x: x, y: (bounds.height - check.size.height) / 2),
+                           from: .zero, operation: .sourceOver, fraction: 1)
+            }
+            x += theme.component(.menuIcon) + gap
+            if let dot {
+                dot.draw(at: NSPoint(x: x, y: (bounds.height - dot.size.height) / 2), from: .zero, operation: .sourceOver, fraction: 1)
+                x += dot.size.width + gap
+            }
+        }
+        let value = NSAttributedString(string: text, attributes: [
+            .font: theme.nsFont(.body, size: theme.tokens.textStyle(header ? .micro : .ui).size), .foregroundColor: theme.nsColor(header ? .text3 : .text)])
+        value.draw(in: CGRect(x: x, y: (bounds.height - value.size().height) / 2,
+                              width: bounds.width - x - inset, height: value.size().height))
+    }
+    override func mouseUp(with event: NSEvent) {
+        guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu else { return }
+        menu.cancelTracking()
+        menu.performActionForItem(at: menu.index(of: item))
     }
 }

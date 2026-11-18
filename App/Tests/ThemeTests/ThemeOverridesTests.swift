@@ -27,7 +27,7 @@ import Testing
         #expect(layered.color(.surface, .light) == base.color(.surface, .light))
         #expect(layered.textStyle(.h1) == base.textStyle(.h1))
         // 원본은 바뀌지 않는다.
-        #expect(base.textStyle(.body).size == 13)
+        #expect(base.textStyle(.body).size == (try ThemeTokens.bundled()).textStyle(.body).size)
         // 덮어쓰기를 걷어 내면 원본과 같다.
         #expect(try base.applying(ThemeOverrides()) == base)
     }
@@ -86,7 +86,7 @@ import Testing
         let theme = try Theme.bundled(overrideStore: store, appearance: .dark)
         #expect(theme.overrides == ThemeOverrides(values: ["color.dark.accent": "#3DDC84"]))
         #expect(theme.rgba(.accent) == RGBA(red: 61 / 255, green: 220 / 255, blue: 132 / 255))
-        #expect(theme.tokens.textStyle(.body).size == 13)
+        #expect(theme.tokens.textStyle(.body).size == theme.defaultBodySize)
         #expect(theme.loadWarnings.count == 2)
         #expect(theme.loadWarnings.contains { $0.contains("color.light.removed-token") })
         #expect(theme.loadWarnings.contains { $0.contains("type.fs-body") })
@@ -127,7 +127,12 @@ import Testing
             }
             return components
         }
-        #expect(try resolved(.light) == [1, 1, 1])
-        #expect(try resolved(.dark) == [0, 0, 0])
+        for appearance in ThemeAppearance.allCases {
+            let expected = theme.tokens.color(.surface, appearance)
+            let actual = try resolved(appearance)
+            for (component, value) in zip(actual, [expected.red, expected.green, expected.blue]) {
+                #expect(abs(component - value) < 0.0001)
+            }
+        }
     }
 }

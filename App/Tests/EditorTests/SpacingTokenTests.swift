@@ -12,31 +12,44 @@ import Theme
 
     @Test func defaultsComeFromTheTokens() throws {
         let h = try EditorHarness("[ ] 할 일\n\t- 하위\n본문")
-        #expect(h.theme.component(.gutter) == 19)
-        #expect(h.theme.component(.indent) == 19)
-        #expect(h.theme.lineHeight(.body) == 22)
-        #expect(try paragraphStyle(h, line: 0).headIndent == 19)
-        #expect(try paragraphStyle(h, line: 1).headIndent == 38)
-        #expect(try paragraphStyle(h, line: 2).minimumLineHeight == 22)
+        #expect(try paragraphStyle(h, line: 0).headIndent == h.theme.component(.gutter))
+        #expect(try paragraphStyle(h, line: 1).headIndent == h.theme.component(.gutter) + h.theme.component(.indent))
+        #expect(try paragraphStyle(h, line: 2).minimumLineHeight == h.theme.lineHeight(.body))
+    }
+
+    @Test func headingsAndStrongScaleWithTheBodySize() throws {
+        let h = try EditorHarness("# 제목\n## 제목\n### 제목\n**굵게**")
+        let roles: [TextStyle] = [.h1, .h2, .h3, .strong]
+        for size in [h.theme.defaultBodySize, h.theme.component(.settingsFontMax)] {
+            try h.theme.applyBodyTypography(size: Int(size), lineHeight: nil)
+            let ratio = size / h.theme.defaultBodySize
+            for (line, role) in roles.enumerated() {
+                let attributed = try h.display(line: line)
+                let end = (attributed.string as NSString).range(of: line == 3 ? "굵게" : "제목").location
+                let font = try #require(attributed.attribute(.font, at: end, effectiveRange: nil) as? NSFont)
+                #expect(abs(font.pointSize - h.theme.tokens.textStyle(role).size * ratio) < 0.001)
+            }
+        }
     }
 
     @Test func overridesUpdateAnOpenEditorLive() throws {
         let h = try EditorHarness("[ ] 할 일\n\t- 하위\n> 인용\n본문")
         let before = h.editor.contentHeight
+        let taller = Int(h.theme.lineHeight(.body)) + 2
         try h.theme.setOverrides(ThemeOverrides(values: [
-            "component.gutter": "26px", "component.indent": "30px", "type.lh-body": "24px", "component.quote-pad": "20px",
+            "component.gutter": "26px", "component.indent": "30px", "type.lh-body": "\(taller)px", "component.quote-pad": "20px",
         ]))
         #expect(try paragraphStyle(h, line: 0).headIndent == 26)
         #expect(try paragraphStyle(h, line: 1).headIndent == 56)
         #expect(try paragraphStyle(h, line: 2).headIndent == 20)
-        #expect(try paragraphStyle(h, line: 3).minimumLineHeight == 24)
+        #expect(try paragraphStyle(h, line: 3).minimumLineHeight == CGFloat(taller))
         #expect(h.editor.contentHeight > before)
         // 왼쪽 칸 그림도 새 칸에 놓인다.
         let decoration = try #require(try h.display(line: 1).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
         #expect(decoration.gutterX == 30)
         // 되돌리면 기본값으로 돌아온다.
         try h.theme.setOverrides(ThemeOverrides())
-        #expect(try paragraphStyle(h, line: 0).headIndent == 19)
+        #expect(try paragraphStyle(h, line: 0).headIndent == h.theme.component(.gutter))
     }
 
     @Test func decorationMetricsFollowLiveTokenOverrides() throws {

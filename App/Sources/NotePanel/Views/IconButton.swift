@@ -11,6 +11,13 @@ final class IconButton: ClickableView {
     private let imageView = NSImageView()
     private var symbolName: String
     private var tint: ColorToken
+    var isSelected = false {
+        didSet {
+            guard oldValue != isSelected else { return }
+            setAccessibilityValue(isSelected ? "켜짐" : "꺼짐")
+            refresh()
+        }
+    }
     private var isPointerInside = false
 
     init(style: PanelStyle, symbolName: String, iconSize: ComponentToken, label: String, tint: ColorToken = .text2) {
@@ -45,8 +52,8 @@ final class IconButton: ClickableView {
 
     /// 테마나 접근성 설정이 바뀌었을 때.
     func refresh() {
-        imageView.image = style.symbol(symbolName, size: iconSize)
-        imageView.contentTintColor = style.color(isPointerInside ? .text : tint)
+        imageView.image = NoteButtonGlyph.image(symbolName, theme: style.theme) ?? style.symbol(symbolName, size: iconSize)
+        imageView.contentTintColor = style.color(isPointerInside || isSelected ? .text : tint)
         needsLayout = true
         needsDisplay = true
     }
@@ -57,17 +64,17 @@ final class IconButton: ClickableView {
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
-        layer?.cornerRadius = style.theme.shape(.chipRadius)
-        layer?.backgroundColor = isPointerInside ? style.cgColor(.hover, in: self) : CGColor.clear
+        layer?.cornerRadius = style.theme.shape(.controlRadius)
+        layer?.backgroundColor = isSelected ? style.cgColor(.selected, in: self) : (isPointerInside ? style.cgColor(.hover, in: self) : CGColor.clear)
     }
 
     override func layout() {
         super.layout()
         let side = style.theme.component(iconSize)
-        imageView.frame = style.theme.symbolFrame(NSRect(
+        imageView.frame = NSRect(
             x: (bounds.width - side) / 2, y: (bounds.height - side) / 2,
             width: side, height: side
-        ))
+        )
     }
 
     /// 버튼 가장자리에서 그림의 가장자리까지(좌우 한쪽). 그림은 버튼 가운데에 제 크기로 놓인다.
@@ -104,7 +111,7 @@ final class IconButton: ClickableView {
         guard inside != isPointerInside else { return }
         isPointerInside = inside
         style.crossfade(imageView)
-        imageView.contentTintColor = style.color(inside ? .text : tint)
+        imageView.contentTintColor = style.color(inside || isSelected ? .text : tint)
         style.animate { updateLayer() }
     }
 

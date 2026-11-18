@@ -16,6 +16,7 @@ nonisolated public enum InlineCodeStyle: String, Sendable, CaseIterable {
 
 /// 편집기 설정. 색, 글꼴, 치수는 `Theme`에서 온다.
 nonisolated public struct MarkdownEditorConfiguration: Sendable, Equatable {
+    public var paletteID: String?
     public var recognizesDates = true
     public var checkboxStyle: CheckboxStyle
     public var inlineCodeStyle: InlineCodeStyle
@@ -30,6 +31,7 @@ nonisolated public struct MarkdownEditorConfiguration: Sendable, Equatable {
 nonisolated public enum EditorAction: Sendable, Hashable {
     case indent
     case outdent
+    case toggleBullet
     case toggleTodo
     case toggleDone
     case moveLineUp

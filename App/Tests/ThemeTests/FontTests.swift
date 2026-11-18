@@ -14,19 +14,20 @@ import Testing
         let theme = try Theme.bundled()
         let body = theme.nsFont(.body)
         #expect(body.familyName?.hasPrefix("Pretendard") == true)
-        #expect(body.pointSize == 13)
+        #expect(body.pointSize == theme.tokens.textStyle(.body).size)
 
         let code = theme.nsFont(.code)
         #expect(code.familyName == "D2Coding")
-        #expect(code.pointSize == 11.5)
+        #expect(code.pointSize == theme.tokens.textStyle(.code).size)
 
         // 가변 글꼴의 굵기 축에 토큰 값이 그대로 들어간다.
         #expect(weightAxisValue(theme.nsFont(.strong)) == 650)
-        #expect(weightAxisValue(theme.nsFont(.h1)) == 700)
+        #expect((try #require(weightAxisValue(theme.nsFont(.h1)))) == Double(theme.tokens.textStyle(.h1).weight))
         #expect(weightAxisValue(theme.nsFont(.body, weight: 500)) == 500)
         // 굵기별 파일이 따로 있는 글꼴은 굵은 파일로 바뀐다.
         #expect(theme.nsFont(.code, weight: 700).fontDescriptor.symbolicTraits.contains(.bold))
         #expect(!code.fontDescriptor.symbolicTraits.contains(.bold))
+        #expect(FontResolver.cssWeight(theme.nsFont(.uiStrong)) <= theme.tokens.textStyle(.uiStrong).weight)
     }
 
     @Test func fallsBackWhenFamilyIsNotInstalled() {
