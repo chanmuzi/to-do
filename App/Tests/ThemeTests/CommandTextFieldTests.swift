@@ -18,6 +18,8 @@ import Testing
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
         let field = try #require(descendants(root).compactMap { $0 as? NSTextField }.first)
         #expect(field.isEditable && field.isSelectable && field.focusRingType == .none)
+        let placeholder = try #require(field.placeholderAttributedString)
+        #expect(placeholder.attribute(.font, at: 0, effectiveRange: nil) as? NSFont == field.font)
         #expect(window.makeFirstResponder(field))
         let editor = try #require(field.currentEditor() as? NSTextView)
         editor.doCommand(by: #selector(NSResponder.moveDown(_:)))
