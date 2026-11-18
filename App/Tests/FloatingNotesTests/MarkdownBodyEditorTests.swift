@@ -631,7 +631,7 @@ extension MarkdownBodyEditorTests {
 }
 
 extension MarkdownBodyEditorTests {
-    @Test func windowDispatchesBoldForSelectionAndEmptyPair() throws {
+    @Test func windowDispatchesBoldForSelectionAndTypingState() throws {
         defer { fixture.cleanUp() }
         let (id, adapter) = try fixture.open(NoteDraft(title: "서식", body: "한글"))
         let window = try #require(fixture.notePanels.window(for: id))
@@ -653,10 +653,10 @@ extension MarkdownBodyEditorTests {
         #expect(adapter.text == "한글")
         editor.selectedRange = NSRange(location: 2, length: 0)
         pressBold()
-        #expect(adapter.text == "한글****")
-        #expect(editor.selectedRange == NSRange(location: 4, length: 0))
+        #expect(adapter.text == "한글" && editor.formattingState.bold)
+        #expect(editor.selectedRange == NSRange(location: 2, length: 0))
         pressBold()
-        #expect(adapter.text == "한글")
+        #expect(adapter.text == "한글" && !editor.formattingState.bold)
         pressBold()
         editor.textView.insertText("가", replacementRange: editor.selectedRange)
         #expect(adapter.text == "한글**가**")

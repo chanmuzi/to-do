@@ -251,7 +251,7 @@ import Theme
         for selector in [NSResponder.tab, NSResponder.newline, NSResponder.backspace] {
             #expect(!h.controller.textView(h.view, doCommandBy: selector))
         }
-        h.step { h.editor.perform(.bold) }
+        h.step { h.editor.perform(.strikethrough) }
         h.step { h.editor.perform(.indent) }
         #expect(h.editor.text == "- ㅎ")
         #expect(h.view.hasMarkedText())

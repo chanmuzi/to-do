@@ -143,7 +143,7 @@ private typealias Key = EditorShortcuts.Key
         h.mark("ㅎ")
         #expect(h.editor.text == "**굵게ㅎ**")
         let marked = h.view.markedRange()
-        h.key(Key.b, "ㅠ", .command)
+        h.key(Key.e, "e", .command)
         h.step { h.editor.perform(.link) }
         #expect(h.view.hasMarkedText())
         #expect(h.view.markedRange() == marked)

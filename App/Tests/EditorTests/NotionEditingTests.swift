@@ -300,9 +300,10 @@ private typealias Key = EditorShortcuts.Key
         let h = try EditorHarness("가 ")
         h.caret(atEndOfLine: 0)
         #expect(h.key(Key.b, "b", .command))
-        // 빈 기호 쌍도 한 번의 편집으로 저장한다.
-        #expect(h.marked == "가 **|**")
-        #expect(h.changes.last == "가 ****")
+        // 첫 입력 전에는 원문 변경이나 실행 취소 단계가 생기지 않는다.
+        #expect(h.marked == "가 |")
+        #expect(h.changes.isEmpty && !h.editor.undoManager.canUndo)
+        #expect(h.editor.formattingState.bold)
         h.type("굵")
         #expect(h.marked == "가 **굵|**")
         h.type("게")
@@ -312,29 +313,41 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.marked == "가 **굵게**|")
         h.type(" 나")
         #expect(h.marked == "가 **굵게** 나|")
-        // 첫 글자와 기호 삽입을 각각 되돌리고 다시 한다.
+        // 첫 글자와 기호를 함께 되돌리고 다시 한다.
         for _ in 0..<3 { h.undo() }
         #expect(h.editor.text == "가 **굵**")
         h.undo()
-        #expect(h.marked == "가 **|**")
-        h.undo()
         #expect(h.marked == "가 |")
         #expect(!h.editor.undoManager.canUndo)
-        h.redo()
         h.redo()
         #expect(h.editor.text == "가 **굵**")
         for _ in 0..<3 { h.redo() }
         #expect(h.editor.text == "가 **굵게** 나")
     }
 
-    @Test func boldCanBeCancelledAfterUndoRestoresItsEmptyPair() throws {
-        let h = try EditorHarness.at("가 |")
-        h.perform(.bold)
-        h.type("나")
-        h.undo()
-        #expect(h.marked == "가 **|**")
-        h.perform(.bold)
-        #expect(h.marked == "가 |")
+    @Test func boldCommitsMarkedTextAndFormatsOnlySubsequentInput() throws {
+        let h = try EditorHarness()
+        h.mark("가")
+        #expect(h.key(Key.b, "ㅠ", .command))
+        #expect(!h.view.hasMarkedText() && h.editor.text == "가")
+        #expect(h.editor.formattingState.bold)
+        h.mark("나")
+        h.commit("나 ")
+        #expect(h.editor.text == "가**나** ")
+        #expect(h.editor.formattingState.bold)
+        #expect(h.key(Key.b, "ㅠ", .command))
+        #expect(!h.editor.formattingState.bold)
+        h.type("다")
+        #expect(h.editor.text == "가**나** 다")
+    }
+
+    @Test func formattingStateCombinesCursorAndPendingMarks() throws {
+        let h = try EditorHarness.at("**~~가|나~~**")
+        #expect(h.editor.formattingState.bold && h.editor.formattingState.strikethrough)
+        h.perform(.strikethrough)
+        #expect(h.editor.formattingState.bold && !h.editor.formattingState.strikethrough)
+        h.place(at: 0)
+        #expect(!h.editor.formattingState.bold && !h.editor.formattingState.strikethrough)
     }
 
     @Test func eachShortcutTogglesItsOwnTypingAttribute() throws {

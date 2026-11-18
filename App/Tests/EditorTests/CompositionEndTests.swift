@@ -30,10 +30,7 @@ import Testing
         h.redo()
         #expect(h.editor.text == "a **ㅎ**b")
         h.undo()
-        #expect(h.marked == "a **|**b")
-        h.undo()
         #expect(h.editor.text == "a b")
-        h.redo()
         h.redo()
         #expect(h.editor.text == "a **ㅎ**b")
     }

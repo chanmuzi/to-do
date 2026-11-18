@@ -42,7 +42,7 @@ struct SettingsView: View {
         switch model.pane {
         case .appearance:
             segments("모드", \.appearance, [("light", "라이트"), ("dark", "다크"), ("system", "시스템")])
-            step("본문 글꼴 크기", \.bodySize, Int(theme.tokens.textStyle(.body).size), .settingsFontMin, .settingsFontMax)
+            step("본문 글꼴 크기", \.bodySize, Int(theme.noteBodySize), .settingsFontMin, .settingsFontMax)
             step("본문 줄 높이", \.bodyLineHeight, Int(theme.lineHeight(.body)), .settingsLineMin, .settingsLineMax)
             segments("스페이스 표시", \.spaceDisplay, [("icon", "아이콘"), ("iconAndName", "아이콘과 이름"), ("name", "이름")])
         case .editor:

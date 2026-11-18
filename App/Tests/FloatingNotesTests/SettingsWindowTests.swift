@@ -1,4 +1,5 @@
 import AppKit
+@_spi(Verification) import Editor
 import FloatSettings
 import Library
 import Models
@@ -111,6 +112,7 @@ import Theme
                 fixture.notePanels.recognizesDates = enabled
                 library.model.displayOptions = options
             }, showMenuIcon: { iconVisible = $0 })
+        let libraryBodySize = library.model.theme.nsFont(.body).pointSize
         try store.update {
             $0.appearance = "dark"
             $0.bodySize = 16
@@ -126,7 +128,8 @@ import Theme
         }
         #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings == store.settings)
         #expect(appearance?.name == .darkAqua && !iconVisible)
-        #expect(library.model.theme.tokens.textStyle(.body).size == 16)
+        #expect(library.model.theme.nsFont(.body).pointSize == libraryBodySize)
+        #expect(adapter.editor.textView.font?.pointSize == 16)
         #expect(fixture.theme.lineHeight(.body) == 28)
         #expect(adapter.editor.configuration.checkboxStyle == .bracket)
         #expect(adapter.editor.configuration.inlineCodeStyle == .plain)

@@ -33,8 +33,12 @@ nonisolated struct ShortcutEntry: Hashable, Sendable {
     /// 표에 적는 키 모습(`tokens.json`의 `keys`와 같다). 보조 키를 한 번 적고 키를 차례로 잇는다.
     var keyLabels: [String] {
         switch keys {
-        case .typed(let labels): labels
-        case .chords(let chords): (chords.first?.modifiers.labels ?? []) + chords.map(\.key.label)
+        case .typed(let labels): return labels
+        case .chords(let chords):
+            if Set(chords.map(\.modifiers)).count > 1 {
+                return [chords.map { $0.labels.joined() }.joined(separator: " / ")]
+            }
+            return (chords.first?.modifiers.labels ?? []) + chords.map(\.key.label)
         }
     }
 }
@@ -114,6 +118,11 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         row(.noteWindow, "리마인더 설정", [.r], [.command], command: .setReminder),
         row(.noteWindow, "스페이스 옮기기", [.m], [.shift, .command], command: .moveToSpace),
         row(.noteWindow, "노트 안에서 찾기", [.f], [.command], command: .findInNote),
+        ShortcutEntry(group: .noteWindow, action: "본문 확대", keys: .chords([
+            KeyChord(.equals, [.shift, .command]), KeyChord(.equals, .command)
+        ]), command: .enlargeBody),
+        row(.noteWindow, "본문 축소", [.minus], [.command], command: .reduceBody),
+        row(.noteWindow, "본문 기본 크기", [.zero], [.command], command: .resetBodySize),
         row(.noteWindow, "전체 검색", [.f], [.shift, .command], command: .searchAll),
         row(.noteWindow, "창 닫기 (노트는 남음)", [.w], [.command], command: .closeWindow),
         row(.noteWindow, "설정", [.comma], [.command], command: .settings),

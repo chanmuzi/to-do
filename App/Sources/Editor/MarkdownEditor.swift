@@ -2,6 +2,14 @@ import AppKit
 import Theme
 import DateTime
 
+/// 입력할 글자 또는 선택 전체에 적용되는 인라인 서식. 형광펜 0은 꺼짐이다.
+public struct EditorFormattingState: Equatable, Sendable {
+    public let bold: Bool
+    public let strikethrough: Bool
+    public let inlineCode: Bool
+    public let highlight: Int
+}
+
 /// 마크다운 본문 편집기(spec 6). 미리 보기 없이 입력한 자리에서 스타일을 입힌다.
 ///
 /// 원문(`text`)은 사용자가 친 Markdown 글자 그대로다. 화면의 서식은 TextKit 2가 문단을 만들 때
@@ -133,6 +141,10 @@ public final class MarkdownEditor {
         get { controller.onOpenLink }
         set { controller.onOpenLink = newValue }
     }
+
+    public var formattingState: EditorFormattingState { controller.formattingState }
+
+    package static var toggleBoldAction: Selector { #selector(EditorTextView.toggleMarkdownBold(_:)) }
 
     /// 선택 범위(원문의 UTF-16 위치).
     public var selectedRange: NSRange {

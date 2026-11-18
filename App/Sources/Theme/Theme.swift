@@ -22,6 +22,10 @@ public final class Theme {
     /// 앱이 켤 때 모아서 기록한다. 문제가 없었으면 비어 있다.
     public let loadWarnings: [String]
 
+    private var configuredBodySize: Int?
+    public var noteBodySize: CGFloat { configuredBodySize.map { CGFloat($0) } ?? tokens.textStyle(.body).size }
+    public var defaultBodySize: CGFloat { baseTokens.textStyle(.body).size }
+
     @ObservationIgnored private var bodyOverrides = ThemeOverrides()
     @ObservationIgnored private let baseTokens: ThemeTokens
     @ObservationIgnored private let overrideStore: ThemeOverrideStore?
@@ -68,11 +72,11 @@ public final class Theme {
     /// 기존 테마 파일 위에 앱 설정의 본문 치수만 얹는다. 저장은 AppSettingsStore가 맡는다.
     public func applyBodyTypography(size: Int?, lineHeight: Int?) throws {
         var effective = ThemeOverrides()
-        if let size { effective = effective.setting("type.fs-body", to: "\(size)px") }
         if let lineHeight { effective = effective.setting("type.lh-body", to: "\(lineHeight)px") }
         let next = try baseTokens.applying(overrides).applying(effective)
         bodyOverrides = effective
-        guard next != tokens else { return }
+        guard next != tokens || configuredBodySize != size else { return }
+        configuredBodySize = size
         tokens = next
         notifyChange()
     }

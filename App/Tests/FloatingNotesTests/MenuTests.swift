@@ -175,6 +175,30 @@ import Theme
         #expect(try !press(KeyChord(.k, [.control, .option, .command]), in: menu))
     }
 
+    @Test func viewMenuChangesSharedBodySizeAndPersistsItsLimits() throws {
+        defer { fixture.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let theme = fixture.theme
+        SettingsApplication.follow(store, theme: theme, appearanceOverride: nil, setAppearance: { _ in },
+            applyDisplay: { _, _ in }, showMenuIcon: { _ in })
+        fixture.commands.changeBodySize = { try $0.apply(to: store, theme: theme) }
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
+        let view = try #require(menu.item(withTitle: "보기")?.submenu)
+        #expect(view.item(withTitle: "본문 확대")?.isHidden == false)
+        let minSize = Int(theme.component(.settingsFontMin)), maxSize = Int(theme.component(.settingsFontMax))
+        let initial = Int(theme.defaultBodySize)
+        #expect(try press(KeyChord(.equals, .command), in: menu))
+        #expect(store.settings.bodySize == initial + 1)
+        #expect(try press(KeyChord(.equals, [.command, .shift]), in: menu))
+        #expect(store.settings.bodySize == initial + 2)
+        for _ in minSize...maxSize { _ = try press(KeyChord(.equals, .command), in: menu) }
+        #expect(store.settings.bodySize == maxSize)
+        for _ in minSize...maxSize { _ = try press(KeyChord(.minus, .command), in: menu) }
+        #expect(store.settings.bodySize == minSize)
+        #expect(try press(KeyChord(.zero, .command), in: menu))
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.bodySize == initial)
+    }
+
     @Test func everyNoteWindowRowHasAHiddenKeyItem() {
         defer { fixture.cleanUp() }
         let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)

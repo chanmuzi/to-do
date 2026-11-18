@@ -1,4 +1,5 @@
 import AppKit
+import Editor
 
 /// 앱 메뉴. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
 ///
@@ -21,7 +22,7 @@ enum MainMenu {
             visible.representedObject = command.rawValue
             return [visible] + hiddenItems(for: [command], in: table, dispatcher: dispatcher)
         }
-        let listed: Set<AppCommand> = [.newNote, .findNote, .closeWindow, .settings, .shortcuts, .nextNote]
+        let listed: Set<AppCommand> = [.newNote, .findNote, .closeWindow, .settings, .shortcuts, .nextNote, .enlargeBody, .reduceBody, .resetBodySize]
         let unlisted = table.entries(in: .noteWindow).compactMap(\.command).filter { !listed.contains($0) }
         let undo = #selector(AppCommandDispatcher.undoOrRestoreTrash(_:))
 
@@ -49,9 +50,12 @@ enum MainMenu {
                 + standard("오려두기", #selector(NSText.cut(_:)), KeyChord(.x, .command))
                 + standard("복사", #selector(NSText.copy(_:)), KeyChord(.c, .command))
                 + standard("붙여넣기", #selector(NSText.paste(_:)), KeyChord(.v, .command))
+                + standard("굵게", MarkdownEditor.toggleBoldAction, KeyChord(.b, .command))
                 + standard("모두 선택", #selector(NSText.selectAll(_:)), KeyChord(.a, .command))
         ))
-        menu.addItem(submenu(title: "보기", items: command(StatusMenuModel.hideAllTitle, .toggleNotesHidden)))
+        menu.addItem(submenu(title: "보기", items: command(StatusMenuModel.hideAllTitle, .toggleNotesHidden)
+            + [.separator()] + command("본문 확대", .enlargeBody) + command("본문 축소", .reduceBody)
+            + command("본문 기본 크기", .resetBodySize)))
         menu.addItem(submenu(title: "창", items: command("다음 노트로", .nextNote)))
         menu.addItem(submenu(title: "도움말", items: command("단축키", .shortcuts)))
         return menu
@@ -61,16 +65,16 @@ enum MainMenu {
     private static func hiddenItems(
         for commands: [AppCommand], in table: ShortcutTable, dispatcher: AppCommandDispatcher
     ) -> [NSMenuItem] {
-        commands.compactMap { command in
+        commands.flatMap { command -> [NSMenuItem] in
             // "어디서나" 줄의 키는 전역 단축키가 받는다. 메뉴에는 노트 창의 키만 넣는다.
-            guard let entry = table.entry(for: command), entry.group == .noteWindow,
-                  let chord = entry.chords.first
-            else { return nil }
-            let item = keyOnlyItem(
-                entry.action, #selector(AppCommandDispatcher.performMenuCommand(_:)), chord, target: dispatcher
-            )
-            item.representedObject = command.rawValue
-            return item
+            guard let entry = table.entry(for: command), entry.group == .noteWindow else { return [] }
+            return entry.chords.map { chord in
+                let item = keyOnlyItem(
+                    entry.action, #selector(AppCommandDispatcher.performMenuCommand(_:)), chord, target: dispatcher
+                )
+                item.representedObject = command.rawValue
+                return item
+            }
         }
     }
 

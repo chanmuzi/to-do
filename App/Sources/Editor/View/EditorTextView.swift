@@ -37,6 +37,7 @@ final class EditorTextView: NSTextView {
         switch item.action {
         case #selector(undo(_:)): editor?.editorUndoManager.canUndo ?? false
         case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
+        case #selector(toggleMarkdownBold(_:)): isEditable && editor?.isActive == true
         default: super.validateUserInterfaceItem(item)
         }
     }
@@ -94,12 +95,18 @@ final class EditorTextView: NSTextView {
     /// 키 창이 아닌 창의 뷰에도 `performKeyEquivalent`가 올 수 있다(다른 창이 넘긴 키, 창을 가리지 않고
     /// 부르는 쪽). 그때 받으면 사용자가 보고 있지 않은 노트의 글이 바뀐다.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if editor?.isActive == true, !hasMarkedText(),
-           let action = EditorShortcuts.action(keyCode: event.keyCode, modifiers: Self.modifiers(of: event)) {
+        if editor?.isActive == true,
+           let action = EditorShortcuts.action(keyCode: event.keyCode, modifiers: Self.modifiers(of: event)),
+           action == .bold || !hasMarkedText() {
             editor?.perform(action)
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    @objc func toggleMarkdownBold(_ sender: Any?) {
+        guard editor?.isActive == true else { return }
+        editor?.perform(.bold)
     }
 
     private static func modifiers(of event: NSEvent) -> EditorShortcuts.Modifiers {

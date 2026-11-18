@@ -178,13 +178,6 @@ extension EditorController {
             let snapped = CaretSnapping.snap(old: selection, new: selection, in: document, folded: folded)
             if snapped != selection { setSelection(snapped) }
         }
-        // 원문과 선택을 함께 되살렸으면 첫 입력을 기다리던 굵게 쌍도 다시 사용할 수 있다.
-        if let pair = emptyBold, selectedRange == pair.edit.selection {
-            let restored = NSRange(location: pair.edit.range.location, length: pair.edit.replacement.utf16.count)
-            if NSMaxRange(restored) <= document.length, document.string(in: restored) == pair.edit.replacement {
-                emptyBold?.version = documentVersion
-            }
-        }
         notifyFoldChangeIfNeeded()
     }
 }
