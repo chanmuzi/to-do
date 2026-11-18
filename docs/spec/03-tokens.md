@@ -12,13 +12,13 @@
 | 본문 제목 3 (###) | Pretendard | `fs-h3` 16px / `lh-h3` 25px | `fw-h3` 600 |
 | 본문 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-body` 400 |
 | 본문 굵게 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-strong` 650 |
-| 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 24px | `fw-title` 600 |
-| 라이브러리 줄 제목 | Pretendard | `fs-row` 13.5px / `lh-row` 18px | `fw-row` 450, 선택 `fw-selected` 500, 빈 제목 `fw-body` 400 |
+| 라이브러리 목록 제목 | Pretendard | `library-header-font` 15px / `lh-body` 24px | `fw-title` 600 |
+| 라이브러리 줄 제목 | Pretendard | `fs-row` 14px / `lh-row` 18px | `fw-selected` 500, 빈 제목 `fw-body` 400 |
 | 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 12.5px / `lh-ui` 16px | `fw-body` 400 |
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui` 400 |
 | 임박한 리마인더 | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui-strong` 600 |
 | 날짜, 보조 숫자 | D2Coding | `fs-micro` 12px / `lh-micro` 14px | `fw-ui` 400 |
-| 라이브러리 사이드바 시작 시각과 개수, 목록 진행 수 | Pretendard, 같은 폭 숫자 | `fs-micro` 12px | `fw-body` 400 |
+| 라이브러리 사이드바 시작 시각 | Pretendard, 같은 폭 숫자 | `fs-micro` 12px | `fw-body` 400 |
 | 인라인 코드 | D2Coding | `fs-code` 12.5px / `lh-body` 24px | `fw-body` 400 |
 | 코드 블록 | D2Coding | `fs-code` 12.5px / `lh-code` 20px | `fw-body` 400 |
 | 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 24px | `fw-body` 400 |
@@ -147,11 +147,11 @@
 
 편집기 장식은 `component.editor-*` 토큰으로 관리한다. 기존 값은 유지한다: 체크 테두리 1.25, 체크 그림 9와 선 1, 대괄호 칸 28, 글머리 원 5와 사각 4와 왼쪽 여백 4, 꺾쇠 12와 선 0.875, 줄 수 간격 8, 안내선 위치 6, 형광펜 여백 2/1, 링크 칸 간격 3과 안쪽 여백 6, 복사 버튼 여백 4. 제목 1/2/3의 전후 여백은 4/4, 6/2, 6/0이다. 복사 아이콘은 기존 `icon-m`과 공용 광학 보정을 쓴다(D-085).
 
-- `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
-- `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
-- `library-reminder-w`: 200. L1 오른쪽에는 시간과 icon-s 13 핀 칸만 남긴다. 예전 progress-w 토큰은 저장 호환을 위해 남기되 화면에는 사용하지 않는다(D-086).
+- `library-w/h`: 920/640, `library-min-w/h`: 660/400, `library-sidebar-w`: 240.
+- `library-header-h` 52, `library-section-head-h` 22, `library-section-gap` 11, `library-sidebar-inset` 10. `library-more-size` 20, 그림은 `menu-icon` 12다.
+- `library-row-leading` 20을 양쪽에 쓰고 `library-row-pad-y` 9, `library-row-gap` 3을 적용한다. `upcoming-detail-w` 216, 상세 여백은 10/12/6이다. 일정 호버 지연은 없다.
 - 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다.
-- `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
+- `library-sidebar-row-gap`: 0, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
 
