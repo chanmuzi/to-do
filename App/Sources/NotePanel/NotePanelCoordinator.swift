@@ -20,6 +20,9 @@ public final class NotePanelCoordinator {
     }
 
     /// 상단 줄 표시 방식. 바꾸면 떠 있는 창에 바로 반영된다.
+    public var recognizesDates = true {
+        didSet { controllers.values.forEach { $0.root.topRow.recognizesDates = recognizesDates } }
+    }
     public var displayOptions = NotePanelDisplayOptions() {
         didSet { controllers.values.forEach { $0.refreshChrome(animated: false) } }
     }

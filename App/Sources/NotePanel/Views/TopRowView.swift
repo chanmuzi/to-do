@@ -73,6 +73,10 @@ final class TopRowView: NSView {
         }
     }
 
+    var recognizesDates: Bool {
+        get { title.recognizesDates }
+        set { title.recognizesDates = newValue }
+    }
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)? {
         get { title.onAcceptDate }
         set { title.onAcceptDate = newValue }

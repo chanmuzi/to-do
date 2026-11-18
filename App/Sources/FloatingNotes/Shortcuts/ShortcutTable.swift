@@ -5,6 +5,7 @@ nonisolated enum ShortcutGroup: String, Hashable, Sendable, CaseIterable {
     case aiPanel = "AI 패널"
     case noteWindow = "노트 창"
     case browse = "노트 찾기"
+    case library = "라이브러리"
     case editing = "편집"
     case markdownInput = "마크다운으로 입력"
 }
@@ -67,7 +68,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
     }
 
     static let standard = ShortcutTable(
-        entries: global + capture + aiPanel + noteWindow + browse + editing + markdownInput
+        entries: global + capture + aiPanel + noteWindow + browse + library + editing + markdownInput
     )
 
     private static func row(
@@ -125,9 +126,17 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         row(.browse, "닫기", [.escape]),
     ]
 
+    private static let library: [ShortcutEntry] = [
+        row(.library, "선택한 줄 열기", [.returnKey]),
+        row(.library, "목록 선택 이동", [.up, .down]),
+        ShortcutEntry(group: .library, action: "컨트롤 사이 이동", keys: .typed(["⇥", "/", "⇧⇥"]), command: nil),
+    ]
+
     /// 편집기(`Editor` 모듈)가 스스로 받는 키. 여기서는 표에 보일 내용만 든다.
     private static let editing: [ShortcutEntry] = [
-        row(.editing, "들여쓰기 (하위 계층으로)", [.tab]),
+        row(.editing, "현재 줄 날짜 제안 받기", [.tab]),
+        row(.editing, "날짜 제안만 닫기", [.escape]),
+        row(.editing, "들여쓰기 (날짜 제안이 없을 때)", [.tab]),
         row(.editing, "내어쓰기", [.tab], [.shift]),
         row(.editing, "투두로 바꾸기", [.nine], [.shift, .command]),
         row(.editing, "완료 표시", [.returnKey], [.command]),
@@ -149,7 +158,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
     private static let markdownInput: [ShortcutEntry] = [
         typed("제목 1, 2, 3", ["#", "##", "###"]),
         typed("글머리표", ["-"]),
-        typed("투두", ["[]"]),
+        typed("투두", ["[]", "[ ]"]),
         typed("토글", [">"]),
         typed("인용문", ["\"", "|"]),
         typed("굵게", ["**글자**"]),

@@ -119,9 +119,9 @@ import Testing
             menu.performActionForItem(at: index)
         }
         // 여는 화면이 아직 이어지지 않은 항목(AI 패널, 설정, 단축키)은 자리에 그대로 있되 고를 수 없다.
-        #expect(chosen == [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden])
+        #expect(chosen == [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .settings, .shortcuts])
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
-            "AI 패널", "설정", "단축키",
+            "AI 패널",
         ])
     }
 
@@ -139,11 +139,11 @@ import Testing
         let items = visible(in: menu)
         let titles = items.map(\.title)
         for title in StatusMenuModel.entries(areNotesHidden: false).compactMap(\.title) where title != "종료" {
-            #expect(titles.contains(title), "\(title)")
+            #expect(titles.contains(title == "설정" ? "설정..." : title), "\(title)")
         }
         #expect(titles.contains("Float 종료"))
 
-        for title in ["빠른 캡처", "노트 찾기", "라이브러리", "AI 패널", "설정", "단축키", "새 노트", "노트 모두 숨기기"] {
+        for title in ["빠른 캡처", "노트 찾기", "라이브러리", "AI 패널", "설정...", "단축키", "새 노트", "노트 모두 숨기기"] {
             let item = try #require(items.first { $0.title == title })
             item.menu.performActionForItem(at: item.index)
         }

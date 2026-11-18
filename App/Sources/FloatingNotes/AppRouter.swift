@@ -1,5 +1,6 @@
 import Models
 import Foundation
+import FloatSettings
 import NotePanel
 import Library
 import Reminders
@@ -13,8 +14,8 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor: true
-        case .openAIPanel, .openSettings, .openShortcuts: false
+        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
+        case .openAIPanel: false
         }
     }
 }
@@ -30,6 +31,7 @@ final class AppRouter: Routing {
     /// 조립할 때 넣는다. `NotePanelCoordinator`가 이 라우터를 들고 있으므로 약하게 든다.
     weak var notePanels: NotePanelCoordinator?
     /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
+    weak var settingsWindow: SettingsCoordinator?
     weak var reminders: ReminderEditorCoordinator?
     weak var library: LibraryCoordinator?
     weak var quickPanels: QuickPanels?
@@ -79,7 +81,11 @@ final class AppRouter: Routing {
                 guard let reminders, let anchor = notePanels.reminderAnchor(for: id) else { return logUnhandled(route) }
                 notePanels.flushPendingEdits()
                 try reminders.show(id, anchor: anchor)
-            case .openAIPanel, .openSettings, .openShortcuts:
+            case .openSettings, .openShortcuts:
+                guard let settingsWindow else { return logUnhandled(route) }
+                settingsWindow.show(route == .openShortcuts ? .shortcuts : nil)
+                activateApp()
+            case .openAIPanel:
                 return logUnhandled(route)
             }
             return .handled

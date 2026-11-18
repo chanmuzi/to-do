@@ -31,7 +31,7 @@ enum MainMenu {
         menu.addItem(submenu(
             title: appName,
             items: [plain("\(appName)에 관하여", #selector(NSApplication.orderFrontStandardAboutPanel(_:)))]
-                + [.separator()] + command("설정", .settings) + [.separator()]
+                + [.separator()] + command("설정...", .settings) + [.separator()]
                 + standard("\(appName) 종료", #selector(NSApplication.terminate(_:)), KeyChord(.q, .command))
         ))
         menu.addItem(submenu(

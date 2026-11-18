@@ -6,6 +6,7 @@ import Models
 import Routing
 import Library
 import Scheduling
+import FloatSettings
 import Reminders
 import Theme
 
@@ -74,6 +75,7 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var settingsWindow: SettingsCoordinator?
     weak var reminderEditor: ReminderEditorCoordinator?
     weak var fakeCalendar: FakeCalendarBridge?
     weak var library: LibraryCoordinator?
@@ -271,6 +273,23 @@ final class DebugControl {
             }
         case ("library-open", let id?, _):
             if let note = library?.model.rows.first(where: { $0.id == id }) { library?.model.open(note) }
+        case ("settings-pane", let pane?, _):
+            guard let selection = SettingsPane(rawValue: pane.rawValue) else { return }
+            settingsWindow?.show(selection)
+        case ("settings-snapshot", let name?, _):
+            guard let url = output(named: name.rawValue) else { return }
+            write(settingsWindow?.window, to: url)
+        case ("settings-fake-access", let mode?, _) where isPassive:
+            fakeCalendar?.accessByKind = mode.rawValue == "new" ? [.event: .needsRequest, .reminder: .needsRequest] : [:]
+        case ("settings-appearance", let value?, _) where isPassive:
+            guard ["light", "dark", "system"].contains(value.rawValue) else { return }
+            settingsWindow?.model.change { $0.appearance = value.rawValue }
+        case ("settings-destination", let kind?, let id?) where isPassive:
+            guard let kind = ScheduleItem.Kind(rawValue: kind.rawValue) else { return }
+            settingsWindow?.model.choose(id, for: kind)
+        case ("settings-connect", let kind?, _) where isPassive:
+            guard let kind = ScheduleItem.Kind(rawValue: kind.rawValue) else { return }
+            Task { await settingsWindow?.model.connect(kind) }
         case ("library-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
             write(library?.window, to: url)

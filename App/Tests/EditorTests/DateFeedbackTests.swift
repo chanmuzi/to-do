@@ -34,6 +34,20 @@ import DateTime
                 [source.hasPrefix("회의") ? "내일 오후 3시" : "오늘 오후 1시"])
     }
 
+    @Test func disablingRecognitionClearsAnOpenEditor() throws {
+        let h = try EditorHarness("회의 내일 오후 3시")
+        h.editor.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+        h.caret(at: h.editor.text.utf16.count)
+        #expect(h.controller.dateSuggestion != nil)
+        h.editor.configuration.recognizesDates = false
+        #expect(h.controller.dateSuggestion == nil)
+        h.type(" 회의")
+        #expect(!h.controller.acceptDateSuggestion())
+        #expect(h.editor.text.contains("내일 오후 3시"))
+        h.editor.configuration.recognizesDates = true
+        #expect(h.controller.dateSuggestion != nil)
+    }
+
     @Test func explicitPastAndBareClock() throws {
         #expect(InlineDateProposal.find(in: "오늘 오후 1시", caret: "오늘 오후 1시".utf16.count, now: now(14), calendar: calendar) == nil)
         let source = "오후 1시"

@@ -88,7 +88,7 @@ import Theme
     /// 눌러도 아무 일이 없는 항목을 내놓지 않는다(D-034). 메뉴 막대 메뉴, 앱 메뉴 모두 같다.
     @Test func entriesForUnconnectedScreensAreDisabledNotRemoved() throws {
         defer { fixture.cleanUp() }
-        let unconnected: Set<StatusMenuAction> = [.aiPanel, .settings, .shortcuts]
+        let unconnected: Set<StatusMenuAction> = [.aiPanel]
         let connected: [StatusMenuAction] = [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .quit]
         #expect(connected.filter(\.isConnected) == connected)
         #expect(unconnected.filter(\.isConnected).isEmpty)
@@ -99,13 +99,13 @@ import Theme
             menu, with: StatusMenuModel.entries(areNotesHidden: false)
         ) { chosen.append($0) }
         let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
-        #expect(disabled == ["AI 패널", "설정", "단축키"])
+        #expect(disabled == ["AI 패널"])
         // 고를 수 없는 항목은 눌러도 동작이 가지 않는다(고를 수 있는 항목은 위의 시험이 본다).
         let library = try #require(menu.items.firstIndex { $0.title == "AI 패널" })
         menu.performActionForItem(at: library)
         #expect(chosen.isEmpty)
         #expect(menu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title) == [
-            "새 노트", "빠른 캡처", "노트 찾기", "라이브러리", "노트 모두 숨기기", "종료",
+            "새 노트", "빠른 캡처", "노트 찾기", "라이브러리", "노트 모두 숨기기", "설정", "단축키", "종료",
         ])
 
         // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
@@ -114,11 +114,11 @@ import Theme
         func validity(_ title: String) throws -> Bool {
             fixture.commands.validateMenuItem(try #require(items.first { $0.title == title && !$0.isHidden }))
         }
-        for title in ["AI 패널", "설정", "단축키"] {
+        for title in ["AI 패널"] {
             let isValid = try validity(title)
             #expect(!isValid, "\(title)")
         }
-        for title in ["새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "창 닫기"] {
+        for title in ["새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "창 닫기", "설정...", "단축키"] {
             let isValid = try validity(title)
             #expect(isValid, "\(title)")
         }

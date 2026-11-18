@@ -11,6 +11,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     var onEditingChange: ((Bool) -> Void)?
     /// Return으로 끝냈을 때.
     var onReturn: (() -> Void)?
+    var recognizesDates = true { didSet { if oldValue != recognizesDates { updateDateSuggestion() } } }
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
     var dateSuggestion: InlineDateProposal?

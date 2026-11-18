@@ -1,5 +1,6 @@
 import AppKit
 import Scheduling
+import FloatSettings
 import Reminders
 import NotePanel
 import Library
@@ -15,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var schedules: ScheduleService?
     private var reminderEditor: ReminderEditorCoordinator?
     private var fakeCalendar: FakeCalendarBridge?
+    private var settingsWindow: SettingsCoordinator?
     private var library: LibraryCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -83,6 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             let schedules = ScheduleService(notes: environment.notes, notifier: notifier,
                                             makeBridge: makeBridge, log: AppLog.warning)
+            schedules.preferredID = { [settings = environment.settings] in settings.settings[idFor: $0] }
             try schedules.start()
             self.schedules = schedules
             reminderEditor.destination = { [weak schedules] item in schedules?.destination(for: item) }
@@ -122,7 +125,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if let error { Task { @MainActor in library?.model.error = error.localizedDescription } }
                 }
             }
-            schedules.calendarChanged = { [weak library] in
+            let settingsWindow = makeSettingsWindow(environment: environment, schedules: schedules)
+            self.settingsWindow = settingsWindow
+            router.settingsWindow = settingsWindow
+            schedules.calendarChanged = { [weak self, weak library, weak reminderEditor] in
+                self?.refreshSettingsCalendars()
+                if let reminderEditor { reminderEditor.model?.destination = reminderEditor.destination }
                 if library?.window?.isVisible == true { library?.model.refreshCalendar() }
             }
             library.beforeMove = { [weak notePanels] in notePanels?.flushPendingEdits() }
@@ -131,15 +139,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #endif
             router.library = library
             self.library = library
-            let priorSettingsChange = environment.settings.onChange
-            let applyDisplay: (AppSettings) -> Void = { [weak notePanels, weak library, weak reminderEditor] settings in
-                let options = NoteDisplayOptions(dateFormat: .init(rawValue: settings.scheduleDateFormat) ?? .relative)
-                notePanels?.displayOptions = options
-                library?.model.displayOptions = options
-                reminderEditor?.displayOptions = options
-            }
-            applyDisplay(environment.settings.settings)
-            environment.settings.onChange = { settings in priorSettingsChange?(settings); applyDisplay(settings) }
+            refreshSettingsCalendars()
+            SettingsApplication.follow(environment.settings, theme: environment.theme,
+                appearanceOverride: options.appearance, setAppearance: { NSApp.appearance = $0 },
+                applyDisplay: { [weak notePanels, weak library, weak reminderEditor] display, recognizesDates in
+                    notePanels?.recognizesDates = recognizesDates
+                    notePanels?.displayOptions = display
+                    library?.model.displayOptions = display
+                    reminderEditor?.displayOptions = display
+                    if let reminderEditor { reminderEditor.model?.destination = reminderEditor.destination }
+                }, showMenuIcon: { [weak self] shown in
+                    guard let self else { return }
+                    menuBarIcon?.apply(shown: options.menuBarIconOverride ?? shown)
+                })
             router.quickPanels = quickPanels
             self.router = router
             self.notePanels = notePanels
@@ -187,6 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 이어 쓴다. 노트를 눌러 앞으로 온 것이면 그 누름이 그 노트를 키 창으로 만든다. 누름은 이 알림 뒤에 처리되므로
     /// 한 차례 미뤄 본다: 그때 키 창인 노트가 있으면 아무것도 하지 않는다. 켜면서 오는 활성화는 뺀다(D-025).
     func applicationDidBecomeActive(_ notification: Notification) {
+        refreshSettingsCalendars()
         do {
             try environment?.notes.refresh()
         } catch {
@@ -268,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             AppLog.warning("메뉴 막대 아이콘 설정을 저장하지 못했습니다: \(error)")
         }
-        menuBarIcon?.apply(shown: shown)
+
     }
 
     private func makeMenuBarIconSwitch(
@@ -331,6 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
+        control.settingsWindow = settingsWindow
         control.reminderEditor = reminderEditor
         control.fakeCalendar = fakeCalendar
         control.library = library
@@ -345,6 +359,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         debugControl = control
     }
     #endif
+
+    private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
+        let store = environment.settings
+        let table = ShortcutTable.standard
+        let sections = ShortcutGroup.allCases.map { group in
+            let title = group == .aiPanel ? "AI 패널 (예정)" : group == .global ? "어디서나" : group.rawValue
+            return ShortcutSection(title, rows: table.entries(in: group).map { entry in
+                let action = entry.command?.isConnected == false ? entry.action + " (예정)" : entry.action
+                return (action, entry.keyLabels.joined(separator: group == .markdownInput ? " 또는 " : " "))
+            })
+        }
+        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+                                  shortcuts: sections) { [usesFake = options.usesFakeCalendar] kind in
+            guard !usesFake else { return }
+            let anchor = kind == .event ? "Privacy_Calendars" : "Privacy_Reminders"
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + anchor) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        let coordinator = SettingsCoordinator(model: model, theme: environment.theme)
+        #if DEBUG
+        coordinator.allowsKeyWindows = !options.debugIsPassive
+        #endif
+        return coordinator
+    }
+
+    private func refreshSettingsCalendars() {
+        guard let settingsWindow, let values = environment?.settings.settings,
+              settingsWindow.window?.isVisible == true || values.calendarID != nil || values.reminderListID != nil else { return }
+        settingsWindow.model.refreshCalendars()
+    }
 
     private func presentLaunchFailure(_ error: Error) {
         AppLog.warning("앱을 시작하지 못했습니다: \(error)")

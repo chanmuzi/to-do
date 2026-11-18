@@ -12,6 +12,35 @@ public final class EventKitBridge: CalendarBridge {
     private var observer: (any NSObjectProtocol)?
     private var requested: Set<ScheduleItem.Kind> = []
     public init() {}
+    public var preferredID: (ScheduleItem.Kind) -> String? = { _ in nil }
+
+    public func access(for kind: ScheduleItem.Kind) -> CalendarAccess {
+        switch EKEventStore.authorizationStatus(for: kind == .event ? .event : .reminder) {
+        case .fullAccess: .available
+        case .notDetermined: .needsRequest
+        default: .blocked
+        }
+    }
+    public func writableChoices(for kind: ScheduleItem.Kind) -> [CalendarChoice] {
+        guard access(for: kind) == .available else { return [] }
+        return store().calendars(for: kind == .event ? .event : .reminder)
+            .filter(\.allowsContentModifications)
+            .map { CalendarChoice(id: $0.calendarIdentifier, destination: destination(for: $0)) }
+            .sorted { $0.destination.name.localizedStandardCompare($1.destination.name) == .orderedAscending }
+    }
+    private func defaultCalendar(_ kind: ScheduleItem.Kind, in store: EKEventStore) -> EKCalendar? {
+        kind == .event ? store.defaultCalendarForNewEvents : store.defaultCalendarForNewReminders()
+    }
+    public func systemDefault(for kind: ScheduleItem.Kind) -> ScheduleDestination? {
+        guard access(for: kind) == .available else { return nil }
+        return defaultCalendar(kind, in: store()).map(destination(for:))
+    }
+    private func newItemCalendar(_ kind: ScheduleItem.Kind, in store: EKEventStore) -> EKCalendar? {
+        if let id = preferredID(kind), let calendar = store.calendar(withIdentifier: id),
+           calendar.allowsContentModifications,
+           calendar.allowedEntityTypes.contains(kind == .event ? .event : .reminder) { return calendar }
+        return defaultCalendar(kind, in: store)
+    }
 
     private func store() -> EKEventStore {
         if let storage { return storage }
@@ -30,7 +59,7 @@ public final class EventKitBridge: CalendarBridge {
             guard let existing = try? find(item, in: store) else { return nil }
             calendar = existing.calendar
         } else {
-            calendar = item.kind == .event ? store.defaultCalendarForNewEvents : store.defaultCalendarForNewReminders()
+            calendar = newItemCalendar(item.kind, in: store)
         }
         guard let calendar else { return nil }
         return destination(for: calendar)
@@ -55,8 +84,13 @@ public final class EventKitBridge: CalendarBridge {
         if status == .fullAccess { _ = store(); return true }
         guard status == .notDetermined, request, requested.insert(kind).inserted else { return false }
         let granted: Bool
-        if kind == .event { granted = try await store().requestFullAccessToEvents() }
-        else { granted = try await store().requestFullAccessToReminders() }
+        do {
+            if kind == .event { granted = try await store().requestFullAccessToEvents() }
+            else { granted = try await store().requestFullAccessToReminders() }
+        } catch {
+            requested.remove(kind)
+            throw error
+        }
         return granted
     }
     private func authorizedStore(_ kind: ScheduleItem.Kind) throws -> EKEventStore {
@@ -104,11 +138,11 @@ public final class EventKitBridge: CalendarBridge {
         if let existing, isSameKind { value = existing }
         else if item.kind == .event {
             let event = EKEvent(eventStore: store)
-            guard let calendar = store.defaultCalendarForNewEvents else { throw CalendarBridgeError.noDefaultCalendar }
+            guard let calendar = newItemCalendar(.event, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
             event.calendar = calendar; value = event
         } else {
             let reminder = EKReminder(eventStore: store)
-            guard let calendar = store.defaultCalendarForNewReminders() else { throw CalendarBridgeError.noDefaultCalendar }
+            guard let calendar = newItemCalendar(.reminder, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
             reminder.calendar = calendar; value = reminder
         }
         guard value.calendar.allowsContentModifications else { throw CalendarBridgeError.readOnly }

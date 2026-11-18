@@ -8,6 +8,7 @@ import DateTime
 /// 본문 편집기의 표시 방식. 설정 화면이 생기면 거기서 바꾼다. 기본값은 `tokens.json`의 `display.defaults`와 같다.
 struct NoteEditorOptions: Hashable {
     /// 체크박스 모양(spec 6): 상자(기본) 또는 대괄호.
+    var recognizesDates = true
     var checkbox: CheckboxStyle = .box
     /// 인라인 코드의 글자색(spec 6, D-035): 코드 강조색(기본) 또는 무채색.
     var inlineCode: InlineCodeStyle = .accent
@@ -23,10 +24,12 @@ struct NoteEditorOptions: Hashable {
             checkbox: CheckboxStyle(rawValue: settings.checkbox) ?? .box,
             inlineCode: InlineCodeStyle(rawValue: settings.inlineCode) ?? .accent
         )
+        recognizesDates = settings.recognizesDates
     }
 
     /// 저장할 설정에 적는다.
     func write(to settings: inout AppSettings) {
+        settings.recognizesDates = recognizesDates
         settings.checkbox = checkbox.rawValue
         settings.inlineCode = inlineCode.rawValue
     }
@@ -79,7 +82,9 @@ final class NoteEditorFactory {
     }
 
     private var configuration: MarkdownEditorConfiguration {
-        MarkdownEditorConfiguration(checkboxStyle: options.checkbox, inlineCodeStyle: options.inlineCode)
+        var value = MarkdownEditorConfiguration(checkboxStyle: options.checkbox, inlineCodeStyle: options.inlineCode)
+        value.recognizesDates = options.recognizesDates
+        return value
     }
 
     private var liveEditors: [MarkdownBodyEditor] {

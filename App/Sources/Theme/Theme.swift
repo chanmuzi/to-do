@@ -22,6 +22,7 @@ public final class Theme {
     /// 앱이 켤 때 모아서 기록한다. 문제가 없었으면 비어 있다.
     public let loadWarnings: [String]
 
+    @ObservationIgnored private var bodyOverrides = ThemeOverrides()
     @ObservationIgnored private let baseTokens: ThemeTokens
     @ObservationIgnored private let overrideStore: ThemeOverrideStore?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
@@ -56,10 +57,23 @@ public final class Theme {
 
     /// 덮어쓰기를 통째로 바꾼다. 값이 잘못됐으면 던지고 아무것도 바꾸지 않는다.
     public func setOverrides(_ newOverrides: ThemeOverrides) throws {
-        let newTokens = try baseTokens.applying(newOverrides)
+        let stored = try baseTokens.applying(newOverrides)
+        let newTokens = bodyOverrides.isEmpty ? stored : try stored.applying(bodyOverrides)
         try overrideStore?.save(newOverrides)
         overrides = newOverrides
         tokens = newTokens
+        notifyChange()
+    }
+
+    /// 기존 테마 파일 위에 앱 설정의 본문 치수만 얹는다. 저장은 AppSettingsStore가 맡는다.
+    public func applyBodyTypography(size: Int?, lineHeight: Int?) throws {
+        var effective = ThemeOverrides()
+        if let size { effective = effective.setting("type.fs-body", to: "\(size)px") }
+        if let lineHeight { effective = effective.setting("type.lh-body", to: "\(lineHeight)px") }
+        let next = try baseTokens.applying(overrides).applying(effective)
+        bodyOverrides = effective
+        guard next != tokens else { return }
+        tokens = next
         notifyChange()
     }
 
