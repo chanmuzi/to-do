@@ -84,6 +84,15 @@ public final class MarkdownEditor {
         set { controller.onTextChange = newValue }
     }
 
+    public var onFocusTitle: (() -> Void)? {
+        get { controller.onFocusTitle }
+        set { controller.onFocusTitle = newValue }
+    }
+
+    public func scheduleRemoved(fromBodyLine line: Int) {
+        controller.scheduleRemoved(fromBodyLine: line)
+    }
+
     public var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)? {
         get { controller.onAcceptDate }
         set { controller.onAcceptDate = newValue }

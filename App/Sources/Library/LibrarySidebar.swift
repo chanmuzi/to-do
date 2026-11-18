@@ -78,7 +78,7 @@ struct LibrarySidebar: View {
         switch entry {
         case .note(let note, _):
             let title = item.title.isEmpty ? LibraryPreview(note).upcomingTitle(for: item) : item.title
-            LibrarySelectableRow(model: model, note: note, label: presentation.accessibilityLabel(title: title)) {
+            LibrarySelectableRow(model: model, note: note, label: presentation.accessibilityLabel(title: title), isUpcoming: true) {
                 upcomingLabel(title, item: item, presentation: presentation, destination: model.markerDestination(for: item))
             }
         case .calendar(let event):

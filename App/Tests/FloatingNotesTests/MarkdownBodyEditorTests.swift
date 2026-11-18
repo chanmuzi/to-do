@@ -3,6 +3,8 @@ import AppKit
 import Models
 import NotePanel
 import Store
+import Scheduling
+import Reminders
 import Testing
 import Theme
 @testable import FloatingNotes
@@ -563,5 +565,100 @@ import Theme
         try fixture.notes.flushPendingSaves()
         #expect(try fixture.fileText(id).hasSuffix("처음한\n캡처"))
         #expect(view.string == "처음한\n캡처")
+    }
+}
+
+extension MarkdownBodyEditorTests {
+    @Test(arguments: [false, true], [false, true])
+    func registerSameLineAfterDeletion(externally: Bool, dismissed: Bool) async throws {
+        defer { fixture.cleanUp() }
+        let bridge = FakeCalendarBridge()
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { bridge })
+        try service.start()
+        defer { service.stop() }
+        let writer = InlineScheduleWriter(notes: fixture.notes, service: service)
+        fixture.editors.onAcceptDate = { id, request in try writer.accept(request, in: id) }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "등록", body: "회의"))
+        adapter.editor.forcesActiveAppearance = true
+        adapter.focus()
+        func accept() async throws -> String {
+            if adapter.text == "회의" { type(" 내일 3시~4시", into: adapter) }
+            #expect(adapter.editor.textView.accessibilityHelp()?.contains("일정") == true)
+            adapter.editor.textView.doCommand(by: #selector(NSResponder.insertTab(_:)))
+            adapter.flushPendingChange()
+            await service.flush()
+            #expect(adapter.text == "회의")
+            let items = try fixture.notes.load(id).schedules
+            #expect(items.count == 1)
+            return try #require(items.first?.id)
+        }
+        let first = try await accept()
+        if dismissed {
+            type(" 내일 3시~4시", into: adapter)
+            adapter.editor.textView.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+            #expect(adapter.editor.textView.accessibilityHelp() == nil)
+            adapter.flushPendingChange()
+        }
+        if externally {
+            bridge.deleteExternally(first)
+        } else {
+            let clock = try ReminderEditorModel(noteID: id, notes: fixture.notes)
+            clock.select(first)
+            #expect(clock.remove())
+        }
+        await service.flush()
+        #expect(try fixture.notes.load(id).schedules.isEmpty)
+        let second = try await accept()
+        #expect(first != second)
+        #expect(Set(bridge.items.keys) == [second])
+    }
+
+    @Test(arguments: ["", "첫 줄"])
+    func backtabAtStartFocusesTitle(body: String) throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "제목", body: body))
+        adapter.focus()
+        adapter.editor.selectedRange = NSRange(location: 0, length: 0)
+        adapter.editor.textView.doCommand(by: #selector(NSResponder.insertBacktab(_:)))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let title = try #require(window.firstResponder as? NSTextView)
+        #expect(title !== adapter.editor.textView)
+        #expect(title.string == "제목")
+        #expect(adapter.text == body)
+        title.doCommand(by: #selector(NSResponder.insertTab(_:)))
+        #expect(window.firstResponder === adapter.editor.textView)
+    }
+}
+
+extension MarkdownBodyEditorTests {
+    @Test func windowDispatchesBoldForSelectionAndEmptyPair() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "서식", body: "한글"))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let editor = adapter.editor
+        editor.forcesActiveAppearance = true
+        adapter.focus()
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
+            timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "ㅠ",
+            charactersIgnoringModifiers: "ㅠ", isARepeat: false, keyCode: 11))
+        func pressBold() {
+            let handled = window.performKeyEquivalent(with: event) || menu.performKeyEquivalent(with: event)
+            #expect(handled)
+        }
+        editor.selectedRange = NSRange(location: 0, length: 2)
+        pressBold()
+        #expect(adapter.text == "**한글**")
+        pressBold()
+        #expect(adapter.text == "한글")
+        editor.selectedRange = NSRange(location: 2, length: 0)
+        pressBold()
+        #expect(adapter.text == "한글****")
+        #expect(editor.selectedRange == NSRange(location: 4, length: 0))
+        pressBold()
+        #expect(adapter.text == "한글")
+        pressBold()
+        editor.textView.insertText("가", replacementRange: editor.selectedRange)
+        #expect(adapter.text == "한글**가**")
     }
 }

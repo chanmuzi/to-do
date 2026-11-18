@@ -300,9 +300,9 @@ private typealias Key = EditorShortcuts.Key
         let h = try EditorHarness("가 ")
         h.caret(atEndOfLine: 0)
         #expect(h.key(Key.b, "b", .command))
-        // 원문은 아직 그대로다.
-        #expect(h.marked == "가 |")
-        #expect(h.changes.isEmpty)
+        // 빈 기호 쌍도 한 번의 편집으로 저장한다.
+        #expect(h.marked == "가 **|**")
+        #expect(h.changes.last == "가 ****")
         h.type("굵")
         #expect(h.marked == "가 **굵|**")
         h.type("게")
@@ -312,16 +312,29 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.marked == "가 **굵게**|")
         h.type(" 나")
         #expect(h.marked == "가 **굵게** 나|")
-        // 기호와 첫 글자는 한 번에 되돌려진다(빈 기호 쌍이 남지 않는다).
+        // 첫 글자와 기호 삽입을 각각 되돌리고 다시 한다.
         for _ in 0..<3 { h.undo() }
         #expect(h.editor.text == "가 **굵**")
+        h.undo()
+        #expect(h.marked == "가 **|**")
         h.undo()
         #expect(h.marked == "가 |")
         #expect(!h.editor.undoManager.canUndo)
         h.redo()
+        h.redo()
         #expect(h.editor.text == "가 **굵**")
         for _ in 0..<3 { h.redo() }
         #expect(h.editor.text == "가 **굵게** 나")
+    }
+
+    @Test func boldCanBeCancelledAfterUndoRestoresItsEmptyPair() throws {
+        let h = try EditorHarness.at("가 |")
+        h.perform(.bold)
+        h.type("나")
+        h.undo()
+        #expect(h.marked == "가 **|**")
+        h.perform(.bold)
+        #expect(h.marked == "가 |")
     }
 
     @Test func eachShortcutTogglesItsOwnTypingAttribute() throws {

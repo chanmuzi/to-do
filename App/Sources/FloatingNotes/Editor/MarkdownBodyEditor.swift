@@ -71,6 +71,14 @@ final class MarkdownBodyEditor: NoteBodyEditing {
         saveFolds()
     }
 
+    func setTitleFocusAction(_ action: @escaping () -> Void) {
+        editor.onFocusTitle = action
+    }
+
+    func scheduleRemoved(fromBodyLine line: Int) {
+        editor.scheduleRemoved(fromBodyLine: line)
+    }
+
     func focus() {
         editor.focus()
     }

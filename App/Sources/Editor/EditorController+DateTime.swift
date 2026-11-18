@@ -59,6 +59,12 @@ extension EditorController {
         textView.setAccessibilityHelp(message)
     }
 
+    func scheduleRemoved(fromBodyLine line: Int) {
+        moveDateDismissals()
+        dismissedDateLines.removeValue(forKey: line)
+        updateDateSuggestion()
+    }
+
     func dismissCurrentDateLine() {
         let index = document.lineIndex(at: selectedRange.location)
         dismissedDateLines[index] = document.string(in: document.lines[index].range)
@@ -91,9 +97,8 @@ extension EditorController {
 
     /// 미리 계산한 원문 편집만 실행한다. 실패하면 원문/기록 모두 손대지 않는다.
     func acceptDateSuggestion() -> Bool {
-        guard dateSuggestion != nil else { return false }
         updateDateSuggestion()
-        guard let proposal = dateSuggestion, let accept = onAcceptDate else { return true }
+        guard let proposal = dateSuggestion, let accept = onAcceptDate else { return false }
         let old = document
         let index = old.lineIndex(at: selectedRange.location)
         let line = old.lines[index]

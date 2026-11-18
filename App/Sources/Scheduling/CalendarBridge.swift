@@ -49,6 +49,8 @@ public enum CalendarBridgeError: Error, LocalizedError {
 public final class FakeCalendarBridge: CalendarBridge {
     public var onChange: (@MainActor () -> Void)?
     public var items: [String: ScheduleItem] = [:]
+    public private(set) var openedURL: URL?
+    public func open(_ url: URL) { openedURL = url }
     public var isAllowed = true { didSet { if oldValue != isAllowed { onChange?() } } }
     public var preferredID: (ScheduleItem.Kind) -> String? = { _ in nil }
     public var accessByKind: [ScheduleItem.Kind: CalendarAccess] = [:] { didSet { onChange?() } }

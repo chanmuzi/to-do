@@ -116,3 +116,18 @@ import Testing
         #expect(summary.completed == 2 && summary.total == 3)
     }
 }
+
+extension LibraryIndexTests {
+    @Test func reusedLocalIdentifierKeepsBothDestinations() {
+        var owner = note("연결 노트", day: 17)
+        var item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
+        item.link = .init(localID: "local", externalID: "original", kind: .event)
+        owner.schedules = [item]
+        var other = item
+        other.link = .init(localID: "local", externalID: "copy", kind: .event)
+        let external = CalendarEvent(item: other, destination: nil)
+        let rows = LibraryIndex(notes: [owner], events: [external], now: now, calendar: calendar).upcoming
+        #expect(rows.contains { if case .note(let note, _) = $0 { note.id == owner.id } else { false } })
+        #expect(rows.contains { if case .calendar(let event) = $0 { event == external } else { false } })
+    }
+}

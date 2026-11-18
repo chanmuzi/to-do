@@ -7,6 +7,7 @@ final class NoteRootView: NSView {
     let topRow: TopRowView
     let cornerButtons: CornerButtonsView
     let background: NoteBackgroundView
+    private var hoverTracking: NSTrackingArea?
     var onHoverChange: ((Bool) -> Void)?
     /// 배치가 끝난 뒤. 배치 도중에 알게 된 내용 높이를 이때 창에 반영한다.
     var onLayout: (() -> Void)?
@@ -141,14 +142,20 @@ final class NoteRootView: NSView {
 
     // MARK: - 호버
 
-    /// 영역은 한 번만 건다(`.inVisibleRect`라 창 크기를 따라간다). 크기가 바뀔 때마다 새로 걸면 마우스가 이미
-    /// 안에 있을 때 들어왔다는 알림이 오지 않는다.
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        guard window != nil, trackingAreas.isEmpty else { return }
-        addTrackingArea(NSTrackingArea(
-            rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self
-        ))
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if hoverTracking == nil {
+            let area = NSTrackingArea(rect: .zero,
+                options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect, .enabledDuringMouseDrag],
+                owner: self)
+            addTrackingArea(area)
+            hoverTracking = area
+        }
+        syncHover()
+    }
+
+    func syncHover() {
+        onHoverChange?(containsPointer)
     }
 
     /// 버튼마다 마우스가 그 위에 있는지 다시 잰다. 창이 뜬 직후나 마우스가 창으로 들어온 순간에는
@@ -160,6 +167,7 @@ final class NoteRootView: NSView {
         buttons(in: self).forEach { $0.syncPointerInside() }
     }
 
-    override func mouseEntered(with event: NSEvent) { onHoverChange?(true) }
-    override func mouseExited(with event: NSEvent) { onHoverChange?(false) }
+    override func mouseEntered(with event: NSEvent) { syncHover() }
+    override func mouseExited(with event: NSEvent) { syncHover() }
+    override func mouseMoved(with event: NSEvent) { syncHover() }
 }

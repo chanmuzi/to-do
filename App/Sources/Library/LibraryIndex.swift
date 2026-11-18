@@ -50,15 +50,18 @@ public struct LibraryIndex: Sendable {
             }
         }
         // 다른 캘린더에 복사한 일정은 같은 외부 ID를 가질 수 있다.
-        let localIDs = Set(events.compactMap { $0.item.link?.localID })
-        let externalIDs = Dictionary(grouping: events.compactMap { $0.item.link }, by: \.externalID)
+        func sameLocalItem(_ a: ScheduleItem.Link, _ b: ScheduleItem.Link) -> Bool {
+            a.localID == b.localID && (a.externalID == nil || b.externalID == nil || a.externalID == b.externalID)
+        }
+        let links = events.compactMap { $0.item.link }
+        let externalIDs = Dictionary(grouping: links, by: \.externalID)
             .mapValues { Set($0.map(\.localID)) }
         for event in events where event.item.kind == .event && included(event.item) {
             let duplicate = linked.contains { item in
                 guard let a = item.link, let b = event.item.link,
                       !event.recurring || item.start == event.item.start else { return false }
-                if a.localID == b.localID { return true }
-                guard !localIDs.contains(a.localID), let external = a.externalID else { return false }
+                if sameLocalItem(a, b) { return true }
+                guard let external = a.externalID, !links.contains(where: { sameLocalItem(a, $0) }) else { return false }
                 return external == b.externalID && externalIDs[external]?.count == 1
             }
             if !duplicate { rows.append(.calendar(event)) }
@@ -69,7 +72,7 @@ public struct LibraryIndex: Sendable {
                 if row.id == other.id { return true }
                 guard row.item.kind == .event, row.item.start == other.item.start,
                       let a = row.item.link, let b = other.item.link else { return false }
-                return a.localID == b.localID
+                return sameLocalItem(a, b)
             }
             if !duplicate { result.append(row) }
             if result.count == 5 { break }

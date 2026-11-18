@@ -23,6 +23,7 @@ nonisolated struct EditorStyle {
         }
     }
 
+    let bodyParagraph: NSParagraphStyle
     let body: TextFont
     let strong: NSFont
     let headings: [TextFont]
@@ -79,6 +80,10 @@ nonisolated struct EditorStyle {
         metrics = EditorVisualMetrics(theme: theme)
         func color(_ token: ColorToken) -> NSColor { theme.rgba(token).nsColor }
         body = TextFont(theme.nsFont(.body), lineHeight: theme.lineHeight(.body))
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = body.lineHeight
+        paragraph.maximumLineHeight = body.lineHeight
+        bodyParagraph = paragraph
         strong = theme.nsFont(.strong)
         headings = [TextStyle.h1, .h2, .h3].map { TextFont(theme.nsFont($0), lineHeight: theme.lineHeight($0)) }
         headingTracking = [TextStyle.h1, .h2, .h3].map { theme.tracking($0) }

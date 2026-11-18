@@ -153,6 +153,7 @@ import Testing
     @Test func noteWindowIsAnActivatingWindowThatStaysVisible() {
         let panel = NotePanelWindow(contentRect: NSRect(x: 0, y: 0, width: 340, height: 100))
         defer { panel.close() }
+        panel.orderFront(nil)
         #expect(!panel.styleMask.contains(.nonactivatingPanel))
         #expect(panel.canBecomeKey)
         #expect(panel.canBecomeMain)

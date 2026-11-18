@@ -92,3 +92,47 @@ import Theme
         }
     }
 }
+
+extension TitleFieldInputTests {
+    @Test func emptyTitleKeepsFirstRectAfterTypingAndDeleting() throws {
+        try withField { field, _ in
+            field.endEditing()
+            field.beginEditing(title: "")
+            let view = try #require(field.currentEditor() as? NSTextView)
+            func rect() -> NSRect {
+                view.firstRect(forCharacterRange: view.selectedRange(), actualRange: nil)
+            }
+            let empty = rect()
+            view.insertText("가", replacementRange: view.selectedRange())
+            let typed = rect()
+            #expect(typed.height > 0)
+            #expect(empty.minY == typed.minY && empty.height == typed.height)
+            view.deleteBackward(nil)
+            #expect(view.string.isEmpty)
+            #expect(rect().minY == typed.minY && rect().height == typed.height)
+            field.endEditing()
+            #expect(field.titleCursor == .arrow)
+        }
+    }
+
+    @Test func markedTitleKeepsCompositionWithoutDecoration() throws {
+        try withField { _, view in
+            let position = view.selectedRange()
+            let marked = NSAttributedString(string: "ㅎ", attributes: [.underlineStyle: NSUnderlineStyle.single.rawValue,
+                .foregroundColor: NSColor.red, .backgroundColor: NSColor.green])
+            view.setMarkedText(marked, selectedRange: NSRange(location: 1, length: 0), replacementRange: position)
+            #expect(view.hasMarkedText())
+            #expect(view.markedTextAttributes?[.underlineStyle] as? Int == 0)
+            #expect(view.markedTextAttributes?[.foregroundColor] == nil)
+            #expect(view.markedTextAttributes?[.backgroundColor] == nil)
+            let stored = try #require(view.textStorage?.attributes(at: view.markedRange().location, effectiveRange: nil))
+            #expect((stored[.underlineStyle] as? Int ?? 0) == 0)
+            #expect(stored[.foregroundColor] as? NSColor != NSColor.red && stored[.backgroundColor] == nil)
+            let drawn = view.layoutManager?.temporaryAttributes(atCharacterIndex: view.markedRange().location, effectiveRange: nil)
+            #expect((drawn?[.underlineStyle] as? Int ?? 0) == 0)
+            #expect(drawn?[.foregroundColor] == nil && drawn?[.backgroundColor] == nil)
+            view.insertText("한", replacementRange: view.markedRange())
+            #expect(view.string == "제목한" && !view.hasMarkedText())
+        }
+    }
+}

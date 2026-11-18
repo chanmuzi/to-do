@@ -202,11 +202,13 @@ final class NoteWindowController: NSObject {
     private func connect() {
         panel.onMouseDown = { [unowned self] in coordinator?.endTrashUndo() }
         root.onHoverChange = { [unowned self] inside in
+            guard isPointerInside != inside else { return }
             isPointerInside = inside
             refreshChrome(animated: true)
             if inside { root.syncButtonHover() }
         }
         panel.onButtonPress = { [unowned self] in coordinator?.noteButtonPressed() }
+        editor.setTitleFocusAction { [weak self] in self?.root.topRow.beginTitleEditing() }
         editor.onTextChange = { [unowned self] text in
             exchangedBody = text
             mutate(deferred: true) { $0.body = text }

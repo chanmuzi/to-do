@@ -64,6 +64,33 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
+    @Test func statusMenuSettingsPreservesHiddenAndClosedNotes() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        defer { settings.window?.close() }
+        let router = AppRouter()
+        router.notePanels = fixture.notePanels
+        router.settingsWindow = settings
+        let dispatcher = AppCommandDispatcher(router: router, notePanels: fixture.notePanels)
+        let (hidden, _) = try fixture.open(NoteDraft(body: "숨김"))
+        let (closed, _) = try fixture.open(NoteDraft(body: "닫힘"))
+        fixture.notePanels.closeWindow(closed)
+        fixture.notePanels.toggleAllHidden()
+        let menu = NSMenu()
+        StatusMenuBuilder(theme: fixture.theme).fill(menu, with: StatusMenuModel.entries(areNotesHidden: true)) { dispatcher.performStatusMenu($0) }
+        let index = try #require(menu.items.firstIndex { $0.title == "설정" })
+        menu.performActionForItem(at: index)
+        #expect(settings.window?.isVisible == true)
+        #expect(fixture.notePanels.areNotesHidden)
+        #expect(fixture.notePanels.window(for: hidden)?.isVisible == false)
+        #expect(fixture.notePanels.window(for: closed) == nil)
+    }
+
     @Test func savedChangesReachAnOpenNoteAndLibrary() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }

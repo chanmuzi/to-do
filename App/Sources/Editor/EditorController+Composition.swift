@@ -24,6 +24,12 @@ extension EditorController {
         codeTag = nil
         let absorb = absorbRun
         absorbRun = nil
+        if let pair = currentEmptyBold {
+            let caret = selectedRange.location
+            pendingPair = (caret, document.string(in: NSRange(location: pair.range.location, length: caret - pair.range.location)),
+                           document.string(in: NSRange(location: caret, length: NSMaxRange(pair.range) - caret)))
+            return
+        }
         let original = clamped(textView.selectedRange())
         let selection = EditorCommands.normalized(document, original, replacement: "가")
         if selection != original { setSelection(selection) }

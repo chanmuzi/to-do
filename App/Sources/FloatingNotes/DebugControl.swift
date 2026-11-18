@@ -81,6 +81,7 @@ final class DebugControl {
     weak var library: LibraryCoordinator?
     var setScheduleDateFormat: (String) -> Void = { _ in }
     var reopen: () -> Void = {}
+    var simulateActivation: () -> Void = {}
     var toastWindow: () -> NSWindow? = { nil }
     var toastAction: () -> Void = {}
     private var statusItem: StatusItemController? { currentStatusItem() }
@@ -259,6 +260,7 @@ final class DebugControl {
         case ("library", _, _): router.route(.openLibrary)
         case ("library-close", _, _): library?.close()
         case ("reopen", _, _): reopen()
+        case ("simulate-activation", _, _) where isPassive: simulateActivation()
         case ("library-select", let target?, _):
             let value = target.rawValue
             switch value {
@@ -273,6 +275,8 @@ final class DebugControl {
             }
         case ("library-open", let id?, _):
             if let note = library?.model.rows.first(where: { $0.id == id }) { library?.model.open(note) }
+        case ("settings-close", _, _) where isPassive:
+            settingsWindow?.window?.close()
         case ("settings-pane", let pane?, _):
             guard let selection = SettingsPane(rawValue: pane.rawValue) else { return }
             settingsWindow?.show(selection)
@@ -797,6 +801,12 @@ final class DebugControl {
         }
         let document: [String: Any] = [
             "hidden": notePanels.areNotesHidden,
+            "settingsVisible": settingsWindow?.window?.isVisible == true,
+            "libraryVisible": library?.window?.isVisible == true,
+            "calendarURL": fakeCalendar?.openedURL?.absoluteString ?? "",
+            "orderedNotes": NSApp.orderedWindows.compactMap { window in
+                notePanels.openNoteIDs.first { notePanels.window(for: $0) === window }?.rawValue
+            },
             "appActive": NSApplication.shared.isActive,
             "appDisplayName": AppDelegate.displayName,
             "mainMenuTitles": NSApplication.shared.mainMenu?.items.map(\.title) ?? [],

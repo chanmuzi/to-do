@@ -177,3 +177,17 @@ extension AppSettingsTests {
         #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(value)).scheduleDateFormat == "absolute")
     }
 }
+
+extension AppSettingsTests {
+    @Test(arguments: ["none", "underline"])
+    func markedTextStyleSurvivesSettingsRoundTrip(value: String) throws {
+        let old = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        func encodedValue(_ settings: AppSettings) throws -> String? {
+            let encoded = try JSONEncoder().encode(settings)
+            return (try JSONSerialization.jsonObject(with: encoded) as? [String: Any])?["markedTextStyle"] as? String
+        }
+        #expect(try encodedValue(old) == "none")
+        let data = try JSONSerialization.data(withJSONObject: ["markedTextStyle": value])
+        #expect(try encodedValue(JSONDecoder().decode(AppSettings.self, from: data)) == value)
+    }
+}

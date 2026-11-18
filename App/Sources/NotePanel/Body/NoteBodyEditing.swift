@@ -50,6 +50,8 @@ public protocol NoteBodyEditing: AnyObject {
     var text: String { get set }
     var onTextChange: ((String) -> Void)? { get set }
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
+    func setTitleFocusAction(_ action: @escaping () -> Void)
+    func scheduleRemoved(fromBodyLine line: Int)
     /// 본문에 입력 커서를 둔다.
     func focus()
     /// 아직 `onTextChange`로 알리지 않은 변경이 있으면 지금 알린다.
@@ -69,6 +71,9 @@ public protocol NoteBodyEditing: AnyObject {
 }
 
 extension NoteBodyEditing {
+    public func setTitleFocusAction(_ action: @escaping () -> Void) {}
+    public func scheduleRemoved(fromBodyLine line: Int) {}
+
     public func appendFromOutside(_ suffix: String) {
         text += suffix
     }

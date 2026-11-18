@@ -144,3 +144,32 @@ import Theme
         #expect(h.theme.rgba(.accent).nsColor.greenComponent > 0.6)
     }
 }
+
+extension CaretTests {
+    @Test(arguments: ["|", "앞줄\n|", "앞줄\n\n|", "앞줄\n|\n끝", "- |", "[ ] |", "[x] |"], [false, true])
+    func emptyAndTypedCaretShareLineGeometry(source: String, resized: Bool) throws {
+        let h = try EditorHarness.at(source)
+        if resized { try h.theme.applyBodyTypography(size: 18, lineHeight: 30) }
+        func rect() throws -> NSRect {
+            h.controller.layoutManager.ensureLayout(for: h.controller.layoutManager.documentRange)
+            return try #require(h.controller.caretRect())
+        }
+        func inputRect() -> NSRect {
+            h.view.firstRect(forCharacterRange: h.editor.selectedRange, actualRange: nil)
+        }
+        let empty = try rect()
+        let emptyInput = inputRect()
+        h.type("가")
+        let typed = try rect()
+        let typedInput = inputRect()
+        #expect(typedInput.height > 0)
+        #expect(emptyInput.minY == typedInput.minY && emptyInput.height == typedInput.height)
+        #expect(abs(empty.minY - typed.minY) < 0.01)
+        #expect(abs(empty.height - typed.height) < 0.01)
+        h.press(#selector(NSResponder.deleteBackward(_:)))
+        let cleared = try rect()
+        #expect(inputRect().minY == typedInput.minY && inputRect().height == typedInput.height)
+        #expect(abs(cleared.minY - typed.minY) < 0.01)
+        #expect(abs(cleared.height - typed.height) < 0.01)
+    }
+}

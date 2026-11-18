@@ -50,6 +50,7 @@ final class EditorController: NSObject {
     var dismissedDateDocument: MarkdownDocument?
     var dateNow: () -> Date = { Date() }
     var dateCalendar = Calendar.current
+    var onFocusTitle: (() -> Void)?
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
     var dateEffects: [UUID: InlineDateEffect] = [:]
@@ -126,6 +127,8 @@ final class EditorController: NSObject {
     /// 선택 없이 서식 단축키로 정해 둔 "다음에 칠 글자의 서식"과, 그때의 커서 자리와 원문.
     var typingMarks: (location: Int, version: Int, marks: TypingMarks)?
     /// 조합(한글 입력)을 시작하며 넣어 둔 빈 기호 쌍. 조합이 글자 없이 끝나면 지운다.
+    // 선택 없는 ⌘B로 막 넣은 빈 기호 쌍. 다른 편집이 일어나면 버전을 통해 만료된다.
+    var emptyBold: (edit: TextEdit, marks: TypingMarks, version: Int)?
     var pendingPair: (location: Int, before: String, after: String)?
     /// 세 번째 백틱으로 코드 블록을 만든 바로 뒤. 습관대로 이어 누른 Return, Space 하나는 넣지 않는다.
     var swallowsCodeTriggerKey = false
@@ -266,10 +269,17 @@ final class EditorController: NSObject {
         textView.containerOrigin = NSPoint(x: padding.leading, y: padding.top)
         textView.font = style.body.font
         textView.textColor = style.text
-        textView.typingAttributes = baseAttributes
+        setInputParagraph(style.bodyParagraph)
         textView.selectedTextAttributes = [.backgroundColor: theme.rgba(.hover).nsColor]
         copyButton.apply(theme: theme, tint: style.text3)
         linkField.apply(theme: theme, style: style)
+    }
+
+    func setInputParagraph(_ paragraph: NSParagraphStyle) {
+        textView.defaultParagraphStyle = paragraph
+        var attributes = baseAttributes
+        attributes[.paragraphStyle] = paragraph
+        textView.typingAttributes = attributes
     }
 
     /// 원문에 붙여 두는 기본 속성. 화면의 서식은 여기 넣지 않는다.
@@ -314,7 +324,6 @@ final class EditorController: NSObject {
         style = EditorStyle(theme: theme, configuration: configuration, increaseContrast: Self.increaseContrast)
         applyStyleToViews()
         appliedTrailingStyle = nil
-        textView.defaultParagraphStyle = nil
         if let storage = textView.textStorage, storage.length > 0 {
             isRestyling = true
             storage.addAttributes(baseAttributes, range: NSRange(location: 0, length: storage.length))
@@ -338,6 +347,7 @@ final class EditorController: NSObject {
         isSettingText = true
         if linkSession != nil { cancelLinkEditing() }
         typingMarks = nil
+        emptyBold = nil
         pendingPair = nil
         pendingAbsorb = nil
         absorbRun = nil

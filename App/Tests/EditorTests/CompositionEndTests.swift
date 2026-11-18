@@ -30,7 +30,10 @@ import Testing
         h.redo()
         #expect(h.editor.text == "a **ㅎ**b")
         h.undo()
+        #expect(h.marked == "a **|**b")
+        h.undo()
         #expect(h.editor.text == "a b")
+        h.redo()
         h.redo()
         #expect(h.editor.text == "a **ㅎ**b")
     }
@@ -92,5 +95,23 @@ import Testing
         // 되돌리기는 전처럼 두 단계다.
         h.undo()
         #expect(h.editor.text == "\\*\\*가\\*\\*")
+    }
+}
+
+extension CompositionEndTests {
+    @Test func markedBodyUsesNoDecorationAndCommitsKorean() throws {
+        let h = try EditorHarness.at("앞|")
+        let marked = NSAttributedString(string: "ㅎ", attributes: [.underlineStyle: NSUnderlineStyle.single.rawValue,
+            .foregroundColor: NSColor.red, .backgroundColor: NSColor.green])
+        h.view.setMarkedText(marked, selectedRange: NSRange(location: 1, length: 0), replacementRange: h.view.selectedRange())
+        #expect(h.view.hasMarkedText())
+        let attributes = try #require(h.view.markedTextAttributes)
+        #expect(attributes[.underlineStyle] as? Int == 0)
+        #expect(attributes[.foregroundColor] == nil && attributes[.backgroundColor] == nil)
+        let display = try h.display(line: 0).attributes(at: 1, effectiveRange: nil)
+        #expect((display[.underlineStyle] as? Int ?? 0) == 0 && display[.backgroundColor] == nil)
+        #expect(display[.foregroundColor] as? NSColor != NSColor.red)
+        h.commit("한")
+        #expect(h.editor.text == "앞한" && !h.view.hasMarkedText())
     }
 }
