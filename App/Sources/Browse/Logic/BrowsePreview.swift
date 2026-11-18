@@ -1,19 +1,17 @@
 import Foundation
+import Models
 
 /// 본문을 한 줄로 편 글(spec 8의 "본문 첫머리"). 줄 머리의 기호(들여쓰기, 투두, 글머리표, 토글 `+ `, 인용문 `> `, 제목)와
-/// 인라인 기호(굵게, 취소선, 형광펜, 코드)를 떼고, 빈 줄을 건너뛰어 쉼표로 잇는다. 찾기도 이 글에서 한다.
+/// 인라인 기호(굵게, 취소선, 형광펜, 코드)를 떼고 보이는 줄을 잇는다. 찾기도 이 글에서 한다.
 nonisolated enum BrowsePreview {
     private static let contextLength = 8
     private static let maximumLeadingContext = 12
 
     static func flatten(_ body: String) -> String {
-        body
-            .split(whereSeparator: \.isNewline)
-            .compactMap { line -> String? in
-                let text = stripInline(stripLineMarker(String(line)))
-                return text.isEmpty ? nil : text
-            }
-            .joined(separator: ", ")
+        let lines = body.split(whereSeparator: \.isNewline).map { line in
+            stripInline(stripLineMarker(String(line)))
+        }
+        return NotePreviewText.join(lines)
     }
 
     /// 일치한 글자 주위의 문맥을 보여 주고, 앞을 생략했으면 말줄임표까지 세어 강조 범위를 돌려준다.
