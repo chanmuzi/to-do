@@ -169,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.editors = editors
 
             let commands = AppCommandDispatcher(router: router, notePanels: notePanels)
+            commands.changeBodySize = { try $0.apply(to: environment.settings, theme: environment.theme) }
             commands.closeQuickPanel = { [unowned quickPanels] in quickPanels.closeVisiblePanel() }
             self.commands = commands
             // 휴지통으로 보낸 뒤와 캡처한 뒤의 짧은 알림(D-041).

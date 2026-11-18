@@ -79,16 +79,20 @@ nonisolated struct EditorStyle {
     init(theme: Theme, configuration: MarkdownEditorConfiguration, increaseContrast: Bool) {
         metrics = EditorVisualMetrics(theme: theme)
         func color(_ token: ColorToken) -> NSColor { theme.rgba(token).nsColor }
-        body = TextFont(theme.nsFont(.body), lineHeight: theme.lineHeight(.body))
+        let scale = theme.noteBodySize / theme.tokens.textStyle(.body).size
+        func noteFont(_ role: TextStyle) -> NSFont {
+            theme.nsFont(role, size: theme.tokens.textStyle(role).size * scale)
+        }
+        body = TextFont(noteFont(.body), lineHeight: theme.lineHeight(.body))
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = body.lineHeight
         paragraph.maximumLineHeight = body.lineHeight
         bodyParagraph = paragraph
-        strong = theme.nsFont(.strong)
-        headings = [TextStyle.h1, .h2, .h3].map { TextFont(theme.nsFont($0), lineHeight: theme.lineHeight($0)) }
+        strong = noteFont(.strong)
+        headings = [TextStyle.h1, .h2, .h3].map { TextFont(noteFont($0), lineHeight: theme.lineHeight($0) * scale) }
         headingTracking = [TextStyle.h1, .h2, .h3].map { theme.tracking($0) }
-        inlineCode = theme.nsFont(.code)
-        codeBlock = TextFont(theme.nsFont(.codeBlock), lineHeight: theme.lineHeight(.codeBlock))
+        inlineCode = noteFont(.code)
+        codeBlock = TextFont(noteFont(.codeBlock), lineHeight: theme.lineHeight(.codeBlock) * scale)
         micro = theme.nsFont(.micro)
         hidden = NSFont.systemFont(ofSize: EditorMetrics.hiddenFontSize)
 
@@ -120,7 +124,7 @@ nonisolated struct EditorStyle {
         borderWidth = theme.shape(.borderWidth)
         codePadX = theme.component(.codePaddingX)
         codeGap = theme.component(.codeGap)
-        codeHeight = theme.component(.codeHeight)
+        codeHeight = theme.component(.codeHeight) * scale
         codeDrop = theme.component(.codeDrop)
         codeRise = theme.component(.codeRise)
         codeBlockPadX = theme.component(.codeBlockPaddingX)

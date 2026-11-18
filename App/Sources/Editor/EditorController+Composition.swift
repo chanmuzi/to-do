@@ -5,7 +5,7 @@ import AppKit
 
 extension EditorController {
     /// 입력기가 기호와 마지막 Space를 한 번에 확정하면 delegate가 아직 marked text를 보고
-    /// 변환을 건너뛴다. 변환 가능한 줄 머리에 한해 확정과 Space를 나눠 기존 입력 경로로 보낸다.
+    /// 변환을 건너뛴다. 줄 머리 변환이나 인라인 서식 끝에서 확정과 Space를 나눠 기존 입력 경로로 보낸다.
     func separatesCommittedTrigger(_ text: String, replacementRange: NSRange) -> Bool {
         guard textView.hasMarkedText(), text.hasSuffix(" "), !isApplyingEdit, !isReplayingUndo else { return false }
         let range = replacementRange.location == NSNotFound ? textView.markedRange() : replacementRange
@@ -13,7 +13,9 @@ extension EditorController {
         let prefix = String(text.dropLast())
         let committed = (document.text as NSString).replacingCharacters(in: range, with: prefix)
         let candidate = MarkdownDocument(committed)
-        return EditorCommands.spaceTrigger(candidate, selection: NSRange(location: range.location + prefix.utf16.count, length: 0)) != nil
+        let caret = range.location + prefix.utf16.count
+        return candidate.line(at: caret).marker(startingAt: caret)?.isOpen == false
+            || EditorCommands.spaceTrigger(candidate, selection: NSRange(location: caret, length: 0)) != nil
     }
 
     /// 조합이 시작되기 직전. 조합 중에는 원문을 고쳐 쓸 수 없으므로(조합이 끊긴다) 그 전에 자리를 만든다:
@@ -24,12 +26,6 @@ extension EditorController {
         codeTag = nil
         let absorb = absorbRun
         absorbRun = nil
-        if let pair = currentEmptyBold {
-            let caret = selectedRange.location
-            pendingPair = (caret, document.string(in: NSRange(location: pair.range.location, length: caret - pair.range.location)),
-                           document.string(in: NSRange(location: caret, length: NSMaxRange(pair.range) - caret)))
-            return
-        }
         let original = clamped(textView.selectedRange())
         let selection = EditorCommands.normalized(document, original, replacement: "가")
         if selection != original { setSelection(selection) }

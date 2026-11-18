@@ -79,7 +79,8 @@ import Testing
                 .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? []
         }
         #expect(visible("Float") == ["Float에 관하여", "설정...", "Float 종료"])
-        #expect(visible("보기") == ["노트 모두 숨기기"])
+        #expect(visible("편집").contains("굵게"))
+        #expect(visible("보기") == ["노트 모두 숨기기", "본문 확대", "본문 축소", "본문 기본 크기"])
         #expect(visible("창") == ["다음 노트로"])
         #expect(visible("도움말") == ["단축키"])
         // 규칙 4: 보이는 항목에는 단축키가 적혀 있지 않다.

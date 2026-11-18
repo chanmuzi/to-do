@@ -1,13 +1,12 @@
 import AppKit
 
 extension EditorController {
-    /// 편집 동작 하나를 실행한다. 한글 조합 중에는 하지 않는다.
+    /// 굵게는 조합한 글자를 먼저 확정하고 그 뒤의 입력 상태를 바꾼다.
     func run(_ action: EditorAction) {
-        guard !textView.hasMarkedText() else { return }
-        if let pair = currentEmptyBold {
-            apply(.insert("", replacing: pair.range))
-            if action == .bold { return }
-            typingMarks = (selectedRange.location, documentVersion, pair.marks)
+        if textView.hasMarkedText() {
+            guard action == .bold else { return }
+            textView.unmarkText()
+            textView.inputContext?.discardMarkedText()
         }
         let selection = clamped(textView.selectedRange())
         switch action {
@@ -27,7 +26,7 @@ extension EditorController {
             if selection.length > 0 {
                 apply(EditorCommands.cycleHighlight(document, selection: selection))
             } else {
-                perform(EditorCommands.cycleTypingHighlight(document, caret: selection.location, marks: currentTypingMarks() ?? TypingMarks()))
+                perform(EditorCommands.cycleTypingHighlight(document, caret: selection.location, marks: marksForShortcut()))
             }
         case .codeBlock: apply(EditorCommands.toggleCodeBlock(document, selection: selection))
         case .link: beginLinkEditing()
@@ -46,24 +45,47 @@ extension EditorController {
         if selection.length > 0 {
             apply(EditorCommands.toggleWrap(document, selection: selection, wrap))
         } else {
-            let toggle = EditorCommands.toggleTyping(document, caret: selection.location, wrap, marks: currentTypingMarks() ?? TypingMarks())
-            if wrap == .bold, case .marks(let marks) = toggle, marks.bold == true,
-               let edit = EditorCommands.materialize(document, caret: selection.location, marks: marks) {
-                apply(edit)
-                if selectedRange == edit.selection {
-                    emptyBold = (edit, marks, documentVersion)
-                }
-            } else {
-                perform(toggle)
-            }
+            let toggle = EditorCommands.toggleTyping(document, caret: selection.location, wrap, marks: marksForShortcut())
+            perform(toggle)
         }
     }
 
-    var currentEmptyBold: (range: NSRange, marks: TypingMarks)? {
-        guard let pair = emptyBold, pair.version == documentVersion, pair.edit.selection == selectedRange else { return nil }
-        let range = NSRange(location: pair.edit.range.location, length: pair.edit.replacement.utf16.count)
-        guard NSMaxRange(range) <= document.length, document.string(in: range) == pair.edit.replacement else { return nil }
-        return (range, pair.marks)
+    /// 구간 끝의 공백 뒤에서는 다음 글자가 앞 구간의 서식을 이어받는다.
+    var continuingRunEnd: Int? {
+        guard let run = absorbRun, run.version == documentVersion,
+              selectedRange == NSRange(location: run.location, length: 0) else { return nil }
+        return run.closeStart
+    }
+
+    private func marksForShortcut() -> TypingMarks {
+        guard continuingRunEnd != nil else { return currentTypingMarks() ?? TypingMarks() }
+        let state = formattingState
+        absorbRun = nil
+        return TypingMarks(bold: state.bold ? true : nil, strike: state.strikethrough ? true : nil,
+                           code: state.inlineCode ? true : nil, highlight: state.highlight == 0 ? nil : state.highlight)
+    }
+
+    var formattingState: EditorFormattingState {
+        let selection = clamped(selectedRange)
+        let line = document.line(at: selection.location)
+        var range = selection
+        if let end = continuingRunEnd {
+            range = NSRange(location: end, length: 0)
+        } else if selection.length > 0, let inline = EditorCommands.inlineLine(document, selection) {
+            range = EditorCommands.visibleSelection(selection, in: inline) ?? selection
+        }
+        let spans = line.spansContaining(range.location).filter { NSMaxRange($0.contentRange) >= NSMaxRange(range) }
+        let marks = currentTypingMarks()
+        let highlight = spans.compactMap { span -> Int? in
+            if case .highlight(let color) = span.kind { return color }
+            return nil
+        }.first
+        return EditorFormattingState(
+            bold: marks?.bold ?? spans.contains { $0.kind == .bold },
+            strikethrough: marks?.strike ?? spans.contains { $0.kind == .strike },
+            inlineCode: marks?.code ?? spans.contains { $0.kind == .code },
+            highlight: marks?.highlight ?? highlight ?? 0
+        )
     }
 
     private func perform(_ toggle: TypingToggle) {
@@ -226,12 +248,6 @@ extension EditorController: NSTextViewDelegate {
             // 입력기가 처리한 뒤에도 조합이 남아 있으면 Tab이 조합 글자를 덮어쓰지 않게 한다.
             return onAcceptDate != nil && (selector == #selector(NSResponder.insertTab(_:)) || selector == #selector(NSResponder.insertBacktab(_:)))
         }
-        if let pair = currentEmptyBold {
-            apply(.insert("", replacing: pair.range))
-            if selector == #selector(NSResponder.deleteBackward(_:)) || selector == #selector(NSResponder.cancelOperation(_:)) {
-                return true
-            }
-        }
         let selection = clamped(textView.selectedRange())
         let swallows = swallowsCodeTriggerKey
         swallowsCodeTriggerKey = false
@@ -384,19 +400,6 @@ extension EditorController: NSTextViewDelegate {
             // 줄이 없는 코드 블록의 커서 자리: 친 글이 코드 줄이 된다.
             if let block = EditorCommands.emptyBlock(document, caretAt: range.location) {
                 apply(EditorCommands.insertingIntoEmptyBlock(document, block, text))
-                return false
-            }
-            if let pair = currentEmptyBold, range == selectedRange {
-                let remove = TextEdit.insert("", replacing: pair.range)
-                let original = MarkdownDocument(remove.applied(to: document.text))
-                let caret = pair.range.location
-                let formatted = EditorCommands.typing(original, text, caret: caret, marks: pair.marks)
-                    ?? EditorCommands.insert(original, text, replacing: remove.selection)
-                let edit = EditorCommands.compose(remove, then: formatted, middle: original)
-                apply(finalized(edit))
-                if !text.contains("\n"), text.allSatisfy(\.isWhitespace) {
-                    typingMarks = (selectedRange.location, documentVersion, pair.marks)
-                }
                 return false
             }
             // 정해 둔 서식이 있으면 기호 쌍과 함께 넣는다(한 번의 편집). 여러 줄이면 줄마다 감싼다.

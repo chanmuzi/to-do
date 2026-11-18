@@ -1,6 +1,22 @@
 import AppKit
 import Theme
 
+enum BodyZoom {
+    case larger, smaller, reset
+
+    func apply(to store: AppSettingsStore, theme: Theme) throws {
+        let lower = Int(theme.component(.settingsFontMin))
+        let upper = Int(theme.component(.settingsFontMax))
+        let current = Int(min(CGFloat(upper), max(CGFloat(lower), theme.noteBodySize)))
+        let size = switch self {
+        case .larger: current + 1
+        case .smaller: current - 1
+        case .reset: Int(theme.defaultBodySize)
+        }
+        try store.update { $0.bodySize = min(upper, max(lower, size)) }
+    }
+}
+
 /// 파일에 성공적으로 쓴 설정을 기존 창과 다음에 열 창에 함께 전달한다.
 enum SettingsApplication {
     static func follow(_ store: AppSettingsStore, theme: Theme, appearanceOverride: ThemeAppearance?,
@@ -13,7 +29,10 @@ enum SettingsApplication {
                 setAppearance((appearanceOverride ?? ThemeAppearance(rawValue: values.appearance))?.nsAppearance)
             }
             if previous?.bodySize != values.bodySize || previous?.bodyLineHeight != values.bodyLineHeight {
-                do { try theme.applyBodyTypography(size: values.bodySize, lineHeight: values.bodyLineHeight) }
+                let size = values.bodySize.map {
+                    min(Int(theme.component(.settingsFontMax)), max(Int(theme.component(.settingsFontMin)), $0))
+                }
+                do { try theme.applyBodyTypography(size: size, lineHeight: values.bodyLineHeight) }
                 catch { AppLog.warning("본문 치수를 적용하지 못했습니다: \(error)") }
             }
             let display = NoteDisplayOptions(dateFormat: .init(rawValue: values.scheduleDateFormat) ?? .relative,

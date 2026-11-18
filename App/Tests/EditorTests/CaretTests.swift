@@ -19,6 +19,21 @@ import Theme
         return h.view.convert(inWindow, from: nil).minX
     }
 
+    @Test func zoomScalesBodyHeadingsAndCodeWithinTheEditor() throws {
+        let h = try EditorHarness("# 제목\n## 제목\n### 제목\n본문\n`코드`")
+        func sizes() throws -> [CGFloat] {
+            try [2, 3, 4, 0, 1].enumerated().map { line, offset in
+                let paragraph = try h.display(line: line)
+                return try #require(paragraph.attribute(.font, at: offset, effectiveRange: nil) as? NSFont).pointSize
+            }
+        }
+        let before = try sizes()
+        let titleFont = h.theme.nsFont(.title)
+        try h.theme.applyBodyTypography(size: Int(h.theme.component(.settingsFontMax)), lineHeight: nil)
+        #expect(try zip(sizes(), before).allSatisfy { $0 > $1 })
+        #expect(h.theme.nsFont(.title) == titleFont)
+    }
+
     @Test func thinAccentCaretWithTheBodyGlyphHeight() throws {
         let h = try EditorHarness.at("본문 글자|")
         let caret = try caret(h)

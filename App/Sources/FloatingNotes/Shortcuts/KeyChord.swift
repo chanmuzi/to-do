@@ -8,7 +8,7 @@ import AppKit
 ///   (`KeyCodeMenu`) 키 자리로 한 번 더 찾으므로, 이벤트에 한글 자모가 실려 와도 같은 자리의 키가 듣는다.
 nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
     case a, b, c, e, f, h, k, l, m, n, p, q, r, t, v, w, x, z
-    case one, two, three, nine
+    case one, two, three, nine, zero, equals, minus
     case comma, slash, backtick, leftBracket, rightBracket
     case returnKey, tab, space, escape, up, down
 
@@ -36,6 +36,9 @@ nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
         case .one: 18
         case .two: 19
         case .three: 20
+        case .zero: 29
+        case .equals: 24
+        case .minus: 27
         case .nine: 25
         case .comma: 43
         case .slash: 44
@@ -57,6 +60,9 @@ nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
         case .one: "1"
         case .two: "2"
         case .three: "3"
+        case .zero: "0"
+        case .equals: "="
+        case .minus: "−"
         case .nine: "9"
         case .comma: ","
         case .slash: "/"
@@ -82,7 +88,8 @@ nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
         case .escape: "\u{1B}"
         case .up: "\u{F700}"
         case .down: "\u{F701}"
-        case .one, .two, .three, .nine, .comma, .slash, .backtick, .leftBracket, .rightBracket: label
+        case .minus: "-"
+        case .zero, .equals, .one, .two, .three, .nine, .comma, .slash, .backtick, .leftBracket, .rightBracket: label
         default: rawValue
         }
     }
@@ -126,5 +133,8 @@ nonisolated struct KeyChord: Hashable, Sendable {
     }
 
     /// 표에 적는 모습. 예: `["⇧", "⌘", "T"]`.
-    var labels: [String] { modifiers.labels + [key.label] }
+    var labels: [String] {
+        if key == .equals, modifiers.contains(.shift) { return modifiers.subtracting(.shift).labels + ["+"] }
+        return modifiers.labels + [key.label]
+    }
 }

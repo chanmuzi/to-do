@@ -12,6 +12,7 @@ nonisolated enum AppCommand: String, Hashable, Sendable, CaseIterable {
     case newNote
     case findNote
     case moreMenu
+    case enlargeBody, reduceBody, resetBodySize
     case nextNote
     case editTitle
     case togglePin
@@ -42,7 +43,7 @@ extension AppCommand {
         // 리마인더 설정, 스페이스 옮기기는 지금 노트가 있어야 요청이 된다. 요청 종류는 노트와 상관없다.
         case .setReminder: Route.openReminderEditor(NoteID(rawValue: "")).isConnected
         case .moveToSpace: Route.openSpacePicker(NoteID(rawValue: "")).isConnected
-        case .moreMenu, .nextNote, .editTitle, .togglePin, .closeWindow: true
+        case .enlargeBody, .reduceBody, .resetBodySize, .moreMenu, .nextNote, .editTitle, .togglePin, .closeWindow: true
         }
     }
 }

@@ -12,6 +12,7 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
     /// 편집기 같은 첫 응답자에게 넘길 실행 취소. 테스트에서 바꿔 넣는다.
     var forwardUndo: (Any?) -> Void = { NSApplication.shared.sendAction(Selector(("undo:")), to: nil, from: $0) }
+    var changeBodySize: (BodyZoom) throws -> Void = { _ in }
     /// 앱을 끝낸다. 테스트에서 바꿔 넣는다.
     var quit: () -> Void = { NSApplication.shared.terminate(nil) }
     /// 떠 있는 캡처 바나 노트 찾기를 닫는다. 닫은 것이 있었으면 참. 조립할 때 넣는다(`QuickPanels`).
@@ -35,6 +36,9 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         case .findNote: router.route(.openBrowse(anchor: note))
         case .settings: router.route(.openSettings)
         case .shortcuts: router.route(.openShortcuts)
+        case .enlargeBody: zoom(.larger)
+        case .reduceBody: zoom(.smaller)
+        case .resetBodySize: zoom(.reset)
         case .nextNote: notePanels.focusNextNote()
         case .closeWindow:
             // 캡처 바나 노트 찾기가 떠 있으면 그것을 닫는다(esc와 같다, D-032). 떠 있는 동안에는 그 화면이
@@ -57,6 +61,11 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
             unavailable.append(command)
             AppLog.warning("아직 만들지 않은 동작입니다: \(command.rawValue)")
         }
+    }
+
+    private func zoom(_ change: BodyZoom) {
+        do { try changeBodySize(change) }
+        catch { presentFailure("본문 글꼴 크기를 저장하지 못했습니다", error) }
     }
 
     /// 메뉴 막대 메뉴에서 고른 것(spec 4.3).

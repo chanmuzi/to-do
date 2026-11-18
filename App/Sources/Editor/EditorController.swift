@@ -127,8 +127,6 @@ final class EditorController: NSObject {
     /// 선택 없이 서식 단축키로 정해 둔 "다음에 칠 글자의 서식"과, 그때의 커서 자리와 원문.
     var typingMarks: (location: Int, version: Int, marks: TypingMarks)?
     /// 조합(한글 입력)을 시작하며 넣어 둔 빈 기호 쌍. 조합이 글자 없이 끝나면 지운다.
-    // 선택 없는 ⌘B로 막 넣은 빈 기호 쌍. 다른 편집이 일어나면 버전을 통해 만료된다.
-    var emptyBold: (edit: TextEdit, marks: TypingMarks, version: Int)?
     var pendingPair: (location: Int, before: String, after: String)?
     /// 세 번째 백틱으로 코드 블록을 만든 바로 뒤. 습관대로 이어 누른 Return, Space 하나는 넣지 않는다.
     var swallowsCodeTriggerKey = false
@@ -347,7 +345,6 @@ final class EditorController: NSObject {
         isSettingText = true
         if linkSession != nil { cancelLinkEditing() }
         typingMarks = nil
-        emptyBold = nil
         pendingPair = nil
         pendingAbsorb = nil
         absorbRun = nil

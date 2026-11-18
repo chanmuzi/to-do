@@ -32,8 +32,7 @@ extension EditorController {
             return
         }
         let selection = clamped(textView.selectedRange())
-        let runEnd = absorbRun.flatMap { $0.location == selection.location && $0.version == documentVersion ? $0.closeStart : nil }
-        let prepared = EditorCommands.preparedForPaste(document, LineEndings.normalized(text), replacing: selection, runEnd: runEnd)
+        let prepared = EditorCommands.preparedForPaste(document, LineEndings.normalized(text), replacing: selection, runEnd: continuingRunEnd)
         guard !prepared.isEmpty else { return }
         textView.insertText(prepared, replacementRange: selection)
     }
