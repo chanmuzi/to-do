@@ -1,6 +1,6 @@
 import AppKit
 
-/// 목록: 줄을 위에서부터 쌓는다. 고른 줄 하나에 `hover` 바탕이 깔리고, 마우스를 올린 줄이 고른 줄이 된다(spec 8).
+/// 목록: 줄을 위에서부터 쌓는다. 고른 줄 하나에 `selected` 바탕이 깔리고, 마우스를 올린 줄이 고른 줄이 된다(spec 8).
 final class BrowseListView: NSView {
     private let style: BrowseStyle
     private(set) var entryViews: [BrowseEntryView] = []

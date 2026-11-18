@@ -204,6 +204,22 @@ final class TopRowView: NSView {
         return self
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if trackingAreas.isEmpty {
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.cursorUpdate, .mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        }
+    }
+
+    override func cursorUpdate(with event: NSEvent) { updateCursor(for: event) }
+    override func mouseEntered(with event: NSEvent) { updateCursor(for: event) }
+    override func mouseMoved(with event: NSEvent) { updateCursor(for: event) }
+
+    private func updateCursor(for event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if title.frame.contains(point) { title.titleCursor.set() } else { NSCursor.arrow.set() }
+    }
+
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 

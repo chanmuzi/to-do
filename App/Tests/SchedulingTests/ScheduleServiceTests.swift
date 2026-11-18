@@ -15,6 +15,29 @@ import Reminders
         #expect(f.bridge.authorizationRequests.isEmpty)
         #expect(f.notifier.permissionRequests == 0)
     }
+    @Test func calendarRangeRequiresExistingAccessAndRefreshesUnlinkedEvents() throws {
+        let f = try fixture(); defer { f.close() }
+        let start = Date()
+        let interval = DateInterval(start: start, duration: 86400)
+        let fake = FakeCalendarBridge(sampleEventsAt: start)
+        let service = ScheduleService(notes: f.notes, notifier: f.notifier, makeBridge: { fake })
+        defer { service.stop() }
+        fake.isAllowed = false
+        #expect(service.events(in: interval).isEmpty && fake.eventRangeReads == 0)
+        fake.isAllowed = true
+        fake.items["미리 알림"] = ScheduleItem(start: start)
+        let events = service.events(in: interval)
+        #expect(events.count == 2 && events.allSatisfy { $0.item.kind == .event })
+        let event = try #require(events.first)
+        #expect(event.calendarURL?.host == "ekevent")
+        #expect(event.calendarURL?.lastPathComponent == event.item.link?.localID)
+        var visible = events
+        service.calendarChanged = { visible = service.events(in: interval) }
+        fake.deleteExternally(event.item.id)
+        #expect(visible.count == 1 && visible.first != event)
+        #expect(fake.authorizationPromptAttempts.isEmpty && f.notifier.permissionRequests == 0)
+    }
+
     @Test func createChangeCompleteDeleteBothDirectionsPreservesText() async throws {
         let f = try fixture(); defer { f.close() }
         let item = ScheduleItem(start: future, title: "원문", todo: TodoAnchor(line: 0, text: "원문"))

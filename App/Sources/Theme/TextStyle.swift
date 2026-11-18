@@ -8,6 +8,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
     case body
     case strong     // 본문 굵게
     case paneTitle  // 라이브러리 목록 제목
+    case selected
     case row        // 라이브러리 줄 제목
     case rowSub     // 라이브러리 줄 미리 보기
     case ui         // 정보(시간, 개수)
@@ -37,7 +38,8 @@ public enum TextStyle: String, CaseIterable, Sendable {
         case .body: Keys(font: .body, size: "fs-body", lineHeight: "lh-body", weight: "fw-body")
         case .strong: Keys(font: .body, size: "fs-body", lineHeight: "lh-body", weight: "fw-strong")
         case .paneTitle: Keys(font: .body, size: "fs-pane-title", lineHeight: "lh-body", weight: "fw-strong")
-        case .row: Keys(font: .body, size: "fs-row", lineHeight: "lh-row", weight: "fw-title")
+        case .selected: Keys(font: .body, size: "fs-body", lineHeight: "lh-body", weight: "fw-selected")
+        case .row: Keys(font: .body, size: "fs-row", lineHeight: "lh-row", weight: "fw-row")
         case .rowSub: Keys(font: .body, size: "fs-row-sub", lineHeight: "lh-ui", weight: "fw-body")
         case .ui: Keys(font: .ui, size: "fs-ui", lineHeight: "lh-ui", weight: "fw-ui")
         case .uiStrong: Keys(font: .ui, size: "fs-ui", lineHeight: "lh-ui", weight: "fw-ui-strong")

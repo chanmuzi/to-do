@@ -7,6 +7,7 @@ import Models
 struct LibraryRowInput: NSViewRepresentable {
     let model: LibraryModel
     let note: Note
+    let label: String
     let hover: (Bool) -> Void
 
     func makeNSView(context: Context) -> LibraryRowInputView { LibraryRowInputView() }
@@ -14,7 +15,7 @@ struct LibraryRowInput: NSViewRepresentable {
         view.model = model
         view.note = note
         view.hover = hover
-        view.setAccessibilityLabel(LibraryPreview.title(note))
+        view.setAccessibilityLabel(label)
         view.setAccessibilityValue(model.selectedNoteID == note.id ? "선택됨" : "")
         view.setAccessibilityCustomActions([
             NSAccessibilityCustomAction(name: model.index.trash.contains { $0.id == note.id } ? "복원 후 열기" : "열기") {
@@ -110,19 +111,20 @@ final class LibraryRowInputView: NSView {
 struct LibrarySelectableRow<Content: View>: View {
     let model: LibraryModel
     let note: Note
-    var rounded = false
+    let label: String
+    var highlightInsets = EdgeInsets()
     @ViewBuilder let content: () -> Content
     @State private var hovered = false
 
     var body: some View {
         content().accessibilityHidden(true)
-            .background(model.selectedNoteID == note.id ? model.theme.libraryColor(.surface3) : .clear)
-            .overlay {
-                (hovered && model.selectedNoteID != note.id ? model.theme.libraryColor(.hover) : .clear)
-                    .allowsHitTesting(false)
+            .background {
+                let selected = model.selectedNoteID == note.id
+                RoundedRectangle(cornerRadius: model.theme.shape(.controlRadius))
+                    .fill(selected ? model.theme.libraryColor(.selected) : hovered ? model.theme.libraryColor(.hover) : .clear)
+                    .padding(highlightInsets)
             }
-            .overlay { LibraryRowInput(model: model, note: note) { hovered = $0 } }
-            .clipShape(RoundedRectangle(cornerRadius: rounded ? model.theme.shape(.controlRadius) : 0))
+            .overlay { LibraryRowInput(model: model, note: note, label: label) { hovered = $0 } }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : model.theme.motion.animation, value: hovered)
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : model.theme.motion.animation, value: model.selectedNoteID)
     }

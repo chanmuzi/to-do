@@ -14,12 +14,18 @@ struct LibraryRootView: View {
             theme.libraryColor(.line).frame(width: theme.shape(.borderWidth))
             VStack(spacing: 0) {
                 HStack(spacing: theme.space(.sp1)) {
+                    if model.selection == .trash {
+                        LibrarySymbol(theme: theme, name: "trash", size: .iconLarge)
+                            .foregroundStyle(theme.libraryColor(.text2)).accessibilityHidden(true)
+                    }
                     Text(model.title(model.selection)).font(theme.font(.paneTitle))
                     Spacer()
-                    LibraryIconButton(theme: theme, title: "새 노트", symbol: "plus") {
-                        var draft = NoteDraft()
-                        switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
-                        model.router.route(.newNote(NewNoteRequest(draft: draft)))
+                    if model.showsNewNote {
+                        LibraryIconButton(theme: theme, title: "새 노트", symbol: "plus") {
+                            var draft = NoteDraft()
+                            switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
+                            model.router.route(.newNote(NewNoteRequest(draft: draft)))
+                        }
                     }
                 }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
                     .frame(height: theme.component(.libraryHeaderHeight))
@@ -60,14 +66,19 @@ struct LibraryNoteRow: View {
     let note: Note
     private var theme: Theme { model.theme }
     var body: some View {
-        LibrarySelectableRow(model: model, note: note) {
+        let preview = LibraryPreview(note)
+        let weight = preview.isEmpty ? theme.tokens.textStyle(.body).weight : (model.selectedNoteID == note.id ? theme.tokens.textStyle(.selected).weight : nil)
+        let insetX = theme.space(.sp2)
+        let insetY = theme.component(.libraryRowHighlightInsetY)
+        LibrarySelectableRow(model: model, note: note, label: preview.title,
+                             highlightInsets: EdgeInsets(top: insetY, leading: insetX, bottom: insetY, trailing: insetX)) {
             HStack(spacing: theme.component(.libraryRowGap)) {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(LibraryPreview.title(note)).font(theme.font(.row))
-                        .foregroundStyle(theme.libraryColor(LibraryPreview.isEmpty(note) ? .text3 : .text)).lineLimit(1)
+                    Text(preview.title).font(theme.font(.row, weight: weight))
+                        .foregroundStyle(theme.libraryColor(preview.isEmpty || model.selection == .trash ? .text2 : .rowTitle)).lineLimit(1)
                         .frame(height: theme.lineHeight(.row))
-                    if !LibraryPreview.subtitle(note).isEmpty {
-                        Text(LibraryPreview.subtitle(note)).font(theme.font(.rowSub))
+                    if !preview.subtitle.isEmpty {
+                        Text(preview.subtitle).font(theme.font(.rowSub))
                             .foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
                             .frame(height: theme.lineHeight(.rowSub))
                     }

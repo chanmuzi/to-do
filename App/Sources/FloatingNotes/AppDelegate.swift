@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let notifier: any ReminderNotifier
             let makeBridge: @MainActor () -> any CalendarBridge
             if options.usesFakeCalendar {
-                let fake = FakeCalendarBridge()
+                let fake = FakeCalendarBridge(sampleEventsAt: Date())
                 fakeCalendar = fake
                 notifier = FakeReminderNotifier()
                 makeBridge = { fake }
@@ -109,6 +109,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
+            library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
+            library.model.openCalendarEvent = { [weak library, usesFake = options.usesFakeCalendar] event in
+                guard !usesFake else { return }
+                guard let url = event.calendarURL,
+                      let calendarApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") else {
+                    library?.model.error = "캘린더 일정을 열 수 없습니다"
+                    return
+                }
+                NSWorkspace.shared.open([url], withApplicationAt: calendarApp, configuration: .init()) { _, error in
+                    if let error { Task { @MainActor in library?.model.error = error.localizedDescription } }
+                }
+            }
+            schedules.calendarChanged = { [weak library] in
+                if library?.window?.isVisible == true { library?.model.refreshCalendar() }
+            }
             library.beforeMove = { [weak notePanels] in notePanels?.flushPendingEdits() }
             #if DEBUG
             library.allowsKeyWindows = !options.debugIsPassive

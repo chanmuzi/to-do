@@ -10,6 +10,7 @@ public protocol CalendarBridge: AnyObject {
     func save(_ item: ScheduleItem) throws -> ScheduleItem
     func remove(_ item: ScheduleItem) throws
     func destination(for item: ScheduleItem) -> ScheduleDestination?
+    func events(in interval: DateInterval) -> [CalendarEvent]
     func stop()
 }
 
@@ -31,7 +32,7 @@ public enum CalendarBridgeError: Error, LocalizedError {
 public final class FakeCalendarBridge: CalendarBridge {
     public var onChange: (@MainActor () -> Void)?
     public var items: [String: ScheduleItem] = [:]
-    public var isAllowed = true
+    public var isAllowed = true { didSet { if oldValue != isAllowed { onChange?() } } }
     public var eventDestination: ScheduleDestination? = .init(name: "개인 일정", color: .init(red: 0.25, green: 0.52, blue: 0.80))
     public var reminderDestination: ScheduleDestination? = .init(name: "할 일", color: .init(red: 0.85, green: 0.53, blue: 0.22))
     public var linkedDestinations: [String: ScheduleDestination] = [:]
@@ -49,7 +50,27 @@ public final class FakeCalendarBridge: CalendarBridge {
     public private(set) var authorizationPromptAttempts: [ScheduleItem.Kind] = []
     public private(set) var saves = 0
     public private(set) var reads = 0
-    public init() {}
+    public private(set) var eventRangeReads = 0
+
+    public init(sampleEventsAt now: Date? = nil) {
+        guard let now else { return }
+        for (index, title) in ["팀 회의", "책 반납"].enumerated() {
+            let id = "sample-event-\(index)"
+            let start = now.addingTimeInterval(Double(index + 1) * 3600)
+            items[id] = ScheduleItem(id: id, start: start, end: start.addingTimeInterval(1800), title: title,
+                                     link: .init(localID: id, externalID: id, kind: .event))
+        }
+    }
+
+    public func events(in interval: DateInterval) -> [CalendarEvent] {
+        guard isAllowed else { return [] }
+        eventRangeReads += 1
+        return items.values.compactMap { item in
+            guard let end = item.end, !item.isDeleted, !item.isCompleted,
+                  item.start < interval.end, end > interval.start else { return nil }
+            return CalendarEvent(item: item, destination: destination(for: item))
+        }
+    }
     public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
         if request { authorizationPromptAttempts.append(kind) }
         await authorizationGate?()

@@ -116,7 +116,8 @@ import Testing
 
         textView.insertText("한 줄만", replacementRange: NSRange(location: 0, length: (textView.string as NSString).length))
 
-        #expect(await fixture.wait { controller.heightTarget == nil })
+        await controller.heightAnimation?.value
+        #expect(controller.heightTarget == nil)
         #expect(controller.panel.frame.height == chrome + bodyHeight(lines: 4))
         #expect(controller.panel.frame.maxY == top)
     }

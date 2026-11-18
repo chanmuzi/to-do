@@ -42,10 +42,15 @@ public final class ScheduleService {
     private var bridge: any CalendarBridge {
         if let bridgeStorage { return bridgeStorage }
         let value = makeBridge()
-        value.onChange = { [weak self] in self?.refreshLinked() }
+        value.onChange = { [weak self] in
+            self?.refreshLinked()
+            self?.calendarChanged?()
+        }
         bridgeStorage = value
         return value
     }
+    public var calendarChanged: (() -> Void)?
+    public func events(in interval: DateInterval) -> [CalendarEvent] { bridge.events(in: interval) }
     public func destination(for item: ScheduleItem) -> ScheduleDestination? { bridge.destination(for: item) }
     public func refreshLinked() {
         do {

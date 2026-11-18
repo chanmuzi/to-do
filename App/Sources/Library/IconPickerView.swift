@@ -7,20 +7,20 @@ import Theme
 
 struct IconPickerView: View {
     @Bindable var model: LibraryModel
-    let spaceID: SpaceID
+    let spaceID: SpaceID?
     @State private var tab: Int
     @State private var query = ""
     @State private var catalog = IconCatalog.shared
     @FocusState private var searchFocused: Bool
     private var theme: Theme { model.theme }
     private var space: Space? { model.spaceList.first { $0.id == spaceID } }
-    private var icon: SpaceIcon { space?.icon ?? .none }
+    private var icon: SpaceIcon { space?.icon ?? model.draftIcon }
     private var columns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 0), count: theme.count(.iconPickerColumns))
     }
-    init(model: LibraryModel, spaceID: SpaceID, initialTab: Int? = nil) {
+    init(model: LibraryModel, spaceID: SpaceID? = nil, initialTab: Int? = nil) {
         self.model = model; self.spaceID = spaceID
-        let icon = model.spaceList.first { $0.id == spaceID }?.icon
+        let icon = model.spaceList.first { $0.id == spaceID }?.icon ?? model.draftIcon
         let selected: Int
         switch icon { case .emoji: selected = 1; case .image: selected = 2; default: selected = 0 }
         _tab = State(initialValue: initialTab ?? selected)
@@ -28,31 +28,32 @@ struct IconPickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.space(.sp2)) {
             HStack(spacing: theme.space(.sp2)) {
-                iconView(icon)
-                Text(space?.name ?? "").lineLimit(1)
+                iconView(icon == .none ? LibraryModel.defaultSpaceIcon : icon)
+                Text(space?.name ?? model.spaceName).lineLimit(1)
                 Spacer(minLength: 0)
                 Button("아이콘 없음") { model.setIcon(.none, for: spaceID) }.buttonStyle(.plain)
             }
             HStack(spacing: 0) {
                 ForEach(Array(["기호", "이모지", "이미지"].enumerated()), id: \.offset) { index, title in
                     Button { tab = index; query = "" } label: {
-                        Text(title).font(theme.font(.body)).fontWeight(tab == index ? .semibold : .regular)
+                        Text(title).font(theme.font(tab == index ? .selected : .body))
                             .foregroundStyle(theme.libraryColor(tab == index ? .text : .text2))
                             .frame(maxWidth: .infinity).frame(height: theme.component(.controlHeight))
-                            .background(tab == index ? theme.libraryColor(.surface3) : .clear,
-                                        in: RoundedRectangle(cornerRadius: theme.shape(.chipRadius)))
-                    }.buttonStyle(LibraryButtonStyle(theme: theme))
+                    }.buttonStyle(LibraryButtonStyle(theme: theme, selected: tab == index))
                 }
-            }.overlay(RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).stroke(theme.libraryColor(.line), lineWidth: theme.shape(.borderWidth)))
+            }
             if tab == 2 { images } else { searchable }
             if let error = model.error ?? catalog.warning { Text(error).font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text2)) }
             Divider()
-            HStack { Spacer(); Button("완료") { model.iconSpace = nil }.buttonStyle(LibraryButtonStyle(theme: theme)) }
+            HStack { Spacer(); Button("완료", action: close).buttonStyle(LibraryButtonStyle(theme: theme)) }
         }.focusEffectDisabled().font(theme.font(.body)).foregroundStyle(theme.libraryColor(.text))
             .padding(theme.component(.iconPickerPadding)).frame(width: theme.component(.iconPickerWidth))
             .background(theme.libraryColor(.surface))
             .onAppear { searchFocused = true }
-            .onExitCommand { model.iconSpace = nil }
+            .onExitCommand(perform: close)
+    }
+    private func close() {
+        if spaceID == nil { model.choosingDraftIcon = false } else { model.iconSpace = nil }
     }
     private var searchable: some View {
         VStack(alignment: .leading, spacing: theme.space(.sp2)) {
@@ -114,9 +115,7 @@ struct IconPickerView: View {
             model.setIcon(chosen, for: spaceID)
         } label: {
             iconView(value).frame(maxWidth: .infinity).frame(height: theme.component(.iconPickerCellHeight))
-                .overlay(RoundedRectangle(cornerRadius: theme.shape(.chipRadius))
-                    .stroke(isSelected(value) ? theme.libraryColor(.text) : .clear, lineWidth: theme.component(.iconPickerRing)))
-        }.buttonStyle(LibraryButtonStyle(theme: theme))
+        }.buttonStyle(LibraryButtonStyle(theme: theme, selected: isSelected(value)))
             .contextMenu {
                 Button(model.settings.pinnedIcons.contains(value) ? "고정 해제" : "고정") {
                     model.changeSettings { settings in

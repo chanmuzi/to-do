@@ -5,6 +5,8 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface
     case surface2 = "surface-2"
     case surface3 = "surface-3"
+    case selected
+    case rowTitle = "row-title"
     case hover
     case text
     case text2 = "text-2"
@@ -106,6 +108,7 @@ public enum ComponentToken: String, CaseIterable, Sendable {
 
     case libraryUpcomingTimeWidth = "library-upcoming-time-w"
     case librarySidebarRowGap = "library-sidebar-row-gap"
+    case libraryRowHighlightInsetY = "library-row-highlight-inset-y"
     case reminderInputHeight = "reminder-input-h"
     case scheduleMarkerWidth = "schedule-marker-w"
     case scheduleEventBarWidth = "schedule-event-bar-w"
