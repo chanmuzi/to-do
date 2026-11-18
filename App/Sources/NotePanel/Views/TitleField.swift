@@ -88,6 +88,11 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             : style.theme.nsFont(.title)
     }
 
+    var titleCursor: NSCursor { isEditing && window?.isKeyWindow == true ? .iBeam : .arrow }
+
+    override func resetCursorRects() { addCursorRect(bounds, cursor: titleCursor) }
+    override func cursorUpdate(with event: NSEvent) { titleCursor.set() }
+
     // MARK: - 고치기
 
     func beginEditing(title: String) {
@@ -106,6 +111,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
                 .foregroundColor: style.color(.text3),
             ]
         )
+        window.invalidateCursorRects(for: self)
         onEditingChange?(true)
         window.makeFirstResponder(self)
         if let editor = currentEditor() as? NSTextView {
@@ -156,6 +162,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
         // 조합 중이던 글자는 편집이 끝나면서 확정되는데, 그때는 글자가 바뀌었다는 알림이 오지 않는다.
         // 칸에 보이는 마지막 값을 넘겨 저장소가 화면과 같은 제목을 갖게 한다.
         onChange?(normalizeTitle())
+        window?.invalidateCursorRects(for: self)
         onEditingChange?(false)
     }
 

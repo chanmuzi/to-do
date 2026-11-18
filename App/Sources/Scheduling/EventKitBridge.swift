@@ -33,8 +33,21 @@ public final class EventKitBridge: CalendarBridge {
             calendar = item.kind == .event ? store.defaultCalendarForNewEvents : store.defaultCalendarForNewReminders()
         }
         guard let calendar else { return nil }
+        return destination(for: calendar)
+    }
+    private func destination(for calendar: EKCalendar) -> ScheduleDestination {
         let color = calendar.cgColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) }
         return ScheduleDestination(name: calendar.title, color: color.map { .init(red: $0.redComponent, green: $0.greenComponent, blue: $0.blueComponent) })
+    }
+    public func events(in interval: DateInterval) -> [CalendarEvent] {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
+        let store = store()
+        let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
+        return store.events(matching: predicate).compactMap { event in
+            guard event.status != .canceled, let start = event.startDate,
+                  let item = decoded(event, retaining: ScheduleItem(id: event.calendarItemIdentifier, start: start)) else { return nil }
+            return CalendarEvent(item: item, destination: destination(for: event.calendar), recurring: event.hasRecurrenceRules || event.isDetached)
+        }
     }
     public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
         let type: EKEntityType = kind == .event ? .event : .reminder

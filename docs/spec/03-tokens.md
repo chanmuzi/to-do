@@ -13,7 +13,7 @@
 | 본문 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-body` 400 |
 | 본문 굵게 | Pretendard | `fs-body` 13px / `lh-body` 22px | `fw-strong` 650 |
 | 라이브러리 목록 제목 | Pretendard | `fs-pane-title` 14px / `lh-body` 22px | `fw-strong` 650 |
-| 라이브러리 줄 제목 | Pretendard | `fs-row` 12.5px / `lh-row` 18px | `fw-title` 600 |
+| 라이브러리 줄 제목 | Pretendard | `fs-row` 12.5px / `lh-row` 18px | `fw-row` 450, 선택 `fw-selected` 500, 빈 제목 `fw-body` 400 |
 | 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 11.5px / `lh-ui` 16px | `fw-body` 400 |
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui` 400 |
 | 임박한 리마인더 | D2Coding | `fs-ui` 12px / `lh-ui` 16px | `fw-ui-strong` 700 |
@@ -31,8 +31,10 @@
 | --- | --- | --- | --- |
 | `surface` | 창 바탕 | `#FFFFFF` | `#000000` |
 | `surface-2` | 사이드바, 보조 바탕 | `#F6F6F6` | `#0E0E0E` |
-| `surface-3` | 입력칸, 칩, 호버 | `#EDEDED` | `#1C1C1C` |
-| `hover` | 마우스를 올렸을 때의 바탕 효과 (버튼, 줄, 칸 공통. 어떤 바탕색 위에서도 보이도록 반투명) | `rgba(0,0,0,.07)` | `rgba(255,255,255,.11)` |
+| `surface-3` | 입력칸 | `#EDEDED` | `#1C1C1C` |
+| `selected` | 고른 줄과 세그먼트 바탕 | `#DEDAD4` | `#373430` |
+| `row-title` | 목록 제목 | `#393632` | `#D5D2CE` |
+| `hover` | 마우스를 올렸을 때의 바탕 효과 (버튼, 줄, 칸 공통. 어떤 바탕색 위에서도 보이도록 반투명) | `rgba(96,76,52,.08)` | `rgba(224,208,186,.10)` |
 | `text` | 본문 글자 | `#000000` | `#F0F0F0` |
 | `text-2` | 보조 글자 | `#6B6B6B` | `#9A9A9A` |
 | `text-3` | 흐린 글자(완료, 자리표시) | `#8F8F8F` | `#6E6E6E` |
@@ -59,7 +61,7 @@
 | `shadow-pop` | 캡처 바, 메뉴 그림자 | `0 28px 70px -16px rgba(0,0,0,.38),0 6px 16px -4px rgba(0,0,0,.12)` | `0 30px 80px -16px rgba(0,0,0,.90),0 6px 16px -4px rgba(0,0,0,.50)` |
 
 - `accent`는 사용자가 바꿉니다. 프리셋: 잉크(라이트 `#000000`, 다크 `#FFFFFF`), 그린(라이트 `#1A8F4C`, 다크 `#3DDC84`), 앰버(라이트 `#B26A00`, 다크 `#FFB000`), 코발트(라이트 `#1F4FFF`, 다크 `#6E8BFF`), 그래파이트(라이트 `#6B6B6B`, 다크 `#9A9A9A`)
-- `hover`는 반투명이라 색을 입힌 노트나 줄 위에서도 같은 진하기로 보입니다. 흰 바탕(다크에서는 검정 바탕) 위에서는 `surface-3`와 같은 색이 됩니다. 시안의 일부 버튼은 `surface-3`로 칠했지만 앱에서는 올렸을 때의 바탕을 모두 `hover`로 통일합니다.
+- 선택 바탕은 불투명하고 호버는 같은 계열의 반투명 색이다. 둘이 겹치면 선택을 우선한다.
 
 ### 3.3 팔레트 (노트 바탕, 스페이스 아이콘 색)
 
@@ -145,6 +147,7 @@
 - `library-w/h`: 880/560, `library-min-w/h`: 660/400, `library-sidebar-w`: 220.
 - `library-header-h`: 42, `library-row-h`: 47, `library-row-leading/trailing/gap`: 20/14/14, `library-toolbar-button`: 24.
 - `library-reminder-w`: 200. L1 오른쪽에는 시간과 icon-s 12 핀 칸만 남긴다. 예전 progress-w 토큰은 저장 호환을 위해 남기되 화면에는 사용하지 않는다(D-086).
+- 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다.
 - `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.

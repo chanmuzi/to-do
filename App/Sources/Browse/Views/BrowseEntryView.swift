@@ -1,7 +1,7 @@
 import AppKit
 import Theme
 
-/// 목록에 놓이는 뷰의 바탕. 고를 수 있는 줄은 고르거나 마우스를 올리면 `hover` 바탕이 줄 전체에 겹친다
+/// 목록에 놓이는 뷰의 바탕. 고를 수 있는 줄은 고르거나 마우스를 올리면 `selected` 바탕이 줄 전체에 겹친다
 /// (색을 입힌 줄 위에도, spec 14). 그 위에서도 마우스는 화살표다(규칙 9).
 class BrowseEntryView: NSView {
     let style: BrowseStyle
@@ -26,7 +26,7 @@ class BrowseEntryView: NSView {
     /// 줄의 높이.
     var height: CGFloat { style.theme.component(.rowHeight) }
 
-    /// `hover` 바탕을 `dur` 동안 겹치거나 걷는다(규칙 8).
+    /// `selected` 바탕을 `dur` 동안 겹치거나 걷는다(규칙 8).
     func setHighlighted(_ highlighted: Bool, animated: Bool) {
         guard highlighted != isHighlighted else { return }
         isHighlighted = highlighted
@@ -53,7 +53,7 @@ class BrowseEntryView: NSView {
         layer?.cornerRadius = radius
         layer?.backgroundColor = tint.map { style.cgColor($0, in: self) } ?? CGColor.clear
         highlightView.layer?.cornerRadius = radius
-        highlightView.layer?.backgroundColor = style.cgColor(.hover, in: self)
+        highlightView.layer?.backgroundColor = style.cgColor(.selected, in: self)
     }
 
     override func viewDidChangeEffectiveAppearance() {

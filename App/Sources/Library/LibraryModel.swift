@@ -28,17 +28,24 @@ public final class LibraryModel {
     var editingViews = false
     public private(set) var editingSpace = false
     public private(set) var renamingSpaceID: SpaceID?
+    static let defaultSpaceIcon = SpaceIcon.symbol(name: "folder", colorID: nil)
+    var draftIcon = defaultSpaceIcon
+    var choosingDraftIcon = false
+    var draftFocus = 0
+    @ObservationIgnored weak var spaceInputView: NSView?
     public var spaceName = ""
     public func beginSpaceEditing(_ id: SpaceID? = nil) {
+        draftIcon = id.flatMap { spaces.space(for: $0)?.icon } ?? Self.defaultSpaceIcon
+        choosingDraftIcon = false
         renamingSpaceID = id; spaceName = id.flatMap { spaces.space(for: $0)?.name } ?? ""; editingSpace = true
     }
-    public func cancelSpaceEditing() { editingSpace = false; renamingSpaceID = nil; spaceName = "" }
+    public func cancelSpaceEditing() { editingSpace = false; choosingDraftIcon = false; renamingSpaceID = nil; spaceName = "" }
     public func submitSpaceEditing() {
         let value = spaceName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
         do {
             if let id = renamingSpaceID { try spaces.update(id) { $0.name = value } }
-            else { let space = try spaces.create(name: value); refresh(); select(.space(space.id)) }
+            else { let space = try spaces.create(name: value, icon: draftIcon); rememberIcon(draftIcon); refresh(); select(.space(space.id)) }
             refresh(); cancelSpaceEditing()
         } catch { self.error = error.localizedDescription }
     }
@@ -69,15 +76,31 @@ public final class LibraryModel {
     public func refresh(now: Date = Date(), calendar: Calendar = .current) {
         perform {
             let listing = try notes.list(), trash = try notes.listTrash()
-            index = LibraryIndex(notes: listing.notes, trash: trash.notes, windows: windows.all, now: now, calendar: calendar)
+            index = LibraryIndex(notes: listing.notes, trash: trash.notes, windows: windows.all, events: calendarEvents, now: now, calendar: calendar)
             spaceList = spaces.spaces
             let failures = listing.failures + trash.failures
             if !failures.isEmpty { error = failures.map { $0.error.description }.joined(separator: "\n") }
         }
     }
 
+    public var readEvents: (DateInterval) -> [CalendarEvent] = { _ in [] }
+    public var linkedDestination: (ScheduleItem) -> ScheduleDestination? = { _ in nil }
+
+    func markerDestination(for item: ScheduleItem) -> ScheduleDestination? {
+        guard let link = item.link, link.kind == nil || link.kind == item.kind else { return nil }
+        return linkedDestination(item)
+    }
+
+    public var openCalendarEvent: (CalendarEvent) -> Void = { _ in }
+    private var calendarEvents: [CalendarEvent] = []
+
+    public func refreshCalendar(now: Date = Date(), calendar: Calendar = .current) {
+        calendarEvents = readEvents(LibraryIndex.upcomingInterval(now: now, calendar: calendar))
+        refresh(now: now, calendar: calendar)
+    }
+
     public func opened() {
-        refresh()
+        refreshCalendar()
         select(validated(settings.openingView ?? settings.lastSelection))
     }
     private func validated(_ value: LibrarySelection) -> LibrarySelection {
@@ -98,6 +121,7 @@ public final class LibraryModel {
         selection = target
         changeSettings { $0.lastSelection = target }
     }
+    public var showsNewNote: Bool { selection != .trash }
     public var rows: [Note] { index.rows(for: selection, query: query) }
 
     /// 한 번 클릭은 선택만 한다. 더블 클릭과 키보드 열기는 구분한다.
@@ -107,7 +131,7 @@ public final class LibraryModel {
     }
     public func openSelected() {
         guard let id = selectedNoteID,
-              let note = (rows + index.upcoming).first(where: { $0.id == id }) else { return }
+              let note = (rows + index.notes).first(where: { $0.id == id }) else { return }
         open(note)
     }
     public func moveSelection(by offset: Int) {
@@ -155,23 +179,26 @@ public final class LibraryModel {
             refresh(); select(validated(selection))
         }
     }
-    public func setIcon(_ icon: SpaceIcon, for id: SpaceID) {
+    public func setIcon(_ icon: SpaceIcon, for id: SpaceID?) {
+        guard let id else { draftIcon = icon; return }
         perform {
             try spaces.update(id) { $0.icon = icon }
-            if icon != .none {
-                changeSettings { settings in
-                    settings.recentIcons.removeAll { $0 == icon }
-                    settings.recentIcons.insert(icon, at: 0)
-                    settings.recentIcons = Array(settings.recentIcons.prefix(28))
-                }
-            }
+            rememberIcon(icon)
             refresh()
+        }
+    }
+    private func rememberIcon(_ icon: SpaceIcon) {
+        guard icon != .none else { return }
+        changeSettings { settings in
+            settings.recentIcons.removeAll { $0 == icon }
+            settings.recentIcons.insert(icon, at: 0)
+            settings.recentIcons = Array(settings.recentIcons.prefix(28))
         }
     }
     public func changeSettings(_ change: (inout LibraryPreferences) -> Void) {
         perform { try preferences.update(change); settings = preferences.value }
     }
-    func importImage(_ url: URL, for space: SpaceID) {
+    func importImage(_ url: URL, for space: SpaceID?) {
         perform {
             let name = try SpaceIconAssets.importFile(url, directory: spaces.imageDirectory,
                                                      maxPixels: Int(theme.component(.iconImportMaxPixels)))

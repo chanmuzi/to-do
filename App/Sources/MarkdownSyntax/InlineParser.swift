@@ -13,7 +13,7 @@ import Foundation
 ///   한글은 여기의 영문자나 숫자가 아니다(`한글**굵은 글**`, `**중요**하다`는 굵게다).
 /// - `\` 뒤의 `*`, `=`, `~`, `` ` ``, `[`, `]`, `\`는 그 글자 그대로다. 백슬래시는 보이지 않고 원문에 남는다.
 ///   인라인 코드 안에서는 백슬래시도 글자다.
-nonisolated enum InlineParser {
+nonisolated package enum InlineParser {
     private static let backtick: unichar = 0x60
     private static let star: unichar = 0x2A
     private static let tilde: unichar = 0x7E
@@ -28,16 +28,16 @@ nonisolated enum InlineParser {
     private static let httpPrefixes: [[unichar]] = [Array("https://".utf16), Array("http://".utf16)]
     private static let trailingPunctuation = Set(".,;:!?)\"'".utf16)
     /// 백슬래시로 막을 수 있는 글자.
-    static let escapable: Set<unichar> = [star, equals, tilde, backtick, leftBracket, rightBracket, backslash]
-    static let escapableCharacters: Set<Character> = ["*", "=", "~", "`", "[", "]", "\\"]
+    package static let escapable: Set<unichar> = [star, equals, tilde, backtick, leftBracket, rightBracket, backslash]
+    package static let escapableCharacters: Set<Character> = ["*", "=", "~", "`", "[", "]", "\\"]
 
-    static func parse(_ units: [unichar], in range: NSRange) -> [InlineSpan] {
+    package static func parse(_ units: [unichar], in range: NSRange) -> [InlineSpan] {
         var spans: [InlineSpan] = []
         scan(units, from: range.location, to: NSMaxRange(range), lineStart: range.location, into: &spans)
         return spans
     }
 
-    static func isWhitespace(_ c: unichar) -> Bool {
+    package static func isWhitespace(_ c: unichar) -> Bool {
         c == 0x20 || c == 0x09 || c == 0xA0 || c == 0x3000
     }
 
@@ -203,7 +203,7 @@ nonisolated enum InlineParser {
     }
 
     /// 영문자나 숫자(ASCII)인지.
-    static func isWordCharacter(_ c: unichar) -> Bool {
+    package static func isWordCharacter(_ c: unichar) -> Bool {
         (0x30...0x39).contains(c) || (0x41...0x5A).contains(c) || (0x61...0x7A).contains(c)
     }
 

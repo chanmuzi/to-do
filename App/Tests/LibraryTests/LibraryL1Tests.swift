@@ -23,9 +23,11 @@ import Theme
         let f = try LibraryInteractionTests.Fixture(); defer { try? f.close() }
         f.model.beginSpaceEditing(); f.model.spaceName = "  "; f.model.submitSpaceEditing()
         #expect(f.model.spaceList.isEmpty && f.model.editingSpace)
+        f.model.setIcon(.emoji("📁"), for: nil)
+        #expect(f.model.spaces.spaces.isEmpty)
         f.model.spaceName = " 업무 "; f.model.submitSpaceEditing()
         let space = try #require(f.model.spaceList.first)
-        #expect(space.name == "업무" && !f.model.editingSpace)
+        #expect(space.name == "업무" && space.icon == .emoji("📁") && !f.model.editingSpace)
         f.model.beginSpaceEditing(space.id); f.model.spaceName = "취소"; f.model.cancelSpaceEditing()
         #expect(f.model.spaceList[0].name == "업무")
         f.model.beginSpaceEditing(space.id); f.model.spaceName = "개인"; f.model.submitSpaceEditing()
@@ -33,14 +35,28 @@ import Theme
     }
     @Test func untitledUsesBodyFirstLineAndDoesNotRepeatItOrTodoProgress() {
         let note = Note(id: .make(), body: "첫 줄\n둘째 줄\n[ ] 할 일", created: Date(), modified: Date())
-        #expect(LibraryPreview.title(note) == "첫 줄")
-        #expect(LibraryPreview.subtitle(note) == "둘째 줄, 할 일")
+        #expect(LibraryPreview(note).title == "첫 줄")
+        #expect(LibraryPreview(note).subtitle == "둘째 줄, 할 일")
         var one = note; one.body = "[ ] 할 일"
-        #expect(LibraryPreview.title(one) == "할 일" && LibraryPreview.subtitle(one).isEmpty)
-        one.body = ""; #expect(LibraryPreview.title(one) == "제목 없음" && LibraryPreview.isEmpty(one))
-        #expect(LibraryPreview.upcomingTitle(one, now: Date(), calendar: .current) == "리마인더")
+        #expect(LibraryPreview(one).title == "할 일" && LibraryPreview(one).subtitle.isEmpty)
+        one.body = ""; #expect(LibraryPreview(one).title == "제목 없음" && LibraryPreview(one).isEmpty)
+        #expect(LibraryPreview(one).upcomingTitle(for: ScheduleItem(start: Date())) == "리마인더")
         one.title = "제목"; one.body = "[ ] "
-        #expect(LibraryPreview.subtitle(one) == "투두 1개 남음")
+        #expect(LibraryPreview(one).subtitle == "투두 1개 남음")
+    }
+    @Test func previewUsesEditorMarkersAndPreservesCodeAndLiteralSymbols() {
+        let body = "# **제목** `글자`\n- [x] [링크](https://example.org) ==강조==\n```swift\n**그대로**\n```"
+        let note = Note(id: .make(), body: body, created: Date(), modified: Date())
+        #expect(LibraryPreview(note).title == "제목 글자")
+        #expect(LibraryPreview(note).subtitle == "링크 강조, **그대로**")
+    }
+
+    @Test func trashOmitsTheHeaderCreationAction() throws {
+        let f = try LibraryInteractionTests.Fixture(); defer { try? f.close() }
+        f.model.select(.trash)
+        #expect(!f.model.showsNewNote)
+        f.model.select(.all)
+        #expect(f.model.showsNewNote)
     }
     @Test func sidebarAndRightInfoRenderWithoutRemovedControls() throws {
         let f = try LibraryInteractionTests.Fixture(); defer { try? f.close() }

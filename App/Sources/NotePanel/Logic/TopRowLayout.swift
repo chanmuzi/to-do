@@ -36,29 +36,24 @@ struct TopRowLayout: Hashable {
     var pin: CGRect
 
     init(_ input: Input, metrics: Metrics) {
-        let buttonY = ((metrics.height - metrics.iconButton) / 2).rounded()
+        let buttonY = (metrics.height - metrics.iconButton) / 2
         var trailing = input.width - metrics.paddingTrailing
-        // 바로 앞(오른쪽)에 놓인 것이 아이콘 버튼인지. 버튼끼리는 `buttonGap`, 그 밖은 `gap`만큼 띄운다.
-        var previousIsButton = false
-        func takeTrailing(_ width: CGFloat, isButton: Bool) -> CGRect {
-            if trailing < input.width - metrics.paddingTrailing {
-                trailing -= previousIsButton && isButton ? metrics.buttonGap : metrics.gap
-            }
+        func takeTrailing(_ width: CGFloat, gap: CGFloat) -> CGRect {
+            trailing -= gap
             let rect = CGRect(x: trailing - width, y: buttonY, width: width, height: metrics.iconButton)
             trailing = rect.minX
-            previousIsButton = isButton
             return rect
         }
 
-        pin = takeTrailing(metrics.iconButton, isButton: true)
+        pin = takeTrailing(metrics.iconButton, gap: 0)
         let fixed = metrics.paddingLeading + metrics.paddingTrailing
             + (input.spaceWidth.map { $0 + metrics.gap } ?? 0)
             + metrics.iconButton * (input.showsProblem ? 4 : 3)
-            + metrics.gap * 3 + metrics.buttonGap * (input.showsProblem ? 2 : 1)
-        reminder = input.reminderWidth.map { takeTrailing(min($0, max(0, input.width - fixed)), isButton: false) }
-        add = takeTrailing(metrics.iconButton, isButton: true)
-        more = takeTrailing(metrics.iconButton, isButton: true)
-        problem = input.showsProblem ? takeTrailing(metrics.iconButton, isButton: true) : nil
+            + metrics.gap * 2 + metrics.buttonGap * (input.showsProblem ? 3 : 2)
+        reminder = input.reminderWidth.map { takeTrailing(min($0, max(0, input.width - fixed)), gap: metrics.buttonGap) }
+        add = takeTrailing(metrics.iconButton, gap: reminder == nil ? metrics.buttonGap : metrics.gap)
+        more = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
+        problem = input.showsProblem ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : nil
         trailing -= metrics.gap
 
         var leading = metrics.paddingLeading

@@ -21,6 +21,90 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
+    @Test func schedulePopoverDismissesOnExternalFocusAndDiscardsUnsubmittedChanges() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("dismissal-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try FileNoteStore(location: .isolated(notesDirectory: root))
+        let id = try store.create(NoteDraft(title: "원래 노트")).id
+        _ = NSApplication.shared
+        let item = ScheduleItem(start: now, title: "저장된 일정")
+        try store.update(id) { $0.schedules = [item] }
+        let before = try store.load(id)
+        let coordinator = ReminderEditorCoordinator(notes: store, theme: try Theme.bundled())
+        coordinator.allowsKeyWindows = false
+        defer { coordinator.close() }
+        let owner = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let anchor = try #require(owner.contentView)
+        let other = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        var saves = 0
+        coordinator.onSave = { _, _, _ in saves += 1 }
+        @MainActor func openDraft() throws {
+            try coordinator.show(id, anchor: anchor)
+            let model = try #require(coordinator.model)
+            model.select(item.id)
+            model.input = "입력 중 내일 오후 3시"
+            #expect(!model.candidates.isEmpty)
+        }
+        try openDraft()
+        let popup = try #require(coordinator.contentView?.window)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: popup)
+        #expect(coordinator.model != nil)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: other)
+        #expect(coordinator.model == nil)
+
+        try openDraft()
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: owner)
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        #expect(coordinator.model == nil)
+
+        try openDraft()
+        let fieldWindow = try #require(coordinator.contentView?.window)
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        let content = try #require(coordinator.contentView)
+        @MainActor func input(in view: NSView) -> NSTextField? {
+            if let field = view as? NSTextField, field.isEditable { return field }
+            return view.subviews.lazy.compactMap { input(in: $0) }.first
+        }
+        let field = try #require(input(in: content))
+        #expect(fieldWindow.makeFirstResponder(field))
+        let editor = try #require(field.currentEditor() as? NSTextView)
+        editor.setMarkedText("한", selectedRange: NSRange(location: 1, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(editor.hasMarkedText())
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        #expect(!editor.hasMarkedText())
+        #expect(coordinator.contentView == nil && coordinator.model == nil)
+        #expect(try store.load(id) == before)
+        #expect(saves == 0)
+    }
+
+    @Test func schedulePopoverOutsideClickDismissesWhileInsideClickKeepsDraft() throws {
+        try fixture { _, store, id in
+            _ = NSApplication.shared
+            let coordinator = ReminderEditorCoordinator(notes: store, theme: try Theme.bundled())
+            coordinator.allowsKeyWindows = false
+            defer { coordinator.close() }
+            let owner = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 240, height: 120),
+                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            try coordinator.show(id, anchor: try #require(owner.contentView))
+            let popup = try #require(coordinator.contentView?.window)
+            coordinator.model?.input = "입력 중 내일"
+            @MainActor func click(_ window: NSWindow) throws {
+                // 이 앱의 창 번호를 대상으로 로컬 모니터를 거치는 오른쪽 누름을 보낸다.
+                let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: NSPoint(x: 1, y: 1),
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+                NSApp.sendEvent(event)
+            }
+            try click(popup)
+            #expect(coordinator.model?.input == "입력 중 내일")
+            try click(owner)
+            #expect(coordinator.model == nil)
+            #expect(try store.load(id).schedules.isEmpty)
+        }
+    }
+
     @Test func singleTimeOffersHourEventAndReminderAndArrowsChoose() throws {
         try fixture { model, store, id in
             model.input = "윤부일 내일 2pm"

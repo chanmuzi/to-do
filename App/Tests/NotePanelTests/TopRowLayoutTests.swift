@@ -23,9 +23,9 @@ import Testing
         #expect(frames.title.minX == 31)
         #expect(frames.title.width == 60)
         #expect(frames.pin == CGRect(x: 314, y: 4, width: 20, height: 20))
-        #expect(frames.reminder?.maxX == frames.pin.minX - 6)
+        #expect(frames.reminder?.maxX == frames.pin.minX)
         #expect(frames.reminder?.width == 57)
-        #expect(frames.add.maxX == (frames.reminder?.minX ?? 0) - 6)
+        #expect(frames.add.maxX == (frames.reminder?.minX ?? 0) - metrics.gap)
         // 나란히 놓인 아이콘 버튼은 `icon-btn-gap`(0)만큼: hover 상자가 맞닿는다.
         #expect(frames.more.maxX == frames.add.minX)
     }

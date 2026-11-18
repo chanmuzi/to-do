@@ -68,7 +68,9 @@ import Theme
             windows: try WindowStateStore(location: location), preferences: try LibraryPreferencesStore(location: location),
             router: RouteDispatcher { routes.append($0) })
         model.select(.trash)
-        model.open(try #require(model.index.upcoming.first))
+        let first = try #require(model.index.upcoming.first)
+        guard case .note(let upcoming, _) = first else { Issue.record("노트가 필요합니다"); return }
+        model.open(upcoming)
         #expect(model.error == nil)
         #expect(routes == [.openNote(reminder.id)])
         #expect(try notes.load(reminder.id) == reminder)

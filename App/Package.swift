@@ -24,6 +24,7 @@ let package = Package(
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
         ),
         .target(name: "Models"),
+        .target(name: "MarkdownSyntax"),
         .target(name: "DateTime", dependencies: ["Models"]),
         .target(name: "SpaceIcons", dependencies: ["Models", "Theme"],
                 resources: [.copy("Resources/SpaceImages")], swiftSettings: uiSettings),
@@ -40,7 +41,7 @@ let package = Package(
         ),
         .target(
             name: "Editor",
-            dependencies: ["Theme", "DateTime"],
+            dependencies: ["Theme", "DateTime", "MarkdownSyntax"],
             swiftSettings: uiSettings
         ),
         .target(
@@ -54,7 +55,7 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
-        .target(name: "Library", dependencies: ["Theme", "Models", "Store", "Routing", "SpaceIcons"],
+        .target(name: "Library", dependencies: ["MarkdownSyntax", "Theme", "Models", "Store", "Routing", "SpaceIcons"],
                 swiftSettings: uiSettings),
 
         .target(name: "Reminders", dependencies: ["Theme", "Models", "Store", "DateTime"], swiftSettings: uiSettings),

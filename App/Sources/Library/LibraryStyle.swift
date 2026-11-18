@@ -28,9 +28,10 @@ private struct LibraryButtonBody<Label: View>: View {
             .background {
                 if !hoverName.isEmpty { LibrarySidebarHover(name: hoverName) { hovered = $0 && enabled } }
             }
-            .background(selected ? theme.libraryColor(.surface) : ((hovered || pressed) && enabled ? theme.libraryColor(.hover) : .clear))
+            .background(selected ? theme.libraryColor(.selected) : ((hovered || pressed) && enabled ? theme.libraryColor(.hover) : .clear))
             .clipShape(RoundedRectangle(cornerRadius: rounded ? theme.shape(icon ? .chipRadius : .controlRadius) : 0))
-            .overlay { if selected { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.libraryColor(.outline), lineWidth: theme.shape(.borderWidth)) } }
+
+            .accessibilityAddTraits(selected ? .isSelected : [])
             .onHover { hovered = $0 && enabled }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation,
                        value: hovered || pressed || selected)

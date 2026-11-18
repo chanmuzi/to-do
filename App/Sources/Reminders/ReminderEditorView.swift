@@ -56,7 +56,7 @@ struct ReminderEditorView: View {
             }.buttonStyle(.plain)
         }.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.space(.sp1))
             .frame(height: theme.component(.scheduleRowHeight))
-            .background(model.selectedID == item.id ? theme.color(.surface3) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .background(model.selectedID == item.id ? theme.color(.selected) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
     }
     private func row(_ item: ScheduleItem, title: String, selected: Bool, destination: ScheduleDestination?) -> some View {
         HStack(alignment: .top, spacing: theme.space(.sp2)) {
@@ -65,12 +65,12 @@ struct ReminderEditorView: View {
         }.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.space(.sp1))
             .frame(height: theme.component(.scheduleRowHeight))
             .contentShape(Rectangle())
-            .background(selected ? theme.color(.surface3) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .background(selected ? theme.color(.selected) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
     }
     private func rowText(_ item: ScheduleItem, title: String, selected: Bool, destination: ScheduleDestination?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: theme.space(.sp2)) {
-                Text(title).font(theme.font(selected ? .strong : .body)).lineLimit(1)
+                Text(title).font(theme.font(selected ? .selected : .body)).lineLimit(1)
                     .foregroundStyle(theme.color(item.isCompleted ? .text3 : .text))
                 Spacer(minLength: 0)
                 if let destination { Text(destination.name).font(theme.font(.rowSub, size: theme.tokens.textStyle(.micro).size)).foregroundStyle(theme.color(.text3)).lineLimit(1) }
@@ -82,27 +82,5 @@ struct ReminderEditorView: View {
     }
     private func marker(_ item: ScheduleItem, destination: ScheduleDestination?) -> some View {
         ScheduleMarker(item: item, destination: destination, theme: theme)
-    }
-}
-
-struct ScheduleMarker: View {
-    let item: ScheduleItem
-    let destination: ScheduleDestination?
-    let theme: Theme
-    var color: Color {
-        if let color = destination?.color { return Color(.sRGB, red: color.red, green: color.green, blue: color.blue) }
-        return theme.color(Self.fallback(for: item.kind))
-    }
-    static func fallback(for kind: ScheduleItem.Kind) -> ColorToken { kind == .event ? .text : .text2 }
-    var body: some View {
-        ZStack {
-            if item.kind == .event {
-                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(.scheduleReminderCircle))
-            } else {
-                Circle().strokeBorder(color, lineWidth: theme.shape(.borderWidth))
-                    .background(Circle().fill(item.isCompleted ? color : .clear))
-                    .frame(width: theme.component(.scheduleReminderCircle), height: theme.component(.scheduleReminderCircle))
-            }
-        }.frame(width: theme.component(.scheduleMarkerWidth), height: theme.lineHeight(.body))
     }
 }

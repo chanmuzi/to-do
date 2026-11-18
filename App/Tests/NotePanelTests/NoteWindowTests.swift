@@ -20,6 +20,28 @@ import Theme
         textView.insertText(text, replacementRange: NSRange(location: (textView.string as NSString).length, length: 0))
     }
 
+    @Test func openingMovingAndPinningPreserveModificationDateAndOrder() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let first = try fixture.notes.create(NoteDraft(title: "먼저 쓴 노트"))
+        let second = try fixture.notes.create(NoteDraft(title: "나중에 쓴 노트"))
+        let order = try fixture.notes.list().notes.map(\.id)
+        try coordinator.open(first.id, focus: false)
+        let controller = try #require(coordinator.controllers[first.id])
+        let title = try #require(controller.root.topRow.subviews.compactMap { $0 as? TitleField }.first)
+        #expect(!controller.panel.isKeyWindow && title.titleCursor == .arrow)
+        controller.panel.setFrameOrigin(.init(x: 30, y: 60))
+        coordinator.setPinned(false, for: first.id)
+        coordinator.closeWindow(first.id)
+        try coordinator.open(second.id, focus: false)
+        try coordinator.open(first.id, focus: false)
+        #expect(try fixture.notes.load(first.id).modified == first.modified)
+        #expect(try fixture.notes.list().notes.map(\.id) == order)
+        let edited = try fixture.notes.update(first.id) { $0.title = "고친 제목" }
+        #expect(edited.modified > first.modified)
+        #expect(try fixture.notes.list().notes.first?.id == first.id)
+    }
+
     // MARK: - 크기와 상태 조합
 
     @Test func windowAndElementFramesAreIdenticalAcrossHoverAndFocus() throws {

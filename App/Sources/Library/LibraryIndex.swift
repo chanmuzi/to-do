@@ -6,13 +6,14 @@ public struct LibraryIndex: Sendable {
     public let notes: [Note]
     public let trash: [Note]
     public let windows: [NoteID: NoteWindowState]
+    public let events: [CalendarEvent]
     public let now: Date
     public let calendar: Calendar
 
     public init(notes: [Note], trash: [Note] = [], windows: [NoteID: NoteWindowState] = [:],
-                now: Date = Date(), calendar: Calendar = .current) {
+                events: [CalendarEvent] = [], now: Date = Date(), calendar: Calendar = .current) {
         self.notes = notes; self.trash = trash; self.windows = windows
-        self.now = now; self.calendar = calendar
+        self.events = events; self.now = now; self.calendar = calendar
     }
 
     public func isArchived(_ note: Note) -> Bool {
@@ -29,9 +30,51 @@ public struct LibraryIndex: Sendable {
     public var archiveMonths: [String] {
         Array(Set(notes.filter(isArchived).map { month(of: $0.created) })).sorted(by: >)
     }
-    public var upcoming: [Note] {
-        notes.filter { $0.schedules.contains { $0.isUpcoming(at: now, calendar: calendar) } }
-            .sorted { $0.displayedSchedule(at: now, calendar: calendar)!.start < $1.displayedSchedule(at: now, calendar: calendar)!.start }
+    public static func upcomingInterval(now: Date, calendar: Calendar) -> DateInterval {
+        DateInterval(start: now, end: calendar.date(byAdding: .day, value: 7, to: now) ?? now)
+    }
+
+    public var upcoming: [UpcomingRow] {
+        let interval = Self.upcomingInterval(now: now, calendar: calendar)
+        func included(_ item: ScheduleItem) -> Bool {
+            guard !item.isDeleted, !item.isCompleted, item.start < interval.end else { return false }
+            if let end = item.end { return end > now }
+            return item.isUpcoming(at: now, calendar: calendar)
+        }
+        var rows: [UpcomingRow] = []
+        var linked: [ScheduleItem] = []
+        for note in notes {
+            for item in note.schedules {
+                if item.kind == .event, let link = item.link, link.kind != .reminder { linked.append(item) }
+                if included(item) { rows.append(.note(note, item)) }
+            }
+        }
+        // 다른 캘린더에 복사한 일정은 같은 외부 ID를 가질 수 있다.
+        let localIDs = Set(events.compactMap { $0.item.link?.localID })
+        let externalIDs = Dictionary(grouping: events.compactMap { $0.item.link }, by: \.externalID)
+            .mapValues { Set($0.map(\.localID)) }
+        for event in events where event.item.kind == .event && included(event.item) {
+            let duplicate = linked.contains { item in
+                guard let a = item.link, let b = event.item.link,
+                      !event.recurring || item.start == event.item.start else { return false }
+                if a.localID == b.localID { return true }
+                guard !localIDs.contains(a.localID), let external = a.externalID else { return false }
+                return external == b.externalID && externalIDs[external]?.count == 1
+            }
+            if !duplicate { rows.append(.calendar(event)) }
+        }
+        var result: [UpcomingRow] = []
+        for row in rows.sorted(by: { ($0.item.start, $0.id) < ($1.item.start, $1.id) }) {
+            let duplicate = result.contains { other in
+                if row.id == other.id { return true }
+                guard row.item.kind == .event, row.item.start == other.item.start,
+                      let a = row.item.link, let b = other.item.link else { return false }
+                return a.localID == b.localID
+            }
+            if !duplicate { result.append(row) }
+            if result.count == 5 { break }
+        }
+        return result
     }
     public func days(in space: SpaceID?) -> [Date] {
         Array(Set(notes.filter { $0.spaceID == space && !isArchived($0) }
@@ -56,12 +99,23 @@ public struct LibraryIndex: Sendable {
             return included && (query.isEmpty || (note.title + "\n" + note.body)
                 .localizedStandardContains(query))
         }.sorted {
-            if selection == .floating {
-                let a = windows[$0.id]?.stackOrder ?? 0, b = windows[$1.id]?.stackOrder ?? 0
-                if a != b { return a > b }
-            }
             if $0.modified != $1.modified { return $0.modified > $1.modified }
             return $0.id.rawValue < $1.id.rawValue
+        }
+    }
+}
+
+public enum UpcomingRow: Identifiable, Sendable {
+    case note(Note, ScheduleItem)
+    case calendar(CalendarEvent)
+
+    public var item: ScheduleItem {
+        switch self { case .note(_, let item): item; case .calendar(let event): event.item }
+    }
+    public var id: String {
+        switch self {
+        case .note(let note, let item): "note/\(note.id.rawValue)/\(item.id)"
+        case .calendar(let event): "calendar/\(event.item.id)/\(event.item.start.timeIntervalSinceReferenceDate)"
         }
     }
 }

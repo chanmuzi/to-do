@@ -52,20 +52,11 @@ struct LibrarySidebar: View {
                         ForEach(model.index.archiveMonths, id: \.self) { row(.archive($0), symbol: "archivebox") }
                         row(.trash, symbol: "trash")
                     }
-                    if !model.index.upcoming.isEmpty {
+                    let upcoming = model.index.upcoming
+                    if !upcoming.isEmpty {
                         VStack(spacing: theme.component(.librarySidebarRowGap)) {
                             sectionHeader("다가오는 예정")
-                            ForEach(model.index.upcoming) { note in
-                                LibrarySelectableRow(model: model, note: note, rounded: true) {
-                                    HStack(spacing: theme.space(.sp1)) {
-                                        Text(LibraryPreview.upcomingTitle(note, now: model.index.now, calendar: model.index.calendar)).lineLimit(1)
-                                        Spacer(minLength: 0)
-                                        LibraryReminder(note: note, model: model, sidebar: true)
-                                            .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing)
-                                    }.font(theme.font(.body)).frame(height: theme.component(.rowHeight))
-                                        .padding(.horizontal, theme.space(.sp2))
-                                }
-                            }
+                            ForEach(upcoming) { entry in upcomingRow(entry) }
                         }
                     }
                 }.padding(.top, theme.space(.sp2))
@@ -81,15 +72,56 @@ struct LibrarySidebar: View {
             Button("취소", role: .cancel) { deleting = nil }
         }
     }
+    @ViewBuilder private func upcomingRow(_ entry: UpcomingRow) -> some View {
+        let item = entry.item
+        let presentation = ReminderPresentation(item: item, now: model.index.now, options: model.displayOptions, calendar: model.index.calendar)
+        switch entry {
+        case .note(let note, _):
+            let title = item.title.isEmpty ? LibraryPreview(note).upcomingTitle(for: item) : item.title
+            LibrarySelectableRow(model: model, note: note, label: presentation.accessibilityLabel(title: title)) {
+                upcomingLabel(title, item: item, presentation: presentation, destination: model.markerDestination(for: item))
+            }
+        case .calendar(let event):
+            let title = item.title.isEmpty ? "일정" : item.title
+            Button {
+                model.openCalendarEvent(event)
+            } label: {
+                upcomingLabel(title, item: item, presentation: presentation, destination: event.destination)
+            }.buttonStyle(LibraryButtonStyle(theme: theme))
+                .accessibilityLabel("캘린더 " + presentation.accessibilityLabel(title: title))
+        }
+    }
+
+    private func upcomingLabel(_ title: String, item: ScheduleItem, presentation: ReminderPresentation,
+                               destination: ScheduleDestination?) -> some View {
+        HStack(spacing: theme.space(.sp1)) {
+            ScheduleMarker(item: item, destination: destination, theme: theme)
+                .accessibilityHidden(true)
+            Text(title).lineLimit(1)
+            Spacer(minLength: 0)
+            Text(presentation.text ?? "").font(theme.font(.micro)).lineLimit(1)
+                .foregroundStyle(theme.libraryColor(presentation.status == .scheduled ? .text3 : .warn))
+                .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+        }.font(theme.font(.body)).frame(maxWidth: .infinity).frame(height: theme.component(.rowHeight))
+            .padding(.horizontal, theme.space(.sp2))
+    }
     private var spaceInput: some View {
-        HStack(spacing: theme.space(.sp2)) {
-            RoundedRectangle(cornerRadius: theme.shape(.chipRadius)).fill(theme.libraryColor(.surface3))
-                .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
-            CommandTextField(text: $model.spaceName, theme: theme, placeholder: "스페이스 이름",
+        SidebarColumns(theme: theme) {
+            Button { model.choosingDraftIcon = true } label: {
+                SidebarSpaceIcon(model: model, icon: model.draftIcon)
+                    .frame(width: theme.component(.controlHeight), height: theme.component(.controlHeight))
+                    .contentShape(Rectangle())
+            }.buttonStyle(LibraryButtonStyle(theme: theme)).accessibilityLabel("스페이스 아이콘")
+                .disabled(model.renamingSpaceID != nil)
+                .popover(isPresented: $model.choosingDraftIcon) { IconPickerView(model: model) }
+                .onChange(of: model.choosingDraftIcon) { _, open in if !open { model.draftFocus += 1 } }
+        } content: {
+            CommandTextField(text: $model.spaceName, theme: theme, placeholder: "스페이스 이름", focusToken: model.draftFocus,
                              submit: model.submitSpaceEditing, cancel: model.cancelSpaceEditing)
-        }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
-            .background(theme.libraryColor(.surface), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-            .overlay { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.libraryColor(.outline), lineWidth: theme.shape(.borderWidth)) }
+        }.padding(.trailing, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
+            .background(theme.libraryColor(.selected), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .background(SpaceInputBounds(model: model))
     }
     private func sectionHeader(_ title: String, symbol: String? = nil, label: String = "", action: @escaping () -> Void = {}) -> some View {
         LibrarySectionHeader(theme: theme, title: title, symbol: symbol, label: label, action: action)
@@ -98,17 +130,20 @@ struct LibrarySidebar: View {
     private func row(_ item: LibrarySelection, symbol: String?, indented: Bool = false) -> some View {
         let selected = model.selection == item
         return Button { model.select(item) } label: {
-            HStack(spacing: theme.space(.sp2)) {
+            let title = Text(model.title(item)).lineLimit(1)
+                .font(theme.font(indented || isArchive(item) ? .ui : .body, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
                 if let symbol {
-                    LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
-                        .foregroundStyle(theme.libraryColor(.text2))
+                    SidebarColumns(theme: theme) {
+                        LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
+                            .foregroundStyle(theme.libraryColor(.text2))
+                    } content: { title }
+                } else {
+                    title.padding(.leading, theme.space(.sp6))
                 }
-                Text(model.title(item)).lineLimit(1)
-                    .font(theme.font(indented || isArchive(item) ? .ui : .body, weight: selected ? theme.tokens.textStyle(.strong).weight : nil))
-                Spacer(minLength: 0)
             }
             .foregroundStyle(theme.libraryColor(isArchive(item) || isPastDay(item) ? .text3 : .text))
-            .padding(.leading, indented ? theme.space(.sp6) : theme.space(.sp2))
             .padding(.trailing, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
         }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected, hoverName: model.title(item)))
     }
@@ -122,6 +157,33 @@ struct LibrarySidebar: View {
     }
 }
 
+/// 이름 입력도 같은 아이콘 중심과 글자 시작선을 사용한다.
+private struct SidebarColumns<Icon: View, Content: View>: View {
+    let theme: Theme
+    @ViewBuilder let icon: () -> Icon
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(spacing: theme.space(.sp1)) {
+            icon().frame(width: theme.component(.controlHeight))
+            content()
+        }.padding(.leading, theme.space(.sp1))
+    }
+}
+
+private struct SidebarSpaceIcon: View {
+    let model: LibraryModel
+    let icon: SpaceIcon
+
+    var body: some View {
+        let side = model.theme.component(.iconLarge)
+        SpaceIconView(icon: icon == .none ? LibraryModel.defaultSpaceIcon : icon,
+                      directory: model.spaces.imageDirectory, theme: model.theme,
+                      size: side, color: model.theme.nsColor(.text2))
+            .frame(width: side, height: side)
+    }
+}
+
 private struct LibrarySpaceRow: View {
     @Bindable var model: LibraryModel
     let space: Space
@@ -132,32 +194,33 @@ private struct LibrarySpaceRow: View {
     private var selected: Bool { model.selection == .space(space.id) }
     var body: some View {
         HStack(spacing: theme.space(.sp1)) {
-            Button {
-                if model.expanded.contains(space.id) { model.expanded.remove(space.id) } else { model.expanded.insert(space.id) }
-            } label: {
-                LibrarySymbol(theme: theme, name: model.expanded.contains(space.id) ? "chevron.down" : "chevron.right", size: .iconSmall)
-                    .frame(width: theme.component(.iconSmall), height: theme.component(.rowHeight))
-                    .contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜 펼치기")
             Button { model.select(.space(space.id)) } label: {
-                HStack(spacing: theme.space(.sp2)) {
-                    SpaceIconView(icon: space.icon, directory: model.spaces.imageDirectory, theme: theme,
-                                  size: theme.component(.iconLarge), color: theme.nsColor(.text2))
-                        .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
-                    Text(space.name).font(theme.font(.body, weight: selected ? theme.tokens.textStyle(.strong).weight : nil)).lineLimit(1)
-                    Spacer(minLength: 0)
+                SidebarColumns(theme: theme) {
+                    SidebarSpaceIcon(model: model, icon: space.icon)
+                } content: {
+                    Text(space.name).font(theme.font(.body, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
+                        .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
             ZStack {
                 Menu { menuContents } label: { LibrarySymbol(theme: theme, name: "ellipsis", size: .iconLarge) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .opacity(hovered ? 1 : 0).accessibilityLabel("\(space.name) 더 보기")
             }.frame(width: theme.component(.libraryToolbarButton))
-        }.padding(.horizontal, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
+            Button {
+                if model.expanded.contains(space.id) { model.expanded.remove(space.id) } else { model.expanded.insert(space.id) }
+            } label: {
+                LibrarySymbol(theme: theme, name: model.expanded.contains(space.id) ? "chevron.down" : "chevron.right", size: .iconSmall)
+                    .foregroundStyle(theme.libraryColor(.text3))
+                    .opacity(hovered || model.expanded.contains(space.id) ? 1 : 0)
+                    .frame(width: theme.component(.controlHeight), height: theme.component(.rowHeight))
+                    .contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜").accessibilityValue(model.expanded.contains(space.id) ? "펼쳐짐" : "접힘")
+        }.padding(.trailing, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
             .foregroundStyle(theme.libraryColor(.text))
-            .background(selected ? theme.libraryColor(.surface) : (hovered ? theme.libraryColor(.hover) : .clear),
+            .background(selected ? theme.libraryColor(.selected) : (hovered ? theme.libraryColor(.hover) : .clear),
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-            .overlay { if selected { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.libraryColor(.outline), lineWidth: theme.shape(.borderWidth)) } }
+
             .onHover { hovered = $0 }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: selected)
@@ -192,4 +255,14 @@ private struct LibrarySectionHeader: View {
             .contentShape(Rectangle()).onHover { hovered = $0 }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
     }
+}
+
+private struct SpaceInputBounds: NSViewRepresentable {
+    let model: LibraryModel
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        model.spaceInputView = view
+        return view
+    }
+    func updateNSView(_ view: NSView, context: Context) {}
 }

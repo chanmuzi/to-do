@@ -30,7 +30,7 @@ import Testing
         let index = LibraryIndex(notes: [today, old, tomorrow], now: now, calendar: calendar)
         #expect(Set(index.rows(for: .today).map(\.id)) == [today.id, old.id])
         #expect(index.rows(for: .all).count == 3)
-        #expect(index.upcoming.map(\.id) == [today.id, tomorrow.id])
+        #expect(index.upcoming.map(\.item.start) == [now, date(2026, 11, 18)])
     }
     @Test func datesAreCreationDatesAndTrashDoesNotLeakIntoViews() {
         let recent = note("recent", day: 16), old = note("old", day: 10), trash = note("trash", day: 17)
@@ -41,13 +41,15 @@ import Testing
         #expect(index.archiveMonths == ["2026-11"])
         #expect(index.rows(for: .archive("2026-11")).map(\.id) == [old.id])
     }
-    @Test func floatingUsesOpenStateAndStackOrderEvenWhenUnpinned() {
-        let a = note("a", day: 17), b = note("b", day: 17), c = note("c", day: 17)
+    @Test func floatingUsesEditDateEvenWhenAnOlderWindowIsInFront() {
+        let a = note("a", day: 17), c = note("c", day: 17)
+        var b = note("b", day: 17)
+        b.modified = now.addingTimeInterval(5)
         let index = LibraryIndex(notes: [a,b,c], windows: [
             a.id: NoteWindowState(isPinned: false, isOpen: true, stackOrder: 5),
             b.id: NoteWindowState(isOpen: true, stackOrder: 2), c.id: NoteWindowState(isOpen: false)
         ], now: now, calendar: calendar)
-        #expect(index.rows(for: .floating).map(\.id) == [a.id,b.id])
+        #expect(index.rows(for: .floating).map(\.id) == [b.id,a.id])
     }
     @Test func localMidnightAndMonthRollover() {
         let old = Note(id: .make(), created: date(2026, 10, 31, 23), modified: now)
@@ -70,7 +72,47 @@ import Testing
         #expect(index.rows(for: .space(nil)).count == 1)
         #expect(index.rows(for: .all, query: "없음").isEmpty)
     }
+    @Test func upcomingMergesOccurrencesDeduplicatesLinksAndCapsAfterSorting() {
+        let interval = LibraryIndex.upcomingInterval(now: now, calendar: calendar)
+        let link = ScheduleItem.Link(localID: "회의", externalID: "회사-회의", kind: .event)
+        let ongoing = ScheduleItem(id: "진행", start: now.addingTimeInterval(-600), end: now.addingTimeInterval(600), link: link)
+        let later = ScheduleItem(id: "다음 회차", start: now.addingTimeInterval(60), end: now.addingTimeInterval(180), link: link)
+        let done = ScheduleItem(id: "완료", start: now, isCompleted: true)
+        let ended = ScheduleItem(id: "끝", start: now.addingTimeInterval(-120), end: now)
+        var owner = note("노트", day: 17)
+        owner.schedules = [ongoing, done, ended, ScheduleItem(id: "경계", start: interval.end),
+                           ScheduleItem(id: "노트 알림", start: now.addingTimeInterval(30))]
+        let extra = (1...4).map { n in
+            CalendarEvent(item: ScheduleItem(id: "외부\(n)", start: now.addingTimeInterval(Double(n * 120)),
+                                             end: now.addingTimeInterval(3600)), destination: nil)
+        }
+        let events = extra + [CalendarEvent(item: ongoing, destination: nil, recurring: true),
+                              CalendarEvent(item: later, destination: nil, recurring: true)]
+        let rows = LibraryIndex(notes: [owner], events: events, now: now, calendar: calendar).upcoming
+        #expect(rows.map(\.item.id) == ["진행", "노트 알림", "다음 회차", "외부1", "외부2"])
+        guard case .note(let first, _) = rows.first else { Issue.record("노트 연결을 우선해야 합니다"); return }
+        #expect(first.id == owner.id)
+        #expect(LibraryIndex(notes: [], now: now).upcoming.isEmpty)
+    }
+
+    @Test func externalIDFallbackKeepsIndependentCalendarCopies() {
+        func event(_ id: String) -> ScheduleItem {
+            ScheduleItem(id: id, start: now, end: now.addingTimeInterval(60),
+                         link: .init(localID: id, externalID: "공유 UID", kind: .event))
+        }
+        var owner = note("연결 노트", day: 17)
+        owner.schedules = [event("원본")]
+        let current = CalendarEvent(item: event("원본"), destination: nil)
+        let copy = CalendarEvent(item: event("사본"), destination: nil)
+        let both = LibraryIndex(notes: [owner], events: [current, copy], now: now).upcoming
+        #expect(both.count == 2)
+        let changedLocalID = LibraryIndex(notes: [owner], events: [copy], now: now).upcoming
+        #expect(changedLocalID.count == 1)
+        guard case .note = changedLocalID.first else { Issue.record("노트 연결을 유지해야 합니다"); return }
+    }
+
     @Test func taskProgressExcludesCode() {
-        #expect(LibraryPreview.progress("[ ] a\n- [x] b\n```\n[x] code\n```\n\t[X] c") == "2/3")
+        let summary = LibraryPreview(Note(id: .make(), body: "[ ] a\n- [x] b\n```\n[x] code\n```\n\t[X] c", created: Date(), modified: Date()))
+        #expect(summary.completed == 2 && summary.total == 3)
     }
 }

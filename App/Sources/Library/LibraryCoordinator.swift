@@ -25,7 +25,11 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
             let window = LibraryWindow(contentRect: NSRect(x: 0, y: 0, width: theme.component(.libraryWidth), height: theme.component(.libraryHeight)),
                 styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
             window.allowsKey = allowsKeyWindows
-            window.cancelSpaceEditing = { [weak model] in model?.cancelSpaceEditing() }
+            window.cancelSpaceEditingOutside = { [weak model] point in
+                guard let model, model.editingSpace else { return }
+                if let view = model.spaceInputView, view.bounds.contains(view.convert(point, from: nil)) { return }
+                model.cancelSpaceEditing()
+            }
             window.title = "라이브러리"; window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
             window.isReleasedWhenClosed = false; window.delegate = self
             window.minSize = NSSize(width: theme.component(.libraryMinWidth), height: theme.component(.libraryMinHeight))
@@ -44,7 +48,7 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
         timer?.invalidate()
         // 자정과 리마인더가 지나면 열린 라이브러리의 분류도 갱신한다.
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.model.refresh() }
+            MainActor.assumeIsolated { self?.model.refreshCalendar() }
         }
     }
     #if DEBUG
@@ -61,7 +65,7 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
     }
     #endif
     public func close() { model.cancelSpaceEditing(); spacePopover?.close(); window?.close(); timer?.invalidate(); timer = nil }
-    public func windowDidResignKey(_ notification: Notification) { model.cancelSpaceEditing() }
+    public func windowDidResignKey(_ notification: Notification) { if !model.choosingDraftIcon { model.cancelSpaceEditing() } }
     public func windowWillClose(_ notification: Notification) { timer?.invalidate(); timer = nil }
     public func showSpacePicker(for id: NoteID, anchor: NSView?) {
         beforeMove()
@@ -75,17 +79,14 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
 
 private final class LibraryWindow: NSWindow {
     var allowsKey = true
-    var cancelSpaceEditing: () -> Void = {}
+    var cancelSpaceEditingOutside: (NSPoint) -> Void = { _ in }
     private weak var pressedRow: LibraryRowInputView?
     override func sendEvent(_ event: NSEvent) {
         // 노트 창과 같은 경로: hosting view의 제스처 처리 전에 줄이 누름/뗌 한 쌍을 소유한다.
         // 특히 두 번째 누름이 SwiftUI 부모에 흡수되어 더블 클릭이 없어지지 않게 한다.
         switch event.type {
         case .leftMouseDown:
-            if let content = contentView, let parent = content.superview {
-                let hit = content.hitTest(parent.convert(event.locationInWindow, from: nil))
-                if !(hit is NSTextView), hit?.accessibilityLabel() != "스페이스 이름" { cancelSpaceEditing() }
-            }
+            cancelSpaceEditingOutside(event.locationInWindow)
             pressedRow = nil
             if let content = contentView, let parent = content.superview,
                let row = content.hitTest(parent.convert(event.locationInWindow, from: nil)) as? LibraryRowInputView {

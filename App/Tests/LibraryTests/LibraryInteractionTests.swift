@@ -6,6 +6,7 @@ import Models
 import Store
 import Theme
 import Routing
+import SpaceIcons
 @testable import Library
 
 @Suite(.serialized) @MainActor struct LibraryInteractionTests {
@@ -134,6 +135,130 @@ import Routing
         #expect(try f.notes.listTrash().notes.map(\.id) == [trash.id])
     }
 
+    @Test func calendarOnlyRowOpensItsEventOnOneClick() throws {
+        let f = try Fixture(); defer { try? f.close() }
+        let now = Date()
+        _ = try f.notes.create(NoteDraft(title: "노트", reminder: now.addingTimeInterval(3600)))
+        let event = CalendarEvent(item: ScheduleItem(start: now.addingTimeInterval(7200),
+            end: now.addingTimeInterval(9000), title: "캘린더 회의"), destination: nil)
+        f.model.readEvents = { _ in [event] }
+        var opened: [CalendarEvent] = []
+        f.model.openCalendarEvent = { opened.append($0) }
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show(); settle()
+        let window = try #require(f.coordinator.window)
+        let root = try #require(window.contentView)
+        let height = f.model.theme.component(.rowHeight)
+        let noteRow = try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }.first { $0.bounds.height == height })
+        let center = noteRow.convert(NSPoint(x: noteRow.bounds.midX, y: noteRow.bounds.midY), to: nil)
+        try click(window, at: NSPoint(x: center.x, y: center.y - height - f.model.theme.component(.librarySidebarRowGap)))
+        #expect(opened == [event])
+        #expect(f.routes.isEmpty)
+    }
+
+    @Test func draftAndSavedSpaceShareIconSizeAndColumn() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        _ = try f.model.spaces.create(name: "업무")
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        f.model.beginSpaceEditing()
+        settle()
+        let root = try #require(f.coordinator.window?.contentView)
+        root.layoutSubtreeIfNeeded()
+        let theme = f.model.theme
+        let boxes = descendants(root).compactMap { $0 as? SpaceIconNSView }.map { $0.convert($0.bounds, to: root) }
+        let side = theme.component(.iconLarge)
+        let center = theme.space(.sp2) + theme.space(.sp1) + theme.component(.controlHeight) / 2
+        #expect(boxes.count == 2)
+        for box in boxes {
+            #expect(box.size == NSSize(width: side, height: side))
+            #expect(box.midX == center)
+        }
+        let field = try #require(descendants(root).compactMap { $0 as? NSTextField }
+            .first { $0.accessibilityLabel() == "스페이스 이름" })
+        let fieldStart = field.convert(field.bounds, to: root).minX + field.alignmentRectInsets.left
+        let textStart = center + theme.component(.controlHeight) / 2 + theme.space(.sp1)
+        #expect(fieldStart == textStart)
+        #expect(!field.drawsBackground && !field.isBordered)
+    }
+
+    @Test func collapsedSpaceDisclosureStillRespondsAcrossItsButton() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let space = try f.model.spaces.create(name: "업무")
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        settle()
+        let window = try #require(f.coordinator.window)
+        let root = try #require(window.contentView)
+        let folder = try #require(descendants(root).compactMap { $0 as? SpaceIconNSView }.first)
+        let center = folder.convert(folder.bounds, to: nil)
+        let theme = f.model.theme
+        let right = theme.component(.librarySidebarWidth) - theme.space(.sp2) - theme.space(.sp1)
+        let control = theme.component(.controlHeight)
+        #expect(!f.model.expanded.contains(space.id))
+        try click(window, at: NSPoint(x: right - control + 1, y: center.midY))
+        #expect(f.model.expanded.contains(space.id))
+        try click(window, at: NSPoint(x: right - 1, y: center.midY))
+        #expect(!f.model.expanded.contains(space.id))
+    }
+
+    @Test func noteMarkerUsesOnlyItsLinkedCalendarOrReminderList() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let now = Date()
+        let destination = ScheduleDestination(name: "업무", color: .init(red: 0, green: 0, blue: 1))
+        var queries: [ScheduleItem.Kind] = []
+        f.model.linkedDestination = { item in
+            queries.append(item.kind)
+            return destination
+        }
+        var item = ScheduleItem(start: now)
+        #expect(f.model.markerDestination(for: item) == nil)
+        item.link = .init(localID: "연결", externalID: nil, kind: .event)
+        #expect(f.model.markerDestination(for: item) == nil)
+        item.end = now.addingTimeInterval(3600)
+        #expect(f.model.markerDestination(for: item) == destination)
+        item.end = nil
+        item.link?.kind = nil
+        #expect(f.model.markerDestination(for: item) == destination)
+        #expect(queries == [.event, .reminder])
+    }
+
+    @Test func selectedNoteFillKeepsSideMarginsAndSeparatorClear() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let note = try f.notes.create(NoteDraft(title: "시험"))
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        settle()
+        let root = try #require(f.coordinator.window?.contentView)
+        let row = try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }.first { $0.note?.id == note.id })
+        let rect = row.convert(row.bounds, to: root)
+        func render() throws -> NSBitmapImageRep {
+            let bitmap = try #require(root.bitmapImageRepForCachingDisplay(in: rect))
+            root.cacheDisplay(in: rect, to: bitmap)
+            return bitmap
+        }
+        let before = try render()
+        f.model.activate(note)
+        RunLoop.main.run(until: Date().addingTimeInterval(f.model.theme.motion.duration + 0.05))
+        let after = try render()
+        let width = after.pixelsWide
+        let height = after.pixelsHigh
+        let insetX = Int(CGFloat(width) / rect.width * f.model.theme.space(.sp2))
+        let insetY = Int(CGFloat(height) / rect.height * f.model.theme.component(.libraryRowHighlightInsetY))
+        func unchanged(_ x: Int, _ y: Int) -> Bool { before.colorAt(x: x, y: y) == after.colorAt(x: x, y: y) }
+        #expect(unchanged(insetX - 1, height / 2))
+        #expect(unchanged(width - insetX, height / 2))
+        #expect(!unchanged(insetX, height / 2))
+        #expect(!unchanged(width - 1 - insetX, height / 2))
+        #expect(unchanged(width / 2, insetY - 1))
+        #expect(unchanged(width / 2, height - insetY))
+        #expect(!unchanged(width / 2, height / 2))
+    }
+
     @Test func sidebarPixelsDoNotChangeWhenOnlyNoteCountsChange() throws {
         let f = try Fixture(); defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "첫째"))
@@ -177,7 +302,9 @@ import Routing
             #expect(f.model.reminderPresentation(for: note) == ReminderPresentation(reminder: reminder,
                 now: now, options: f.model.displayOptions, calendar: cal))
         }
-        #expect(LibraryPreview.progress("본문") == "")
-        #expect(LibraryPreview.progress("- [x] 완료\n- [ ] 대기") == "1/2")
+        let empty = LibraryPreview(Note(id: .make(), body: "본문", created: Date(), modified: Date()))
+        #expect(empty.total == 0)
+        let summary = LibraryPreview(Note(id: .make(), body: "- [x] 완료\n- [ ] 대기", created: Date(), modified: Date()))
+        #expect(summary.completed == 1 && summary.total == 2)
     }
 }
