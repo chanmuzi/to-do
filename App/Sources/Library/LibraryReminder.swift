@@ -9,7 +9,7 @@ struct LibraryReminder: View {
         if let value = model.reminderPresentation(for: note), let text = value.text {
             Text(text).lineLimit(1).truncationMode(.tail)
                 .font(model.theme.font(.scheduleTime))
-                .foregroundStyle(model.theme.libraryColor(value.status == .scheduled ? .text2 : .warn))
+                .foregroundStyle(model.theme.libraryColor(value.status == .scheduled ? .text2 : .warn, on: model.selectedNoteID == note.id ? .selected : .surface3))
                 .accessibilityLabel(value.accessibilityLabel)
         }
     }

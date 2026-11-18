@@ -3,6 +3,7 @@ import AppKit
 extension EditorController {
     /// 굵게는 조합한 글자를 먼저 확정하고 그 뒤의 입력 상태를 바꾼다.
     func run(_ action: EditorAction) {
+        defer { onFormattingChange?() }
         if textView.hasMarkedText() {
             guard action == .bold else { return }
             textView.unmarkText()
@@ -12,6 +13,7 @@ extension EditorController {
         switch action {
         case .indent: apply(EditorCommands.indent(document, selection: selection, folded: folded))
         case .outdent: apply(EditorCommands.outdent(document, selection: selection, folded: folded))
+        case .toggleBullet: apply(EditorCommands.toggleBullet(document, selection: selection))
         case .toggleTodo: apply(EditorCommands.toggleTodo(document, selection: selection))
         case .toggleDone: apply(EditorCommands.toggleDone(document, selection: selection))
         case .moveLineUp: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, direction: .up))
@@ -84,7 +86,10 @@ extension EditorController {
             bold: marks?.bold ?? spans.contains { $0.kind == .bold },
             strikethrough: marks?.strike ?? spans.contains { $0.kind == .strike },
             inlineCode: marks?.code ?? spans.contains { $0.kind == .code },
-            highlight: marks?.highlight ?? highlight ?? 0
+            highlight: marks?.highlight ?? highlight ?? 0,
+            link: spans.contains { if case .link = $0.kind { true } else { false } },
+            checklist: document.lineRange(for: selection).allSatisfy { if case .todo = document.lines[$0].kind { true } else { false } },
+            bullet: document.lineRange(for: selection).allSatisfy { document.lines[$0].kind == .bullet }
         )
     }
 
@@ -211,6 +216,7 @@ extension EditorController {
         notifyFoldChangeIfNeeded()
         // 미뤄 둔 덧붙임(글 끝에서 조합 중)이 있으면 그것까지가 원문이다.
         onTextChange?(text)
+        onFormattingChange?()
         reportContentHeight()
         layoutCopyButton()
         updateDateSuggestion()
@@ -528,6 +534,7 @@ extension EditorController: NSTextViewDelegate {
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
+        defer { onFormattingChange?() }
         guard !isSettingText else { return }
         if !isApplyingEdit {
             unfoldAroundSelection()

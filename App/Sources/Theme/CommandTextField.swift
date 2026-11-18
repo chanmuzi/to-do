@@ -37,7 +37,7 @@ public struct CommandTextField: NSViewRepresentable {
             DispatchQueue.main.async { [weak field] in if let field { field.window?.makeFirstResponder(field) } }
         }
         field.font = theme.nsFont(style); field.textColor = theme.nsColor(.text)
-        field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.foregroundColor: theme.nsColor(.text3)])
+        field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [.foregroundColor: theme.nsColor(.text3, on: .surface3)])
         if field.stringValue != text, !((field.currentEditor() as? NSTextView)?.hasMarkedText() ?? false) {
             field.stringValue = text
             (field.currentEditor() as? NSTextView)?.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))

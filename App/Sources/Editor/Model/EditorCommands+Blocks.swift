@@ -11,7 +11,17 @@ nonisolated extension EditorCommands {
         }
     }
 
-    /// 투두로 바꾸기. 고른 줄이 모두 투두면 본문으로 되돌린다.
+    /// 선택한 줄들의 글머리 목록 서식을 함께 전환한다.
+    static func toggleBullet(_ doc: MarkdownDocument, selection: NSRange) -> TextEdit? {
+        let lines = doc.lineRange(for: selection)
+        let targets = lines.filter { !doc.lines[$0].kind.isCode }
+        let remove = targets.allSatisfy { doc.lines[$0].kind == .bullet }
+        return LinePrefixEdit.make(doc, lines: lines, selection: selection) { line in
+            guard !line.kind.isCode, remove || line.kind != .bullet else { return nil }
+            return .init(oldLength: line.prefixLength, new: doc.string(in: line.indentRange) + (remove ? "" : "- "))
+        }
+    }
+
     static func toggleTodo(_ doc: MarkdownDocument, selection: NSRange) -> TextEdit? {
         let lines = doc.lineRange(for: selection)
         let targets = lines.filter { !doc.lines[$0].kind.isCode }

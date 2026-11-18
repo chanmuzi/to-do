@@ -8,7 +8,9 @@ public enum CalendarAccess: Sendable {
 public struct CalendarChoice: Identifiable, Hashable, Sendable {
     public let id: String
     public let destination: ScheduleDestination
-    public init(id: String, destination: ScheduleDestination) {
+    public let account: String
+    public init(id: String, destination: ScheduleDestination, account: String = "") {
+        self.account = account
         self.id = id
         self.destination = destination
     }
@@ -56,8 +58,8 @@ public final class FakeCalendarBridge: CalendarBridge {
     public var accessByKind: [ScheduleItem.Kind: CalendarAccess] = [:] { didSet { onChange?() } }
     public var readOnlyIDs: Set<String> = [] { didSet { onChange?() } }
     public var additionalChoices: [ScheduleItem.Kind: [CalendarChoice]] = [
-        .event: [.init(id: "work", destination: .init(name: "업무", color: .init(red: 0.40, green: 0.64, blue: 0.48)))],
-        .reminder: [.init(id: "shopping", destination: .init(name: "장보기", color: .init(red: 0.60, green: 0.46, blue: 0.68)))]
+        .event: [.init(id: "work", destination: .init(name: "업무", color: .init(red: 0.40, green: 0.64, blue: 0.48)), account: "Google")],
+        .reminder: [.init(id: "shopping", destination: .init(name: "장보기", color: .init(red: 0.60, green: 0.46, blue: 0.68)), account: "iCloud")]
     ] { didSet { onChange?() } }
     public func access(for kind: ScheduleItem.Kind) -> CalendarAccess {
         accessByKind[kind] ?? (isAllowed ? .available : .blocked)
@@ -68,7 +70,7 @@ public final class FakeCalendarBridge: CalendarBridge {
     }
     public func writableChoices(for kind: ScheduleItem.Kind) -> [CalendarChoice] {
         guard access(for: kind) == .available else { return [] }
-        let system = systemDefault(for: kind).map { CalendarChoice(id: kind.rawValue, destination: $0) }
+        let system = systemDefault(for: kind).map { CalendarChoice(id: kind.rawValue, destination: $0, account: "iCloud") }
         return ([system].compactMap { $0 } + (additionalChoices[kind] ?? [])).filter { !readOnlyIDs.contains($0.id) }
     }
     public var eventDestination: ScheduleDestination? = .init(name: "개인 일정", color: .init(red: 0.25, green: 0.52, blue: 0.80))

@@ -100,8 +100,9 @@ import Theme
         try await settle()
         #expect(window.frame.height > closed)
         #expect(window.frame.height == chrome + adapter.editor.contentHeight)
-        #expect(scrollView.contentView.bounds.origin == .zero)
-        #expect(scrollView.frame.height == adapter.editor.contentHeight)
+        let toolbarHeight = fixture.theme.shape(.chromeHeight)
+        #expect(scrollView.contentView.bounds.origin == CGPoint(x: 0, y: toolbarHeight))
+        #expect(scrollView.frame.height + toolbarHeight == adapter.editor.contentHeight)
 
         adapter.editor.selectedRange = NSRange(location: 0, length: 0)
         try await settle()

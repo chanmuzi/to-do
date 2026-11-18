@@ -19,7 +19,13 @@ final class TopRowView: NSView {
     var actions = Actions()
 
     private let style: PanelStyle
-    private let spaceBadge: SpaceBadgeView
+    let closeButton: IconButton
+    private let clockButton: IconButton
+    private let divider = NSView()
+    var underlineMarkedText: Bool {
+        get { title.underlineMarkedText }
+        set { title.underlineMarkedText = newValue }
+    }
     private let title: TitleField
     private let moreButton: IconButton
     private let addButton: IconButton
@@ -35,10 +41,11 @@ final class TopRowView: NSView {
 
     init(style: PanelStyle) {
         self.style = style
-        spaceBadge = SpaceBadgeView(style: style)
+        closeButton = IconButton(style: style, symbolName: "xmark", iconSize: .iconMedium, label: "창 닫기")
+        clockButton = IconButton(style: style, symbolName: "clock", iconSize: .iconMedium, label: "이 노트의 일정")
         title = TitleField(style: style)
-        moreButton = IconButton(style: style, symbolName: "ellipsis", iconSize: .iconLarge, label: "더 보기")
-        addButton = IconButton(style: style, symbolName: "plus", iconSize: .iconLarge, label: "새 노트")
+        moreButton = IconButton(style: style, symbolName: "ellipsis", iconSize: .iconMedium, label: "더 보기")
+        addButton = IconButton(style: style, symbolName: "plus", iconSize: .iconMedium, label: "새 노트")
         problemButton = IconButton(
             style: style, symbolName: "exclamationmark.triangle", iconSize: .iconMedium, label: ""
         )
@@ -47,7 +54,8 @@ final class TopRowView: NSView {
             style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "항상 위에 고정", tint: .text3
         )
         super.init(frame: .zero)
-        [spaceBadge, title, moreButton, addButton, problemButton, reminderBadge, pinButton]
+        divider.wantsLayer = true
+        [closeButton, clockButton, divider, title, moreButton, addButton, problemButton, reminderBadge, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
         problemButton.alphaValue = 0
@@ -60,6 +68,7 @@ final class TopRowView: NSView {
     }
 
     private func connect() {
+        clockButton.onPress = { [unowned self] in actions.reminder() }
         moreButton.onPress = { [unowned self] in actions.more(moreButton) }
         addButton.onPress = { [unowned self] in actions.add() }
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
@@ -88,7 +97,7 @@ final class TopRowView: NSView {
     var isEditingTitle: Bool { title.isEditing }
     /// 더 보기 메뉴를 띄울 기준(단축키로 열 때도 쓴다).
     var moreAnchor: NSView { moreButton }
-    var reminderAnchor: NSView { state?.reminder == nil ? moreButton : reminderBadge }
+    var reminderAnchor: NSView { state?.reminder == nil ? clockButton : reminderBadge }
 
     func beginTitleEditing() {
         guard let state else { return }
@@ -104,18 +113,22 @@ final class TopRowView: NSView {
     func apply(_ state: TopRowState, animated: Bool) {
         let hadProblem = self.state?.problem != nil || (self.state?.syncFailure == true && self.state?.reminder == nil)
         self.state = state
-        spaceBadge.apply(state.space, color: state.spaceColor, animated: animated)
+        divider.layer?.backgroundColor = style.cgColor(.line, in: self)
+        title.paletteID = state.paletteID
+        reminderBadge.paletteID = state.paletteID
         title.show(
             title: state.title, isPlaceholder: state.isTitlePlaceholder, color: state.titleColor,
             animated: animated
         )
-        reminderBadge.apply(state.reminder, animated: animated)
+        reminderBadge.apply(state.reminder, count: state.additionalSchedules, animated: animated)
         pinButton.set(symbolName: state.pin.symbolName, tint: state.pin.color, animated: animated)
         pinButton.setAccessibilityValue(state.pin.isOn ? "켜짐" : "꺼짐")
         applyProblem(state.problem, wasShown: hadProblem, animated: animated)
 
+        clockButton.isHidden = state.reminder != nil
         let alphas: [(NSView, Double)] = [
-            (moreButton, state.hoverControlsAlpha),
+            (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
+            (clockButton, state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
             (addButton, state.hoverControlsAlpha), (pinButton, state.pin.alpha),
         ]
         if animated {
@@ -124,6 +137,7 @@ final class TopRowView: NSView {
             alphas.forEach { $0.0.alphaValue = $0.1 }
         }
         needsLayout = true
+        layoutSubtreeIfNeeded()
     }
 
     /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.
@@ -147,10 +161,9 @@ final class TopRowView: NSView {
     }
 
     func refreshTheme() {
-        spaceBadge.refresh()
         title.refreshTheme()
         reminderBadge.refresh()
-        [moreButton, addButton, problemButton, pinButton].forEach { $0.refresh() }
+        [moreButton, addButton, problemButton, pinButton, closeButton, clockButton].forEach { $0.refresh() }
         needsLayout = true
     }
 
@@ -164,23 +177,28 @@ final class TopRowView: NSView {
         let frames = TopRowLayout(
             TopRowLayout.Input(
                 width: bounds.width,
-                spaceWidth: spaceBadge.fittingWidth,
                 // 고치는 동안에는 남는 너비를 다 쓴다.
                 titleWidth: title.isEditing ? .greatestFiniteMagnitude : title.idealWidth,
                 reminderWidth: reminderBadge.fittingWidth,
+                showsControls: state?.hoverControlsAlpha == 1,
                 showsProblem: holdsProblemSlot
             ),
             metrics: TopRowLayout.Metrics(
                 height: style.theme.shape(.chromeHeight),
                 paddingLeading: theme.space(.sp3),
                 // 핀 아이콘의 오른쪽 끝이 제목의 왼쪽 여백과 같은 거리에 오게 한다(좌우 균형).
-                paddingTrailing: max(0, theme.space(.sp3) - pinButton.glyphSideInset),
+                paddingTrailing: theme.component(.chromePaddingEnd),
                 gap: theme.component(.chromeGap),
                 iconButton: theme.component(.iconButton),
+                dividerWidth: theme.shape(.borderWidth),
                 buttonGap: theme.component(.iconButtonGap)
             )
         )
-        spaceBadge.frame = frames.space ?? .zero
+        closeButton.frame = frames.close
+        clockButton.frame = frames.clock
+        let dividerHeight = theme.component(.iconMedium)
+        divider.frame = CGRect(x: frames.divider.minX, y: (bounds.height - dividerHeight) / 2,
+                               width: frames.divider.width, height: dividerHeight)
         let titleHeight = title.idealHeight
         title.frame = NSRect(
             x: frames.title.minX, y: ((style.theme.shape(.chromeHeight) - titleHeight) / 2).rounded(),

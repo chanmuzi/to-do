@@ -71,11 +71,11 @@ struct ReminderEditorView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: theme.space(.sp2)) {
                 Text(title).font(theme.font(selected ? .selected : .body)).lineLimit(1)
-                    .foregroundStyle(theme.color(item.isCompleted ? .text3 : .text))
+                    .foregroundStyle(theme.color(item.isCompleted ? .text3 : .text, on: selected ? .selected : .surface))
                 Spacer(minLength: 0)
-                if let destination { Text(destination.name).font(theme.font(.rowSub, size: theme.tokens.textStyle(.micro).size)).foregroundStyle(theme.color(.text3)).lineLimit(1) }
+                if let destination { Text(destination.name).font(theme.font(.rowSub, size: theme.tokens.textStyle(.micro).size)).foregroundStyle(theme.color(.text3, on: selected ? .selected : .surface)).lineLimit(1) }
             }.frame(height: theme.lineHeight(.body))
-            Text(model.presentation(item).text ?? "").font(theme.font(.scheduleTime)).foregroundStyle(theme.color(.text2))
+            Text(model.presentation(item).text ?? "").font(theme.font(.scheduleTime)).foregroundStyle(theme.color(.text2, on: selected ? .selected : .surface))
                 .lineLimit(1).truncationMode(.tail).frame(height: theme.lineHeight(.scheduleTime))
         }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
             .accessibilityLabel(model.presentation(item).accessibilityLabel(title: title))

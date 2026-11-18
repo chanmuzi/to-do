@@ -1,10 +1,6 @@
 import CoreGraphics
 
-/// 상단 줄 요소의 자리(spec 5.1, 5.2). 호버로 나타나는 것도 늘 자리를 차지하고,
-/// 좁아지면 제목이 먼저 줄어든다(spec 16). 호버와 포커스는 입력이 아니다.
-///
-/// 저장 문제 표시는 호버 아이콘 둘의 왼쪽, 제목 쪽에 놓는다. 표시가 나타나고 사라져도
-/// 자리를 미리 차지하는 것들(호버 아이콘, 리마인더, 핀)은 움직이지 않고 제목이 잘리는 자리만 달라진다(규칙 7).
+/// 상단 조작은 오른쪽부터 배치하고 남은 너비를 제목과 예정 칩에 쓴다.
 struct TopRowLayout: Hashable {
     struct Metrics: Hashable {
         var height: CGFloat
@@ -14,25 +10,27 @@ struct TopRowLayout: Hashable {
         var iconButton: CGFloat
         /// 나란히 놓인 아이콘 버튼 사이(`icon-btn-gap`). 버튼은 평소 상자 없이 아이콘만 보이므로(규칙 10)
         /// 보이는 간격은 아이콘 사이의 거리다. 이웃한 버튼의 `hover` 상자는 겹치지 않고 맞닿는다.
+        var dividerWidth: CGFloat = 1
         var buttonGap: CGFloat = 0
     }
 
     struct Input: Hashable {
         var width: CGFloat
-        /// 스페이스 표시의 너비. 없으면 자리도 없다.
-        var spaceWidth: CGFloat?
         /// 제목이 다 보이는 너비.
         var titleWidth: CGFloat
         var reminderWidth: CGFloat?
+        var showsControls = true
         var showsProblem: Bool
     }
 
-    var space: CGRect?
     var title: CGRect
     var more: CGRect
     var add: CGRect
     var problem: CGRect?
     var reminder: CGRect?
+    var close: CGRect = .zero
+    var divider: CGRect = .zero
+    var clock: CGRect = .zero
     var pin: CGRect
 
     init(_ input: Input, metrics: Metrics) {
@@ -45,24 +43,23 @@ struct TopRowLayout: Hashable {
             return rect
         }
 
-        pin = takeTrailing(metrics.iconButton, gap: 0)
-        let fixed = metrics.paddingLeading + metrics.paddingTrailing
-            + (input.spaceWidth.map { $0 + metrics.gap } ?? 0)
-            + metrics.iconButton * (input.showsProblem ? 4 : 3)
-            + metrics.gap * 2 + metrics.buttonGap * (input.showsProblem ? 3 : 2)
-        reminder = input.reminderWidth.map { takeTrailing(min($0, max(0, input.width - fixed)), gap: metrics.buttonGap) }
-        add = takeTrailing(metrics.iconButton, gap: reminder == nil ? metrics.buttonGap : metrics.gap)
-        more = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
+        close = input.showsControls ? takeTrailing(metrics.iconButton, gap: 0) : .zero
+        divider = input.showsControls ? takeTrailing(metrics.dividerWidth, gap: metrics.gap) : .zero
+        more = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.gap) : .zero
+        add = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
+        pin = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
+        if input.showsControls && input.reminderWidth == nil {
+            clock = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
+        }
+        if let width = input.reminderWidth {
+            let gap = input.showsControls ? metrics.gap : 0
+            let reserved = metrics.paddingLeading + metrics.gap + (input.showsProblem ? metrics.iconButton + metrics.buttonGap : 0)
+            reminder = takeTrailing(min(width, max(0, trailing - reserved - gap)), gap: gap)
+        }
         problem = input.showsProblem ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : nil
         trailing -= metrics.gap
 
-        var leading = metrics.paddingLeading
-        if let spaceWidth = input.spaceWidth {
-            space = CGRect(x: leading, y: 0, width: spaceWidth, height: metrics.height)
-            leading += spaceWidth + metrics.gap
-        } else {
-            space = nil
-        }
+        let leading = metrics.paddingLeading
         let available = max(0, trailing - leading)
         title = CGRect(x: leading, y: 0, width: min(input.titleWidth, available), height: metrics.height)
     }

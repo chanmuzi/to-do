@@ -5,8 +5,11 @@ extension Theme {
     /// 글자 역할의 글꼴. `size`, `weight`를 주면 토큰 값 대신 쓴다(예: 임박한 리마인더의 굵기).
     public func nsFont(_ style: TextStyle, size: CGFloat? = nil, weight: CGFloat? = nil) -> NSFont {
         let spec = tokens.textStyle(style)
+        let requestedWeight = weight ?? spec.weight
+        let ceiling = tokens.textStyle(.uiStrong).weight
         return FontResolver.font(
-            families: spec.families, size: size ?? spec.size, weight: weight ?? spec.weight
+            families: spec.families, size: size ?? spec.size, weight: requestedWeight,
+            maximumWeight: requestedWeight <= ceiling ? ceiling : nil
         )
     }
 

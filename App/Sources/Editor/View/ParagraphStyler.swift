@@ -114,7 +114,6 @@ nonisolated enum ParagraphStyler {
                 font = style.heading(level)
                 tracking = style.headingTracking[level - 1]
                 spacing = style.metrics.headingSpacing[level - 1]
-                if key.isFirst { spacing.before = 0 }
             } else {
                 font = style.body
             }
@@ -264,7 +263,7 @@ nonisolated enum ParagraphStyler {
                 lineHeight = key.isEmptyBlockSpot ? font.lineHeight : style.codeBlockPadY
                 paragraph.lineBreakMode = .byClipping
             } else if isComment(out.string) {
-                color = style.text3
+                color = style.comment
             }
             paragraph.minimumLineHeight = lineHeight
             paragraph.maximumLineHeight = lineHeight

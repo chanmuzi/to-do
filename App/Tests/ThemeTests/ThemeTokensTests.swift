@@ -29,21 +29,21 @@ import Testing
 
     @Test func lightAndDarkColorsMatchKnownValues() {
         #expect(tokens.color(.surface, .light) == RGBA(red: 1, green: 1, blue: 1))
-        #expect(tokens.color(.surface, .dark) == RGBA(red: 0, green: 0, blue: 0))
-        #expect(tokens.color(.text, .dark) == RGBA(red: 240 / 255, green: 240 / 255, blue: 240 / 255))
+        #expect(tokens.color(.surface, .dark) == RGBA(red: 30/255, green: 30/255, blue: 30/255))
+        #expect(tokens.color(.text, .dark) == RGBA(red: 236 / 255, green: 236 / 255, blue: 236 / 255))
         #expect(tokens.color(.hover, .light) == RGBA(red: 96/255, green: 76/255, blue: 52/255, alpha: 0.08))
-        #expect(tokens.color(.hover, .dark) == RGBA(red: 224/255, green: 208/255, blue: 186/255, alpha: 0.10))
+        #expect(tokens.color(.hover, .dark) == RGBA(red: 224/255, green: 208/255, blue: 186/255, alpha: 0.12))
         #expect(tokens.color(.selected, .light) == RGBA(red: 222/255, green: 218/255, blue: 212/255))
-        #expect(tokens.color(.selected, .dark) == RGBA(red: 55/255, green: 52/255, blue: 48/255))
+        #expect(tokens.color(.selected, .dark) == RGBA(red: 70/255, green: 66/255, blue: 61/255))
         #expect(tokens.textStyle(.selected).weight == 500)
         #expect(tokens.textStyle(.row).weight == 450)
         #expect(tokens.textStyle(.body).weight == 400)
         #expect(tokens.color(.warn, .light) == RGBA(red: 229 / 255, green: 52 / 255, blue: 43 / 255))
-        #expect(tokens.color(.warn, .dark) == RGBA(red: 242 / 255, green: 71 / 255, blue: 60 / 255))
+        #expect(tokens.color(.warn, .dark) == RGBA(red: 1, green: 121 / 255, blue: 110 / 255))
         #expect(tokens.color(HighlightColor.yellow.background, .light)
             == RGBA(red: 1, green: 235 / 255, blue: 133 / 255))
         #expect(tokens.color(HighlightColor.blue.background, .dark)
-            == RGBA(red: 110 / 255, green: 170 / 255, blue: 1, alpha: 0.36))
+            == RGBA(red: 110 / 255, green: 170 / 255, blue: 1, alpha: 0.28))
     }
 
     @Test(arguments: ThemeAppearance.allCases)
@@ -62,6 +62,17 @@ import Testing
         #expect(tokens.shadow(.pop, appearance).count == 2)
     }
 
+    @Test func darkSecondaryTextMeetsContrastOnEveryLevel() {
+        for surface in [ColorToken.surface, .surface2, .surface3, .selected] {
+            let background = tokens.color(surface, .dark)
+            for token in [ColorToken.text2, .text3] {
+                let ink = tokens.foreground(token, .dark, on: surface)
+                #expect((ink.luminance + 0.05) / (background.luminance + 0.05) >= 4.5)
+                #expect(tokens.foreground(token, .light, on: surface) == tokens.color(token, .light))
+            }
+        }
+    }
+
     @Test func metricsCoverTheFile() throws {
         #expect(Set(try section("space").keys) == Set(SpaceToken.allCases.map(\.rawValue)))
         #expect(Set(try section("shape").keys) == Set(ShapeToken.allCases.map(\.rawValue)))
@@ -74,10 +85,10 @@ import Testing
 
         #expect(tokens.space(.sp4) == 16)
         #expect(tokens.shape(.windowRadius) == 10)
-        #expect(tokens.shape(.chromeHeight) == 28)
+        #expect(tokens.shape(.chromeHeight) == TokenValueParser.length(try section("shape")["chrome-h"]!))
         #expect(tokens.component(.caretWidth) == 1.5)
         #expect(tokens.component(.browseWidth) == 300)
-        #expect(tokens.docPadding == ThemeInsets(top: 10, trailing: 14, bottom: 18, leading: 14))
+        #expect(tokens.docPadding == TokenValueParser.insets(try section("component")["doc-pad"]!))
         #expect(tokens.material == MaterialTokens(opacity: 0.92, blur: 24, tintMix: 0.26, tintMixRow: 0.18))
         #expect(tokens.motion.duration == 0.18)
         #expect(tokens.motion.curve == BezierCurve(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1))
@@ -100,23 +111,24 @@ import Testing
         #expect(tokens.ratio(.noteMaxScreenHeight) == 0.7)
     }
 
-    @Test func textStylesFollowTheTypeScale() {
+    @Test func textStylesFollowTheTypeScale() throws {
+        let type = try section("type")
         let body = tokens.textStyle(.body)
         #expect(body.families.first == "Pretendard")
-        #expect(body.size == 13)
-        #expect(body.lineHeight == 22)
+        #expect(body.size == TokenValueParser.length(type["fs-body"]!))
+        #expect(body.lineHeight == TokenValueParser.length(type["lh-body"]!))
         #expect(body.weight == 400)
         #expect(body.tracking == 0)
 
         let h1 = tokens.textStyle(.h1)
-        #expect(h1.size == 17)
-        #expect(h1.weight == 700)
-        #expect(abs(h1.tracking - (-0.34)) < 0.0001)
+        #expect(h1.size == TokenValueParser.length(type["fs-h1"]!))
+        #expect(Double(h1.weight) == (try #require(TokenValueParser.weight(type["fw-h1"]!))))
+        #expect(abs(h1.tracking - (h1.size * CGFloat(TokenValueParser.em(type["ls-h1"]!)!))) < 0.0001)
 
         #expect(tokens.textStyle(.strong).weight == 650)
-        #expect(tokens.textStyle(.row).size == 12.5)
+        #expect(tokens.textStyle(.row).size == TokenValueParser.length(type["fs-row"]!))
         #expect(tokens.textStyle(.micro).families.first == "D2Coding")
-        #expect(tokens.textStyle(.code).size == 11.5)
+        #expect(tokens.textStyle(.code).size == TokenValueParser.length(type["fs-code"]!))
     }
 
     @Test func paletteAndAccentPresets() {
@@ -132,10 +144,10 @@ import Testing
         #expect(tokens.noteBackground(paletteID: nil, .light) == tokens.color(.surface, .light))
         #expect(tokens.noteBackground(paletteID: "없는-키", .dark) == tokens.color(.surface, .dark))
 
-        // 검정 바탕에 26% 섞으면 각 성분이 팔레트 색의 0.26배.
+        let surface = tokens.color(.surface, .dark)
+        let tint = try #require(tokens.paletteColor(id: "tint-2")).color
         let dark = tokens.noteBackground(paletteID: "tint-2", .dark)
-        #expect(abs(dark.red - 108.0 / 255 * 0.26) < 0.0001)
-        #expect(abs(dark.blue - 173.0 / 255 * 0.26) < 0.0001)
+        #expect(dark == surface.mixed(with: tint, fraction: tokens.material.tintMix))
         #expect(dark.alpha == 1)
 
         let row = try #require(tokens.rowTint(paletteID: "tint-2"))

@@ -114,11 +114,13 @@ extension NoteWindowController: NSWindowDelegate {
     /// 키 창이 되면 맨 앞에 온 것이다. 겹친 차례를 적고, 다른 프로그램이 고친 파일을 다시 읽게 한다.
     func windowDidBecomeKey(_ notification: Notification) {
         environment.recorder.recordFronted(noteID, openedAt: environment.now())
+        refreshFormatBar()
         coordinator?.noteWindowDidBecomeKey()
     }
 
     /// 포커스는 창 모습을 바꾸지 않는다(규칙 5). 고치던 제목만 마무리한다.
     func windowDidResignKey(_ notification: Notification) {
+        refreshFormatBar()
         root.topRow.endTitleEditing()
     }
 }

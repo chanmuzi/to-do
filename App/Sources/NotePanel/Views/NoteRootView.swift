@@ -110,17 +110,10 @@ final class NoteRootView: NSView {
         topRow.frame = NSRect(x: 0, y: 0, width: bounds.width, height: rowHeight)
         separator.frame = NSRect(x: 0, y: rowHeight, width: bounds.width, height: theme.shape(.borderWidth))
         scrollView.frame = NSRect(
-            x: 0, y: chromeHeight, width: bounds.width, height: max(0, bounds.height - chromeHeight)
+            x: 0, y: chromeHeight, width: bounds.width, height: max(0, bounds.height - chromeHeight - (cornerButtons.showsFormats ? rowHeight : 0))
         )
         placeBody()
-        let corner = cornerButtons.preferredSize
-        let inset = theme.space(.sp1)
-        // 닫기 아이콘의 오른쪽 끝이 핀 아이콘과 같은 세로줄(창 오른쪽에서 `sp-3`)에 오게 한다.
-        let trailing = max(0, theme.space(.sp3) - cornerButtons.closeButton.glyphSideInset)
-        cornerButtons.frame = NSRect(
-            x: bounds.width - trailing - corner.width, y: bounds.height - inset - corner.height,
-            width: corner.width, height: corner.height
-        )
+        cornerButtons.frame = NSRect(x: 0, y: bounds.height - rowHeight, width: bounds.width, height: rowHeight)
     }
 
     /// 본문 뷰는 너비만 맞춘다. 높이는 편집기가 내용에 맞춘다.

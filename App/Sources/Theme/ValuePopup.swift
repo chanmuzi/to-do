@@ -1,0 +1,113 @@
+import AppKit
+import SwiftUI
+
+/// 이름 열 뒤에서 세그먼트와 글자 시작선을 공유하는 팝업.
+public struct ValuePopup: View {
+    let label: String
+    let value: String
+    let dot: NSImage?
+    let theme: Theme
+    let makeMenu: () -> NSMenu
+    let choose: (NSMenuItem) -> Void
+
+    public init(label: String, value: String, dot: NSImage? = nil, theme: Theme,
+                makeMenu: @escaping () -> NSMenu, choose: @escaping (NSMenuItem) -> Void) {
+        self.label = label
+        self.value = value
+        self.dot = dot
+        self.theme = theme
+        self.makeMenu = makeMenu
+        self.choose = choose
+    }
+
+    public var body: some View {
+        let firstLetter = theme.component(.iconButtonGap) + theme.space(.sp3)
+        let leading = firstLetter - theme.component(.chromePaddingEnd)
+            - (dot.map { $0.size.width + theme.component(.badgePad) } ?? 0)
+        ValuePopupHost(popup: self).fixedSize().padding(.leading, leading)
+    }
+
+    private struct ValuePopupHost: NSViewRepresentable {
+        let popup: ValuePopup
+        func makeNSView(context: Context) -> ValueButton { ValueButton(theme: popup.theme) }
+        func updateNSView(_ button: ValueButton, context: Context) {
+            button.title = popup.value
+            button.image = popup.dot
+            button.font = popup.theme.nsFont(.body, size: popup.theme.tokens.textStyle(.ui).size)
+            button.setAccessibilityLabel(popup.label)
+            button.setAccessibilityValue(popup.value)
+            button.menu = popup.makeMenu()
+            button.choose = popup.choose
+            button.prepareMenu()
+            button.invalidateIntrinsicContentSize()
+            button.needsDisplay = true
+        }
+    }
+}
+
+private final class ValueButton: NSButton {
+    let theme: Theme
+    var choose: ((NSMenuItem) -> Void)?
+    private var hovered = false
+    init(theme: Theme) {
+        self.theme = theme
+        super.init(frame: .zero)
+        isBordered = false
+        target = self
+        action = #selector(openChoices)
+        setAccessibilityRole(.popUpButton)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.inVisibleRect, .activeAlways, .mouseEnteredAndExited], owner: self))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    private var text: NSAttributedString {
+        NSAttributedString(string: title, attributes: [.font: font ?? theme.nsFont(.body), .foregroundColor: theme.nsColor(.text)])
+    }
+    private var textX: CGFloat {
+        theme.component(.chromePaddingEnd) + (image.map { $0.size.width + theme.component(.badgePad) } ?? 0)
+    }
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: textX + ceil(text.size().width) + theme.component(.badgePad) + theme.component(.menuDot) + theme.component(.chromePaddingEnd),
+               height: theme.component(.connectHeight))
+    }
+    override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
+    override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
+    override func draw(_ dirtyRect: NSRect) {
+        if hovered || isHighlighted {
+            theme.nsColor(.hover).setFill()
+            let radius = theme.shape(.controlRadius)
+            NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
+        }
+        if let image {
+            image.draw(in: CGRect(x: theme.component(.chromePaddingEnd), y: (bounds.height - image.size.height) / 2,
+                                  width: image.size.width, height: image.size.height))
+        }
+        let value = text
+        value.draw(at: NSPoint(x: textX, y: (bounds.height - value.size().height) / 2))
+        let width = theme.component(.menuDot), height = theme.space(.sp3)
+        let x = textX + ceil(value.size().width) + theme.component(.badgePad), y = bounds.midY
+        let path = NSBezierPath()
+        for sign: CGFloat in [-1, 1] {
+            path.move(to: NSPoint(x: x, y: y + sign * height / 6))
+            path.line(to: NSPoint(x: x + width / 2, y: y + sign * height / 2))
+            path.line(to: NSPoint(x: x + width, y: y + sign * height / 6))
+        }
+        theme.nsColor(.text2).setStroke()
+        path.lineWidth = theme.component(.iconStroke)
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
+    }
+    func prepareMenu() {
+        for item in menu?.items ?? [] where item.isEnabled && !item.isSeparatorItem {
+            item.target = self
+            item.action = #selector(selectChoice(_:))
+        }
+    }
+    @objc private func selectChoice(_ sender: NSMenuItem) { choose?(sender) }
+    @objc private func openChoices() {
+        menu?.popUp(positioning: menu?.items.first { $0.state == .on }, at: NSPoint(x: 0, y: bounds.midY), in: self)
+    }
+}

@@ -2,6 +2,7 @@ import Foundation
 import Models
 import Observation
 import Scheduling
+import Theme
 
 package enum SettingsPane: String, CaseIterable {
     case appearance = "모양", editor = "편집기", schedule = "예정", app = "앱", shortcuts = "단축키"
@@ -32,7 +33,6 @@ package final class SettingsModel {
     private let schedules: ScheduleService
     let openPrivacy: (ScheduleItem.Kind) -> Void
     var menus: [ScheduleItem.Kind: DestinationMenu] = [:]
-    var returnedToDefault: Set<ScheduleItem.Kind> = []
     private(set) var connecting = false
     package private(set) var error: String?
     package var values: SettingsValues { read() }
@@ -58,15 +58,28 @@ package final class SettingsModel {
         }
     }
 
+    func restoreDefaults(theme: Theme) {
+        let prior = theme.overrides
+        do {
+            if !prior.isEmpty { try theme.setOverrides(ThemeOverrides()) }
+            do { try save { $0 = SettingsValues() } }
+            catch {
+                if !prior.isEmpty { try theme.setOverrides(prior) }
+                throw error
+            }
+            error = nil
+            refreshCalendars()
+        } catch { self.error = error.localizedDescription }
+    }
+
     package func refreshCalendars() {
         for kind in [ScheduleItem.Kind.event, .reminder] {
             let access = schedules.calendarAccess(kind)
             let choices = access == .available ? schedules.calendarChoices(kind) : []
             menus[kind] = DestinationMenu(access: access, choices: choices,
                 system: access == .available ? schedules.systemDefault(kind) : nil)
-            if access == .available, let id = values[idFor: kind], !choices.contains(where: { $0.id == id }),
-               change({ $0[idFor: kind] = nil }) {
-                returnedToDefault.insert(kind)
+            if access == .available, let id = values[idFor: kind], !choices.contains(where: { $0.id == id }) {
+                change { $0[idFor: kind] = nil }
             }
         }
     }
@@ -74,7 +87,13 @@ package final class SettingsModel {
     package func choose(_ id: String?, for kind: ScheduleItem.Kind) {
         guard let menu = menus[kind], menu.access == .available,
               id == nil || menu.choices.contains(where: { $0.id == id }) else { return }
-        if change({ $0[idFor: kind] = id }) { returnedToDefault.remove(kind) }
+        change { $0[idFor: kind] = id }
+    }
+
+    package func connectRequestedCalendars() async {
+        for kind in [ScheduleItem.Kind.event, .reminder] where schedules.calendarAccess(kind) == .needsRequest {
+            await connect(kind)
+        }
     }
 
     package func connect(_ kind: ScheduleItem.Kind) async {
@@ -82,7 +101,7 @@ package final class SettingsModel {
         connecting = true
         defer { connecting = false }
         do { try await schedules.connect(kind) }
-        catch { self.error = error.localizedDescription }
+        catch { if schedules.calendarAccess(kind) != .blocked { self.error = error.localizedDescription } }
         refreshCalendars()
     }
 }

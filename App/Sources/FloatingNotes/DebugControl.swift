@@ -275,6 +275,38 @@ final class DebugControl {
             }
         case ("library-open", let id?, _):
             if let note = library?.model.rows.first(where: { $0.id == id }) { library?.model.open(note) }
+        case ("settings-value-hover", _, _) where isPassive:
+            if let root = settingsWindow?.window?.contentView { DebugViewAudit.hover(root, label: "기본 캘린더") }
+        case ("library-views-snapshot", let name?, _) where isPassive:
+            guard let library, let url = output(named: name.rawValue) else { return }
+            library.model.editingViews = true
+            Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(350))
+                self?.write(NSApp.windows.first { $0.isVisible && $0.parent === library.window }, to: url)
+                library.model.editingViews = false
+            }
+        case ("settings-popup-snapshot", let name?, _) where isPassive:
+            func findPicker(_ view: NSView) -> NSView? {
+                if view.accessibilityLabel() == "기본 캘린더", view.menu != nil { return view }
+                return view.subviews.lazy.compactMap(findPicker).first
+            }
+            if let root = settingsWindow?.window?.contentView, let button = findPicker(root), let menu = button.menu,
+               let url = output(named: name.rawValue) { snapshotLiveMenu(menu, anchor: button, to: url) }
+        case ("settings-format-bar", let mode?, _) where isPassive:
+            guard NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) != nil else { return }
+            settingsWindow?.model.change { $0.formatBar = mode.rawValue }
+        case ("settings-input-style", let value?, _) where isPassive:
+            settingsWindow?.model.change { $0.markedTextStyle = value.rawValue == "underline" ? .underline : .none }
+        case ("settings-reset-sheet", _, _) where isPassive:
+            settingsWindow?.confirmReset()
+        case ("settings-sheet-snapshot", let name?, _) where isPassive:
+            if let url = output(named: name.rawValue) { write(settingsWindow?.window?.attachedSheet, to: url) }
+        case ("settings-reset-answer", let value?, _) where isPassive:
+            if let sheet = settingsWindow?.window?.attachedSheet {
+                settingsWindow?.window?.endSheet(sheet, returnCode: value.rawValue == "restore" ? .alertFirstButtonReturn : .alertSecondButtonReturn)
+            }
+        case ("format-bold", let id?, _) where isPassive:
+            editor(of: id)?.perform(.bold)
         case ("settings-close", _, _) where isPassive:
             settingsWindow?.window?.close()
         case ("settings-pane", let pane?, _):
@@ -284,7 +316,11 @@ final class DebugControl {
             guard let url = output(named: name.rawValue) else { return }
             write(settingsWindow?.window, to: url)
         case ("settings-fake-access", let mode?, _) where isPassive:
-            fakeCalendar?.accessByKind = mode.rawValue == "new" ? [.event: .needsRequest, .reminder: .needsRequest] : [:]
+            fakeCalendar?.accessByKind = switch mode.rawValue {
+            case "new": [.event: .needsRequest, .reminder: .needsRequest]
+            case "blocked": [.event: .blocked, .reminder: .blocked]
+            default: [:]
+            }
         case ("settings-appearance", let value?, _) where isPassive:
             guard ["light", "dark", "system"].contains(value.rawValue) else { return }
             settingsWindow?.model.change { $0.appearance = value.rawValue }
@@ -293,7 +329,7 @@ final class DebugControl {
             settingsWindow?.model.choose(id, for: kind)
         case ("settings-connect", let kind?, _) where isPassive:
             guard let kind = ScheduleItem.Kind(rawValue: kind.rawValue) else { return }
-            Task { await settingsWindow?.model.connect(kind) }
+            Task { if kind == .event { await settingsWindow?.model.connectRequestedCalendars() } else { await settingsWindow?.model.connect(kind) } }
         case ("library-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
             write(library?.window, to: url)
@@ -377,6 +413,8 @@ final class DebugControl {
         case ("dump", _, _):
             guard let url = output(named: String(command.dropFirst("dump ".count))) else { return }
             dump(to: url)
+        case ("input-select-all", let target?, _) where isPassive:
+            verificationInput(target.rawValue)?.selectAll(nil)
         case ("input-check", let target?, let name?):
             guard let view = verificationInput(target.rawValue), let url = output(named: name) else { return }
             write(json: DebugInputVerification.state(of: view), to: url)

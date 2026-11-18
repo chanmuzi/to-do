@@ -35,10 +35,12 @@ enum SettingsApplication {
                 do { try theme.applyBodyTypography(size: size, lineHeight: values.bodyLineHeight) }
                 catch { AppLog.warning("본문 치수를 적용하지 못했습니다: \(error)") }
             }
-            let display = NoteDisplayOptions(dateFormat: .init(rawValue: values.scheduleDateFormat) ?? .relative,
+            var display = NoteDisplayOptions(dateFormat: .init(rawValue: values.scheduleDateFormat) ?? .relative,
                 space: .init(rawValue: values.spaceDisplay) ?? .icon,
                 reminder: .init(rawValue: values.reminderDisplay) ?? .time,
                 clock: .init(rawValue: values.clockFormat) ?? .koreanMeridiem)
+            display.underlineMarkedText = values.markedTextStyle == .underline
+            display.formatBar = .init(rawValue: values.formatBar) ?? .editing
             applyDisplay(display, values.recognizesDates)
             if previous?.showsMenuBarIcon != values.showsMenuBarIcon { showMenuIcon(values.showsMenuBarIcon) }
             previous = values

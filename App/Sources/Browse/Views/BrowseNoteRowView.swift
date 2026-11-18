@@ -79,7 +79,7 @@ final class BrowseNoteRowView: BrowseEntryView {
 
         titleLabel.stringValue = isUntitled ? Self.untitled : model.row.title
         titleLabel.font = isUntitled ? style.plainFont : style.titleFont
-        titleLabel.textColor = style.color(isUntitled ? .text3 : .text)
+        titleLabel.textColor = style.theme.nsColor(isUntitled ? .text3 : .text, on: .selected)
         previewLabel.attributedStringValue = previewString()
 
         reminderIconView.image = model.reminder.flatMap { style.symbol($0.symbolName, size: .iconSmall) }
@@ -102,7 +102,7 @@ final class BrowseNoteRowView: BrowseEntryView {
         paragraph.lineBreakMode = .byTruncatingTail
         let text = NSMutableAttributedString(
             string: model.row.preview,
-            attributes: [.font: style.previewFont, .foregroundColor: style.color(.text2), .paragraphStyle: paragraph]
+            attributes: [.font: style.previewFont, .foregroundColor: style.theme.nsColor(.text2, on: .selected), .paragraphStyle: paragraph]
         )
         guard let highlight = model.row.previewHighlight else { return text }
         let preview = model.row.preview

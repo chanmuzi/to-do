@@ -50,6 +50,7 @@ public protocol NoteBodyEditing: AnyObject {
     var text: String { get set }
     var onTextChange: ((String) -> Void)? { get set }
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
+    func setNotePalette(_ id: String?)
     func setTitleFocusAction(_ action: @escaping () -> Void)
     func scheduleRemoved(fromBodyLine line: Int)
     /// 본문에 입력 커서를 둔다.
@@ -71,6 +72,7 @@ public protocol NoteBodyEditing: AnyObject {
 }
 
 extension NoteBodyEditing {
+    public func setNotePalette(_ id: String?) {}
     public func setTitleFocusAction(_ action: @escaping () -> Void) {}
     public func scheduleRemoved(fromBodyLine line: Int) {}
 
@@ -92,6 +94,16 @@ public struct NoteBodyEditorContext {
         self.theme = theme
         self.noteID = noteID
     }
+}
+
+public enum NoteFormat: CaseIterable { case bold, strike, highlight, code, link, checklist, bullet }
+
+@MainActor
+public protocol NoteBodyFormatting: AnyObject {
+    var isEditingBody: Bool { get }
+    var activeFormats: Set<NoteFormat> { get }
+    var onFormattingChange: (() -> Void)? { get set }
+    func applyFormat(_ format: NoteFormat)
 }
 
 /// 노트 창 하나에 편집기 하나를 만든다. App이 넘긴다.

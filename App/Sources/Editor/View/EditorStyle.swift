@@ -35,6 +35,7 @@ nonisolated struct EditorStyle {
 
     let text: NSColor
     let text2: NSColor
+    let comment: NSColor
     let text3: NSColor
     let surface: NSColor
     let guide: NSColor
@@ -90,16 +91,21 @@ nonisolated struct EditorStyle {
         bodyParagraph = paragraph
         strong = noteFont(.strong)
         headings = [TextStyle.h1, .h2, .h3].map { TextFont(noteFont($0), lineHeight: theme.lineHeight($0) * scale) }
-        headingTracking = [TextStyle.h1, .h2, .h3].map { theme.tracking($0) }
+        headingTracking = [TextStyle.h1, .h2, .h3].map { theme.tracking($0) * scale }
         inlineCode = noteFont(.code)
         codeBlock = TextFont(noteFont(.codeBlock), lineHeight: theme.lineHeight(.codeBlock) * scale)
         micro = theme.nsFont(.micro)
         hidden = NSFont.systemFont(ofSize: EditorMetrics.hiddenFontSize)
 
         text = color(.text)
-        text2 = color(.text2)
+        func noteInk(_ token: ColorToken, on overlay: ColorToken? = nil) -> NSColor {
+            theme.tokens.noteForeground(token, paletteID: configuration.paletteID, appearance: theme.appearance,
+                                        overlay: overlay, selectable: true).nsColor
+        }
+        text2 = noteInk(.text2)
         // 대비 증가가 켜져 있으면 흐린 글자를 한 단계 진하게 한다(spec 17).
-        text3 = color(increaseContrast ? .text2 : .text3)
+        text3 = noteInk(increaseContrast ? .text2 : .text3)
+        comment = noteInk(increaseContrast ? .text2 : .text3, on: .codeBlockBackground)
         surface = color(.surface)
         guide = color(.guide)
         accent = color(.accent)

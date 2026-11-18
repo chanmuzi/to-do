@@ -11,6 +11,13 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     var onEditingChange: ((Bool) -> Void)?
     /// Return으로 끝냈을 때.
     var onReturn: (() -> Void)?
+    var underlineMarkedText = false { didSet { if oldValue != underlineMarkedText { applyInputStyle() } } }
+    private func applyInputStyle() {
+        if let editor = currentEditor() as? NSTextView {
+            TextInputPolicy.applyNoteStyle(to: editor, theme: style.theme, underline: underlineMarkedText)
+        }
+    }
+
     var recognizesDates = true { didSet { if oldValue != recognizesDates { updateDateSuggestion() } } }
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
@@ -26,6 +33,7 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
     private(set) var isEditing = false
     var titleBeforeEditing = ""
     private var isPlaceholder = false
+    var paletteID: String?
     private var colorToken: ColorToken = .text3
 
     init(style: PanelStyle) {
@@ -74,12 +82,13 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             font = displayFont
         }
         if colorChanged && animated { style.crossfade(self) }
-        textColor = style.color(isEditing ? .text : color)
+        textColor = style.theme.noteTextColor(isEditing ? .text : color, paletteID: paletteID)
     }
 
     func refreshTheme() {
+        applyInputStyle()
         font = isEditing ? style.theme.nsFont(.title) : displayFont
-        textColor = style.color(isEditing ? .text : colorToken)
+        textColor = style.theme.noteTextColor(isEditing ? .text : colorToken, paletteID: paletteID)
     }
 
     /// "제목 없음"은 보통 굵기로 보인다(spec 5.2).
@@ -109,13 +118,14 @@ final class TitleField: NSTextField, NSTextFieldDelegate {
             string: TopRowState.untitled,
             attributes: [
                 .font: style.theme.nsFont(.title, weight: style.theme.tokens.textStyle(.body).weight),
-                .foregroundColor: style.color(.text3),
+                .foregroundColor: style.theme.noteTextColor(.text3, paletteID: paletteID),
             ]
         )
         window.invalidateCursorRects(for: self)
         onEditingChange?(true)
         window.makeFirstResponder(self)
         if let editor = currentEditor() as? NSTextView {
+            applyInputStyle()
             observeDateSelection(editor)
             editor.insertionPointColor = style.color(.accent)
             editor.setSelectedRange(NSRange(location: (stringValue as NSString).length, length: 0))

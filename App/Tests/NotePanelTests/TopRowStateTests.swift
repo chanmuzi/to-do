@@ -13,7 +13,6 @@ import Theme
 
     private func state(
         _ note: Note,
-        space: Space? = nil,
         pinned: Bool = true,
         hovered: Bool = false,
         editing: Bool = false,
@@ -21,29 +20,23 @@ import Theme
         options: NotePanelDisplayOptions = NotePanelDisplayOptions()
     ) -> TopRowState {
         TopRowState(
-            note: note, space: space, isPinned: pinned, isHovered: hovered, isEditingTitle: editing,
+            note: note, isPinned: pinned, isHovered: hovered, isEditingTitle: editing,
             problem: problem, options: options, now: now, calendar: Calendar(identifier: .gregorian)
         )
     }
 
-    private let work = Space(
-        id: SpaceID(rawValue: "work"), name: "회사", icon: .symbol(name: "briefcase", colorID: nil)
-    )
-
     @Test func restingRowIsDimAndHidesHoverControls() {
-        let resting = state(note(), space: work)
+        let resting = state(note())
         #expect(resting.title == "오늘 할 일")
         #expect(!resting.isTitlePlaceholder)
         #expect(resting.titleColor == .text3)
-        #expect(resting.spaceColor == .text3)
         #expect(resting.hoverControlsAlpha == 0)
-        #expect(resting.pin == .init(symbolName: "pin.fill", alpha: 1, color: .text3, isOn: true))
+        #expect(resting.pin == .init(symbolName: "pin.fill", alpha: 0, color: .text3, isOn: true))
     }
 
     @Test func hoverDarkensTheTitleAndRevealsControls() {
-        let hovered = state(note(), space: work, hovered: true)
+        let hovered = state(note(), hovered: true)
         #expect(hovered.titleColor == .text)
-        #expect(hovered.spaceColor == .text2)
         #expect(hovered.hoverControlsAlpha == 1)
         #expect(hovered.pin.color == .text2)
     }
@@ -66,27 +59,27 @@ import Theme
         #expect(editing.hoverControlsAlpha == 0)
     }
 
-    @Test func spaceAndReminderHaveNoSlotWhenAbsent() {
+    @Test func reminderHasNoSlotWhenAbsent() {
         let bare = state(note())
-        #expect(bare.space == nil)
         #expect(bare.reminder == nil)
         let reminded = state(note(reminder: now.addingTimeInterval(3600)))
         #expect(reminded.reminder?.status == .scheduled)
     }
 
-    @Test func spaceDisplayModes() {
-        typealias Badge = TopRowState.SpaceBadge
-        #expect(state(note(), space: work).space == Badge(icon: work.icon))
-        #expect(state(note(), space: work, options: .init(space: .iconAndName)).space
-            == Badge(name: "회사", icon: work.icon))
-        #expect(state(note(), space: work, options: .init(space: .name)).space == Badge(name: "회사"))
-        let emoji = Space(id: SpaceID(rawValue: "home"), name: "개인", icon: .emoji("🏠"))
-        #expect(state(note(), space: emoji).space == Badge(icon: emoji.icon))
-    }
-
-    @Test func imageIconsAreCarriedToTheSharedRenderer() {
-        let pixel = Space(id: SpaceID(rawValue: "dev"), name: "개발", icon: .image("terminal"))
-        #expect(state(note(), space: pixel).space == TopRowState.SpaceBadge(icon: .image("terminal")))
+    @Test func chipCountsOnlyPendingSchedulesAndExpires() {
+        var sample = note()
+        sample.schedules = [
+            ScheduleItem(start: now.addingTimeInterval(7200)),
+            ScheduleItem(start: now.addingTimeInterval(-60)),
+            ScheduleItem(start: now.addingTimeInterval(3600)),
+            ScheduleItem(start: now.addingTimeInterval(300), isCompleted: true),
+            ScheduleItem(start: now.addingTimeInterval(400), isDeleted: true),
+        ]
+        let active = state(sample)
+        #expect(active.additionalSchedules == 1)
+        #expect(active.reminder == state(note(reminder: now.addingTimeInterval(3600))).reminder)
+        sample.schedules.removeAll { $0.start > now }
+        #expect(state(sample).reminder == nil)
     }
 
     @Test func problemIsCarriedThrough() {

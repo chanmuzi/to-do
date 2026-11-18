@@ -41,7 +41,11 @@ final class NoteEditorFactory {
     var options = NoteEditorOptions() {
         didSet {
             guard options != oldValue else { return }
-            liveEditors.forEach { $0.editor.configuration = configuration }
+            for adapter in liveEditors {
+                var updated = configuration
+                updated.paletteID = adapter.editor.configuration.paletteID
+                adapter.editor.configuration = updated
+            }
         }
     }
 

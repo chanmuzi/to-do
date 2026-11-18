@@ -6,11 +6,11 @@ enum FontResolver {
     /// OpenType 가변 축 `wght`의 식별자.
     private static let weightAxis = 0x7767_6874
 
-    static func font(families: [String], size: CGFloat, weight: CGFloat) -> NSFont {
+    static func font(families: [String], size: CGFloat, weight: CGFloat, maximumWeight: CGFloat? = nil) -> NSFont {
         for family in families {
             if let generic = genericFont(family, size: size, weight: weight) { return generic }
             if let installed = installedFamily(family),
-               let font = font(family: installed, size: size, weight: weight) {
+               let font = font(family: installed, size: size, weight: weight, maximumWeight: maximumWeight) {
                 return font
             }
         }
@@ -29,7 +29,7 @@ enum FontResolver {
         }
     }
 
-    private static func font(family: String, size: CGFloat, weight: CGFloat) -> NSFont? {
+    private static func font(family: String, size: CGFloat, weight: CGFloat, maximumWeight: CGFloat?) -> NSFont? {
         let descriptor = NSFontDescriptor(fontAttributes: [.family: family])
         guard let base = NSFont(descriptor: descriptor, size: size) else { return nil }
         if hasWeightAxis(base) {
@@ -37,16 +37,17 @@ enum FontResolver {
             return NSFont(descriptor: varied, size: size) ?? base
         }
         // 굵기별 파일이 따로 있는 글꼴(D2Coding)은 가족 안에서 굵기가 가장 가까운 파일을 고른다.
-        return closestMember(family: family, size: size, weight: weight) ?? base
+        return closestMember(family: family, size: size, weight: weight, maximumWeight: maximumWeight)
     }
 
     /// 가족 안의 기울지 않은 글꼴 가운데 CSS 굵기가 가장 가까운 것.
-    private static func closestMember(family: String, size: CGFloat, weight: CGFloat) -> NSFont? {
+    private static func closestMember(family: String, size: CGFloat, weight: CGFloat, maximumWeight: CGFloat?) -> NSFont? {
         let members = (NSFontManager.shared.availableMembers(ofFontFamily: family) ?? [])
             .compactMap { $0.first as? String }
             .compactMap { NSFont(name: $0, size: size) }
             .filter { !$0.fontDescriptor.symbolicTraits.contains(.italic) }
-        return members.min { abs(cssWeight($0) - weight) < abs(cssWeight($1) - weight) }
+        let available = maximumWeight.map { limit in members.filter { cssWeight($0) <= limit } } ?? members
+        return available.min { abs(cssWeight($0) - weight) < abs(cssWeight($1) - weight) }
     }
 
     /// 글꼴의 굵기를 CSS 굵기(100~900)로. 시스템 굵기 눈금(-1~1) 사이는 곧게 잇는다.
