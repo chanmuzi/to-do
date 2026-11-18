@@ -7,13 +7,28 @@ import Theme
 struct LibrarySidebar: View {
     @Bindable var model: LibraryModel
     @State private var deleting: Space?
+    @State private var toggleHovered = false
     private var theme: Theme { model.theme }
     var body: some View {
+        VStack(spacing: 0) {
+            sidebarScroll
+            if model.router.isConnected(.openSettings) { settingsRow.padding(.horizontal, theme.component(.librarySidebarInset)) }
+        }.padding(.top, theme.component(.libraryHeaderHeight))
+        .padding(.bottom, theme.space(.sp2))
+        .frame(width: theme.component(.librarySidebarWidth))
+        .foregroundStyle(theme.libraryColor(.text)).background(theme.libraryColor(.surface2))
+        .confirmationDialog("스페이스를 삭제할까요? 노트는 스페이스 없이 남습니다.",
+            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+            Button("스페이스 삭제", role: .destructive) { if let space = deleting { model.deleteSpace(space.id) }; deleting = nil }
+            Button("취소", role: .cancel) { deleting = nil }
+        }
+    }
+
+    private var sidebarScroll: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: theme.component(.sectionGap)) {
+            VStack(alignment: .leading, spacing: theme.component(.librarySectionGap)) {
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                    sectionHeader("보기", symbol: "slider.horizontal.3", label: "보기 편집") { model.editingViews = true }
-                        .popover(isPresented: $model.editingViews) { LibraryViewEditor(model: model) }
+                    sectionHeader("보기")
                     ForEach(model.settings.visibleViews, id: \.self) { item in row(item, symbol: symbol(item)) }
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
@@ -51,28 +66,38 @@ struct LibrarySidebar: View {
                             UpcomingButton(model: model, entry: entry)
                         }
                         if upcoming.count > collapsedLimit {
-                            Button(model.showAllUpcoming ? "간단히 보기" : "모두 보기") {
+                            Button {
                                 model.showAllUpcoming.toggle()
                                 model.dismissUpcoming()
+                            } label: {
+                                Text(model.showAllUpcoming ? "간단히 보기" : "모두 보기")
+                                    .frame(height: theme.component(.libraryMoreSize)).contentShape(Rectangle())
                             }
-                            .font(theme.font(.title, weight: theme.tokens.textStyle(.body).weight))
-                            .foregroundStyle(theme.libraryColor(.text3)).buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, theme.space(.sp6))
+                            .font(theme.font(.librarySection, weight: theme.tokens.textStyle(.body).weight))
+                            .foregroundStyle(theme.libraryColor(toggleHovered ? .text2 : .text4))
+                            .buttonStyle(.plain).onHover { toggleHovered = $0 }
+                            .padding(.trailing, theme.space(.sp2)).frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
                 }
-            }.padding(.top, theme.space(.sp2))
+            }.padding(.horizontal, theme.component(.librarySidebarInset))
         }
-        .padding(.top, theme.component(.libraryHeaderHeight))
-        .padding(.horizontal, theme.space(.sp2))
-        .padding(.bottom, theme.space(.sp2))
-        .frame(width: theme.component(.librarySidebarWidth))
-        .foregroundStyle(theme.libraryColor(.text)).background(theme.libraryColor(.surface2))
-        .confirmationDialog("스페이스를 삭제할까요? 노트는 스페이스 없이 남습니다.",
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-            Button("스페이스 삭제", role: .destructive) { if let space = deleting { model.deleteSpace(space.id) }; deleting = nil }
-            Button("취소", role: .cancel) { deleting = nil }
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, _ in
+            model.dismissUpcoming()
+        }
+    }
+
+    private var settingsRow: some View {
+        VStack(spacing: theme.component(.chromePaddingEnd)) {
+            theme.libraryColor(.line).frame(height: theme.shape(.borderWidth)).padding(.horizontal, theme.space(.sp2))
+            Button { model.router.route(.openSettings) } label: {
+                SidebarColumns(theme: theme) {
+                    LibrarySymbol(theme: theme, name: "gearshape", size: .iconMedium)
+                } content: {
+                    Text("설정").font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }.foregroundStyle(theme.libraryColor(.text2)).frame(height: theme.component(.rowHeight))
+            }.buttonStyle(LibraryButtonStyle(theme: theme, hoverName: "설정"))
         }
     }
     private var spaceInput: some View {
@@ -102,17 +127,15 @@ struct LibrarySidebar: View {
         let selected = model.selection == item
         return Button { model.select(item) } label: {
             let title = Text(model.title(item)).lineLimit(1)
-                .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
+                .font(theme.font(.body, size: theme.tokens.textStyle(.row).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
                 .frame(maxWidth: .infinity, alignment: .leading)
             Group {
                 if let symbol {
                     SidebarColumns(theme: theme) {
-                        LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
+                        LibrarySymbol(theme: theme, name: symbol, size: .iconMedium)
                             .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
                     } content: {
                         title
-                        Text(String(model.index.rows(for: item).count)).font(theme.libraryNumberFont)
-                            .foregroundStyle(theme.libraryColor(.text3))
                     }
                 } else {
                     title.padding(.leading, theme.space(.sp6))
@@ -134,10 +157,10 @@ private struct SidebarColumns<Icon: View, Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        HStack(spacing: theme.space(.sp1)) {
+        HStack(spacing: theme.component(.iconGap)) {
             icon().frame(width: theme.component(.controlHeight))
             content()
-        }.padding(.leading, theme.space(.sp1))
+        }.padding(.leading, theme.component(.iconGap))
     }
 }
 
@@ -146,7 +169,7 @@ private struct SidebarSpaceIcon: View {
     let icon: SpaceIcon
 
     var body: some View {
-        let side = model.theme.component(.iconLarge)
+        let side = model.theme.component(.iconMedium)
         SpaceIconView(icon: icon == .none ? LibraryModel.defaultSpaceIcon : icon,
                       directory: model.spaces.imageDirectory, theme: model.theme,
                       size: side, color: model.theme.nsColor(.text2))
@@ -163,50 +186,39 @@ private struct LibrarySpaceRow: View {
     private var theme: Theme { model.theme }
     private var selected: Bool { model.selection == .space(space.id) }
     var body: some View {
-        HStack(spacing: theme.space(.sp1)) {
-            Button { model.select(.space(space.id)) } label: {
-                SidebarColumns(theme: theme) {
-                    SidebarSpaceIcon(model: model, icon: space.icon)
-                } content: {
-                    Text(space.name).font(Font(theme.spaceNameFont(selected: selected) as CTFont))
-                        .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
-            ZStack {
-                Text(String(model.index.rows(for: .space(space.id)).count)).font(theme.libraryNumberFont)
-                    .foregroundStyle(theme.libraryColor(.text3)).opacity(hovered ? 0 : 1)
-                Menu { menuContents } label: { LibrarySymbol(theme: theme, name: "ellipsis", size: .iconLarge) }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .opacity(hovered ? 1 : 0).accessibilityLabel("\(space.name) 더 보기")
-            }.frame(width: theme.component(.libraryToolbarButton))
+        let expanded = model.expanded.contains(space.id)
+        SidebarColumns(theme: theme) {
             Button {
-                if model.expanded.contains(space.id) { model.expanded.remove(space.id) } else { model.expanded.insert(space.id) }
+                if expanded { model.expanded.remove(space.id) } else { model.expanded.insert(space.id) }
             } label: {
-                LibrarySymbol(theme: theme, name: model.expanded.contains(space.id) ? "chevron.down" : "chevron.right", size: .iconSmall)
-                    .foregroundStyle(theme.libraryColor(.text3))
-                    .opacity(hovered || model.expanded.contains(space.id) ? 1 : 0)
-                    .frame(width: theme.component(.controlHeight), height: theme.component(.rowHeight))
-                    .contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜").accessibilityValue(model.expanded.contains(space.id) ? "펼쳐짐" : "접힘")
+                ZStack {
+                    SidebarSpaceIcon(model: model, icon: space.icon).opacity(hovered || expanded ? 0 : 1)
+                    LibrarySymbol(theme: theme, name: expanded ? "chevron.down" : "chevron.right", size: .iconSmall)
+                        .opacity(hovered || expanded ? 1 : 0)
+                }.frame(width: theme.component(.controlHeight), height: theme.component(.rowHeight)).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel("\(space.name) 날짜").accessibilityValue(expanded ? "펼쳐짐" : "접힘")
+        } content: {
+            Button { model.select(.space(space.id)) } label: {
+                Text(space.name).font(Font(theme.spaceNameFont(selected: selected) as CTFont))
+                    .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+            SpaceMenuControl(model: model, space: space, rename: rename, delete: delete, contextOnly: false)
+                .frame(width: theme.component(.libraryMoreSize), height: theme.component(.libraryMoreSize))
+                .background(theme.libraryColor(.line), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+                .opacity(hovered ? 1 : 0)
         }.padding(.trailing, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
-            .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
+            .foregroundStyle(theme.libraryColor(selected || hovered ? .text : .text2))
             .background(selected ? theme.libraryColor(.selected) : (hovered ? theme.libraryColor(.hover) : .clear),
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-
-            .onHover { hovered = $0 }
+            .background(LibrarySidebarHover(name: space.name) { hovered = $0 })
+            .overlay { SpaceMenuControl(model: model, space: space, rename: rename, delete: delete, contextOnly: true) }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
-            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: selected)
-            .contextMenu { menuContents }
             .popover(isPresented: Binding(get: { model.iconSpace == space.id }, set: { if !$0 { model.iconSpace = nil } })) {
                 IconPickerView(model: model, spaceID: space.id)
             }
     }
-    @ViewBuilder private var menuContents: some View {
-        Button("아이콘 바꾸기", systemImage: "photo") { model.iconSpace = space.id }
-        Button("이름 바꾸기", systemImage: "character.cursor.ibeam", action: rename)
-        Divider()
-        Button("스페이스 삭제", systemImage: "trash", action: delete)
-    }
+
 }
 
 private struct LibrarySectionHeader: View {
@@ -223,7 +235,7 @@ private struct LibrarySectionHeader: View {
             if let symbol {
                 ChromeIconButton(theme: theme, title: label, symbol: symbol, action: action).opacity(hovered ? 1 : 0)
             }
-        }.frame(height: theme.lineHeight(.librarySection)).padding(.bottom, theme.space(.sp1) - theme.component(.librarySidebarRowGap)).padding(.horizontal, theme.space(.sp2))
+        }.frame(height: theme.component(.librarySectionHeaderHeight)).padding(.horizontal, theme.space(.sp2))
             .contentShape(Rectangle()).onHover { hovered = $0 }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
     }
@@ -241,6 +253,6 @@ private struct SpaceInputBounds: NSViewRepresentable {
 
 private extension Theme {
     func spaceNameFont(selected: Bool) -> NSFont {
-        nsFont(selected ? .selected : .body, size: tokens.textStyle(.ui).size)
+        nsFont(selected ? .selected : .body, size: tokens.textStyle(.row).size)
     }
 }

@@ -103,13 +103,16 @@ final class LibraryRowInputView: NSView {
         let menu = NSMenu()
         let trash = restoresTrash
         let open = NSMenuItem(title: trash ? "되돌리기" : "열기", action: #selector(openNote), keyEquivalent: "")
+        open.styleLibraryCommand(trash ? "arrow.uturn.backward" : "macwindow", theme: model.theme)
         open.target = self
         menu.addItem(open)
         if !trash {
             let archive = NSMenuItem(title: note.isArchived ? "되돌리기" : "보관함으로", action: #selector(toggleArchive), keyEquivalent: "")
+            archive.styleLibraryCommand("archivebox", theme: model.theme)
             archive.target = self
             menu.addItem(archive)
             let move = NSMenuItem(title: "스페이스 옮기기", action: #selector(moveNote), keyEquivalent: "")
+            move.styleLibraryCommand("briefcase", theme: model.theme)
             move.target = self
             menu.addItem(move)
         }

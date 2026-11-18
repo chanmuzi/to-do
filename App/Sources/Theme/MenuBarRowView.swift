@@ -1,9 +1,8 @@
 import AppKit
-import Theme
 
 /// 메뉴 막대 메뉴의 한 줄(spec 4.3, 화면 8): 높이 `row-h`, 왼쪽에 14pt 아이콘, 고르는 중이면 `hover` 바탕.
 /// 노트의 더 보기 메뉴와 같은 모양이다. 단축키는 적지 않는다(규칙 4).
-final class MenuBarRowView: NSView {
+package final class MenuBarRowView: NSView {
     private let theme: Theme
     private let highlightView = NSView()
     private let iconView = NSImageView()
@@ -11,7 +10,7 @@ final class MenuBarRowView: NSView {
     private var isShowingHighlight = false
 
     /// - Parameter isEnabled: 거짓이면 고를 수 없는 줄이다. 글자와 아이콘이 `text-3`이고 `hover` 바탕이 깔리지 않는다.
-    init(theme: Theme, title: String, symbolName: String?, isEnabled: Bool = true) {
+    package init(theme: Theme, title: String, symbolName: String?, iconSize: ComponentToken = .iconLarge, isEnabled: Bool = true) {
         self.theme = theme
         super.init(frame: NSRect(
             x: 0, y: 0, width: theme.component(.menuWidth), height: theme.component(.rowHeight)
@@ -19,7 +18,7 @@ final class MenuBarRowView: NSView {
         wantsLayer = true
         autoresizingMask = [.width]
         highlightView.wantsLayer = true
-        iconView.image = symbolName.flatMap { theme.symbolImage($0, size: .iconLarge) }
+        iconView.image = symbolName.flatMap { theme.symbolImage($0, size: iconSize) }
         iconView.contentTintColor = theme.nsColor(isEnabled ? .text2 : .text3)
         iconView.imageScaling = .scaleNone
         label.stringValue = title
@@ -31,14 +30,14 @@ final class MenuBarRowView: NSView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    package required init?(coder: NSCoder) {
         fatalError("코드로만 만든다")
     }
 
-    override var isFlipped: Bool { true }
-    override var wantsUpdateLayer: Bool { true }
+    package override var isFlipped: Bool { true }
+    package override var wantsUpdateLayer: Bool { true }
 
-    override func layout() {
+    package override func layout() {
         super.layout()
         let edge = theme.space(.sp1)
         let icon = theme.component(.iconLarge)
@@ -58,7 +57,7 @@ final class MenuBarRowView: NSView {
 
     /// 메뉴가 고른 줄을 바꾸면 다시 그리라는 요청이 온다. 그때 바탕을 `dur` 동안 바꾼다(규칙 8).
     /// 줄의 바탕은 불투명한 `surface`다. 메뉴의 반투명 재질 너머가 비쳐 바탕이 탁해지고 글자가 바래지 않게 한다.
-    override func updateLayer() {
+    package override func updateLayer() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = theme.nsColor(.surface).cgColor
         }
@@ -79,12 +78,12 @@ final class MenuBarRowView: NSView {
     }
 
     /// 줄 안의 글자와 아이콘이 누름을 가로채지 않게 줄이 통째로 받는다(글자 칸은 제 누름 처리로 뗀 이벤트를 삼킬 수 있다).
-    override func hitTest(_ point: NSPoint) -> NSView? {
+    package override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isHidden, frame.contains(point) else { return nil }
         return self
     }
 
-    override func mouseUp(with event: NSEvent) {
+    package override func mouseUp(with event: NSEvent) {
         guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu else { return }
         menu.cancelTracking()
         menu.performActionForItem(at: menu.index(of: item))

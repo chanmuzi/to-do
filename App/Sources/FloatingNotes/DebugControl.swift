@@ -198,6 +198,31 @@ final class DebugControl {
         case ("library-audit", let name?, _):
             guard let root = library?.window?.contentView, let url = output(named: name.rawValue) else { return }
             do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("라이브러리 검사 실패: \(error)") }
+        case ("library-sidebar-end", _, _) where isPassive:
+            func sidebar(in view: NSView) -> NSScrollView? {
+                if let scroll = view as? NSScrollView { return scroll }
+                return view.subviews.lazy.compactMap(sidebar).first
+            }
+            if let root = library?.window?.contentView, let document = sidebar(in: root)?.documentView {
+                let end = document.isFlipped ? document.bounds.maxY - 1 : document.bounds.minY
+                document.scrollToVisible(NSRect(x: 0, y: end, width: 1, height: 1))
+            }
+        case ("library-space-menu", let name?, let rest) where isPassive:
+            let label = name.rawValue + (rest.map { " " + $0 } ?? "") + " 더 보기"
+            func button(in view: NSView) -> NSButton? {
+                if view.accessibilityLabel() == label { return view as? NSButton }
+                return view.subviews.lazy.compactMap(button).first
+            }
+            if let root = library?.window?.contentView, let button = button(in: root), let menu = button.menu {
+                verificationMenu = menu
+                let timeout = Timer(timeInterval: 5, repeats: false) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.verificationMenu?.cancelTracking() }
+                }
+                RunLoop.main.add(timeout, forMode: .common)
+                button.performClick(nil)
+                timeout.invalidate()
+                verificationMenu = nil
+            }
         case ("library-hover", let label?, let rest):
             if let root = library?.window?.contentView { DebugViewAudit.hover(root, label: label.rawValue + (rest.map { " " + $0 } ?? "")) }
         case ("reminder-key", let key?, _):
@@ -257,7 +282,7 @@ final class DebugControl {
         case ("upcoming-detail", _, _):
             if let model = library?.model {
                 if let entry = model.index.upcoming.first(where: { if case .note = $0 { true } else { false } }) {
-                    model.pinUpcoming(entry.id)
+                    model.toggleUpcoming(entry.id)
                 }
             }
         case ("reminder-close", _, _): reminderEditor?.close()

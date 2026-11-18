@@ -63,27 +63,26 @@ struct UpcomingButton: View {
     var body: some View {
         let selected = model.upcomingID == entry.id
         Button {
-            model.pinUpcoming(entry.id)
+            model.toggleUpcoming(entry.id)
         } label: {
             HStack(spacing: theme.space(.sp2)) {
                 Circle().fill(entry.item.kind == .event ? entry.color(model) : .clear)
                     .overlay { Circle().strokeBorder(entry.color(model), lineWidth: theme.component(.iconStroke)) }
-                    .frame(width: theme.component(.menuDot), height: theme.component(.menuDot))
+                    .frame(width: theme.component(.badgeDot), height: theme.component(.badgeDot))
                     .frame(width: theme.component(.iconLarge))
                 Text(entry.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                 Text(entry.sidebarTime(now: model.index.now, calendar: model.index.calendar, clock: model.displayOptions.clock))
                     .lineLimit(1).font(theme.libraryNumberFont)
                     .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing).fixedSize(horizontal: true, vertical: false)
-                    .foregroundStyle(theme.libraryColor(.text3)).layoutPriority(1)
+                    .foregroundStyle(theme.libraryColor(selected ? .text2 : .text3)).layoutPriority(1)
             }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
-                .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
+                .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
                 .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
-        }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected))
+        }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected, hoverName: entry.id))
             .anchorPreference(key: UpcomingBounds.self, value: .bounds) { [entry.id: $0] }
-            .background(LibrarySidebarHover(name: entry.id) { inside in
-                model.hoverUpcoming(entry.id, inside: inside)
-            })
-            .onDisappear { model.hoverUpcoming(entry.id, inside: false) }
+            .background {
+                if selected { UpcomingBoundsView(model: model, isSource: true) }
+            }
     }
 }
 
@@ -92,21 +91,26 @@ struct UpcomingDetail: View {
     let entry: UpcomingRow
     private var theme: Theme { model.theme }
 
+    let rowMidY: CGFloat
+    let availableHeight: CGFloat
+    @State private var height: CGFloat = 0
+
     var body: some View {
-        let shadows = theme.shadow(.pop)
-        let far = shadows.first
-        let near = shadows.dropFirst().first
-        return VStack(alignment: .leading, spacing: theme.space(.sp1)) {
-            Text(entry.title).font(theme.font(.paneTitle)).lineLimit(1)
-            Text(entry.detailTime(model)).font(theme.font(.body, size: theme.tokens.textStyle(.ui).size).monospacedDigit())
+        let gap = theme.component(.chromePaddingEnd)
+        let top = min(max(0, rowMidY - theme.component(.controlHeight)), max(0, availableHeight - height))
+        let bubble = UpcomingBubble(tipY: rowMidY - top, radius: theme.shape(.windowRadius), tail: gap)
+        let shadow = theme.shadow(.pop).last
+        VStack(alignment: .leading, spacing: 0) {
+            Text(entry.title).font(theme.font(.title)).lineLimit(1)
+            Text(entry.detailTime(model)).font(theme.libraryNumberFont)
+                .foregroundStyle(theme.libraryColor(.text2)).padding(.top, theme.space(.sp1))
             if let destination = entry.destination(model) {
-                HStack(spacing: theme.component(.chromePaddingEnd)) {
+                HStack(spacing: gap) {
                     Circle().fill(entry.color(model)).frame(width: theme.component(.badgeDot), height: theme.component(.badgeDot))
-                    Text(destination.name).font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
-                        .foregroundStyle(theme.libraryColor(.text3))
-                }
+                    Text(destination.name).lineLimit(1)
+                }.font(theme.libraryNumberFont).foregroundStyle(theme.libraryColor(.text3))
+                    .padding(.top, theme.component(.iconButtonGap))
             }
-            theme.color(.line).frame(height: theme.shape(.borderWidth))
             Button {
                 model.dismissUpcoming()
                 switch entry {
@@ -114,35 +118,53 @@ struct UpcomingDetail: View {
                 case .calendar(let event): model.openCalendarEvent(event)
                 }
             } label: {
-                HStack(spacing: theme.space(.sp2)) {
+                HStack(spacing: theme.component(.badgePad)) {
                     switch entry {
                     case .note(let note, _):
-                        LibrarySymbol(theme: theme, name: "note.text", size: .iconLarge)
+                        LibrarySymbol(theme: theme, name: "note.text", size: .iconSmall)
                         Text(LibraryPreview(note).title)
                     case .calendar:
-                        LibrarySymbol(theme: theme, name: "calendar", size: .iconLarge)
+                        LibrarySymbol(theme: theme, name: "calendar", size: .iconSmall)
                         Text("캘린더에서 열기")
                     }
-                    Spacer()
-                    LibrarySymbol(theme: theme, name: "chevron.right", size: .iconSmall)
-                }.font(theme.font(.body, size: theme.tokens.textStyle(.ui).size)).lineLimit(1)
-                    .padding(.horizontal, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
+                    Spacer(minLength: 0)
+                }.font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text2)).lineLimit(1)
+                    .padding(.horizontal, gap).frame(height: theme.component(.controlHeight))
             }.buttonStyle(LibraryButtonStyle(theme: theme, hoverName: "일정 연결 열기"))
-        }.padding(theme.space(.sp3)).frame(width: theme.component(.upcomingWidth))
-            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.pickerRadius)))
-            .overlay { RoundedRectangle(cornerRadius: theme.component(.pickerRadius)).strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)) }
-            .shadow(color: near?.color.color ?? .clear, radius: (near?.blur ?? 0) / 2, x: near?.x ?? 0, y: near?.y ?? 0)
-            .shadow(color: far?.color.color ?? .clear, radius: (far?.blur ?? 0) / 2, x: far?.x ?? 0, y: far?.y ?? 0)
+                .padding(.horizontal, -gap).padding(.top, theme.space(.sp2))
+        }.padding(.horizontal, theme.space(.sp3)).padding(.top, theme.component(.scheduleInset))
+            .padding(.bottom, gap).frame(width: theme.component(.upcomingWidth))
+            .background {
+                bubble.fill(theme.color(.surface))
+                    .shadow(color: shadow?.color.color ?? .clear, radius: (shadow?.blur ?? 0) / 2, y: shadow?.y ?? 0)
+                bubble.stroke(theme.libraryColor(.line), lineWidth: theme.shape(.borderWidth))
+            }
+            .background(UpcomingBoundsView(model: model, isSource: false))
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .offset(y: top)
     }
 }
 
-/// 바깥 클릭을 판별하되 다른 행의 클릭과 호버는 그대로 전달한다.
-struct UpcomingDetailBounds: NSViewRepresentable {
-    let model: LibraryModel
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        model.upcomingDetailView = view
-        return view
+private nonisolated struct UpcomingBubble: Shape {
+    let tipY: CGFloat
+    let radius: CGFloat
+    let tail: CGFloat
+    func path(in rect: CGRect) -> Path {
+        let y = min(max(tipY, radius + tail), rect.height - radius - tail)
+        var pointer = Path()
+        pointer.move(to: CGPoint(x: rect.minX, y: y - tail))
+        pointer.addLine(to: CGPoint(x: rect.minX - tail, y: y))
+        pointer.addLine(to: CGPoint(x: rect.minX, y: y + tail))
+        pointer.closeSubpath()
+        return Path(roundedRect: rect, cornerRadius: radius).union(pointer)
     }
-    func updateNSView(_ view: NSView, context: Context) {}
+}
+
+private struct UpcomingBoundsView: NSViewRepresentable {
+    let model: LibraryModel
+    let isSource: Bool
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ view: NSView, context: Context) {
+        if isSource { model.upcomingSourceView = view } else { model.upcomingDetailView = view }
+    }
 }

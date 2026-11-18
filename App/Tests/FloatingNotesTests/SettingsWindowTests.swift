@@ -92,6 +92,42 @@ import Theme
         #expect(fixture.notePanels.window(for: closed) == nil)
     }
 
+    @Test func librarySettingsRowOpensExistingSettingsWindow() throws {
+        let f = try AppFixture()
+        defer { f.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: f.location.stateDirectory)
+        let service = ScheduleService(notes: f.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let settings = SettingsCoordinator(model: SettingsModel(read: { store.settings }, save: store.update,
+            schedules: service, shortcuts: [], openPrivacy: { _ in }), theme: f.theme)
+        settings.allowsKeyWindows = false
+        defer { settings.window?.close() }
+        let router = AppRouter()
+        router.notePanels = f.notePanels
+        router.settingsWindow = settings
+        let library = LibraryCoordinator(theme: f.theme, notes: f.notes, spaces: try SpaceStore(location: f.location),
+            windows: f.windowStates, preferences: try LibraryPreferencesStore(location: f.location), router: router)
+        library.allowsKeyWindows = false
+        library.show()
+        defer { library.close() }
+        let window = try #require(library.window)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        func settingsRow(_ view: NSView) -> NSView? {
+            if view.accessibilityLabel() == "설정 호버" { return view }
+            return view.subviews.lazy.compactMap(settingsRow).first
+        }
+        let row = try #require(window.contentView.flatMap(settingsRow))
+        let point = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            window.sendEvent(event)
+        }
+        #expect(settings.window?.isVisible == true)
+        let opened = try #require(settings.window)
+        #expect(router.route(.openSettings) == .handled && settings.window === opened)
+    }
+
     @Test func savedChangesReachAnOpenNoteAndLibrary() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }

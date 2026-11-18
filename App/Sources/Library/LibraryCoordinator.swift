@@ -27,7 +27,10 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
             window.allowsKey = allowsKeyWindows
             window.handleContentClick = { [weak model] point in
                 guard let model else { return }
-                if let detail = model.upcomingDetailView, !detail.bounds.contains(detail.convert(point, from: nil)) {
+                let insideDetail = [model.upcomingSourceView, model.upcomingDetailView].compactMap { $0 }.contains {
+                    $0.bounds.contains($0.convert(point, from: nil))
+                }
+                if !insideDetail {
                     model.dismissUpcoming()
                 }
                 guard model.editingSpace else { return }

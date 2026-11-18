@@ -36,7 +36,7 @@ struct LibraryPreview {
         if visible.isEmpty && todos > checked {
             subtitle = "투두 \(todos - checked)개 남음"
         } else {
-            subtitle = visible.dropFirst(note.title.isEmpty ? 1 : 0).joined(separator: ", ")
+            subtitle = NotePreviewText.join(visible.dropFirst(note.title.isEmpty ? 1 : 0))
         }
     }
 

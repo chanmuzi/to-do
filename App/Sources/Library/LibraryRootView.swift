@@ -1,8 +1,6 @@
 import AppKit
 import SwiftUI
 import Models
-import Routing
-import SpaceIcons
 import Theme
 
 struct LibraryRootView: View {
@@ -18,21 +16,15 @@ struct LibraryRootView: View {
                         LibrarySymbol(theme: theme, name: "trash", size: .iconLarge)
                             .foregroundStyle(theme.libraryColor(.text2)).accessibilityHidden(true)
                     }
-                    Text(model.title(model.selection)).font(theme.font(.paneTitle))
+                    Text(model.title(model.selection)).font(theme.font(.paneTitle, size: theme.component(.libraryHeaderFont)))
                     Spacer()
-                    if model.router.isConnected(.openSettings) {
-                        ChromeIconButton(theme: theme, title: "설정", symbol: "slider.horizontal.3") {
-                            model.router.route(.openSettings)
-                        }
-                    }
+                    ChromeIconButton(theme: theme, title: "보기 편집", symbol: "line.3.horizontal.decrease") {
+                        model.editingViews.toggle()
+                    }.popover(isPresented: $model.editingViews, arrowEdge: .bottom) { LibraryViewEditor(model: model) }
                     if model.showsNewNote {
-                        ChromeIconButton(theme: theme, title: "새 노트", symbol: "plus") {
-                            var draft = NoteDraft()
-                            switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
-                            model.router.route(.newNote(NewNoteRequest(draft: draft)))
-                        }
+                        ChromeIconButton(theme: theme, title: "새 노트", symbol: "plus", action: model.newNoteInSelection)
                     }
-                }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
+                }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp3))
                     .frame(height: theme.component(.libraryHeaderHeight))
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
                 ScrollView {
@@ -40,21 +32,20 @@ struct LibraryRootView: View {
                         if model.rows.isEmpty {
                             Button(model.showsNewNote ? "새 노트" : "전체 노트") {
                                 if !model.showsNewNote { model.select(.all) }
-                                else {
-                                    var draft = NoteDraft()
-                                    switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
-                                    model.router.route(.newNote(NewNoteRequest(draft: draft)))
-                                }
+                                else { model.newNoteInSelection() }
                             }.font(theme.font(.body))
                                 .padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.controlHeight))
                                 .buttonStyle(LibraryButtonStyle(theme: theme))
                                 .padding(theme.space(.sp3))
                         }
-                        ForEach(model.sections) { section in
+                        let sections = model.sections
+                        ForEach(sections) { section in
                             Text(section.id).font(theme.font(.librarySection)).foregroundStyle(theme.libraryColor(.text3))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.leading, theme.component(.libraryRowLeading))
-                                .padding(.top, theme.space(.sp3)).padding(.bottom, theme.space(.sp1))
+                                .padding(.top, section.id == sections.first?.id ? theme.component(.libraryRowTrailing) : theme.lineHeight(.row))
+                                .padding(.bottom, theme.component(.chromePaddingEnd))
+                                .overlay(alignment: .bottom) { LibraryListRule(theme: theme) }
                             ForEach(section.notes) { note in LibraryNoteRow(model: model, note: note) }
                         }
                     }
@@ -72,10 +63,8 @@ struct LibraryRootView: View {
                 if let id = model.upcomingID, let anchor = anchors[id],
                    let entry = model.index.upcoming.first(where: { $0.id == id }) {
                     let rect = geometry[anchor]
-                    UpcomingDetail(model: model, entry: entry)
-                        .background(UpcomingDetailBounds(model: model))
-                        .offset(x: theme.component(.librarySidebarWidth) + theme.space(.sp1),
-                                y: min(rect.minY, max(0, geometry.size.height - theme.component(.upcomingDetailHeight))))
+                    UpcomingDetail(model: model, entry: entry, rowMidY: rect.midY, availableHeight: geometry.size.height)
+                        .offset(x: theme.component(.librarySidebarWidth) + theme.component(.badgePad))
                 }
             }
         }.foregroundStyle(theme.libraryColor(.text)).ignoresSafeArea().focusEffectDisabled()
@@ -88,28 +77,31 @@ struct LibraryNoteRow: View {
     private var theme: Theme { model.theme }
     var body: some View {
         let preview = LibraryPreview(note)
-        let weight = preview.isEmpty ? theme.tokens.textStyle(.body).weight : (model.selectedNoteID == note.id ? theme.tokens.textStyle(.selected).weight : nil)
+        let weight = theme.tokens.textStyle(preview.isEmpty ? .body : .selected).weight
         let insetX = theme.space(.sp2)
         let insetY = theme.component(.libraryRowHighlightInsetY)
         LibrarySelectableRow(model: model, note: note, label: preview.title,
                              highlightInsets: EdgeInsets(top: insetY, leading: insetX, bottom: insetY, trailing: insetX)) {
-            HStack(spacing: theme.component(.libraryRowGap)) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(preview.title).font(theme.font(.row, weight: weight))
-                        .foregroundStyle(theme.libraryColor(preview.isEmpty || model.selection == .trash ? .text2 : .rowTitle, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
-                        .frame(height: theme.lineHeight(.row))
-                    if !preview.subtitle.isEmpty {
-                        Text(preview.subtitle).font(theme.font(.rowSub))
-                            .foregroundStyle(theme.libraryColor(.text3, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
-                            .frame(height: theme.lineHeight(.rowSub))
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-                if preview.total > 0 {
-                    Text("\(preview.completed)/\(preview.total)").font(theme.libraryNumberFont)
-                        .foregroundStyle(theme.libraryColor(.text3))
+            VStack(alignment: .leading, spacing: theme.component(.libraryRowGap)) {
+                Text(preview.title).font(theme.font(.row, weight: weight))
+                    .foregroundStyle(theme.libraryColor(preview.isEmpty ? .text3 : model.selection == .trash ? .text2 : .text))
+                    .lineLimit(1)
+                if !preview.subtitle.isEmpty {
+                    Text(preview.subtitle).font(theme.font(.rowSub))
+                        .foregroundStyle(theme.libraryColor(.text3)).lineLimit(1)
                 }
-            }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
-                .frame(height: theme.component(.libraryRowHeight))
+            }.frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, theme.component(.libraryRowLeading))
+                .padding(.vertical, theme.component(.libraryRowPaddingY))
         }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
+            .overlay(alignment: .bottom) { LibraryListRule(theme: theme) }
+    }
+}
+
+private struct LibraryListRule: View {
+    let theme: Theme
+    var body: some View {
+        theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
+            .padding(.horizontal, theme.component(.libraryRowLeading)).allowsHitTesting(false)
     }
 }

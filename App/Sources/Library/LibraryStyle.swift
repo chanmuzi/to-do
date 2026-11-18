@@ -46,7 +46,7 @@ extension Theme {
 
     func libraryColor(_ token: ColorToken, on background: ColorToken = .surface2) -> Color {
         guard NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast else { return color(token, on: background) }
-        return color(token == .text3 ? .text2 : token == .line ? .outline : token, on: background)
+        return color((token == .text3 || token == .text4) ? .text2 : token == .line ? .outline : token, on: background)
     }
 }
 
@@ -70,6 +70,10 @@ final class LibraryHostingView<Content: View>: NSHostingView<Content> {
         super.layout()
         func suppressRing(_ view: NSView) {
             view.focusRingType = .none
+            if let scroll = view as? NSScrollView, scroll.scrollerStyle != .overlay {
+                scroll.scrollerStyle = .overlay
+                scroll.autohidesScrollers = true
+            }
             view.subviews.forEach(suppressRing)
         }
         suppressRing(self)
@@ -97,4 +101,11 @@ final class SidebarHoverView: NSView {
     }
     override func mouseEntered(with event: NSEvent) { changed(true) }
     override func mouseExited(with event: NSEvent) { changed(false) }
+}
+
+extension NSMenuItem {
+    func styleLibraryCommand(_ symbol: String, theme: Theme) {
+        image = theme.symbolImage(symbol, size: .menuIcon)
+        view = MenuBarRowView(theme: theme, title: title, symbolName: symbol, iconSize: .menuIcon)
+    }
 }
