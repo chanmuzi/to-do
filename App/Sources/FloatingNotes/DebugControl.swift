@@ -353,8 +353,16 @@ final class DebugControl {
         case ("settings-close", _, _) where isPassive:
             settingsWindow?.window?.close()
         case ("settings-pane", let pane?, _):
-            guard let selection = SettingsPane(rawValue: pane.rawValue) else { return }
+            let name = [pane.rawValue, argument].compactMap { $0 }.joined(separator: " ")
+            guard let selection = SettingsPane(rawValue: name) ?? ["앱": .general, "예정": .schedule][name] else { return }
             settingsWindow?.show(selection)
+        case ("settings-state", let name?, _) where isPassive:
+            guard let model = settingsWindow?.model, let url = output(named: name.rawValue) else { return }
+            let engines = model.agents?.engines.map { ["provider": $0.provider.rawValue, "state": $0.detail] } ?? []
+            do {
+                let state: [String: Any] = ["pane": model.pane.rawValue, "engines": engines]
+                try JSONSerialization.data(withJSONObject: state).write(to: url, options: .atomic)
+            } catch { AppLog.warning("설정 상태를 쓰지 못했습니다: \(error)") }
         case ("settings-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
             write(settingsWindow?.window, to: url)

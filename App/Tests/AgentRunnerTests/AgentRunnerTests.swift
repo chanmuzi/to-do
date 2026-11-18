@@ -146,10 +146,10 @@ private struct Fixture {
     }
 
     @Test func timeoutReapsGroup() async throws {
-        let fx = try Fixture(.claude, #"sleep 20 & child=$!; echo "$child" > "$(dirname "$0")/child"; wait"#)
+        let fx = try Fixture(.claude, #"sleep 20 & child=$!; echo "$child" > "${0%/*}/child"; wait"#)
         defer { try! fx.cleanup() }
         await #expect(throws: AgentError.timeout) {
-            try await fx.runner.run("prompt", engine: .claude(.opus), installation: fx.installation, timeout: .milliseconds(400))
+            try await fx.runner.run("prompt", engine: .claude(.opus), installation: fx.installation, timeout: .seconds(2))
         }
         let child = try String(contentsOf: fx.root.appending(path: "bin/child"), encoding: .utf8)
         let pid = try #require(Int32(child.trimmingCharacters(in: .whitespacesAndNewlines)))

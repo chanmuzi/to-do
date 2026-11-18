@@ -234,11 +234,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try notes.flushPendingSaves()
             // 아무것도 적지 않은 노트는 남기지 않는다(D-040). 다 쓴 뒤에만 본다.
             if notePanels?.deleteBlankNotes().isEmpty == false { flushWindowStates() }
-            return .terminateNow
         } catch {
             AppLog.warning("끝내기 전에 저장하지 못했습니다: \(error)")
-            return UnsavedNotesAlert.confirmQuit(after: error) ? .terminateNow : .terminateCancel
+            guard UnsavedNotesAlert.confirmQuit(after: error) else { return .terminateCancel }
         }
+        if let agents = settingsWindow?.model.agents, agents.hasActiveTasks {
+            agents.cancel()
+            Task {
+                await agents.wait()
+                sender.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+        return .terminateNow
     }
 
     /// 한데 모아 쓰려고 미뤄 둔 창 상태를 쓴다. 쓰지 못해도 끝내기를 막지 않는다(노트의 글이 아니다).
@@ -377,8 +385,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return (action, entry.keyLabels.joined(separator: group == .markdownInput ? " 또는 " : " "))
             })
         }
+        var agentDirectory: URL?
+        #if DEBUG
+        agentDirectory = options.debugAgentDirectory
+        if options.debugIsPassive && agentDirectory == nil {
+            agentDirectory = environment.location.stateDirectory.appending(path: "verification-bin")
+        }
+        #endif
+        let agents = AgentSettings(location: environment.location, searchDirectory: agentDirectory)
         let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
-                                  shortcuts: sections) { [usesFake = options.usesFakeCalendar] kind in
+                                  shortcuts: sections, agents: agents) { [usesFake = options.usesFakeCalendar] kind in
             guard !usesFake else { return }
             let anchor = kind == .event ? "Privacy_Calendars" : "Privacy_Reminders"
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + anchor) {

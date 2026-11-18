@@ -88,7 +88,7 @@ scripts/
 
 ### AgentRunner와 FloatMCP
 
-- 연결 화면은 `AgentConnection(provider:location:)`에서 `discover()`로 CLI, 버전, Codex용 node를 찾는다. `account(_:)`는 로그인 여부와 CLI가 제공한 계정 정보만 읽는다. `loginCommand(_:)`는 실행 파일, 인자, 환경, cwd만 반환한다. 로그인 시작은 연결 화면의 명시적 동작이다.
+- 연결 화면은 `AgentConnection(provider:location:)`에서 `discover()`로 CLI, 버전, Codex용 node를 찾는다. `account(_:)`는 로그인 여부와 CLI가 제공한 계정 정보만 읽는다. `loginCommand(_:)`는 실행 파일, 인자, 환경, cwd만 반환한다. 로그인 시작은 연결 화면의 명시적 동작이다. waitForLogin()은 기존 프로세스 그룹 실행기를 재사용한다. 디버그의 --debug-agent-bin은 해당 폴더에서만 탐색하며 --debug-passive도 실제 CLI로 폴백하지 않는다.
 - AI 패널은 `AgentRunner(location:server:)`를 만들고 `run(_:engine:installation:timeout:onEvent:)`를 호출한다. 서버의 기본 위치는 앱의 보조 실행 파일이다. `AgentEvent`는 시작, 본문, 도구 호출, 사용 한도, 사용량을 전달한다. 완료 값은 본문, 확인된 모델, 사용량이다. Swift Task를 취소하면 실행기가 만든 프로세스 그룹을 종료한다.
 - `AgentEngine`은 Claude 별칭, Codex 모델명, API 키 공급자를 구분한다. `APIKeyStoring`의 기본 구현 `KeychainAPIKeyStore`는 공급자별 일반 암호를 읽고 갱신하고 삭제한다. G0에서 API 엔진을 실행하면 `unsupportedEngine`을 반환한다.
 - `FloatMCP <노트 폴더>`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes({})` 결과는 정렬한 파일명이며 `read_note({"name":"파일명.md"})`는 머리를 포함한 UTF-8 원문을 반환한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
@@ -509,6 +509,6 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ## 7단계 설정
 
-- Feature `FloatSettings`는 Theme, Models, Scheduling에 의존한다. SettingsValues는 저장 형식, SettingsModel은 저장 콜백과 권한별 대상 선택, SettingsCoordinator는 단일 창을 맡는다. 다른 Feature를 import하지 않는다.
+- Feature `FloatSettings`는 Theme, Models, Scheduling, Store, AgentRunner에 의존한다. AgentSettings는 엔진별 계정 확인과 명시적인 로그인, 시험의 수명을 관리한다. SettingsValues는 저장 형식, SettingsModel은 저장 콜백과 권한별 대상 선택, SettingsCoordinator는 단일 창을 맡는다. 다른 Feature를 import하지 않는다.
 - AppSettingsStore가 JSON을 원자적으로 쓴 뒤 SettingsApplication과 NoteEditorFactory가 이미 열린 화면을 갱신한다. AppDelegate가 ShortcutTable의 표시 행, 저장소, ScheduleService를 주입한다.
 - CalendarBridge가 권한 상태, 쓰기 가능한 대상, 시스템 기본값을 제공한다. ID 선택은 새 항목 생성과 E2가 공유하고 연결된 항목은 기존 대상을 유지한다.

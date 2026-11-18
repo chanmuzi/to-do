@@ -5,7 +5,7 @@ public enum AgentProvider: String, Codable, Sendable { case claude, codex }
 public enum ClaudeModel: String, Sendable { case opus, sonnet, haiku }
 public enum APIProvider: String, Sendable { case anthropic, openAI }
 public enum AgentEngine: Sendable {
-    case claude(ClaudeModel), codex(model: String), apiKey(APIProvider)
+    case claude(ClaudeModel), codex(model: String? = nil), apiKey(APIProvider)
 }
 
 public struct AgentAccount: Sendable {
@@ -69,22 +69,22 @@ public struct AgentConnection: Sendable {
     }
 
     /// 흔한 경로에서 못 찾은 이름만 한 번의 로그인 셸로 확인한다. 셸에는 고정된 명령만 전달한다.
-    public func discover() async throws -> AgentInstallation {
+    public func discover(in directory: URL? = nil) async throws -> AgentInstallation {
         try await onWorker {
-            let userHome = FileManager.default.homeDirectoryForCurrentUser
-            let nvm = userHome.appending(path: ".nvm/versions/node")
-            let versions = (try? FileManager.default.contentsOfDirectory(at: nvm, includingPropertiesForKeys: nil)) ?? []
-            let bins = [userHome.appending(path: ".local/bin"), URL(filePath: "/opt/homebrew/bin"),
-                        URL(filePath: "/usr/local/bin")] + versions.sorted {
-                $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending
-            }.map { $0.appending(path: "bin") }
+            let bins: [URL]
+            if let directory {
+                bins = [directory]
+            } else {
+                bins = Self.standardBins()
+            }
             func find(_ name: String, in dirs: [URL]) -> URL? {
                 dirs.map { $0.appending(path: name) }.first { FileManager.default.isExecutableFile(atPath: $0.path) }
             }
             var executable = find(provider.rawValue, in: bins)
             var node: URL?
             if provider == .codex { node = find("node", in: [executable?.deletingLastPathComponent()].compactMap { $0 } + bins) }
-            if executable == nil || (provider == .codex && node == nil) {
+            if directory == nil && (executable == nil || (provider == .codex && node == nil)) {
+                let userHome = FileManager.default.homeDirectoryForCurrentUser
                 let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
                 let names = provider == .claude ? ["claude"] : ["codex", "node"]
                 let query = names.map { "command -v \($0) || :" }.joined(separator: "\n")
@@ -109,6 +109,16 @@ public struct AgentConnection: Sendable {
             guard !version.isEmpty else { throw AgentError.invalidOutput }
             return AgentInstallation(provider: provider, executable: executable, version: version, node: node)
         }
+    }
+
+    private static func standardBins() -> [URL] {
+        let userHome = FileManager.default.homeDirectoryForCurrentUser
+        let nvm = userHome.appending(path: ".nvm/versions/node")
+        let versions = (try? FileManager.default.contentsOfDirectory(at: nvm, includingPropertiesForKeys: nil)) ?? []
+        return [userHome.appending(path: ".local/bin"), URL(filePath: "/opt/homebrew/bin"),
+                    URL(filePath: "/usr/local/bin")] + versions.sorted {
+            $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedDescending
+        }.map { $0.appending(path: "bin") }
     }
 
     public func loginCommand(_ installation: AgentInstallation) throws -> AgentCommand {

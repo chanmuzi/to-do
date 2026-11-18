@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Theme
 
-package final class SettingsCoordinator {
+package final class SettingsCoordinator: NSObject, NSWindowDelegate {
     package let model: SettingsModel
     private let theme: Theme
     package var allowsKeyWindows = true
@@ -14,27 +14,40 @@ package final class SettingsCoordinator {
     }
 
     package func show(_ pane: SettingsPane? = nil) {
-        model.pane = pane ?? .appearance
+        model.pane = pane ?? .general
         model.refreshCalendars()
         if window == nil {
-            let panel = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable],
-                                       backing: .buffered, defer: false)
+            let size = NSSize(width: theme.component(.settingsWidth), height: theme.component(.settingsContentHeight))
+            let panel = SettingsWindow(contentRect: NSRect(origin: .zero, size: size),
+                                       styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
+            panel.title = "설정"
+            panel.titlebarAppearsTransparent = true
+            panel.titleVisibility = .hidden
+            panel.titlebarSeparatorStyle = .none
+            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                panel.standardWindowButton(button)?.isHidden = true
+            }
+            panel.isMovableByWindowBackground = true
             panel.allowsKey = allowsKeyWindows
             panel.isReleasedWhenClosed = false
-            let view = SettingsView(model: model, theme: theme, reset: { [weak self] in self?.confirmReset() })
-                .onChange(of: model.pane) { [weak self] _, _ in self?.resize() }
-            panel.contentView = NSHostingView(rootView: view)
+            panel.delegate = self
+            let view = SettingsView(model: model, theme: theme, reset: { [weak self] in self?.confirmReset() },
+                                    close: { [weak panel] in panel?.close() }).ignoresSafeArea()
+            let host = NSHostingView(rootView: view)
+            host.sizingOptions = []
+            panel.contentView = host
+            if !allowsKeyWindows, let screen = NSScreen.screens.last {
+                panel.setFrameOrigin(screen.visibleFrame.origin)
+            } else { panel.center() }
             window = panel
-            resize()
-            panel.center()
         }
-        resize()
         if allowsKeyWindows {
             window?.makeKeyAndOrderFront(nil)
             window?.makeMain()
-        }
-        else { window?.orderFrontRegardless() }
+        } else { window?.orderFrontRegardless() }
     }
+
+    package func windowWillClose(_ notification: Notification) { model.agents?.cancel() }
 
     package func confirmReset() {
         guard let window, window.attachedSheet == nil else { return }
@@ -47,30 +60,21 @@ package final class SettingsCoordinator {
             if response == .alertFirstButtonReturn, let self { model.restoreDefaults(theme: theme) }
         }
     }
-
-    private func resize() {
-        guard let window else { return }
-        window.title = "설정"
-        if model.pane == .shortcuts { window.title = "단축키" }
-        let wanted = theme.component(model.pane.heightToken)
-        let screen = (window.screen ?? NSScreen.main)?.visibleFrame
-        let available = screen.map { window.contentRect(forFrameRect: $0).height } ?? wanted
-        let size = NSSize(width: theme.component(.settingsWidth), height: min(wanted, available))
-        window.setContentSize(size)
-    }
-}
-
-extension SettingsPane {
-    var heightToken: ComponentToken {
-        switch self {
-        case .shortcuts: .settingsShortcutsHeight
-        default: .settingsContentHeight
-        }
-    }
 }
 
 private final class SettingsWindow: NSWindow {
     var allowsKey = true
     override var canBecomeKey: Bool { allowsKey }
     override var canBecomeMain: Bool { allowsKey }
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .control, .option])
+        if attachedSheet == nil && ((modifiers.isEmpty && event.keyCode == 53) ||
+            (modifiers == .command && event.charactersIgnoringModifiers?.lowercased() == "w")) {
+            close()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+    override func cancelOperation(_ sender: Any?) { if attachedSheet == nil { close() } }
+    override func performClose(_ sender: Any?) { if attachedSheet == nil { close() } }
 }

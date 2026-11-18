@@ -25,6 +25,7 @@ struct LaunchOptions: Equatable {
     var debugHover: [NoteID] = []
     /// 확인용 명령을 받을 때 그 명령이 파일을 쓸 수 있는 하나뿐인 폴더. 없으면 명령을 받지 않는다.
     var debugControlDirectory: URL?
+    var debugAgentDirectory: URL?
     var debugSkipsHotKeys = false
     var debugIsPassive = false
     #endif
@@ -71,6 +72,8 @@ struct LaunchOptions: Equatable {
             #if DEBUG
             case "--debug-hover":
                 debugHover.append(NoteID(rawValue: try value(after: flag)))
+            case "--debug-agent-bin":
+                debugAgentDirectory = URL(fileURLWithPath: try value(after: flag), isDirectory: true)
             case "--debug-control":
                 debugControlDirectory = URL(fileURLWithPath: try value(after: flag), isDirectory: true)
             case "--debug-passive":

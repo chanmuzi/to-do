@@ -32,15 +32,17 @@ public struct AgentRunner: Sendable {
                     timeout: Duration = .seconds(120),
                     onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
-        let requested: String
+        let requested: String?
         switch engine {
         case .claude(let alias): (provider, requested) = (.claude, alias.rawValue)
         case .codex(let model): (provider, requested) = (.codex, model)
         case .apiKey: throw AgentError.unsupportedEngine
         }
-        guard !requested.isEmpty, requested.utf8.count <= 128,
+        if let requested {
+            guard !requested.isEmpty, requested.utf8.count <= 128,
               requested.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-._:/".contains($0)) })
-        else { throw AgentError.invalidOutput }
+            else { throw AgentError.invalidOutput }
+        }
         let connection = try AgentConnection(provider: provider, location: location)
         return try await onWorker {
             let id = UUID().uuidString
@@ -70,7 +72,7 @@ public struct AgentRunner: Sendable {
             case .failure(AgentError.isolation): outcome = "isolation"
             case .failure: outcome = "failed"
             }
-            let record = UsageRecord(provider: provider, requestedModel: requested, actualModel: stream.model,
+            let record = UsageRecord(provider: provider, requestedModel: requested ?? "auto", actualModel: stream.model,
                                      startedAt: date, elapsedSeconds: Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18,
                                      outcome: outcome, usage: stream.usage)
             try fm.removeItem(at: folder)
@@ -81,9 +83,9 @@ public struct AgentRunner: Sendable {
         }
     }
 
-    private func arguments(_ provider: AgentProvider, _ model: String, _ prompt: String, _ cwd: URL, _ folder: URL) throws -> [String] {
+    private func arguments(_ provider: AgentProvider, _ model: String?, _ prompt: String, _ cwd: URL, _ folder: URL) throws -> [String] {
         let notes = location.notesDirectory.path
-        if provider == .claude {
+        if provider == .claude, let model {
             let config = folder.appending(path: "mcp.json")
             let data = try JSONSerialization.data(withJSONObject: ["mcpServers": ["float": ["command": server.path, "args": [notes]]]])
             try data.write(to: config, options: .atomic)
@@ -103,7 +105,7 @@ public struct AgentRunner: Sendable {
                             "features.multi_agent=false", "agents.enabled=false", "plugins._default.enabled=false",
                             "skills.bundled.enabled=false", "skills.include_instructions=false"]
         return ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
-                "-C", cwd.path, "-s", "read-only", "-m", model] + settings.flatMap { ["-c", $0] } + ["--", prompt]
+                "-C", cwd.path, "-s", "read-only"] + (model.map { ["-m", $0] } ?? []) + settings.flatMap { ["-c", $0] } + ["--", prompt]
     }
 }
 

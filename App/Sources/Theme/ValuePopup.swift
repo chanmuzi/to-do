@@ -3,6 +3,7 @@ import SwiftUI
 
 /// 이름 열 뒤에서 세그먼트와 글자 시작선을 공유하는 팝업.
 public struct ValuePopup: View {
+    let inSettings: Bool
     let label: String
     let value: String
     let dot: NSImage?
@@ -10,8 +11,9 @@ public struct ValuePopup: View {
     let makeMenu: () -> NSMenu
     let choose: (NSMenuItem) -> Void
 
-    public init(label: String, value: String, dot: NSImage? = nil, theme: Theme,
+    public init(label: String, value: String, dot: NSImage? = nil, theme: Theme, inSettings: Bool = false,
                 makeMenu: @escaping () -> NSMenu, choose: @escaping (NSMenuItem) -> Void) {
+        self.inSettings = inSettings
         self.label = label
         self.value = value
         self.dot = dot
@@ -24,16 +26,17 @@ public struct ValuePopup: View {
         let firstLetter = theme.component(.iconButtonGap) + theme.space(.sp3)
         let leading = firstLetter - theme.component(.chromePaddingEnd)
             - (dot.map { $0.size.width + theme.component(.badgePad) } ?? 0)
-        ValuePopupHost(popup: self).fixedSize().padding(.leading, leading)
+        ValuePopupHost(popup: self).fixedSize().padding(.leading, inSettings ? 0 : leading)
+            .padding(.trailing, inSettings ? -theme.component(.chromePaddingEnd) : 0)
     }
 
     private struct ValuePopupHost: NSViewRepresentable {
         let popup: ValuePopup
-        func makeNSView(context: Context) -> ValueButton { ValueButton(theme: popup.theme) }
+        func makeNSView(context: Context) -> ValueButton { ValueButton(theme: popup.theme, inSettings: popup.inSettings) }
         func updateNSView(_ button: ValueButton, context: Context) {
             button.title = popup.value
             button.image = popup.dot
-            button.font = popup.theme.nsFont(.body, size: popup.theme.tokens.textStyle(.ui).size)
+            button.font = popup.theme.nsFont(.body, size: popup.theme.tokens.textStyle(popup.inSettings ? .micro : .ui).size)
             button.setAccessibilityLabel(popup.label)
             button.setAccessibilityValue(popup.value)
             button.menu = popup.makeMenu()
@@ -49,7 +52,9 @@ private final class ValueButton: NSButton {
     let theme: Theme
     var choose: ((NSMenuItem) -> Void)?
     private var hovered = false
-    init(theme: Theme) {
+    let inSettings: Bool
+    init(theme: Theme, inSettings: Bool) {
+        self.inSettings = inSettings
         self.theme = theme
         super.init(frame: .zero)
         isBordered = false
@@ -68,8 +73,10 @@ private final class ValueButton: NSButton {
     private var textX: CGFloat {
         theme.component(.chromePaddingEnd) + (image.map { $0.size.width + theme.component(.badgePad) } ?? 0)
     }
+    private var chevronWidth: CGFloat { theme.component(inSettings ? .settingsChevronWidth : .menuDot) }
+    private var valueGap: CGFloat { theme.component(inSettings ? .settingsPopupGap : .badgePad) }
     override var intrinsicContentSize: NSSize {
-        NSSize(width: textX + ceil(text.size().width) + theme.component(.badgePad) + theme.component(.menuDot) + theme.component(.chromePaddingEnd),
+        NSSize(width: textX + ceil(text.size().width) + valueGap + chevronWidth + theme.component(.chromePaddingEnd),
                height: theme.component(.connectHeight))
     }
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
@@ -86,8 +93,8 @@ private final class ValueButton: NSButton {
         }
         let value = text
         value.draw(at: NSPoint(x: textX, y: (bounds.height - value.size().height) / 2))
-        let width = theme.component(.menuDot), height = theme.space(.sp3)
-        let x = textX + ceil(value.size().width) + theme.component(.badgePad), y = bounds.midY
+        let width = chevronWidth, height = inSettings ? theme.component(.settingsChevronHeight) : theme.space(.sp3)
+        let x = textX + ceil(value.size().width) + valueGap, y = bounds.midY
         let path = NSBezierPath()
         for sign: CGFloat in [-1, 1] {
             path.move(to: NSPoint(x: x, y: y + sign * height / 6))

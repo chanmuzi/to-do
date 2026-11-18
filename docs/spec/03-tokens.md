@@ -166,3 +166,7 @@
 - [ ] 한 줄 입력칸을 추가할 때 실제 글꼴로 포커스 전후와 첫 입력 전후의 시작점 및 기준선을 검사한다.
 
 노트 찾기는 `browse-w` 300, `browse-r` 12, `browse-pad` 5, `browse-find-h` 30, `browse-header-h` 20, `browse-row-h` 26, `browse-gap` 9, `browse-row-r` 6, `browse-pin-w` 20을 쓴다. 메뉴 바탕은 `menu-surface`, 선택은 `menu-highlight`, 검색 자리 글자는 `text-4`다.
+
+### 설정 창 2판 (D-144)
+
+창 너비와 높이는 settings-w 700, settings-content-h 540이다. 사이드바 너비는 settings-sidebar-w 184, 행은 segment-h 26, 아이콘은 icon-m 14다. 선택 바탕은 settings-selection(라이트 검정, 다크 흰색 6%)이다. 오른쪽 시작은 settings-top 26, 좌우는 settings-body-inset 28이다. 카드는 surface-2와 r-window 10, 행은 settings-row 최소 40이다. 제목은 fs-schedule-title 17/600, 팝업은 fs-micro 12, 설명은 fs-library-section 11이다. 닫기는 connect-h 22, settings-close-icon 10, 스위치는 settings-switch-w/h 30/16이다.
