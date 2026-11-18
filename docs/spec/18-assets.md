@@ -6,7 +6,7 @@
 
 | 자산 | 쓰임 |
 | --- | --- |
-| `AppIcon.icon` | 바탕, 그림자, 노트 창 순서의 세 겹. 라이트와 다크 원본을 분리하고 색조는 시스템이 렌더링한다. 빌드에서 actool로 Assets.car를 만들고 CFBundleIconName으로 지정한다. |
+| `AppIcon.icon` | Icon Composer의 그룹 목록은 앞에서부터 노트 창, 그림자, 바탕 순서다. 라이트와 다크 원본을 분리하고 색조는 시스템이 렌더링한다. 빌드에서 actool로 Assets.car를 만들고 CFBundleIconName으로 지정한다. |
 | `AppIcon.appiconset` | 1024 캔버스의 824 타일, 사방 여백 100. 16, 32에서는 글 줄을 덜어 낸다. iconutil로 AppIcon.icns도 함께 넣는다. |
 | `menubar-icon.svg`, `menubar-icon.pdf` | 18pt 캔버스에 16pt 노트 창, 선 1.5pt. 런타임은 템플릿 PDF의 투명한 좌우 열을 자른다. |
 
