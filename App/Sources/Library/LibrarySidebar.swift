@@ -20,7 +20,7 @@ struct LibrarySidebar: View {
                 .background(theme.libraryColor(.surface3), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
                 .padding(.top, theme.component(.libraryHeaderHeight))
             ScrollView {
-                VStack(alignment: .leading, spacing: theme.space(.sp5)) {
+                VStack(alignment: .leading, spacing: theme.component(.sectionGap)) {
                     VStack(spacing: theme.component(.librarySidebarRowGap)) {
                         sectionHeader("보기", symbol: "slider.horizontal.3", label: "보기 편집") { model.editingViews = true }
                             .popover(isPresented: $model.editingViews) { LibraryViewEditor(model: model) }
@@ -49,14 +49,23 @@ struct LibrarySidebar: View {
                     }
                     VStack(spacing: theme.component(.librarySidebarRowGap)) {
                         sectionHeader("아카이브")
-                        ForEach(model.index.archiveMonths, id: \.self) { row(.archive($0), symbol: "archivebox") }
+                        row(.archived, symbol: "archivebox")
                         row(.trash, symbol: "trash")
                     }
                     let upcoming = model.index.upcoming
                     if !upcoming.isEmpty {
                         VStack(spacing: theme.component(.librarySidebarRowGap)) {
-                            sectionHeader("다가오는 예정")
-                            ForEach(upcoming) { entry in upcomingRow(entry) }
+                            sectionHeader("다가오는 일정")
+                            ForEach(model.showAllUpcoming ? upcoming : Array(upcoming.prefix(5))) { entry in
+                                UpcomingButton(model: model, entry: entry)
+                            }
+                            if upcoming.count > 5 && !model.showAllUpcoming {
+                                Button("모두 보기") { model.showAllUpcoming = true }
+                                    .font(theme.font(.title, weight: theme.tokens.textStyle(.body).weight))
+                                    .foregroundStyle(theme.libraryColor(.text3)).buttonStyle(.plain)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.leading, theme.space(.sp6))
+                            }
                         }
                     }
                 }.padding(.top, theme.space(.sp2))
@@ -71,40 +80,6 @@ struct LibrarySidebar: View {
             Button("스페이스 삭제", role: .destructive) { if let space = deleting { model.deleteSpace(space.id) }; deleting = nil }
             Button("취소", role: .cancel) { deleting = nil }
         }
-    }
-    @ViewBuilder private func upcomingRow(_ entry: UpcomingRow) -> some View {
-        let item = entry.item
-        let presentation = ReminderPresentation(item: item, now: model.index.now, options: model.displayOptions, calendar: model.index.calendar)
-        switch entry {
-        case .note(let note, _):
-            let title = item.title.isEmpty ? LibraryPreview(note).upcomingTitle(for: item) : item.title
-            LibrarySelectableRow(model: model, note: note, label: presentation.accessibilityLabel(title: title), isUpcoming: true) {
-                upcomingLabel(title, item: item, presentation: presentation, destination: model.markerDestination(for: item))
-            }
-        case .calendar(let event):
-            let title = item.title.isEmpty ? "일정" : item.title
-            Button {
-                model.openCalendarEvent(event)
-            } label: {
-                upcomingLabel(title, item: item, presentation: presentation, destination: event.destination)
-            }.buttonStyle(LibraryButtonStyle(theme: theme))
-                .accessibilityLabel("캘린더 " + presentation.accessibilityLabel(title: title))
-        }
-    }
-
-    private func upcomingLabel(_ title: String, item: ScheduleItem, presentation: ReminderPresentation,
-                               destination: ScheduleDestination?) -> some View {
-        HStack(spacing: theme.space(.sp1)) {
-            ScheduleMarker(item: item, destination: destination, theme: theme)
-                .accessibilityHidden(true)
-            Text(title).lineLimit(1)
-            Spacer(minLength: 0)
-            Text(presentation.text ?? "").font(theme.font(.micro)).lineLimit(1)
-                .foregroundStyle(theme.libraryColor(presentation.status == .scheduled ? .text3 : .warn, on: .selected))
-                .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing)
-                .fixedSize(horizontal: true, vertical: false)
-        }.font(theme.font(.body)).frame(maxWidth: .infinity).frame(height: theme.component(.rowHeight))
-            .padding(.horizontal, theme.space(.sp2))
     }
     private var spaceInput: some View {
         SidebarColumns(theme: theme) {
@@ -131,14 +106,18 @@ struct LibrarySidebar: View {
         let selected = model.selection == item
         return Button { model.select(item) } label: {
             let title = Text(model.title(item)).lineLimit(1)
-                .font(theme.font(indented || isArchive(item) ? .ui : .body, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
+                .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
                 .frame(maxWidth: .infinity, alignment: .leading)
             Group {
                 if let symbol {
                     SidebarColumns(theme: theme) {
                         LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
-                            .foregroundStyle(theme.libraryColor(.text2))
-                    } content: { title }
+                            .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
+                    } content: {
+                        title
+                        Text(String(model.index.rows(for: item).count)).font(theme.libraryNumberFont)
+                            .foregroundStyle(theme.libraryColor(.text3))
+                    }
                 } else {
                     title.padding(.leading, theme.space(.sp6))
                 }
@@ -147,9 +126,8 @@ struct LibrarySidebar: View {
             .padding(.trailing, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
         }.buttonStyle(LibraryButtonStyle(theme: theme, selected: selected, hoverName: model.title(item)))
     }
-    private func isArchive(_ item: LibrarySelection) -> Bool { if case .archive = item { true } else { false } }
     private func symbol(_ item: LibrarySelection) -> String {
-        switch item { case .today: "sun.max"; case .floating: "square.on.square"; case .reminders: "clock"; default: "line.3.horizontal" }
+        switch item { case .today: "sun.max"; case .floating: "pin"; case .reminders: "clock"; default: "line.3.horizontal" }
     }
 }
 
@@ -194,11 +172,13 @@ private struct LibrarySpaceRow: View {
                 SidebarColumns(theme: theme) {
                     SidebarSpaceIcon(model: model, icon: space.icon)
                 } content: {
-                    Text(space.name).font(theme.font(.body, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
+                    Text(space.name).font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: selected ? theme.tokens.textStyle(.selected).weight : nil))
                         .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                 }.frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
             ZStack {
+                Text(String(model.index.rows(for: .space(space.id)).count)).font(theme.libraryNumberFont)
+                    .foregroundStyle(theme.libraryColor(.text3)).opacity(hovered ? 0 : 1)
                 Menu { menuContents } label: { LibrarySymbol(theme: theme, name: "ellipsis", size: .iconLarge) }
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     .opacity(hovered ? 1 : 0).accessibilityLabel("\(space.name) 더 보기")
@@ -242,12 +222,12 @@ private struct LibrarySectionHeader: View {
     @State private var hovered = false
     var body: some View {
         HStack {
-            Text(title).font(theme.font(.sectionLabel, weight: theme.tokens.textStyle(.selected).weight)).foregroundStyle(theme.libraryColor(.text3))
+            Text(title).font(theme.font(.librarySection)).foregroundStyle(theme.libraryColor(.text3))
             Spacer()
             if let symbol {
-                LibraryIconButton(theme: theme, title: label, symbol: symbol, action: action).opacity(hovered ? 1 : 0)
+                ChromeIconButton(theme: theme, title: label, symbol: symbol, action: action).opacity(hovered ? 1 : 0)
             }
-        }.frame(height: theme.component(.rowHeight)).padding(.horizontal, theme.space(.sp1))
+        }.frame(height: theme.lineHeight(.librarySection)).padding(.bottom, theme.space(.sp1) - theme.component(.librarySidebarRowGap)).padding(.horizontal, theme.space(.sp2))
             .contentShape(Rectangle()).onHover { hovered = $0 }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
     }

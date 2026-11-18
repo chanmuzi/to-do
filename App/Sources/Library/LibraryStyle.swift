@@ -38,26 +38,12 @@ private struct LibraryButtonBody<Label: View>: View {
     }
 }
 
-struct LibraryIconButton: View {
-    let theme: Theme
-    let title: String
-    let symbol: String
-    var enabled = true
-    @State private var hovered = false
-    let action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            LibrarySymbol(theme: theme, name: symbol, size: .iconLarge)
-                .foregroundStyle(theme.libraryColor(enabled ? (hovered ? .text : .text2) : .text3))
-                .frame(width: theme.component(.libraryToolbarButton), height: theme.component(.libraryToolbarButton))
-        }.buttonStyle(LibraryButtonStyle(theme: theme, icon: true)).disabled(!enabled).accessibilityLabel(title)
-            .onHover { hovered = $0 && enabled }
-            .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
-    }
-}
-
 // 대비 증가에서는 흐린 보조 글자와 경계도 읽을 수 있게 한다(spec 17).
 extension Theme {
+    var libraryNumberFont: Font {
+        font(.body, size: tokens.textStyle(.micro).size).monospacedDigit()
+    }
+
     func libraryColor(_ token: ColorToken, on background: ColorToken = .surface2) -> Color {
         guard NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast else { return color(token, on: background) }
         return color(token == .text3 ? .text2 : token == .line ? .outline : token, on: background)
@@ -91,7 +77,7 @@ final class LibraryHostingView<Content: View>: NSHostingView<Content> {
 }
 
 /// 창 안의 추적 영역만 사용한다. 디버그 검사도 같은 mouseEntered 경로를 지난다.
-private struct LibrarySidebarHover: NSViewRepresentable {
+struct LibrarySidebarHover: NSViewRepresentable {
     let name: String
     let changed: (Bool) -> Void
     func makeNSView(context: Context) -> SidebarHoverView { SidebarHoverView() }
@@ -99,7 +85,7 @@ private struct LibrarySidebarHover: NSViewRepresentable {
         view.changed = changed; view.setAccessibilityLabel(name + " 호버")
     }
 }
-private final class SidebarHoverView: NSView {
+final class SidebarHoverView: NSView {
     var changed: (Bool) -> Void = { _ in }
     private var area: NSTrackingArea?
     override func hitTest(_ point: NSPoint) -> NSView? { nil }

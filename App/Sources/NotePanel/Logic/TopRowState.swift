@@ -21,6 +21,7 @@ struct TopRowState: Hashable {
     var titleColor: ColorToken
     /// 호버로 나타나는 것(아이콘 셋, 휴지통, 닫기)의 알파. 자리는 늘 차지한다(규칙 7).
     var hoverControlsAlpha: Double
+    var hasSchedules: Bool
     var additionalSchedules = 0
     var reminder: ReminderPresentation?
     var pin: Pin
@@ -44,6 +45,7 @@ struct TopRowState: Hashable {
         hoverControlsAlpha = isHovered ? 1 : 0
         var reminderOptions = options
         reminderOptions.reminder = .time
+        hasSchedules = note.schedules.contains { !$0.isCompleted && !$0.isDeleted }
         let upcoming = note.schedules.filter { $0.isUpcoming(at: now, calendar: calendar) }
         additionalSchedules = max(0, upcoming.count - 1)
         reminder = upcoming.min { $0.start < $1.start }.map {

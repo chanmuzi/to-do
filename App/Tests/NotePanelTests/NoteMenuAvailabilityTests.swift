@@ -16,7 +16,7 @@ import Theme
 
         #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == [
             "리마인더 설정", "스페이스 옮기기", "항상 위에 고정", "노트 색", "노트 찾기", "라이브러리", "AI 패널 열기", "창 닫기",
-            "휴지통으로 보내기",
+            "보관함으로", "휴지통으로 보내기",
         ])
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
             "리마인더 설정", "스페이스 옮기기", "AI 패널 열기",

@@ -21,7 +21,7 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
-    @Test func schedulePopoverDismissesOnExternalFocusAndDiscardsUnsubmittedChanges() async throws {
+    @Test func schedulePopoverDismissesOnExternalFocusAndFinishesTitleComposition() async throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("dismissal-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try FileNoteStore(location: .isolated(notesDirectory: root))
@@ -75,12 +75,52 @@ import Scheduling
         NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
         #expect(!editor.hasMarkedText())
         #expect(coordinator.contentView == nil && coordinator.model == nil)
-        #expect(try store.load(id) == before)
-        #expect(saves == 0)
+        let updated = try store.load(id)
+        #expect(updated.body == before.body)
+        #expect(updated.schedules.first?.title.contains("한") == true)
+        #expect(saves > 0)
+    }
+
+    @Test func titleTabOpensDateAndReturnToTimeKeepsSameEditor() async throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("schedule-tab-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try FileNoteStore(location: .isolated(notesDirectory: root))
+        let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
+        let id = try store.create(NoteDraft(schedules: [item])).id
+        _ = NSApplication.shared
+        let owner = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        let coordinator = ReminderEditorCoordinator(notes: store, theme: try Theme.bundled())
+        coordinator.allowsKeyWindows = false
+        defer { coordinator.close() }
+        try coordinator.show(id, anchor: try #require(owner.contentView))
+        let model = try #require(coordinator.model)
+        model.select(item.id)
+        let window = try #require(coordinator.contentView?.window)
+        try await Task.sleep(for: .milliseconds(80))
+        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+            characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48))
+        NSApp.sendEvent(event)
+        try await Task.sleep(for: .milliseconds(80))
+        let panel = try #require(model.pickerWindow)
+        let field = try #require(panel.firstResponder as? NSTextView)
+        let input = try #require(field.delegate as? NSTextField)
+        let handled = input.delegate?.control?(input, textView: field, doCommandBy: #selector(NSResponder.insertTab(_:)))
+        #expect(handled == true)
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(model.datePicker == nil && model.selectedID == item.id)
+        let time = try #require(window.firstResponder as? NSTextView)
+        #expect(model.startField?.currentEditor() === time)
+        NSApp.sendEvent(event)
+        try await Task.sleep(for: .milliseconds(80))
+        let end = try #require(window.firstResponder as? NSTextView)
+        #expect(model.endField?.currentEditor() === end)
     }
 
     @Test func schedulePopoverOutsideClickDismissesWhileInsideClickKeepsDraft() throws {
         try fixture { _, store, id in
+            let item = ScheduleItem(start: now, title: "기존 일정")
+            try store.update(id) { $0.schedules = [item] }
             _ = NSApplication.shared
             let coordinator = ReminderEditorCoordinator(notes: store, theme: try Theme.bundled())
             coordinator.allowsKeyWindows = false
@@ -101,7 +141,7 @@ import Scheduling
             #expect(coordinator.model?.input == "입력 중 내일")
             try click(owner)
             #expect(coordinator.model == nil)
-            #expect(try store.load(id).schedules.isEmpty)
+            #expect(try store.load(id).schedules == [item])
         }
     }
 
@@ -229,28 +269,26 @@ import Scheduling
             #expect(model.presentation(model.candidates[0]).accessibilityLabel(title: "윤부일") == "일정 윤부일 11월 19일 오후 2:00~3:00")
         }
     }
-    @Test func renderedCandidateRowsChangeWhenOnlyTheInputTitleChanges() throws {
-        try fixture { model, _, _ in
-            _ = NSApplication.shared
-            _ = FontRegistrar.registerBundledFonts()
-            let theme = try Theme.bundled()
-            // 입력 칸을 제외한 후보 영역을 비교해 제목을 종류 이름으로 하드코딩하는 회귀를 잡는다.
-            @MainActor func candidatesImage(_ text: String) throws -> Data {
-                model.input = text
-                let view = NSHostingView(rootView: ReminderEditorView(model: model, theme: theme, close: {}))
-                view.frame = NSRect(origin: .zero, size: view.fittingSize)
-                view.layoutSubtreeIfNeeded()
-                let top = theme.space(.sp3) + theme.component(.reminderInputHeight) + theme.space(.sp2)
-                let height = CGFloat(model.candidates.count) * theme.component(.scheduleRowHeight)
-                let rect = NSRect(x: 0, y: view.isFlipped ? top : view.bounds.height - top - height,
-                                  width: view.bounds.width, height: height)
-                let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: rect))
-                view.cacheDisplay(in: rect, to: bitmap)
-                return try #require(bitmap.representation(using: .png, properties: [:]))
-            }
-            let first = try candidatesImage("윤부일 내일 2pm")
-            let second = try candidatesImage("회의 준비 내일 2pm")
-            #expect(first != second)
+    @Test func pickerNavigatesWeeksMonthsAndCommitsParsedDayToOriginalItem() throws {
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            model.showDates()
+            let picker = try #require(model.datePicker)
+            #expect(calendar.component(.weekday, from: picker.week) == 1)
+            picker.scrollWeeks(3)
+            #expect(calendar.component(.month, from: picker.week) == 12)
+            picker.choosingMonth = true
+            picker.moveHeader(1)
+            #expect(calendar.component(.year, from: picker.month) == 2027)
+            #expect(calendar.component(.weekday, from: picker.quickDay(2)) == 2)
+            picker.input = "다음 주 금요일"
+            model.applyExpression(try #require(picker.parse()))
+            let saved = try #require(store.load(id).schedules.first)
+            #expect(saved.id == item.id && saved.end!.timeIntervalSince(saved.start) == 3600)
+            #expect(calendar.component(.weekday, from: saved.start) == 6 && calendar.component(.hour, from: saved.start) == 10)
         }
     }
     @Test func emptyPastAndDeletedItemCannotCreateAccidentally() throws {

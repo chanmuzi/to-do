@@ -16,19 +16,13 @@ public struct LibraryIndex: Sendable {
         self.events = events; self.now = now; self.calendar = calendar
     }
 
-    public func isArchived(_ note: Note) -> Bool {
-        let day = calendar.startOfDay(for: note.created)
-        guard let boundary = calendar.date(byAdding: .day, value: 7, to: day) else { return false }
-        return boundary <= calendar.startOfDay(for: now)
-    }
-
     public func month(of date: Date) -> String {
         let parts = calendar.dateComponents([.year, .month], from: date)
         return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
     }
 
     public var archiveMonths: [String] {
-        Array(Set(notes.filter(isArchived).map { month(of: $0.created) })).sorted(by: >)
+        Array(Set(notes.filter(\.isArchived).map { month(of: $0.created) })).sorted(by: >)
     }
     public static func upcomingInterval(now: Date, calendar: Calendar) -> DateInterval {
         DateInterval(start: now, end: calendar.date(byAdding: .day, value: 7, to: now) ?? now)
@@ -46,7 +40,7 @@ public struct LibraryIndex: Sendable {
         for note in notes {
             for item in note.schedules {
                 if item.kind == .event, let link = item.link, link.kind != .reminder { linked.append(item) }
-                if included(item) { rows.append(.note(note, item)) }
+                if !note.isArchived && included(item) { rows.append(.note(note, item)) }
             }
         }
         // 다른 캘린더에 복사한 일정은 같은 외부 ID를 가질 수 있다.
@@ -75,29 +69,63 @@ public struct LibraryIndex: Sendable {
                 return sameLocalItem(a, b)
             }
             if !duplicate { result.append(row) }
-            if result.count == 5 { break }
         }
         return result
     }
     public func days(in space: SpaceID?) -> [Date] {
-        Array(Set(notes.filter { $0.spaceID == space && !isArchived($0) }
+        Array(Set(notes.filter { $0.spaceID == space && !$0.isArchived }
             .map { calendar.startOfDay(for: $0.created) })).sorted(by: >)
     }
+    struct Section: Identifiable {
+        let id: String
+        var notes: [Note]
+    }
+
+    func sections(for selection: LibrarySelection, query: String) -> [Section] {
+        let rows = rows(for: selection, query: query)
+        var groups: [Section] = []
+        var pinned: [Note] = []
+        for note in rows {
+            if selection != .archived && selection != .trash && windows[note.id]?.isPinned == true {
+                pinned.append(note)
+                continue
+            }
+            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: note.modified),
+                                               to: calendar.startOfDay(for: now)).day ?? 0
+            let title: String
+            switch days {
+            case ...0: title = "오늘"
+            case 1: title = "어제"
+            case 2...7: title = "이전 7일"
+            case 8...30: title = "이전 30일"
+            default: title = "\(calendar.component(.year, from: note.modified))년 \(calendar.component(.month, from: note.modified))월"
+            }
+            if groups.last?.id == title { groups[groups.count - 1].notes.append(note) }
+            else { groups.append(Section(id: title, notes: [note])) }
+        }
+        if !pinned.isEmpty { groups.insert(Section(id: "고정됨", notes: pinned), at: 0) }
+        return groups
+    }
+
     public func rows(for selection: LibrarySelection, query: String = "") -> [Note] {
         let source = selection == .trash ? trash : notes
         return source.filter { note in
+            if note.isArchived {
+                switch selection { case .trash, .archived, .archive: break; default: return false }
+            }
             let included: Bool
             switch selection {
             case .today:
                 included = calendar.isDate(note.created, inSameDayAs: now)
                     || note.schedules.contains { !$0.isDeleted && !$0.isCompleted && calendar.isDate($0.start, inSameDayAs: now) }
-            case .floating: included = windows[note.id]?.isOpen == true
+            case .floating: included = windows[note.id]?.isPinned == true
+            case .archived: included = note.isArchived
             case .all, .trash: included = true
             case .reminders: included = note.schedules.contains { !$0.isDeleted && !$0.isCompleted }
-            case .space(let id): included = note.spaceID == id && !isArchived(note)
+            case .space(let id): included = note.spaceID == id && !note.isArchived
             case .day(let id, let day):
-                included = note.spaceID == id && !isArchived(note) && calendar.isDate(note.created, inSameDayAs: day)
-            case .archive(let month): included = isArchived(note) && self.month(of: note.created) == month
+                included = note.spaceID == id && !note.isArchived && calendar.isDate(note.created, inSameDayAs: day)
+            case .archive(let month): included = note.isArchived && self.month(of: note.created) == month
             }
             return included && (query.isEmpty || (note.title + "\n" + note.body)
                 .localizedStandardContains(query))

@@ -83,8 +83,11 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
     }
     #endif
     public func close() { model.cancelSpaceEditing(); spacePopover?.close(); window?.close(); timer?.invalidate(); timer = nil }
-    public func windowDidResignKey(_ notification: Notification) { if !model.choosingDraftIcon { model.cancelSpaceEditing() } }
-    public func windowWillClose(_ notification: Notification) { timer?.invalidate(); timer = nil }
+    public func windowDidResignKey(_ notification: Notification) {
+        model.upcomingID = nil
+        if !model.choosingDraftIcon { model.cancelSpaceEditing() }
+    }
+    public func windowWillClose(_ notification: Notification) { model.upcomingID = nil; timer?.invalidate(); timer = nil }
     public func showSpacePicker(for id: NoteID, anchor: NSView?) {
         beforeMove()
         guard let anchor = anchor ?? window?.contentView else { show(); showSpacePicker(for: id, anchor: window?.contentView); return }

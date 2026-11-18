@@ -105,6 +105,7 @@ public final class LibraryModel {
     }
     private func validated(_ value: LibrarySelection) -> LibrarySelection {
         switch value {
+        case .archive: return .archived
         case .space(nil), .day(nil, _): return .all
         case .space(let id), .day(let id, _):
             if let id, spaces.space(for: id) == nil { return .today }
@@ -117,11 +118,24 @@ public final class LibraryModel {
     }
     public func select(_ value: LibrarySelection) {
         selectedNoteID = nil
-        let target: LibrarySelection = value == .space(nil) ? .all : value
+        let target: LibrarySelection
+        switch value {
+        case .archive: target = .archived
+        case .space(nil): target = .all
+        default: target = value
+        }
+        upcomingID = nil
         selection = target
         changeSettings { $0.lastSelection = target }
     }
-    public var showsNewNote: Bool { selection != .trash }
+    package var upcomingID: String?
+    package var upcomingPinned = false
+    var showAllUpcoming = false
+    var sections: [LibraryIndex.Section] { index.sections(for: selection, query: query) }
+    public var showsNewNote: Bool { selection != .trash && selection != .archived }
+    func toggleArchive(_ note: Note) {
+        perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
+    }
     public var rows: [Note] { index.rows(for: selection, query: query) }
 
     /// 한 번 클릭은 선택만 한다. 더블 클릭과 키보드 열기는 구분한다.
@@ -136,6 +150,7 @@ public final class LibraryModel {
     }
     public func moveSelection(by offset: Int) {
         guard !rows.isEmpty else { return }
+        let rows = sections.flatMap(\.notes)
         let position = selectedNoteID.flatMap { id in rows.firstIndex { $0.id == id } }
         let next = position.map { min(max($0 + offset, 0), rows.count - 1) } ?? (offset < 0 ? rows.count - 1 : 0)
         selectedNoteID = rows[next].id
@@ -212,7 +227,8 @@ public final class LibraryModel {
     func title(_ selection: LibrarySelection) -> String {
         switch selection {
         case .today: "오늘"
-        case .floating: "떠 있는 노트"
+        case .floating: "고정됨"
+        case .archived: "보관함"
         case .all: "전체 노트"
         case .reminders: "리마인더 있는 노트"
         case .trash: "휴지통"

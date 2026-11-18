@@ -89,7 +89,7 @@ import Theme
         controller.hoverOverride = false
         let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
         // 더 보기, 새 노트, 꺼진 핀(돋보기는 더 보기 메뉴로 옮겼다).
-        #expect(buttons.count == 5)
+        #expect(buttons.count == 4)
         #expect(buttons.allSatisfy { $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 

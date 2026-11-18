@@ -1,7 +1,7 @@
 import Foundation
 
 public enum LibrarySelection: Hashable, Codable, Sendable {
-    case today, floating, all, reminders, trash
+    case today, floating, all, reminders, archived, trash
     case space(SpaceID?)
     case day(SpaceID?, Date)
     case archive(String)

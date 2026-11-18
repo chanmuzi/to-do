@@ -113,10 +113,8 @@ struct SettingsView: View {
         }
     }
 
-    private func group<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        HStack(spacing: theme.component(.iconButtonGap)) { content() }
-            .padding(.horizontal, theme.component(.iconButtonGap)).frame(height: theme.component(.segmentHeight))
-            .overlay { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)).allowsHitTesting(false) }
+    private func group<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+        SegmentGroup(theme: theme, content: content)
     }
 
     private var stepper: some View {
@@ -144,7 +142,7 @@ struct SettingsView: View {
             if let menu = model.menus[kind], menu.access == .available {
                 let title = kind == .event ? "기본 캘린더" : "미리 알림"
                 row(title) {
-                    DestinationPicker(title: title, menu: menu, selectedID: model.values[idFor: kind], theme: theme) {
+                    DestinationPicker(title: title, choices: menu.choices, current: menu.system, selectedID: model.values[idFor: kind], theme: theme) {
                         model.choose($0, for: kind)
                     }.frame(height: theme.component(.controlHeight))
                 }
@@ -186,42 +184,5 @@ struct SettingsView: View {
                 }
             }.padding(theme.space(.sp5))
         }
-    }
-}
-
-private struct SettingsSwitch: ToggleStyle {
-    let theme: Theme
-    @Environment(\.accessibilityReduceMotion) private var reduced
-    func makeBody(configuration: Configuration) -> some View {
-        let inset = theme.component(.iconButtonGap)
-        let height = theme.component(.settingsSwitchHeight)
-        Button { configuration.isOn.toggle() } label: {
-            Capsule().fill(theme.color(configuration.isOn ? .text : .surface3))
-                .frame(width: theme.component(.settingsSwitchWidth), height: height)
-                .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                    Circle().fill(theme.color(configuration.isOn ? .onAccent : .text2))
-                        .frame(width: height - inset * 2, height: height - inset * 2)
-                        .padding(inset)
-                }.frame(height: theme.component(.controlHeight))
-                .animation(reduced ? nil : theme.motion.animation, value: configuration.isOn)
-        }.buttonStyle(.plain)
-            .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label }.toggleStyle(.switch) }
-    }
-}
-
-private struct SettingsButton: ButtonStyle {
-    let theme: Theme
-    let selected: Bool
-    @Environment(\.isEnabled) private var enabled
-    @Environment(\.accessibilityReduceMotion) private var reduced
-    @State private var hovered = false
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
-            .foregroundStyle(theme.color(enabled ? (selected || hovered ? .text : .text2) : .text3))
-            .background(selected ? theme.color(.selected) : ((hovered || configuration.isPressed) && enabled ? theme.color(.hover) : .clear),
-                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-            .contentShape(Rectangle()).onHover { hovered = $0 }
-            .animation(reduced ? nil : theme.motion.animation, value: hovered || selected || configuration.isPressed)
     }
 }

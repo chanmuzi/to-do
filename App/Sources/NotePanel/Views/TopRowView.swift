@@ -125,10 +125,10 @@ final class TopRowView: NSView {
         pinButton.setAccessibilityValue(state.pin.isOn ? "켜짐" : "꺼짐")
         applyProblem(state.problem, wasShown: hadProblem, animated: animated)
 
-        clockButton.isHidden = state.reminder != nil
+        clockButton.isHidden = !state.hasSchedules || state.reminder != nil
         let alphas: [(NSView, Double)] = [
             (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
-            (clockButton, state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
+            (clockButton, state.hasSchedules && state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
             (addButton, state.hoverControlsAlpha), (pinButton, state.pin.alpha),
         ]
         if animated {
@@ -180,6 +180,7 @@ final class TopRowView: NSView {
                 // 고치는 동안에는 남는 너비를 다 쓴다.
                 titleWidth: title.isEditing ? .greatestFiniteMagnitude : title.idealWidth,
                 reminderWidth: reminderBadge.fittingWidth,
+                hasSchedules: state?.hasSchedules == true,
                 showsControls: state?.hoverControlsAlpha == 1,
                 showsProblem: holdsProblemSlot
             ),

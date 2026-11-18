@@ -95,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             schedules.preferredID = { [settings = environment.settings] in settings.settings[idFor: $0] }
             try schedules.start()
             self.schedules = schedules
+            reminderEditor.calendarChoices = { [weak schedules] in schedules?.calendarChoices($0) ?? [] }
             reminderEditor.destination = { [weak schedules] item in schedules?.destination(for: item) }
             let inlineWriter = InlineScheduleWriter(notes: environment.notes, service: schedules)
             editors.onAcceptDate = { id, request in try inlineWriter.accept(request, in: id) }

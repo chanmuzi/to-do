@@ -17,23 +17,43 @@ import Testing
         Note(id: .init(rawValue: id), title: id, spaceID: space.map(SpaceID.init(rawValue:)), reminder: reminder,
              created: date(2026, 11, day), modified: now)
     }
-    @Test(arguments: [9, 10, 11, 16, 17]) func archiveUsesCreatedDayAndSevenCalendarDays(day: Int) {
-        let value = note("note", day: day)
-        let index = LibraryIndex(notes: [value], now: now, calendar: calendar)
-        #expect(index.isArchived(value) == (day <= 10))
-        #expect(index.rows(for: .space(.init(rawValue: "work"))).count == (day <= 10 ? 0 : 1))
+    @Test func upcomingSidebarUsesStartAndCalendarWeek() {
+        let anchor = date(2026, 11, 18, 12)
+        let owner = note("owner", day: 18)
+        func label(_ start: Date, allDay: Bool = false, relativeTo now: Date? = nil) -> String {
+            let item = ScheduleItem(start: start, end: start.addingTimeInterval(3600), isDateOnly: allDay)
+            return UpcomingRow.note(owner, item).sidebarTime(now: now ?? anchor, calendar: calendar, clock: .koreanMeridiem)
+        }
+        #expect(label(date(2026, 11, 18, 17)) == "오후 5:00")
+        #expect(label(date(2026, 11, 19, 10)) == "내일 10:00")
+        #expect(label(date(2026, 11, 20, 9)) == "금 9:00")
+        #expect(label(date(2026, 11, 20, 21)) == "금 21:00")
+        #expect(label(date(2026, 11, 25, 9)) == "11월 25일")
+        #expect(label(anchor, allDay: true) == "오늘")
+        #expect(label(date(2026, 11, 20), allDay: true) == "금")
+        #expect(label(date(2027, 1, 1), allDay: true, relativeTo: date(2026, 12, 31)) == "내일")
     }
-    @Test func todayIsUnionWithoutDuplicatesAndIncludesArchivedReminder() {
+
+    @Test func oldNotesStayActiveUntilManuallyArchived() {
+        let value = note("note", day: 1)
+        let index = LibraryIndex(notes: [value], now: now, calendar: calendar)
+        #expect(index.rows(for: .all) == [value])
+        #expect(index.rows(for: .archived).isEmpty)
+    }
+    @Test func todayExcludesArchivedReminder() {
         let today = note("today", day: 17, reminder: now)
-        let old = note("old", day: 1, reminder: date(2026, 11, 17, 8))
+        var old = note("old", day: 1, reminder: date(2026, 11, 17, 8))
+        old.isArchived = true
         let tomorrow = note("tomorrow", day: 16, reminder: date(2026, 11, 18))
         let index = LibraryIndex(notes: [today, old, tomorrow], now: now, calendar: calendar)
-        #expect(Set(index.rows(for: .today).map(\.id)) == [today.id, old.id])
-        #expect(index.rows(for: .all).count == 3)
+        #expect(Set(index.rows(for: .today).map(\.id)) == [today.id])
+        #expect(index.rows(for: .all).count == 2)
         #expect(index.upcoming.map(\.item.start) == [now, date(2026, 11, 18)])
     }
     @Test func datesAreCreationDatesAndTrashDoesNotLeakIntoViews() {
-        let recent = note("recent", day: 16), old = note("old", day: 10), trash = note("trash", day: 17)
+        let recent = note("recent", day: 16), trash = note("trash", day: 17)
+        var old = note("old", day: 10)
+        old.isArchived = true
         let index = LibraryIndex(notes: [recent, old], trash: [trash], now: now, calendar: calendar)
         #expect(index.days(in: .init(rawValue: "work")) == [date(2026, 11, 16)])
         #expect(index.rows(for: .today).isEmpty)
@@ -49,21 +69,17 @@ import Testing
             a.id: NoteWindowState(isPinned: false, isOpen: true, stackOrder: 5),
             b.id: NoteWindowState(isOpen: true, stackOrder: 2), c.id: NoteWindowState(isOpen: false)
         ], now: now, calendar: calendar)
-        #expect(index.rows(for: .floating).map(\.id) == [b.id,a.id])
+        #expect(index.rows(for: .floating).map(\.id) == [b.id,c.id])
     }
-    @Test func localMidnightAndMonthRollover() {
-        let old = Note(id: .make(), created: date(2026, 10, 31, 23), modified: now)
-        let index = LibraryIndex(notes: [old], now: date(2026, 11, 7), calendar: calendar)
-        #expect(index.isArchived(old))
-        #expect(index.archiveMonths == ["2026-10"])
-    }
-    @Test func daylightSavingUsesCalendarDays() {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "America/Los_Angeles")!
-        let created = cal.date(from: DateComponents(year: 2026, month: 3, day: 7, hour: 23))!
-        let boundary = cal.date(from: DateComponents(year: 2026, month: 3, day: 14))!
-        let value = Note(id: .make(), created: created, modified: created)
-        #expect(LibraryIndex(notes: [value], now: boundary, calendar: cal).isArchived(value))
-        #expect(!LibraryIndex(notes: [value], now: boundary.addingTimeInterval(-1), calendar: cal).isArchived(value))
+    @Test func groupsPinnedThenRecentDatesWithoutDuplicates() {
+        var old = note("old", day: 1)
+        old.modified = date(2026, 10, 1)
+        let pinned = note("pin", day: 1), today = note("today", day: 17)
+        let index = LibraryIndex(notes: [old, pinned, today], windows: [pinned.id: .init(isPinned: true)],
+                                 now: now, calendar: calendar)
+        let groups = index.sections(for: .all, query: "")
+        #expect(groups.map(\.id) == ["고정됨", "오늘", "2026년 10월"])
+        #expect(groups.flatMap(\.notes).map(\.id) == [pinned.id, today.id, old.id])
     }
     @Test func searchAndCountsUseSameRows() {
         var a = note("계획", day: 17, space: nil); a.body = "Swift 배포"
@@ -72,7 +88,7 @@ import Testing
         #expect(index.rows(for: .space(nil)).count == 1)
         #expect(index.rows(for: .all, query: "없음").isEmpty)
     }
-    @Test func upcomingMergesOccurrencesDeduplicatesLinksAndCapsAfterSorting() {
+    @Test func upcomingMergesOccurrencesDeduplicatesLinksWithoutTruncating() {
         let interval = LibraryIndex.upcomingInterval(now: now, calendar: calendar)
         let link = ScheduleItem.Link(localID: "회의", externalID: "회사-회의", kind: .event)
         let ongoing = ScheduleItem(id: "진행", start: now.addingTimeInterval(-600), end: now.addingTimeInterval(600), link: link)
@@ -89,7 +105,7 @@ import Testing
         let events = extra + [CalendarEvent(item: ongoing, destination: nil, recurring: true),
                               CalendarEvent(item: later, destination: nil, recurring: true)]
         let rows = LibraryIndex(notes: [owner], events: events, now: now, calendar: calendar).upcoming
-        #expect(rows.map(\.item.id) == ["진행", "노트 알림", "다음 회차", "외부1", "외부2"])
+        #expect(rows.map(\.item.id) == ["진행", "노트 알림", "다음 회차", "외부1", "외부2", "외부3", "외부4"])
         guard case .note(let first, _) = rows.first else { Issue.record("노트 연결을 우선해야 합니다"); return }
         #expect(first.id == owner.id)
         #expect(LibraryIndex(notes: [], now: now).upcoming.isEmpty)

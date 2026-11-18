@@ -52,7 +52,7 @@ import Theme
         defer { fixture.cleanUp(coordinator) }
         let all = buttons(in: controller.root).filter { !$0.isHidden }
         #expect(Set(all.compactMap { $0.accessibilityLabel() }) == [
-            "이 노트의 일정", "더 보기", "새 노트", "항상 위에 고정", "휴지통으로 보내기", "창 닫기",
+            "더 보기", "새 노트", "항상 위에 고정", "휴지통으로 보내기", "창 닫기",
         ])
         for button in all {
             var pressed = 0

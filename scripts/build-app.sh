@@ -43,7 +43,7 @@ cp -R "$RESOURCES/SpaceImages" "$APP/Contents/Resources/SpaceImages"
 cp "$RESOURCES/menubar-icon.pdf" "$APP/Contents/Resources/menubar-icon.pdf"
 
 # 앱 아이콘: appiconset의 PNG를 iconutil이 받는 이름으로 옮겨 .icns로 만든다.
-ICON_WORK="$(mktemp -d)"
+ICON_WORK="$(mktemp -d "${TMPDIR:-/tmp}/float-icon.XXXXXX")"
 trap 'rm -rf "$ICON_WORK"' EXIT
 ICONSET="$ICON_WORK/AppIcon.iconset"
 mkdir -p "$ICONSET"
@@ -59,6 +59,10 @@ cp "$SOURCE/icon_512.png"  "$ICONSET/icon_256x256@2x.png"
 cp "$SOURCE/icon_512.png"  "$ICONSET/icon_512x512.png"
 cp "$SOURCE/icon_1024.png" "$ICONSET/icon_512x512@2x.png"
 iconutil --convert icns --output "$APP/Contents/Resources/AppIcon.icns" "$ICONSET"
+xcrun actool "$RESOURCES/AppIcon.icon" --compile "$ICON_WORK" --platform macosx \
+  --minimum-deployment-target 26.0 --app-icon AppIcon \
+  --output-partial-info-plist "$ICON_WORK/icon.plist"
+cp "$ICON_WORK/Assets.car" "$APP/Contents/Resources/"
 rm -rf "$ICON_WORK"
 
 # Hardened Runtime은 켜지 않는다: 켜면 EventKit 캘린더 접근에 별도

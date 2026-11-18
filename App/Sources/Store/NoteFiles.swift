@@ -18,6 +18,7 @@ struct NoteFile {
 /// 노트 폴더와 휴지통의 파일을 다룬다. 상태는 없고, 오류는 모두 `StoreError`로 바꿔 던진다.
 struct NoteFiles {
     let location: StoreLocation
+    let archiveCutoff: Date
     private var fileManager: FileManager { .default }
 
     func createDirectories() throws {
@@ -102,13 +103,14 @@ struct NoteFiles {
         let content = NoteFileCodec.decode(text)
         let url = url(id, in: directory)
         let creation = (try? fileManager.attributesOfItem(atPath: url.path))?[.creationDate] as? Date
-        let note = Note(
+        var note = Note(
             id: id, title: content.title, body: content.body, spaceID: content.spaceID,
             colorID: content.colorID, reminder: content.reminder, schedules: content.schedules,
             // 머리에 만든 날짜가 없으면 파일의 날짜를 쓴다. 머리에 적을 때와 같게 초 아래를 버린다.
             created: content.created ?? NoteFileCodec.truncatedToSeconds(creation ?? stamp.modified),
             modified: stamp.modified
         )
+        note.isArchived = content.archived ?? (note.created < archiveCutoff)
         return NoteFile(note: note, text: text, stamp: stamp)
     }
 

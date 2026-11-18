@@ -119,7 +119,12 @@ import SpaceIcons
         #expect(try notes.listTrash().notes.isEmpty)
     }
 
-    @Test func sidebarReminderOpensOnOneClickWhileTrashStaysUntouched() throws {
+    func clickAction(_ name: String, in root: NSView, window: NSWindow) throws {
+        let region = try #require(descendants(root).first { $0.accessibilityLabel() == name + " 호버" })
+        try click(window, at: region.convert(NSPoint(x: region.bounds.midX, y: region.bounds.midY), to: nil))
+    }
+
+    @Test func sidebarReminderOpensFromDetailWhileTrashStaysUntouched() throws {
         let f = try Fixture(); defer { try? f.close() }
         let note = try f.notes.create(NoteDraft(title: "다가옴", reminder: Date().addingTimeInterval(3600)))
         let trash = try f.notes.create(NoteDraft(title: "휴지통")); try f.notes.moveToTrash(trash.id)
@@ -130,16 +135,42 @@ import SpaceIcons
         f.coordinator.allowsKeyWindows = false; f.coordinator.show(); f.model.select(.trash); settle()
         let window = try #require(f.coordinator.window)
         let root = try #require(window.contentView)
-        let row = try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }
-            .first { $0.bounds.height == f.model.theme.component(.rowHeight) })
-        try click(window, at: row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil))
-        #expect(f.model.selectedNoteID == note.id)
+        let entry = try #require(f.model.index.upcoming.first)
+        try clickAction(entry.id, in: root, window: window)
+        #expect(f.model.upcomingID == entry.id && f.model.upcomingPinned)
+        #expect(f.routes.isEmpty)
+        try clickAction("일정 연결 열기", in: root, window: window)
         #expect(f.routes == [.openNote(note.id)])
-        try key(row, code: 36, characters: "\r")
-        #expect(row.accessibilityPerformPress())
-        #expect(f.routes == Array(repeating: .openNote(note.id), count: 3))
         #expect(f.model.error == nil)
         #expect(Set(try f.notes.listTrash().notes.map(\.id)) == [trash.id, note.id])
+    }
+
+    @Test func upcomingHoverCancelsOnExitAndClickPersistsUntilOutside() async throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        _ = try f.notes.create(NoteDraft(title: "다가옴", reminder: Date().addingTimeInterval(3600)))
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        settle()
+        let window = try #require(f.coordinator.window)
+        let root = try #require(window.contentView)
+        let entry = try #require(f.model.index.upcoming.first)
+        let hover = try #require(descendants(root).compactMap { $0 as? SidebarHoverView }
+            .first { $0.accessibilityLabel() == entry.id + " 호버" })
+        let pause = f.model.theme.motion.upcomingHover
+        hover.changed(true)
+        try await Task.sleep(for: .seconds(pause / 2))
+        #expect(f.model.upcomingID == nil)
+        try await Task.sleep(for: .seconds(pause))
+        #expect(f.model.upcomingID == entry.id && !f.model.upcomingPinned)
+        hover.changed(false)
+        settle()
+        #expect(f.model.upcomingID == nil)
+        try clickAction(entry.id, in: root, window: window)
+        hover.changed(false)
+        #expect(f.model.upcomingID == entry.id && f.model.upcomingPinned)
+        try click(window, at: NSPoint(x: root.bounds.maxX - 25, y: root.bounds.midY))
+        #expect(f.model.upcomingID == nil)
     }
 
     @Test func bringingLibraryForwardKeepsTrashSelection() throws {
@@ -157,7 +188,7 @@ import SpaceIcons
         #expect(f.routes.isEmpty)
     }
 
-    @Test func calendarOnlyRowOpensItsEventOnOneClick() throws {
+    @Test func calendarOnlyRowOpensItsEventFromDetail() throws {
         let f = try Fixture(); defer { try? f.close() }
         let now = Date()
         _ = try f.notes.create(NoteDraft(title: "노트", reminder: now.addingTimeInterval(3600)))
@@ -170,10 +201,10 @@ import SpaceIcons
         f.coordinator.show(); settle()
         let window = try #require(f.coordinator.window)
         let root = try #require(window.contentView)
-        let height = f.model.theme.component(.rowHeight)
-        let noteRow = try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }.first { $0.bounds.height == height })
-        let center = noteRow.convert(NSPoint(x: noteRow.bounds.midX, y: noteRow.bounds.midY), to: nil)
-        try click(window, at: NSPoint(x: center.x, y: center.y - height - f.model.theme.component(.librarySidebarRowGap)))
+        let entry = UpcomingRow.calendar(event)
+        try clickAction(entry.id, in: root, window: window)
+        #expect(opened.isEmpty && f.model.upcomingID == entry.id)
+        try clickAction("일정 연결 열기", in: root, window: window)
         #expect(opened == [event])
         #expect(f.routes.isEmpty)
     }
@@ -281,7 +312,7 @@ import SpaceIcons
         #expect(!unchanged(width / 2, height / 2))
     }
 
-    @Test func sidebarPixelsDoNotChangeWhenOnlyNoteCountsChange() throws {
+    @Test func sidebarUpdatesWhenNoteCountsChange() throws {
         let f = try Fixture(); defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "첫째"))
         f.coordinator.allowsKeyWindows = false; f.coordinator.show(); settle()
@@ -296,7 +327,7 @@ import SpaceIcons
         let before = try sidebar()
         _ = try f.notes.create(NoteDraft(title: "둘째")); f.model.refresh(); settle()
         let after = try sidebar()
-        #expect(before == after, "노트 수만 바뀔 때 사이드바의 숫자나 레이아웃이 바뀌면 안 된다")
+        #expect(before != after, "노트 수가 바뀌면 보기 오른쪽 개수를 갱신한다")
     }
 
     @Test func keyboardSelectionClearsWhenViewOrSearchChanges() throws {

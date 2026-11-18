@@ -296,15 +296,15 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         let menu = NoteMenuBuilder(style: environment.style).moreMenu(
-            isPinned: isPinned, selectedPaletteID: note.colorID?.rawValue,
+            isPinned: isPinned, isArchived: note.isArchived, selectedPaletteID: note.colorID?.rawValue,
             isAvailable: { action in
                 switch action {
-                case .setReminder: router.isConnected(.openReminderEditor(id))
+                case .setReminder: note.schedules.contains { !$0.isDeleted && !$0.isCompleted } && router.isConnected(.openReminderEditor(id))
                 case .moveToSpace: router.isConnected(.openSpacePicker(id))
                 case .openAIPanel: router.isConnected(.openAIPanel(context: id))
                 case .openLibrary: router.isConnected(.openLibrary)
                 case .findNote: router.isConnected(.openBrowse(anchor: id))
-                case .togglePin, .setColor, .closeWindow, .moveToTrash: true
+                case .toggleArchive, .togglePin, .setColor, .closeWindow, .moveToTrash: true
                 }
             }
         ) { [weak self] action in
@@ -317,6 +317,7 @@ final class NoteWindowController: NSObject {
             case .findNote: router.route(.openBrowse(anchor: id))
             case .openAIPanel: router.route(.openAIPanel(context: id))
             case .closeWindow: router.route(.closeNoteWindow(id))
+            case .toggleArchive: self?.mutate(deferred: false) { $0.isArchived.toggle() }
             case .moveToTrash: self?.coordinator?.moveToTrash(id)
             }
         }

@@ -12,6 +12,7 @@ enum MoreMenuAction: Hashable {
     case findNote
     case openAIPanel
     case closeWindow
+    case toggleArchive
     case moveToTrash
 }
 
@@ -35,7 +36,7 @@ struct NoteMenuBuilder {
     /// - Parameter isAvailable: 그 항목을 고르면 일어나는 일이 있는지. 여는 화면이 아직 이어지지 않은 항목은
     ///   자리를 그대로 둔 채 고를 수 없게 흐려 둔다(눌러도 아무 일이 없는 것을 내놓지 않는다).
     func moreMenu(
-        isPinned: Bool, selectedPaletteID: String?,
+        isPinned: Bool, isArchived: Bool = false, selectedPaletteID: String?,
         isAvailable: (MoreMenuAction) -> Bool = { _ in true },
         handler: @escaping (MoreMenuAction) -> Void
     ) -> NSMenu {
@@ -53,6 +54,7 @@ struct NoteMenuBuilder {
             row("AI 패널 열기", symbol: "sparkle", isEnabled: isAvailable(.openAIPanel)) { handler(.openAIPanel) },
             separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
+            row(isArchived ? "되돌리기" : "보관함으로", symbol: "archivebox") { handler(.toggleArchive) },
             row("휴지통으로 보내기", symbol: "trash") { handler(.moveToTrash) },
         ]
         return menu

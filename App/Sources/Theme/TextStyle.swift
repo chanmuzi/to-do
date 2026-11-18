@@ -2,6 +2,7 @@ import CoreGraphics
 
 /// 글자 역할(spec 3.1의 표 한 줄씩). 어떤 토큰을 묶는지만 정하고 값은 `tokens.json`에서 온다.
 public enum TextStyle: String, CaseIterable, Sendable {
+    case librarySection, scheduleTitle
     case sectionLabel, scheduleInput, scheduleTime
     case title      // 노트 제목(상단 줄)
     case h1, h2, h3 // 본문 제목
@@ -28,9 +29,11 @@ public enum TextStyle: String, CaseIterable, Sendable {
 
     var keys: Keys {
         switch self {
+        case .librarySection: Keys(font: .body, size: "fs-library-section", lineHeight: "lh-micro", weight: "fw-selected")
+        case .scheduleTitle: Keys(font: .body, size: "fs-schedule-title", lineHeight: "lh-body", weight: "fw-title")
         case .sectionLabel: Keys(font: .body, size: "fs-micro", lineHeight: "lh-micro", weight: "fw-ui-strong")
         case .scheduleInput: Keys(font: .body, size: "fs-capture", lineHeight: "lh-body", weight: "fw-title")
-        case .scheduleTime: Keys(font: .ui, size: "fs-row-sub", lineHeight: "lh-ui", weight: "fw-ui")
+        case .scheduleTime: Keys(font: .ui, size: "fs-schedule-time", lineHeight: "lh-ui", weight: "fw-ui")
         case .title: Keys(font: .body, size: "fs-title", lineHeight: "lh-ui", weight: "fw-title")
         case .h1: Keys(font: .display, size: "fs-h1", lineHeight: "lh-h1", weight: "fw-h1", tracking: "ls-h1")
         case .h2: Keys(font: .h2, size: "fs-h2", lineHeight: "lh-h2", weight: "fw-h2", tracking: "ls-h2")

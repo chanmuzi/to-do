@@ -5,7 +5,9 @@ package struct ScheduleMarker: View {
     let item: ScheduleItem
     let destination: ScheduleDestination?
     let theme: Theme
-    package init(item: ScheduleItem, destination: ScheduleDestination?, theme: Theme) {
+    let tall: Bool
+    package init(item: ScheduleItem, destination: ScheduleDestination?, theme: Theme, tall: Bool = false) {
+        self.tall = tall
         self.item = item
         self.destination = destination
         self.theme = theme
@@ -19,12 +21,12 @@ package struct ScheduleMarker: View {
     package var body: some View {
         ZStack {
             if item.kind == .event {
-                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(.scheduleReminderCircle))
+                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(tall ? .detailRow : .scheduleReminderCircle))
             } else {
                 Circle().strokeBorder(color, lineWidth: theme.shape(.borderWidth))
                     .background(Circle().fill(item.isCompleted ? color : .clear))
                     .frame(width: theme.component(.scheduleReminderCircle), height: theme.component(.scheduleReminderCircle))
             }
-        }.frame(width: theme.component(.scheduleMarkerWidth), height: theme.lineHeight(.body))
+        }.frame(width: theme.component(.scheduleMarkerWidth), height: tall ? theme.component(.detailRow) : theme.lineHeight(.body))
     }
 }

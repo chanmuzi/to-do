@@ -8,6 +8,8 @@
 	<string>FloatingNotes</string>
 	<key>CFBundleExecutable</key>
 	<string>FloatingNotes</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
