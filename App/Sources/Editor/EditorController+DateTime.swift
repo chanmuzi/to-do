@@ -20,7 +20,7 @@ extension EditorController {
         dateSuggestionLine = nil
         moveDateDismissals()
         let selection = selectedRange
-        if onAcceptDate != nil, (isActive || forcesActiveAppearance), !textView.hasMarkedText(),
+        if configuration.recognizesDates, onAcceptDate != nil, (isActive || forcesActiveAppearance), !textView.hasMarkedText(),
            !isEndingComposition, !isReplayingUndo, !isSettingText, !isApplyingOutsideChange,
            selection.length == 0, deferredOutsideEdit == nil,
            dismissedDateLines[document.lineIndex(at: selection.location)] == nil {

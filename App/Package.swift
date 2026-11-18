@@ -60,12 +60,14 @@ let package = Package(
 
         .target(name: "Reminders", dependencies: ["Theme", "Models", "Store", "DateTime"], swiftSettings: uiSettings),
 
+        .target(name: "FloatSettings", dependencies: ["Models", "Theme", "Scheduling"], swiftSettings: uiSettings),
+
         // MARK: App
         .executableTarget(
             name: "FloatingNotes",
             dependencies: [
                 "Theme", "Models", "Store", "Routing",
-                "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders", "DateTime",
+                "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders", "DateTime", "FloatSettings",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
             resources: [.copy("Resources/menubar-icon.pdf")],
@@ -100,7 +102,7 @@ let package = Package(
         .testTarget(
             name: "FloatingNotesTests",
             dependencies: [
-                "FloatingNotes", "NotePanel", "Editor", "Capture", "Browse", "Theme", "Models", "Store", "Routing",
+                "FloatingNotes", "FloatSettings", "Scheduling", "Library", "NotePanel", "Editor", "Capture", "Browse", "Theme", "Models", "Store", "Routing",
             ],
             swiftSettings: uiSettings
         ),

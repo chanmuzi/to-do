@@ -23,6 +23,20 @@ import DateTime
         }
     }
 
+    @Test func disablingRecognitionClearsTitleUnderlineAndAcceptance() throws {
+        try withField("내일 회의") { field, editor in
+            field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+            field.updateDateSuggestion()
+            #expect(field.dateSuggestion != nil)
+            field.recognizesDates = false
+            #expect(field.dateSuggestion == nil)
+            #expect(editor.layoutManager?.temporaryAttribute(.underlineStyle, atCharacterIndex: 0, effectiveRange: nil) == nil)
+            #expect(!field.acceptDateSuggestion(in: editor))
+            field.recognizesDates = true
+            #expect(field.dateSuggestion != nil)
+        }
+    }
+
     @Test func unmarkRefreshesTitleWithoutAnotherKeystroke() throws {
         try withField("회의 내일 오후 3") { field, editor in
             field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }

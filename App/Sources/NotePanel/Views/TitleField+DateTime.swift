@@ -10,7 +10,7 @@ extension TitleField {
         let selection = editor.selectedRange()
         dateSuggestion = nil
         if dismissedDate != text { dismissedDate = nil }
-        if isEditing, onAcceptDate != nil, !editor.hasMarkedText(), selection.length == 0,
+        if recognizesDates, isEditing, onAcceptDate != nil, !editor.hasMarkedText(), selection.length == 0,
            dismissedDate != text {
             let excluded = Self.dateExclusions.matches(in: text, range: NSRange(location: 0, length: text.utf16.count)).map(\.range)
             dateSuggestion = InlineDateProposal.find(in: text, caret: selection.location, now: Date(),

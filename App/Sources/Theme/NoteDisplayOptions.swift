@@ -2,11 +2,11 @@ import Foundation
 
 /// 상단 줄 표시 방식(spec 5.2). 설정 화면이 생기면 거기서 바꾼다. 기본값은 `tokens.json`의 `display.defaults`와 같다.
 public struct NoteDisplayOptions: Hashable, Sendable {
-    public enum SpaceDisplay: Hashable, Sendable {
+    public enum SpaceDisplay: String, Hashable, Sendable {
         case icon, iconAndName, name
     }
 
-    public enum ReminderDisplay: Hashable, Sendable {
+    public enum ReminderDisplay: String, Hashable, Sendable {
         /// 시간("3:00 PM"). 오늘이 아니면 날짜를 앞에 붙인다.
         case time
         /// 남은 시간("12분 후").
@@ -14,7 +14,7 @@ public struct NoteDisplayOptions: Hashable, Sendable {
         case iconOnly
     }
 
-    public enum ClockFormat: Hashable, Sendable {
+    public enum ClockFormat: String, Hashable, Sendable {
         /// `3:00 PM`
         case twelveHour
         /// `오후 3:00`

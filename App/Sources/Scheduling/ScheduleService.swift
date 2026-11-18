@@ -42,12 +42,23 @@ public final class ScheduleService {
     private var bridge: any CalendarBridge {
         if let bridgeStorage { return bridgeStorage }
         let value = makeBridge()
+        value.preferredID = preferredID
         value.onChange = { [weak self] in
             self?.refreshLinked()
             self?.calendarChanged?()
         }
         bridgeStorage = value
         return value
+    }
+    public var preferredID: (ScheduleItem.Kind) -> String? = { _ in nil } {
+        didSet { bridgeStorage?.preferredID = preferredID }
+    }
+    public func calendarAccess(_ kind: ScheduleItem.Kind) -> CalendarAccess { bridge.access(for: kind) }
+    public func calendarChoices(_ kind: ScheduleItem.Kind) -> [CalendarChoice] { bridge.writableChoices(for: kind) }
+    public func systemDefault(_ kind: ScheduleItem.Kind) -> ScheduleDestination? { bridge.systemDefault(for: kind) }
+    public func connect(_ kind: ScheduleItem.Kind) async throws {
+        guard bridge.access(for: kind) == .needsRequest else { return }
+        _ = try await bridge.authorize(kind, request: true)
     }
     public var calendarChanged: (() -> Void)?
     public func events(in interval: DateInterval) -> [CalendarEvent] { bridge.events(in: interval) }

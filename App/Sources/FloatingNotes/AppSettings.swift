@@ -1,42 +1,18 @@
 import Foundation
+import Observation
+import FloatSettings
 
-/// 앱 전체에 걸친 표시 설정. 설정 화면이 생기면 거기서 바꾼다.
-nonisolated struct AppSettings: Codable, Equatable, Sendable {
-    /// 메뉴 막대 아이콘을 보일지. 시안대로 기본은 보임이다(임시 값, D-024).
-    /// 꺼도 모든 기능은 전역 단축키, 앱 메뉴, Dock 메뉴로 쓸 수 있다.
-    var showsMenuBarIcon = true
-    /// 본문 편집기의 표시 방식(spec 6). 값은 `tokens.json`의 `display`에 적힌 이름이다
-    /// (`inline-code`: `accent` | `plain`, `checkbox`: `box` | `bracket`). 모르는 이름은 기본값으로 읽는다
-    /// (`NoteEditorOptions(settings:)`).
-    var inlineCode = "accent"
-    var checkbox = "box"
-    var scheduleDateFormat = "relative"
-
-    init(showsMenuBarIcon: Bool = true, inlineCode: String = "accent", checkbox: String = "box", scheduleDateFormat: String = "relative") {
-        self.showsMenuBarIcon = showsMenuBarIcon
-        self.inlineCode = inlineCode
-        self.checkbox = checkbox
-        self.scheduleDateFormat = scheduleDateFormat
-    }
-
-    /// 나중에 더한 항목이 없는 예전 파일도 읽는다(없는 항목은 기본값).
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        showsMenuBarIcon = try container.decodeIfPresent(Bool.self, forKey: .showsMenuBarIcon) ?? true
-        inlineCode = try container.decodeIfPresent(String.self, forKey: .inlineCode) ?? "accent"
-        scheduleDateFormat = try container.decodeIfPresent(String.self, forKey: .scheduleDateFormat) ?? "relative"
-        checkbox = try container.decodeIfPresent(String.self, forKey: .checkbox) ?? "box"
-    }
-}
+typealias AppSettings = SettingsValues
 
 /// `AppSettings`를 `stateDirectory/app-settings.json`에 둔다.
+@Observable
 final class AppSettingsStore {
     private let url: URL
     private(set) var settings: AppSettings
     /// 저장된 파일을 읽지 못해 기본값으로 시작했으면 그 설명. 앱이 켤 때 모아서 기록한다.
     let loadWarning: String?
     /// 설정이 바뀌어 파일에 적힌 뒤에 부른다. 떠 있는 화면에 곧바로 반영하는 쪽이 건다.
-    var onChange: ((AppSettings) -> Void)?
+    @ObservationIgnored var onChange: ((AppSettings) -> Void)?
 
     /// 파일이 망가져 있으면 지우지 않고 옆으로 옮겨 두고(`app-settings.json.corrupt`) 기본값으로 시작한다.
     /// 옮기지도 못하면 던진다(그대로 두면 다음 저장이 덮어쓴다).

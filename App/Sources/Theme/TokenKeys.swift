@@ -83,6 +83,19 @@ public enum ShapeToken: String, CaseIterable, Sendable {
 
 /// 구성 요소 치수. `doc-pad`는 네 변 값이라 `ThemeTokens.docPadding`으로 따로 낸다.
 public enum ComponentToken: String, CaseIterable, Sendable {
+    case settingsScheduleHeight = "settings-schedule-h"
+    case settingsAppHeight = "settings-app-h"
+    case settingsSwitchWidth = "settings-switch-w"
+    case settingsSwitchHeight = "settings-switch-h"
+    case settingsWidth = "settings-w"
+    case settingsPreviewWidth = "settings-preview-w"
+    case settingsPaneHeight = "settings-pane-h"
+    case settingsShortcutsHeight = "settings-shortcuts-h"
+    case settingsLabelWidth = "settings-label-w"
+    case settingsFontMin = "settings-font-min"
+    case settingsFontMax = "settings-font-max"
+    case settingsLineMin = "settings-line-min"
+    case settingsLineMax = "settings-line-max"
     case editorGlyphStroke = "editor-glyph-stroke"
     case editorCheckmarkSize = "editor-checkmark-size"
     case editorCheckmarkStroke = "editor-checkmark-stroke"

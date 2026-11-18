@@ -73,7 +73,8 @@ import Theme
     /// 같은 곳에서 듣는 키가 겹치지 않는다: App이 받는 것끼리, 그리고 편집기가 먼저 받는 "편집" 줄과.
     @Test func chordsDoNotCollideWithinTheNoteWindow() {
         let table = ShortcutTable.standard
-        let heard = (table.entries(in: .global) + table.entries(in: .noteWindow) + table.entries(in: .editing))
+        let editing = table.entries(in: .editing).filter { $0.action != "현재 줄 날짜 제안 받기" }
+        let heard = (table.entries(in: .global) + table.entries(in: .noteWindow) + editing)
             .flatMap(\.chords)
         #expect(Set(heard).count == heard.count)
         // 앱 메뉴가 따로 듣는 표준 편집 키와도 겹치지 않는다.
@@ -148,7 +149,7 @@ import Theme
             return result
         }
         // Tab, ⇧Tab은 편집기가 글자 입력 경로에서 받는다(단축키 목록에 없다).
-        let typed: Set<String> = ["들여쓰기 (하위 계층으로)", "내어쓰기"]
+        let typed: Set<String> = ["들여쓰기 (날짜 제안이 없을 때)", "내어쓰기", "현재 줄 날짜 제안 받기", "날짜 제안만 닫기"]
         let rows = ShortcutTable.standard.entries(in: .editing).filter { !typed.contains($0.action) }
         #expect(ShortcutTable.standard.entries(in: .editing).count == rows.count + typed.count)
         #expect(Set(rows.map(\.action)) == Set(expected.keys))
@@ -177,7 +178,7 @@ import Theme
         let expected: [String: [LineKind]] = [
             "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],
             "글머리표": [.bullet],
-            "투두": [.todo(done: false)],
+            "투두": [.todo(done: false), .todo(done: false)],
             "토글": [.toggle],
             "인용문": [.quote, .quote],
         ]
@@ -188,6 +189,11 @@ import Theme
             #expect(row.keyLabels.count == kinds.count, "\(row.action)")
             for (label, kind) in zip(row.keyLabels, kinds) {
                 let doc = MarkdownDocument(label)
+                // [ ] 표기는 닫는 괄호까지 입력하면 이미 투두로 파싱된다.
+                if label == "[ ]" {
+                    #expect(doc.lines[0].kind == kind)
+                    continue
+                }
                 let edit = try #require(
                     EditorCommands.spaceTrigger(doc, selection: NSRange(location: label.utf16.count, length: 0)),
                     "\(row.action) \(label)"

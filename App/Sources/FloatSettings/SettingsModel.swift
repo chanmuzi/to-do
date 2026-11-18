@@ -1,0 +1,98 @@
+import Foundation
+import Models
+import Observation
+import Scheduling
+
+package enum SettingsPane: String, CaseIterable {
+    case appearance = "모양", editor = "편집기", schedule = "예정", app = "앱", shortcuts = "단축키"
+}
+
+package struct ShortcutSection: Identifiable {
+    package var id: String { title }
+    let title: String
+    let rows: [(action: String, keys: String)]
+    package init(_ title: String, rows: [(String, String)]) {
+        self.title = title
+        self.rows = rows
+    }
+}
+
+struct DestinationMenu {
+    let access: CalendarAccess
+    let choices: [CalendarChoice]
+    let system: ScheduleDestination?
+}
+
+@Observable
+package final class SettingsModel {
+    package var pane = SettingsPane.appearance
+    package let shortcuts: [ShortcutSection]
+    private let read: () -> SettingsValues
+    private let save: ((inout SettingsValues) -> Void) throws -> Void
+    private let schedules: ScheduleService
+    let openPrivacy: (ScheduleItem.Kind) -> Void
+    var menus: [ScheduleItem.Kind: DestinationMenu] = [:]
+    var returnedToDefault: Set<ScheduleItem.Kind> = []
+    private(set) var connecting = false
+    package private(set) var error: String?
+    package var values: SettingsValues { read() }
+
+    package init(read: @escaping () -> SettingsValues, save: @escaping ((inout SettingsValues) -> Void) throws -> Void,
+                 schedules: ScheduleService, shortcuts: [ShortcutSection], openPrivacy: @escaping (ScheduleItem.Kind) -> Void) {
+        self.read = read
+        self.save = save
+        self.schedules = schedules
+        self.shortcuts = shortcuts
+        self.openPrivacy = openPrivacy
+    }
+
+    @discardableResult
+    package func change(_ mutation: (inout SettingsValues) -> Void) -> Bool {
+        do {
+            try save(mutation)
+            error = nil
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
+    }
+
+    package func refreshCalendars() {
+        for kind in [ScheduleItem.Kind.event, .reminder] {
+            let access = schedules.calendarAccess(kind)
+            let choices = access == .available ? schedules.calendarChoices(kind) : []
+            menus[kind] = DestinationMenu(access: access, choices: choices,
+                system: access == .available ? schedules.systemDefault(kind) : nil)
+            if access == .available, let id = values[idFor: kind], !choices.contains(where: { $0.id == id }),
+               change({ $0[idFor: kind] = nil }) {
+                returnedToDefault.insert(kind)
+            }
+        }
+    }
+
+    package func choose(_ id: String?, for kind: ScheduleItem.Kind) {
+        guard let menu = menus[kind], menu.access == .available,
+              id == nil || menu.choices.contains(where: { $0.id == id }) else { return }
+        if change({ $0[idFor: kind] = id }) { returnedToDefault.remove(kind) }
+    }
+
+    package func connect(_ kind: ScheduleItem.Kind) async {
+        guard !connecting, schedules.calendarAccess(kind) == .needsRequest else { return }
+        connecting = true
+        defer { connecting = false }
+        do { try await schedules.connect(kind) }
+        catch { self.error = error.localizedDescription }
+        refreshCalendars()
+    }
+}
+
+extension SettingsValues {
+    package subscript(idFor kind: ScheduleItem.Kind) -> String? {
+        get { kind == .event ? calendarID : reminderListID }
+        set {
+            if kind == .event { calendarID = newValue }
+            else { reminderListID = newValue }
+        }
+    }
+}

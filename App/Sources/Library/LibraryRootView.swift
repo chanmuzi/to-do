@@ -20,6 +20,11 @@ struct LibraryRootView: View {
                     }
                     Text(model.title(model.selection)).font(theme.font(.paneTitle))
                     Spacer()
+                    if model.router.isConnected(.openSettings) {
+                        LibraryIconButton(theme: theme, title: "설정", symbol: "slider.horizontal.3") {
+                            model.router.route(.openSettings)
+                        }
+                    }
                     if model.showsNewNote {
                         LibraryIconButton(theme: theme, title: "새 노트", symbol: "plus") {
                             var draft = NoteDraft()

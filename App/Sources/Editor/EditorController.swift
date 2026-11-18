@@ -28,6 +28,7 @@ final class EditorController: NSObject {
         didSet {
             guard configuration != oldValue else { return }
             reloadStyle()
+            updateDateSuggestion()
         }
     }
 

@@ -226,6 +226,7 @@ final class NoteWindowController: NSObject {
             applyContentHeight(animated: false)
         }
 
+        root.topRow.recognizesDates = coordinator?.recognizesDates ?? true
         root.topRow.onAcceptDate = { [weak self] request in
             guard let self, let accept = coordinator?.onAcceptTitleDate else { throw CocoaError(.featureUnsupported) }
             return try accept(noteID, request)

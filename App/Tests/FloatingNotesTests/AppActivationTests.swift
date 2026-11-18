@@ -78,7 +78,7 @@ import Testing
             menu.items.first { $0.title == title }?.submenu?.items
                 .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? []
         }
-        #expect(visible("Float") == ["Float에 관하여", "설정", "Float 종료"])
+        #expect(visible("Float") == ["Float에 관하여", "설정...", "Float 종료"])
         #expect(visible("보기") == ["노트 모두 숨기기"])
         #expect(visible("창") == ["다음 노트로"])
         #expect(visible("도움말") == ["단축키"])
