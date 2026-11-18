@@ -103,8 +103,8 @@ swift test --package-path App
 
 ### 브랜드 에셋
 
-흑백 체크 카드 C2 아이콘을 쓴다. `App/Resources/app-icon-1024.svg`와 `menubar-icon.svg`가 벡터 원본이다.
-`swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 SVG, 16~1024px PNG, 18pt 메뉴 막대 PDF를 다시 만든다(macOS, 외부 의존성 없음).
+종이 노트 창 아이콘을 사용한다. 빌드는 Icon Composer의 라이트, 다크 겹을 컴파일하고 7개 크기의 PNG로 ICNS를 함께 만든다.
+`swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 앱 아이콘 겹, PNG, 메뉴 막대 SVG와 PDF를 다시 만든다.
 1024px 캔버스의 본체는 824px(80.46875%), 사방 여백은 100px이며 시스템 메모 앱의 본체 비율을 따른다.
 번들 ID, 실행 파일, 타깃, 모듈, 앱 파일 이름, 기존 노트, 설정 저장 위치는 유지한다(D-062).
 

@@ -17,7 +17,10 @@ import Theme
         badge.layoutSubtreeIfNeeded()
         let chip = try #require(badge.subviews.first)
         #expect(chip.frame.height == theme.component(.badgeHeight))
-        for component in badge.subviews { #expect(component.frame.midY == badge.bounds.midY) }
+        for component in badge.subviews {
+            let drop = component.frame.width == theme.component(.badgeDot) ? theme.component(.badgeDotDrop) : 0
+            #expect(component.frame.midY == badge.bounds.midY - drop)
+        }
         let field = try #require(badge.subviews.compactMap { $0 as? NSTextField }.first)
         #expect(field.font?.familyName == theme.nsFont(.body).familyName)
         #expect(field.font?.pointSize == theme.tokens.textStyle(.micro).size)

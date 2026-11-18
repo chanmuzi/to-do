@@ -4,6 +4,26 @@ import Models
 @testable import Store
 
 @Suite @MainActor struct ScheduleCompatibilityTests {
+    @Test func legacyArchiveCanBeRestoredAndArchivedWithoutChangingBodyOrUnknownFields() throws {
+        let temp = TemporaryStore()
+        defer { temp.cleanUp() }
+        try FileManager.default.createDirectory(at: temp.location.notesDirectory, withIntermediateDirectories: true)
+        let raw = "---\ncreated: 2001-01-01\ncustom: keep\n---\n- [x] 완료\n"
+        let url = temp.noteFile("old")
+        try raw.write(to: url, atomically: true, encoding: .utf8)
+        let store = try FileNoteStore(location: temp.location)
+        let id = NoteID(rawValue: "old")
+        #expect(try store.load(id).isArchived)
+        #expect(try String(contentsOf: url, encoding: .utf8) == raw)
+        try store.update(id) { $0.isArchived = false }
+        let reloaded = try FileNoteStore(location: temp.location)
+        #expect(try !reloaded.load(id).isArchived)
+        try reloaded.update(id) { $0.isArchived = true }
+        #expect(try reloaded.load(id).body == "- [x] 완료\n")
+        #expect(try String(contentsOf: url, encoding: .utf8).contains("custom: keep"))
+        #expect(try reloaded.listTrash().notes.isEmpty)
+    }
+
     @Test func actualStage5DecoderCanReadAndRewriteNewScheduleFiles() throws {
         let temp = TemporaryStore(); defer { temp.cleanUp() }
         let store = try FileNoteStore(location: temp.location)

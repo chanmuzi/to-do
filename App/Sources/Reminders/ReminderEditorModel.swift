@@ -18,6 +18,73 @@ public final class ReminderEditorModel {
     public private(set) var focusToken = 0
     public func chooseCandidate(_ index: Int) { candidateIndex = index; focusToken += 1 }
     public var displayOptions = NoteDisplayOptions()
+    public var calendarChoices: (ScheduleItem.Kind) -> [CalendarChoice] = { _ in [] }
+    @ObservationIgnored weak var pickerAnchor: NSView?
+    @ObservationIgnored public weak var pickerWindow: NSWindow?
+    func applyExpression(_ expression: DateTimeExpression) {
+        if expression.isDateOnly && expression.end == nil { changeDay(expression.start); return }
+        let duration = end.timeIntervalSince(start)
+        start = expression.start
+        dateOnly = expression.isDateOnly
+        if let last = expression.end { end = last; hasEnd = true }
+        else { end = start.addingTimeInterval(duration > 0 ? duration : 3600) }
+        if save() { datePicker = nil }
+    }
+    public var datePicker: ScheduleDateSelection?
+    public var selectedItem: ScheduleItem? { items.first { $0.id == selectedID } }
+    @ObservationIgnored weak var startField: NSTextField?
+    @ObservationIgnored weak var endField: NSTextField?
+
+    func focusTime(isEnd: Bool) {
+        let field = isEnd ? endField : startField
+        DispatchQueue.main.async { [weak field] in
+            if let field { field.window?.makeFirstResponder(field) }
+        }
+    }
+
+    var tabDestination: Bool?
+    func tabFromDate(backward: Bool) {
+        datePicker = nil
+        tabDestination = backward
+    }
+    public func showDates() { datePicker = ScheduleDateSelection(selected: start, now: now(), calendar: calendar) }
+
+    public func changeDay(_ day: Date) {
+        let delta = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: day)).day ?? 0
+        guard let newStart = calendar.date(byAdding: .day, value: delta, to: start),
+              let newEnd = calendar.date(byAdding: .day, value: delta, to: end) else { return }
+        start = newStart
+        end = newEnd
+        if save() { datePicker = nil }
+    }
+
+    func changeTitle(_ value: String) {
+        guard let selectedID, value != title else { return }
+        do {
+            try notes.update(noteID) { note in
+                guard let i = note.schedules.firstIndex(where: { $0.id == selectedID && !$0.isDeleted }) else { return }
+                note.schedules[i].title = value
+                note.schedules[i].modified = now()
+            }
+            title = value
+            reload()
+            onSave?(noteID, selectedID, false)
+        } catch { self.error = error.localizedDescription }
+    }
+
+    public func chooseCalendar(_ id: String) {
+        guard let selectedID else { return }
+        do {
+            try notes.update(noteID) { note in
+                guard let i = note.schedules.firstIndex(where: { $0.id == selectedID && !$0.isDeleted }) else { return }
+                note.schedules[i].pendingCalendarID = id
+                note.schedules[i].modified = now()
+            }
+            reload()
+            onSave?(noteID, selectedID, false)
+        } catch { self.error = error.localizedDescription }
+    }
+
     public var destination: (ScheduleItem) -> ScheduleDestination? = { _ in nil }
     public let calendar: Calendar
     public let now: () -> Date
@@ -36,7 +103,7 @@ public final class ReminderEditorModel {
     public init(noteID: NoteID, notes: any NoteStoring, calendar: Calendar = .current, now: @escaping () -> Date = Date.init) throws {
         self.noteID = noteID; self.notes = notes; self.calendar = calendar; self.now = now
         let note = try notes.load(noteID)
-        items = note.schedules.filter { !$0.isDeleted }
+        items = note.schedules.filter { !$0.isDeleted }.sorted { ($0.start, $0.id) < ($1.start, $1.id) }
         select(note.displayedSchedule(at: now())?.id ?? items.first?.id)
         observation = notes.observe { [weak self] change in
             guard let self, change.id == self.noteID else { return }
@@ -45,6 +112,7 @@ public final class ReminderEditorModel {
     }
     public func select(_ id: String?) {
         focusToken += 1
+        datePicker = nil
         selectedID = id
         let item = items.first { $0.id == id }
         title = item?.title ?? (try? notes.load(noteID).title) ?? ""
@@ -62,7 +130,23 @@ public final class ReminderEditorModel {
         candidateIndex = candidates.firstIndex(where: { $0.kind == item?.kind }) ?? 0
     }
     public func reload() {
-        do { items = try notes.load(noteID).schedules.filter { !$0.isDeleted }; metadataRevision += 1 }
+        do {
+            let previous = selectedItem
+            items = try notes.load(noteID).schedules.filter { !$0.isDeleted }.sorted { ($0.start, $0.id) < ($1.start, $1.id) }
+            if let current = selectedItem, let previous {
+                if current.title != previous.title { title = current.title }
+                if current.start != previous.start { start = current.start }
+                if current.isCompleted != previous.isCompleted { completed = current.isCompleted }
+                if current.end != previous.end || current.isDateOnly != previous.isDateOnly {
+                    dateOnly = current.isDateOnly
+                    hasEnd = current.end != nil
+                    if let finish = current.end {
+                        end = dateOnly ? calendar.date(byAdding: .day, value: -1, to: finish) ?? finish : finish
+                    } else { end = calendar.date(byAdding: .hour, value: 1, to: current.start) ?? current.start }
+                }
+            }
+            metadataRevision += 1
+        }
         catch { self.error = error.localizedDescription }
     }
     private func rebuildCandidates() {
@@ -139,6 +223,7 @@ public final class ReminderEditorModel {
             try notes.update(noteID) { note in
                 let index = note.schedules.firstIndex { $0.id == selectedID && !$0.isDeleted }
                 var item = index.map { note.schedules[$0] } ?? ScheduleItem(start: startValue)
+                if item.kind != (hasEnd ? .event : .reminder) { item.pendingCalendarID = nil }
                 item.title = title; item.start = startValue; item.end = endValue
                 item.isDateOnly = dateOnly; item.isCompleted = hasEnd ? false : completed
                 item.modified = Date()

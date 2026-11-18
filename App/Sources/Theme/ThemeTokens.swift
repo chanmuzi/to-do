@@ -215,6 +215,7 @@ public struct ThemeTokens: Hashable, Sendable {
                 pivotFromTop: try motion(.bellPivot, TokenValueParser.fraction),
                 curve: try motion(.bellEase, TokenValueParser.bezier)
             ),
+            upcomingHover: try motion(.upcomingHover, TokenValueParser.seconds),
             caretBlink: try motion(.caretBlink, TokenValueParser.seconds),
             toastHold: try motion(.toastHold, TokenValueParser.seconds)
         )

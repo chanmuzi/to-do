@@ -106,12 +106,16 @@ final class LibraryRowInputView: NSView {
         open.target = self
         menu.addItem(open)
         if !trash {
+            let archive = NSMenuItem(title: note.isArchived ? "되돌리기" : "보관함으로", action: #selector(toggleArchive), keyEquivalent: "")
+            archive.target = self
+            menu.addItem(archive)
             let move = NSMenuItem(title: "스페이스 옮기기", action: #selector(moveNote), keyEquivalent: "")
             move.target = self
             menu.addItem(move)
         }
         return menu
     }
+    @objc private func toggleArchive() { if let note { model?.toggleArchive(note) } }
     fileprivate var restoresTrash: Bool {
         guard !isUpcoming, let note, let model else { return false }
         return model.index.trash.contains { $0.id == note.id }

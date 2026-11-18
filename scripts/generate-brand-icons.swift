@@ -1,135 +1,213 @@
-#!/usr/bin/env swift
-// 실행: swift scripts/generate-brand-icons.swift <미리보기 폴더>
-// 외부 의존성 없이 같은 도형 정의에서 SVG, PNG, 투명 구멍을 가진 벡터 PDF를 만든다.
+// Float 최종 아이콘 자산 생성기 (3차 1안 "종이 노트 창"을 벡터로 다시 그림).
+// 사용: swift scripts/generate-brand-icons.swift <출력 폴더>
+// 그림 좌표는 타일 한 변 824 단위, 왼쪽 위 원점. 레거시 .icns는 1024 캔버스에 100 여백으로,
+// Icon Composer 겹은 타일이 1024 전체를 채우게(시스템이 둥근 네모를 씌움) 그린다.
 import AppKit
+import CoreGraphics
 
-struct Shape {
-    let path: CGPath
-    let color: String
-    let svg: String
-}
-func rounded(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat, _ color: String) -> Shape {
-    Shape(path: CGPath(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerWidth: r, cornerHeight: r, transform: nil),
-          color: color, svg: "<rect x=\"\(x)\" y=\"\(y)\" width=\"\(w)\" height=\"\(h)\" rx=\"\(r)\" fill=\"\(color)\"/>")
-}
-func stroke(_ points: [(CGFloat, CGFloat)], _ width: CGFloat, _ color: String) -> Shape {
-    let line = CGMutablePath()
-    line.move(to: CGPoint(x: points[0].0, y: points[0].1))
-    for (x, y) in points.dropFirst() { line.addLine(to: CGPoint(x: x, y: y)) }
-    let d = points.enumerated().map { "\($0.offset == 0 ? "M" : "L")\($0.element.0) \($0.element.1)" }.joined(separator: " ")
-    return Shape(path: line.copy(strokingWithWidth: width, lineCap: .round, lineJoin: .round, miterLimit: 10),
-                 color: color, svg: "<path d=\"\(d)\" fill=\"none\" stroke=\"\(color)\" stroke-width=\"\(width)\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
-}
-func color(_ hex: String) -> CGColor {
-    let n = UInt32(hex.dropFirst(), radix: 16)!
-    return CGColor(srgbRed: CGFloat((n >> 16) & 255) / 255, green: CGFloat((n >> 8) & 255) / 255,
-                   blue: CGFloat(n & 255) / 255, alpha: 1)
-}
-let ink = "#1c1c1f", paper = "#f5f4f0"
-let appShapes = [
-    rounded(0, 0, 100, 100, 22, ink),
-    rounded(20, 22, 60, 56, 9, paper),
-    rounded(29, 33, 13, 13, 3, ink),
-    stroke([(32, 39.5), (34.6, 42.1), (39.2, 37.1)], 2.6, paper),
-    rounded(47, 37.5, 24, 4, 2, "#9a9a9e"),
-    rounded(29, 55, 42, 4, 2, ink),
-    rounded(29, 64, 26, 4, 2, ink)
-]
-let card = rounded(1.5, 2.5, 15, 13, 3, "#000000")
-let holes = [
-    stroke([(4.4, 7.2), (5.8, 8.6), (8.2, 6)], 1.4, "#000000"),
-    stroke([(10, 7.3), (13.6, 7.3)], 1.4, "#000000"),
-    stroke([(4.6, 11.6), (11.6, 11.6)], 1.4, "#000000")
-]
-let menuPath = CGMutablePath()
-menuPath.addPath(card.path)
-for hole in holes { menuPath.addPath(hole.path) }
+let T: CGFloat = 824
+let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
-func drawApp(_ context: CGContext) {
-    let pixelScale = abs(context.ctm.a)
-    context.saveGState()
-    // Notes.app: 206px 본체 / 256px 캔버스 = 824 / 1024, 여백 100px.
-    context.translateBy(x: 100, y: 100)
-    context.scaleBy(x: 8.24, y: 8.24)
-    for (index, shape) in appShapes.enumerated() {
-        context.saveGState()
-        if index == 0 {
-            // Quartz의 그림자는 도형 CTM을 따르지 않으므로 출력 픽셀 배율을 직접 적용한다.
-            context.setShadow(offset: CGSize(width: 0, height: -10 * pixelScale), blur: 12 * pixelScale,
-                              color: CGColor(gray: 0, alpha: 0.25))
-        }
-        context.addPath(shape.path)
-        context.setFillColor(color(shape.color))
-        context.fillPath()
-        context.restoreGState()
+func hex(_ s: String, _ a: CGFloat = 1) -> CGColor {
+    let n = UInt32(s.dropFirst(), radix: 16)!
+    return CGColor(colorSpace: srgb, components: [CGFloat((n >> 16) & 255) / 255, CGFloat((n >> 8) & 255) / 255, CGFloat(n & 255) / 255, a])!
+}
+func gradient(_ stops: [(CGColor, CGFloat)]) -> CGGradient {
+    CGGradient(colorsSpace: srgb, colors: stops.map { $0.0 } as CFArray, locations: stops.map { $0.1 })!
+}
+
+struct Palette {
+    let bgTop, bgBottom: String
+    let bgLight: CGFloat
+    let barTop, barBottom: String
+    let bodyTop, bodyBottom, edge: String
+    let pin, line1, line2: String
+    let shadow: CGFloat
+}
+let light = Palette(bgTop: "#F9F5EF", bgBottom: "#EAE2D7", bgLight: 0.55,
+                    barTop: "#3C3B3E", barBottom: "#1E1E20",
+                    bodyTop: "#FFFFFF", bodyBottom: "#F2EFEA", edge: "#D8D3CB",
+                    pin: "#F4F2EE", line1: "#D3CFC9", line2: "#E1DDD7", shadow: 0.26)
+let dark = Palette(bgTop: "#38373B", bgBottom: "#1B1B1D", bgLight: 0.12,
+                   barTop: "#66625D", barBottom: "#4A4642",
+                   bodyTop: "#EFECE6", bodyBottom: "#DCD8D1", edge: "#8E8981",
+                   pin: "#F4F2EE", line1: "#BDB8B1", line2: "#CBC7C0", shadow: 0.6)
+
+// 노트 창 치수 (타일 단위)
+let win = CGRect(x: 162, y: 196, width: 500, height: 400)
+let winR: CGFloat = 44
+
+func roundedPath(_ r: CGRect, _ radius: CGFloat) -> CGPath { CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil) }
+
+// 배경: 위에서 아래로 옅어지는 상아색, 위쪽 가운데 부드러운 빛, 위 가장자리 광택.
+func drawBackground(_ c: CGContext, _ p: Palette, rim: Bool) {
+    c.saveGState()
+    c.drawLinearGradient(gradient([(hex(p.bgTop), 0), (hex(p.bgBottom), 1)]), start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: T), options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    c.drawRadialGradient(gradient([(hex("#FFFFFF", p.bgLight), 0), (hex("#FFFFFF", 0), 1)]), startCenter: CGPoint(x: T / 2, y: T * 0.18), startRadius: 0, endCenter: CGPoint(x: T / 2, y: T * 0.18), endRadius: T * 0.62, options: [])
+    if rim {
+        c.drawLinearGradient(gradient([(hex("#FFFFFF", p.bgLight * 0.9), 0), (hex("#FFFFFF", 0), 1)]), start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: T * 0.08), options: [])
     }
-    context.restoreGState()
+    c.restoreGState()
 }
-func drawMenu(_ context: CGContext) {
-    context.addPath(menuPath)
-    context.setFillColor(CGColor(gray: 0, alpha: 1))
-    context.drawPath(using: .eoFill) // 흰 잉크가 아니라 배경이 비치는 실제 구멍.
+
+// 그림자: 노트 아래 떨어진 곳에 넓고 흐린 타원과 좁고 진한 타원.
+func drawShadow(_ c: CGContext, _ p: Palette, pixelScale: CGFloat) {
+    func blurred(_ rect: CGRect, alpha: CGFloat, blur: CGFloat) {
+        c.saveGState()
+        let off: CGFloat = 4000
+        // 도형은 화면 밖(위)에 그리고 그림자만 제자리로 내린다. 그림자 offset은 장치 좌표(위가 +)라 배율을 직접 곱한다.
+        c.setShadow(offset: CGSize(width: 0, height: -off * pixelScale), blur: blur * pixelScale, color: hex("#000000", alpha))
+        c.addEllipse(in: rect.offsetBy(dx: 0, dy: -off))
+        c.setFillColor(hex("#000000", 1))
+        c.fillPath()
+        c.restoreGState()
+    }
+    blurred(CGRect(x: 412 - 235, y: 640, width: 470, height: 64), alpha: p.shadow * 0.75, blur: 34)
+    blurred(CGRect(x: 412 - 190, y: 652, width: 380, height: 26), alpha: p.shadow * 0.55, blur: 12)
 }
-func png(_ url: URL, pixels: Int, canvas: CGFloat, draw: (CGContext) -> Void) throws {
-    let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-    context.translateBy(x: 0, y: CGFloat(pixels))
-    context.scaleBy(x: CGFloat(pixels) / canvas, y: -CGFloat(pixels) / canvas)
-    draw(context)
-    let bitmap = NSBitmapImageRep(cgImage: context.makeImage()!)
-    try bitmap.representation(using: .png, properties: [:])!.write(to: url)
+
+// 노트 창: 두께 띠, 본문, 검은 제목 줄, 핀 점, 글 줄 두 개, 가장자리 선.
+func drawNote(_ c: CGContext, _ p: Palette, simple: Bool) {
+    let barH: CGFloat = simple ? 118 : 92
+    // 두께 (아래로 비치는 얇은 판)
+    c.addPath(roundedPath(win.offsetBy(dx: 0, dy: simple ? 0 : 7), winR))
+    c.setFillColor(hex(p.edge))
+    c.fillPath()
+    c.saveGState()
+    c.addPath(roundedPath(win, winR))
+    c.clip()
+    c.drawLinearGradient(gradient([(hex(p.bodyTop), 0), (hex(p.bodyBottom), 1)]), start: CGPoint(x: 0, y: win.minY), end: CGPoint(x: 0, y: win.maxY), options: [])
+    // 제목 줄
+    let bar = CGRect(x: win.minX, y: win.minY, width: win.width, height: barH)
+    c.saveGState()
+    c.clip(to: bar)
+    c.drawLinearGradient(gradient([(hex(p.barTop), 0), (hex(p.barBottom), 1)]), start: CGPoint(x: 0, y: bar.minY), end: CGPoint(x: 0, y: bar.maxY), options: [])
+    c.drawLinearGradient(gradient([(hex("#FFFFFF", 0.16), 0), (hex("#FFFFFF", 0), 1)]), start: CGPoint(x: 0, y: bar.minY), end: CGPoint(x: 0, y: bar.minY + 18), options: [])
+    c.restoreGState()
+    c.setFillColor(hex("#000000", 0.18))
+    c.fill(CGRect(x: win.minX, y: bar.maxY, width: win.width, height: 2))
+    if !simple {
+        c.addPath(roundedPath(CGRect(x: win.minX + 64, y: bar.maxY + 86, width: 332, height: 24), 12))
+        c.setFillColor(hex(p.line1)); c.fillPath()
+        c.addPath(roundedPath(CGRect(x: win.minX + 64, y: bar.maxY + 148, width: 250, height: 24), 12))
+        c.setFillColor(hex(p.line2)); c.fillPath()
+    }
+    c.restoreGState()
+    // 핀 점
+    let pinR: CGFloat = simple ? 20 : 15
+    let pin = CGRect(x: win.maxX - 58 - pinR, y: win.minY + barH / 2 - pinR, width: pinR * 2, height: pinR * 2)
+    c.saveGState()
+    c.addEllipse(in: pin); c.clip()
+    c.drawLinearGradient(gradient([(hex(p.pin), 0), (hex("#D6D2CB"), 1)]), start: CGPoint(x: 0, y: pin.minY), end: CGPoint(x: 0, y: pin.maxY), options: [])
+    c.restoreGState()
+    // 가장자리
+    c.addPath(roundedPath(win.insetBy(dx: 1, dy: 1), winR - 1))
+    c.setStrokeColor(hex("#000000", 0.08)); c.setLineWidth(2); c.strokePath()
+}
+
+enum Layer { case background, shadow, note, composite }
+
+// 레거시 .icns: 1024 캔버스, 824 둥근 타일(반지름 185), 타일 그림자 포함.
+func drawLegacy(_ c: CGContext, _ p: Palette, pixelScale: CGFloat, simple: Bool) {
+    c.saveGState()
+    c.translateBy(x: 100, y: 100)
+    let tile = roundedPath(CGRect(x: 0, y: 0, width: T, height: T), 185)
+    c.saveGState()
+    c.setShadow(offset: CGSize(width: 0, height: -10 * pixelScale), blur: 14 * pixelScale, color: hex("#000000", 0.22))
+    c.addPath(tile); c.setFillColor(hex(p.bgBottom)); c.fillPath()
+    c.restoreGState()
+    c.addPath(tile); c.clip()
+    drawBackground(c, p, rim: true)
+    drawShadow(c, p, pixelScale: pixelScale)
+    drawNote(c, p, simple: simple)
+    // 유리 테두리: 안쪽 흰 띠(위가 더 밝음)와 바깥 머리카락 선
+    c.saveGState()
+    c.addPath(roundedPath(CGRect(x: 5, y: 5, width: T - 10, height: T - 10), 180))
+    c.setLineWidth(10); c.replacePathWithStrokedPath(); c.clip()
+    c.drawLinearGradient(gradient([(hex("#FFFFFF", p.bgLight * 1.6), 0), (hex("#FFFFFF", p.bgLight * 0.6), 1)]), start: .zero, end: CGPoint(x: 0, y: T), options: [])
+    c.restoreGState()
+    c.addPath(roundedPath(CGRect(x: 0.75, y: 0.75, width: T - 1.5, height: T - 1.5), 184.25))
+    c.setStrokeColor(hex("#000000", 0.07)); c.setLineWidth(1.5); c.strokePath()
+    c.restoreGState()
+}
+
+// Icon Composer 겹: 타일이 1024 전체. 배경은 꽉 찬 사각형(시스템이 모양을 씌움).
+func drawLayer(_ c: CGContext, _ p: Palette, _ layer: Layer, pixelScale: CGFloat) {
+    c.saveGState()
+    c.scaleBy(x: 1024 / T, y: 1024 / T)
+    let s = pixelScale * 1024 / T
+    switch layer {
+    case .background: drawBackground(c, p, rim: false)
+    case .shadow: drawShadow(c, p, pixelScale: s)
+    case .note: drawNote(c, p, simple: false)
+    case .composite: drawBackground(c, p, rim: false); drawShadow(c, p, pixelScale: s); drawNote(c, p, simple: false)
+    }
+    c.restoreGState()
+}
+
+func png(_ url: URL, pixels: Int, canvas: CGFloat = 1024, draw: (CGContext, CGFloat) -> Void) throws {
+    let c = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0, space: srgb,
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    c.interpolationQuality = .high
+    c.translateBy(x: 0, y: CGFloat(pixels))
+    c.scaleBy(x: CGFloat(pixels) / canvas, y: -CGFloat(pixels) / canvas)
+    draw(c, CGFloat(pixels) / canvas)
+    let rep = NSBitmapImageRep(cgImage: c.makeImage()!)
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try rep.representation(using: .png, properties: [:])!.write(to: url)
+}
+
+// 메뉴 막대: 2차 1안. 18pt 캔버스, 그림 16pt, 선 1.5.
+func drawMenu(_ c: CGContext) {
+    c.setStrokeColor(hex("#000000")); c.setLineWidth(1.5); c.setLineCap(.round); c.setLineJoin(.round)
+    c.addPath(roundedPath(CGRect(x: 1.75, y: 1.75, width: 14.5, height: 14.5), 3)); c.strokePath()
+    c.move(to: CGPoint(x: 5.25, y: 10.75)); c.addLine(to: CGPoint(x: 10.75, y: 10.75)); c.strokePath()
+    let head = CGMutablePath()
+    head.move(to: CGPoint(x: 4.75, y: 1.75)); head.addLine(to: CGPoint(x: 13.25, y: 1.75))
+    head.addArc(tangent1End: CGPoint(x: 16.25, y: 1.75), tangent2End: CGPoint(x: 16.25, y: 4.75), radius: 3)
+    head.addLine(to: CGPoint(x: 16.25, y: 6.5)); head.addLine(to: CGPoint(x: 1.75, y: 6.5)); head.addLine(to: CGPoint(x: 1.75, y: 4.75))
+    head.addArc(tangent1End: CGPoint(x: 1.75, y: 1.75), tangent2End: CGPoint(x: 4.75, y: 1.75), radius: 3)
+    head.closeSubpath()
+    c.addPath(head); c.setFillColor(hex("#000000")); c.fillPath()
 }
 
 guard CommandLine.arguments.count == 2 else {
     fputs("사용: swift scripts/generate-brand-icons.swift <미리보기 폴더>\n", stderr)
     exit(64)
 }
-let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-let resources = root.appendingPathComponent("App/Resources")
-let previews = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
-try FileManager.default.createDirectory(at: previews, withIntermediateDirectories: true)
-for size in [16, 32, 64, 128, 256, 512, 1024] {
-    let url = resources.appendingPathComponent("AppIcon.appiconset/icon_\(size).png")
-    try png(url, pixels: size, canvas: 1024, draw: drawApp)
-    try Data(contentsOf: url).write(to: previews.appendingPathComponent("app-icon-\(size).png"))
-}
-let appSVG = """
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs><filter id="shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
-    <feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dy="10"/>
-    <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
-  </filter></defs>
-  <rect x="100" y="100" width="824" height="824" rx="181.28" fill="\(ink)" filter="url(#shadow)"/>
-  <g transform="translate(100 100) scale(8.24)">
-    \(appShapes.map(\.svg).joined(separator: "\n    "))
-  </g>
-</svg>
-"""
-try appSVG.write(to: resources.appendingPathComponent("app-icon-1024.svg"), atomically: true, encoding: .utf8)
-let menuSVG = """
-<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-  <defs><mask id="m"><rect width="18" height="18" fill="#fff"/>
-    \(holes.map(\.svg).joined(separator: "\n    "))
-  </mask></defs>
-  \(card.svg.replacingOccurrences(of: "/>", with: " mask=\"url(#m)\"/>"))
-</svg>
-"""
-try menuSVG.write(to: resources.appendingPathComponent("menubar-icon.svg"), atomically: true, encoding: .utf8)
-var page = CGRect(x: 0, y: 0, width: 18, height: 18)
-let pdf = CGContext(resources.appendingPathComponent("menubar-icon.pdf") as CFURL, mediaBox: &page, nil)!
-pdf.beginPDFPage(nil)
-pdf.translateBy(x: 0, y: 18)
-pdf.scaleBy(x: 1, y: -1)
-drawMenu(pdf)
-pdf.endPDFPage()
-pdf.closePDF()
-// 최종 PDF를 다시 읽어서 1x/2x PNG로 검증한다.
-let document = CGPDFDocument(resources.appendingPathComponent("menubar-icon.pdf") as CFURL)!
-for scale in [1, 2] {
-    try png(previews.appendingPathComponent("menubar-\(scale)x.png"), pixels: 18 * scale, canvas: 18) { context in
-        context.translateBy(x: 0, y: 18)
-        context.scaleBy(x: 1, y: -1)
-        context.drawPDFPage(document.page(at: 1)!)
+let out = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("App/Resources")
+for (name, palette) in [("light", light), ("dark", dark)] {
+    for (layer, file) in [(Layer.background, "1-background"), (.shadow, "2-shadow"), (.note, "3-note-window")] {
+        try png(resources.appendingPathComponent("AppIcon.icon/Assets/\(name)-\(file).png"), pixels: 1024) { c, scale in
+            drawLayer(c, palette, layer, pixelScale: scale)
+        }
     }
 }
-print("Generated C2 SVG, 7 app PNGs, 18pt vector PDF and previews: \(previews.path)")
+for pixels in [16, 32, 64, 128, 256, 512, 1024] {
+    let url = resources.appendingPathComponent("AppIcon.appiconset/icon_\(pixels).png")
+    try png(url, pixels: pixels) { c, scale in drawLegacy(c, light, pixelScale: scale, simple: pixels <= 32) }
+    try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    try Data(contentsOf: url).write(to: out.appendingPathComponent("app-icon-\(pixels).png"))
+}
+let menuSVG = """
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+  <g fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="1.75" y="1.75" width="14.5" height="14.5" rx="3"/>
+    <path d="M5.25 10.75h5.5"/>
+  </g>
+  <path d="M4.75 1.75h8.5a3 3 0 0 1 3 3v1.75h-14.5v-1.75a3 3 0 0 1 3-3z" fill="#000000"/>
+</svg>
+"""
+try (menuSVG + "\n").write(to: resources.appendingPathComponent("menubar-icon.svg"), atomically: true, encoding: .utf8)
+var page = CGRect(x: 0, y: 0, width: 18, height: 18)
+let pdfURL = resources.appendingPathComponent("menubar-icon.pdf")
+let pdf = CGContext(pdfURL as CFURL, mediaBox: &page, nil)!
+pdf.beginPDFPage(nil); pdf.translateBy(x: 0, y: 18); pdf.scaleBy(x: 1, y: -1); drawMenu(pdf); pdf.endPDFPage(); pdf.closePDF()
+let doc = CGPDFDocument(pdfURL as CFURL)!
+for k in [1, 2] {
+    try png(out.appendingPathComponent("menubar-\(k)x.png"), pixels: 18 * k, canvas: 18) { c, _ in
+        c.translateBy(x: 0, y: 18); c.scaleBy(x: 1, y: -1); c.drawPDFPage(doc.page(at: 1)!)
+    }
+}
+print("done: \(out.path)")

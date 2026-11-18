@@ -29,7 +29,7 @@ struct CaptureWriter {
     /// - Throws: 목록을 읽지 못했거나 쓰지 못했을 때의 `StoreError`. 이때는 아무것도 넣지 않은 것이다.
     func add(_ entry: CaptureInterpretation, now: Date) throws -> Outcome {
         let candidates = CaptureDestination.todayNotes(
-            in: try notes.list().notes, spaceID: entry.spaceID, now: now, calendar: calendar
+            in: try notes.list().notes.filter { !$0.isArchived }, spaceID: entry.spaceID, now: now, calendar: calendar
         )
         var blocked: (id: NoteID, reason: StoreError)?
         for note in candidates {

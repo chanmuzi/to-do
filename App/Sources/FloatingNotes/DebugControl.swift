@@ -243,6 +243,22 @@ final class DebugControl {
             guard let root = reminderEditor?.contentView, let url = output(named: name.rawValue) else { return }
             do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("예정 화면 검사 실패: \(error)") }
         case ("reminder-editor", let id?, _): router.route(.openReminderEditor(id))
+        case ("reminder-date", let action?, _):
+            guard let model = reminderEditor?.model else { return }
+            switch action.rawValue {
+            case "open": model.showDates()
+            case "scroll": model.datePicker?.scrollWeeks(3)
+            case "months": model.datePicker?.choosingMonth = true
+            case "close": model.datePicker = nil
+            default: break
+            }
+        case ("date-snapshot", let name?, _):
+            if let url = output(named: name.rawValue) { write(reminderEditor?.model?.pickerWindow, to: url) }
+        case ("upcoming-detail", _, _):
+            if let model = library?.model {
+                model.upcomingPinned = true
+                model.upcomingID = model.index.upcoming.first { if case .note = $0 { true } else { false } }?.id
+            }
         case ("reminder-close", _, _): reminderEditor?.close()
         case ("reminder-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
@@ -268,6 +284,7 @@ final class DebugControl {
             case "all": library?.model.select(.all)
             case "floating": library?.model.select(.floating)
             case "trash": library?.model.select(.trash)
+            case "archived": library?.model.select(.archived)
             case "reminders": library?.model.select(.reminders)
             default:
                 if value.hasPrefix("archive:") { library?.model.select(.archive(String(value.dropFirst(8)))) }

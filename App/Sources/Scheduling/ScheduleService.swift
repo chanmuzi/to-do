@@ -160,11 +160,12 @@ public final class ScheduleService {
                     }
                     let baseline = expected.syncedAt ?? .distantPast
                     let remoteChanged = expected.syncBaseline.map { $0 != remote.value } ?? (remote.modified > baseline)
-                    let localChanged = expected.syncBaseline.map { $0 != expected.value } ?? (expected.modified > baseline)
+                    let localChanged = expected.pendingCalendarID != nil || (expected.syncBaseline.map { $0 != expected.value } ?? (expected.modified > baseline))
                     if remoteChanged && localChanged { log("예정 충돌 \(expected.id): 마지막 수정 시각으로 선택") }
                     if remoteChanged && (!localChanged || remote.modified > expected.modified) {
                         var received = remote
                         received.syncedAt = max(Date(), remote.modified)
+                        received.pendingCalendarID = nil
                         received.syncBaseline = remote.value
                         received.syncError = nil
                         try replace(expected, with: received, in: id, updateTodo: true)
@@ -182,6 +183,7 @@ public final class ScheduleService {
                 }
                 var saved = try bridge.save(expected)
                 saved.syncedAt = max(Date(), saved.modified)
+                saved.pendingCalendarID = nil
                 saved.syncBaseline = saved.value
                 saved.syncError = nil
                 try replace(expected, with: saved, in: id)

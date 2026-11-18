@@ -123,6 +123,15 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case libraryUpcomingTimeWidth = "library-upcoming-time-w"
     case librarySidebarRowGap = "library-sidebar-row-gap"
     case libraryRowHighlightInsetY = "library-row-highlight-inset-y"
+    case datePickerWidth = "date-picker-w"
+    case dateCell = "date-cell"
+    case detailWidth = "schedule-detail-w"
+    case detailRow = "schedule-detail-row"
+    case scheduleInset = "schedule-inset"
+    case upcomingDetailHeight = "upcoming-detail-h"
+    case upcomingWidth = "upcoming-detail-w"
+    case sectionGap = "section-gap"
+    case badgeDotDrop = "badge-dot-drop"
     case reminderInputHeight = "reminder-input-h"
     case scheduleMarkerWidth = "schedule-marker-w"
     case scheduleEventBarWidth = "schedule-event-bar-w"
@@ -269,6 +278,7 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case bellPivot = "bell-pivot"
     case bellEase = "bell-ease"
     /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(`TextCaret`).
+    case upcomingHover = "upcoming-hover"
     case caretBlink = "caret-blink"
     /// 짧은 알림(토스트)이 떠 있는 시간(D-041, 임시 값). 지나면 `dur` 동안 사라진다.
     case toastHold = "toast-hold"

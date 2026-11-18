@@ -8,6 +8,7 @@ struct NoteFileContent: Equatable {
     var colorID: PaletteID?
     var reminder: Date?
     var schedules: [ScheduleItem]?
+    var archived: Bool?
     var created: Date?
     /// 이 앱이 모르는 머리 줄. 다시 쓸 때 그대로 둔다.
     var unknownLines: [String] = []
@@ -40,7 +41,7 @@ enum NoteFileCodec {
 
     /// 머리에서 이 앱이 아는 항목. 순서는 새 파일에 쓰는 순서다.
     enum Key: String, CaseIterable {
-        case title, space, color, reminder, schedules, created
+        case title, space, color, reminder, schedules, archived, created
     }
 
     /// 새 파일의 표기.
@@ -65,6 +66,7 @@ enum NoteFileCodec {
             // 읽지 못한 날짜 줄은 값 없음으로 읽고, 다시 쓸 때 `encode(_:over:)`가 원래 줄을 남긴다.
             case .reminder: content.reminder = parseDate(field.value)
             case .schedules: content.schedules = decodeSchedules(field.value)
+            case .archived: content.archived = Bool(field.value)
             case .created: content.created = parseDate(field.value)
             }
         }
@@ -94,6 +96,7 @@ enum NoteFileCodec {
         case .color: content.colorID.map { "color: \($0.rawValue)" }
         case .reminder: content.reminder.map { "reminder: \(format($0))" }
         case .schedules: content.schedules.map { "schedules: \(encodeSchedules($0))" }
+        case .archived: content.archived.map { "archived: \($0)" }
         case .created: content.created.map { "created: \(format($0))" }
         }
     }

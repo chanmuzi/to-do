@@ -19,6 +19,7 @@ struct TopRowLayout: Hashable {
         /// 제목이 다 보이는 너비.
         var titleWidth: CGFloat
         var reminderWidth: CGFloat?
+        var hasSchedules = true
         var showsControls = true
         var showsProblem: Bool
     }
@@ -48,7 +49,7 @@ struct TopRowLayout: Hashable {
         more = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.gap) : .zero
         add = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
         pin = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
-        if input.showsControls && input.reminderWidth == nil {
+        if input.hasSchedules && input.showsControls && input.reminderWidth == nil {
             clock = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
         }
         if let width = input.reminderWidth {

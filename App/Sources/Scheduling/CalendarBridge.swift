@@ -5,17 +5,6 @@ public enum CalendarAccess: Sendable {
     case available, needsRequest, blocked
 }
 
-public struct CalendarChoice: Identifiable, Hashable, Sendable {
-    public let id: String
-    public let destination: ScheduleDestination
-    public let account: String
-    public init(id: String, destination: ScheduleDestination, account: String = "") {
-        self.account = account
-        self.id = id
-        self.destination = destination
-    }
-}
-
 @MainActor
 public protocol CalendarBridge: AnyObject {
     var onChange: (@MainActor () -> Void)? { get set }
@@ -77,6 +66,7 @@ public final class FakeCalendarBridge: CalendarBridge {
     public var reminderDestination: ScheduleDestination? = .init(name: "할 일", color: .init(red: 0.85, green: 0.53, blue: 0.22))
     public var linkedDestinations: [String: ScheduleDestination] = [:]
     public func destination(for item: ScheduleItem) -> ScheduleDestination? {
+        if let id = item.pendingCalendarID { return writableChoices(for: item.kind).first { $0.id == id }?.destination }
         guard access(for: item.kind) == .available else { return nil }
         if let link = item.link, link.kind == nil || link.kind == item.kind {
             return linkedDestinations[link.localID] ?? (item.kind == .event ? eventDestination : reminderDestination)
@@ -133,13 +123,17 @@ public final class FakeCalendarBridge: CalendarBridge {
     public func save(_ item: ScheduleItem) throws -> ScheduleItem {
         if let failure { throw failure }
         guard access(for: item.kind) == .available else { throw CalendarBridgeError.denied }
+        if let id = item.pendingCalendarID, !writableChoices(for: item.kind).contains(where: { $0.id == id }) {
+            throw CalendarBridgeError.readOnly
+        }
         var saved = item
         let externalID = item.link?.externalID ?? item.id
         saved.link = .init(localID: item.link?.localID ?? "fake-" + item.id, externalID: externalID, kind: item.kind)
-        if let id = saved.link?.localID, item.link == nil || item.link?.kind != item.kind {
+        if let id = saved.link?.localID, item.pendingCalendarID != nil || item.link == nil || item.link?.kind != item.kind {
             linkedDestinations[id] = destination(for: item)
         }
         saved.modified = Date()
+        saved.pendingCalendarID = nil
         items[externalID] = saved
         saves += 1
         return saved

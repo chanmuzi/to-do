@@ -49,7 +49,17 @@ public final class FileNoteStore: NoteStoring {
         self.location = location
         self.autosaveDelay = autosaveDelay
         self.autosaveMaxWait = autosaveMaxWait
-        files = NoteFiles(location: location)
+        // 기존 월별 보기의 경계를 첫 실행 때 고정해 이후에는 노트가 저절로 보관되지 않게 한다.
+        let migration = JSONFile<Date>(url: location.stateDirectory.appendingPathComponent("archive-cutoff.json"))
+        let cutoff: Date
+        if let saved = try migration.load() {
+            cutoff = saved
+        } else {
+            let today = Calendar.current.startOfDay(for: Date())
+            cutoff = Calendar.current.date(byAdding: .day, value: -6, to: today)!
+            try migration.save(cutoff)
+        }
+        files = NoteFiles(location: location, archiveCutoff: cutoff)
         try files.createDirectories()
         snapshot = try files.scan()
         watcher = DirectoryWatcher(directory: location.notesDirectory) { [weak self] in
@@ -267,7 +277,9 @@ public final class FileNoteStore: NoteStoring {
         let text = NoteFileCodec.encode(
             NoteFileContent(
                 title: note.title, spaceID: note.spaceID, colorID: note.colorID,
-                reminder: note.reminder ?? note.schedules.map(\.start).min(), schedules: schedules, created: note.created, body: note.body
+                reminder: note.reminder ?? note.schedules.map(\.start).min(), schedules: schedules,
+                archived: note.isArchived == (note.created < files.archiveCutoff) && diskContent.archived == nil ? nil : note.isArchived,
+                created: note.created, body: note.body
             ),
             over: diskText
         )

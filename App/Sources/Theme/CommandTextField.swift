@@ -12,10 +12,14 @@ public struct CommandTextField: NSViewRepresentable {
     let submit: () -> Void
     let cancel: () -> Void
     let move: (Int) -> Void
+    let moveDay: ((Int) -> Void)?
+    let tab: ((Bool) -> Void)?
     public init(text: Binding<String>, theme: Theme, placeholder: String, style: TextStyle = .body,
                 ranges: [NSRange] = [], focusToken: Int = 0, submit: @escaping () -> Void, cancel: @escaping () -> Void,
-                move: @escaping (Int) -> Void = { _ in }) {
+                move: @escaping (Int) -> Void = { _ in }, moveDay: ((Int) -> Void)? = nil, tab: ((Bool) -> Void)? = nil) {
         _text = text; self.theme = theme; self.placeholder = placeholder; self.style = style
+        self.moveDay = moveDay
+        self.tab = tab
         self.focusToken = focusToken
         self.ranges = ranges; self.submit = submit; self.cancel = cancel; self.move = move
     }
@@ -82,6 +86,12 @@ public struct CommandTextField: NSViewRepresentable {
             case #selector(NSResponder.cancelOperation(_:)): parent.cancel()
             case #selector(NSResponder.moveDown(_:)): parent.move(1)
             case #selector(NSResponder.moveUp(_:)): parent.move(-1)
+            case #selector(NSResponder.moveLeft(_:)), #selector(NSResponder.moveRight(_:)):
+                guard parent.text.isEmpty, let moveDay = parent.moveDay else { return false }
+                moveDay(selector == #selector(NSResponder.moveLeft(_:)) ? -1 : 1)
+            case #selector(NSResponder.insertTab(_:)), #selector(NSResponder.insertBacktab(_:)):
+                guard let tab = parent.tab else { return false }
+                tab(selector == #selector(NSResponder.insertBacktab(_:)))
             default: return false
             }
             return true

@@ -21,12 +21,12 @@ struct LibraryRootView: View {
                     Text(model.title(model.selection)).font(theme.font(.paneTitle))
                     Spacer()
                     if model.router.isConnected(.openSettings) {
-                        LibraryIconButton(theme: theme, title: "설정", symbol: "slider.horizontal.3") {
+                        ChromeIconButton(theme: theme, title: "설정", symbol: "slider.horizontal.3") {
                             model.router.route(.openSettings)
                         }
                     }
                     if model.showsNewNote {
-                        LibraryIconButton(theme: theme, title: "새 노트", symbol: "plus") {
+                        ChromeIconButton(theme: theme, title: "새 노트", symbol: "plus") {
                             var draft = NoteDraft()
                             switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
                             model.router.route(.newNote(NewNoteRequest(draft: draft)))
@@ -38,9 +38,9 @@ struct LibraryRootView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         if model.rows.isEmpty {
-                            Button(model.query.isEmpty ? (model.selection == .trash ? "전체 노트" : "새 노트") : "검색 지우기") {
+                            Button(model.query.isEmpty ? (!model.showsNewNote ? "전체 노트" : "새 노트") : "검색 지우기") {
                                 if !model.query.isEmpty { model.query = "" }
-                                else if model.selection == .trash { model.select(.all) }
+                                else if !model.showsNewNote { model.select(.all) }
                                 else {
                                     var draft = NoteDraft()
                                     switch model.selection { case .space(let id), .day(let id, _): draft.spaceID = id; default: break }
@@ -51,7 +51,13 @@ struct LibraryRootView: View {
                                 .buttonStyle(LibraryButtonStyle(theme: theme))
                                 .padding(theme.space(.sp3))
                         }
-                        ForEach(model.rows) { note in LibraryNoteRow(model: model, note: note) }
+                        ForEach(model.sections) { section in
+                            Text(section.id).font(theme.font(.librarySection)).foregroundStyle(theme.libraryColor(.text3))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.leading, theme.component(.libraryRowLeading))
+                                .padding(.top, theme.space(.sp3)).padding(.bottom, theme.space(.sp1))
+                            ForEach(section.notes) { note in LibraryNoteRow(model: model, note: note) }
+                        }
                     }
                 }
                 if let error = model.error {
@@ -62,6 +68,19 @@ struct LibraryRootView: View {
                     }.padding(theme.space(.sp2))
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.libraryColor(.surface))
+        }.overlayPreferenceValue(UpcomingBounds.self) { anchors in
+            GeometryReader { geometry in
+                if let id = model.upcomingID, let anchor = anchors[id],
+                   let entry = model.index.upcoming.first(where: { $0.id == id }) {
+                    let rect = geometry[anchor]
+                    if model.upcomingPinned {
+                        Color.clear.contentShape(Rectangle()).onTapGesture { model.upcomingID = nil }
+                    }
+                    UpcomingDetail(model: model, entry: entry)
+                        .offset(x: theme.component(.librarySidebarWidth) + theme.space(.sp1),
+                                y: min(rect.minY, max(0, geometry.size.height - theme.component(.upcomingDetailHeight))))
+                }
+            }
         }.foregroundStyle(theme.libraryColor(.text)).ignoresSafeArea().focusEffectDisabled()
     }
 }
@@ -84,21 +103,16 @@ struct LibraryNoteRow: View {
                         .frame(height: theme.lineHeight(.row))
                     if !preview.subtitle.isEmpty {
                         Text(preview.subtitle).font(theme.font(.rowSub))
-                            .foregroundStyle(theme.libraryColor(.text2, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
+                            .foregroundStyle(theme.libraryColor(.text3, on: model.selectedNoteID == note.id ? .selected : .surface3)).lineLimit(1)
                             .frame(height: theme.lineHeight(.rowSub))
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                LibraryReminder(note: note, model: model)
-                    .frame(width: theme.component(.libraryReminderWidth), alignment: .trailing)
-                LibrarySymbol(theme: theme, name: "pin.fill", size: .iconSmall)
-                    .foregroundStyle(theme.libraryColor(.text3))
-                    .opacity(model.index.windows[note.id]?.isOpen == true ? 1 : 0)
-                    .frame(width: theme.component(.iconSmall))
+                if preview.total > 0 {
+                    Text("\(preview.completed)/\(preview.total)").font(theme.libraryNumberFont)
+                        .foregroundStyle(theme.libraryColor(.text3))
+                }
             }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.component(.libraryRowTrailing))
                 .frame(height: theme.component(.libraryRowHeight))
-                .overlay(alignment: .bottom) {
-                    theme.libraryColor(.line).frame(height: theme.shape(.borderWidth)).allowsHitTesting(false)
-                }
         }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
     }
 }

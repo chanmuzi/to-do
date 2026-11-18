@@ -66,6 +66,29 @@ import Reminders
         #expect(read.schedules.isEmpty)
         #expect(read.body == "[ ] 원문\n다른 글" && read.title == "노트 제목")
     }
+    @Test func calendarChangeSurvivesFailureAndMovesOnlySelectedItem() async throws {
+        let f = try fixture()
+        defer { f.close() }
+        let event = ScheduleItem(start: future, end: future.addingTimeInterval(3600), title: "회의")
+        let other = ScheduleItem(start: future, title: "할 일")
+        let note = try f.create(NoteDraft(schedules: [event, other]))
+        await f.service.flush()
+        let editor = try f.editor(note.id)
+        editor.select(event.id)
+        f.bridge.failure = .readOnly
+        editor.chooseCalendar("work")
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules[0].pendingCalendarID == "work")
+        f.bridge.failure = nil
+        f.service.refreshLinked()
+        await f.service.flush()
+        let saved = try f.notes.load(note.id).schedules
+        #expect(saved[0].pendingCalendarID == nil)
+        #expect(f.bridge.destination(for: saved[0])?.name == "업무")
+        #expect(f.bridge.destination(for: saved[1]) == f.bridge.reminderDestination)
+        #expect(f.bridge.items.count == 2)
+    }
+
     @Test func multipleSchedulesLocalEditAndDelete() async throws {
         let f = try fixture(); defer { f.close() }
         let first = ScheduleItem(start: future, title: "첫째")

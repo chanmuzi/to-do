@@ -54,6 +54,7 @@ public final class EventKitBridge: CalendarBridge {
     public func destination(for item: ScheduleItem) -> ScheduleDestination? {
         guard EKEventStore.authorizationStatus(for: item.kind == .event ? .event : .reminder) == .fullAccess else { return nil }
         let store = store()
+        if let id = item.pendingCalendarID, let target = store.calendar(withIdentifier: id) { return destination(for: target) }
         let calendar: EKCalendar?
         if let link = item.link, link.kind == nil || link.kind == item.kind {
             guard let existing = try? find(item, in: store) else { return nil }
@@ -66,7 +67,7 @@ public final class EventKitBridge: CalendarBridge {
     }
     private func destination(for calendar: EKCalendar) -> ScheduleDestination {
         let color = calendar.cgColor.flatMap { NSColor(cgColor: $0)?.usingColorSpace(.sRGB) }
-        return ScheduleDestination(name: calendar.title, color: color.map { .init(red: $0.redComponent, green: $0.greenComponent, blue: $0.blueComponent) })
+        return ScheduleDestination(name: calendar.title, color: color.map { .init(red: $0.redComponent, green: $0.greenComponent, blue: $0.blueComponent) }, calendarID: calendar.calendarIdentifier)
     }
     public func events(in interval: DateInterval) -> [CalendarEvent] {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
@@ -134,18 +135,25 @@ public final class EventKitBridge: CalendarBridge {
         let store = try authorizedStore(item.kind)
         let existing = try find(item, in: store)
         let isSameKind = item.kind == .event ? existing is EKEvent : existing is EKReminder
+        let targetCalendar: EKCalendar?
+        if let id = item.pendingCalendarID {
+            guard let target = store.calendar(withIdentifier: id), target.allowsContentModifications,
+                  target.allowedEntityTypes.contains(item.kind == .event ? .event : .reminder) else { throw CalendarBridgeError.readOnly }
+            targetCalendar = target
+        } else { targetCalendar = nil }
         let value: EKCalendarItem
         if let existing, isSameKind { value = existing }
         else if item.kind == .event {
             let event = EKEvent(eventStore: store)
-            guard let calendar = newItemCalendar(.event, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
+            guard let calendar = targetCalendar ?? newItemCalendar(.event, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
             event.calendar = calendar; value = event
         } else {
             let reminder = EKReminder(eventStore: store)
-            guard let calendar = newItemCalendar(.reminder, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
+            guard let calendar = targetCalendar ?? newItemCalendar(.reminder, in: store) else { throw CalendarBridgeError.noDefaultCalendar }
             reminder.calendar = calendar; value = reminder
         }
         guard value.calendar.allowsContentModifications else { throw CalendarBridgeError.readOnly }
+        if let targetCalendar { value.calendar = targetCalendar }
         value.title = item.title
         if let event = value as? EKEvent {
             event.startDate = item.start; event.endDate = item.end; event.isAllDay = item.isDateOnly

@@ -1,18 +1,29 @@
 import AppKit
 import Models
-import Scheduling
 import SwiftUI
-import Theme
 
-struct DestinationPicker: View {
+package struct DestinationPicker: View {
     let title: String
-    let menu: DestinationMenu
+    let choices: [CalendarChoice]
+    let current: ScheduleDestination?
+    let includesDefault: Bool
     let selectedID: String?
     let theme: Theme
     let choose: (String?) -> Void
 
-    var body: some View {
-        let destination = menu.choices.first { $0.id == selectedID }?.destination ?? menu.system
+    package init(title: String, choices: [CalendarChoice], current: ScheduleDestination?, selectedID: String?,
+                 includesDefault: Bool = true, theme: Theme, choose: @escaping (String?) -> Void) {
+        self.title = title
+        self.choices = choices
+        self.current = current
+        self.selectedID = selectedID
+        self.includesDefault = includesDefault
+        self.theme = theme
+        self.choose = choose
+    }
+
+    package var body: some View {
+        let destination = choices.first { $0.id == selectedID }?.destination ?? current
         ValuePopup(label: title, value: destination?.name ?? "시스템 기본값",
                    dot: destination?.color.map { Self.dot($0, theme: theme) }, theme: theme,
                    makeMenu: makeMenu) { item in choose(item.representedObject as? String) }
@@ -33,16 +44,18 @@ struct DestinationPicker: View {
             list.addItem(item)
         }
         var seen: Set<String> = []
-        let accounts = menu.choices.map(\.account).filter { seen.insert($0).inserted }
+        let accounts = choices.map(\.account).filter { seen.insert($0).inserted }
         for account in accounts {
             if !list.items.isEmpty { list.addItem(.separator()) }
             if !account.isEmpty { add(account, destination: nil, id: nil, header: true) }
-            for choice in menu.choices where choice.account == account {
+            for choice in choices where choice.account == account {
                 add(choice.destination.name, destination: choice.destination, id: choice.id)
             }
         }
-        if !list.items.isEmpty { list.addItem(.separator()) }
-        add("시스템 기본값", destination: nil, id: nil)
+        if includesDefault {
+            if !list.items.isEmpty { list.addItem(.separator()) }
+            add("시스템 기본값", destination: nil, id: nil)
+        }
         return list
     }
 

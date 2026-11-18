@@ -10,5 +10,21 @@ public struct ScheduleDestination: Hashable, Sendable {
     }
     public let name: String
     public let color: Color?
-    public init(name: String, color: Color? = nil) { self.name = name; self.color = color }
+    public let calendarID: String?
+    public init(name: String, color: Color? = nil, calendarID: String? = nil) {
+        self.name = name
+        self.color = color
+        self.calendarID = calendarID
+    }
+}
+
+public struct CalendarChoice: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let destination: ScheduleDestination
+    public let account: String
+    public init(id: String, destination: ScheduleDestination, account: String = "") {
+        self.account = account
+        self.id = id
+        self.destination = destination
+    }
 }

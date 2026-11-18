@@ -21,6 +21,7 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     public var todo: TodoAnchor?
     public var link: Link?
     public var modified: Date
+    public var pendingCalendarID: String?
     public var syncedAt: Date?
     /// 시간 정밀도가 낮은 외부 저장소도 같은 초의 변경을 놓치지 않도록 마지막 동기화 값을 비교한다.
     public var syncBaseline: Value?
@@ -48,11 +49,12 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
+        case pendingCalendarID, id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
     }
     private enum KindKey: String, CodingKey { case kind }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(pendingCalendarID, forKey: .pendingCalendarID)
         try c.encode(id, forKey: .id); try c.encode(start, forKey: .start); try c.encodeIfPresent(end, forKey: .end)
         try c.encode(isDateOnly, forKey: .isDateOnly); try c.encode(isCompleted, forKey: .isCompleted)
         try c.encodeIfPresent(inlineSource, forKey: .inlineSource)

@@ -297,7 +297,7 @@ public final class BrowseCoordinator {
         do {
             let listing = try notes.list()
             listing.failures.forEach { log("노트 찾기: 읽지 못한 노트 \($0.id): \($0.error)") }
-            indexedNotes = listing.notes.map(BrowseIndexedNote.init)
+            indexedNotes = listing.notes.filter { !$0.isArchived }.map(BrowseIndexedNote.init)
         } catch {
             log("노트 찾기: 노트 목록을 읽지 못했습니다: \(error)")
             failure = error

@@ -13,6 +13,7 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
     public var spaceID: SpaceID?
     /// 노트 색. `nil`이면 색 없음(기본).
     public var colorID: PaletteID?
+    public var isArchived = false
     public var schedules: [ScheduleItem]
     /// 옛 호출자, 파일을 위한 투영. 화면에서는 displayedSchedule(at:)을 쓴다.
     public var reminder: Date? {
@@ -50,7 +51,7 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
         self.modified = modified
     }
     private enum CodingKeys: String, CodingKey {
-        case id, title, body, spaceID, colorID, reminder, schedules, created, modified
+        case isArchived, id, title, body, spaceID, colorID, reminder, schedules, created, modified
     }
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -60,9 +61,11 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
                   reminder: try c.decodeIfPresent(Date.self, forKey: .reminder),
                   schedules: try c.decodeIfPresent([ScheduleItem].self, forKey: .schedules),
                   created: try c.decode(Date.self, forKey: .created), modified: try c.decode(Date.self, forKey: .modified))
+        isArchived = try c.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
     }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        if isArchived { try c.encode(true, forKey: .isArchived) }
         try c.encode(id, forKey: .id); try c.encode(title, forKey: .title); try c.encode(body, forKey: .body)
         try c.encodeIfPresent(spaceID, forKey: .spaceID); try c.encodeIfPresent(colorID, forKey: .colorID)
         try c.encodeIfPresent(reminder, forKey: .reminder); try c.encode(schedules, forKey: .schedules)
@@ -101,6 +104,6 @@ extension Note {
     /// 아무것도 적지 않은 노트: 제목과 본문이 비었거나 공백뿐이고 리마인더가 없다. 창을 닫거나 앱을 끝낼 때
     /// 휴지통을 거치지 않고 지운다(D-040). 스페이스와 색은 적은 것으로 치지 않는다.
     public var isBlank: Bool {
-        title.allSatisfy(\.isWhitespace) && body.allSatisfy(\.isWhitespace) && schedules.isEmpty
+        !isArchived && title.allSatisfy(\.isWhitespace) && body.allSatisfy(\.isWhitespace) && schedules.isEmpty
     }
 }

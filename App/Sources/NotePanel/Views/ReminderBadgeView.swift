@@ -60,8 +60,8 @@ final class ReminderBadgeView: ClickableView {
         let descriptor = body.fontDescriptor.addingAttributes([.featureSettings: [feature]])
         label.font = NSFont(descriptor: descriptor, size: body.pointSize) ?? body
         countLabel.font = label.font
-        label.textColor = style.theme.noteTextColor(isPointerInside ? .text : .text2, paletteID: paletteID, overlay: isPointerInside ? .hover : .surface2)
-        countLabel.textColor = style.theme.noteTextColor(.text3, paletteID: paletteID, overlay: isPointerInside ? .hover : .surface2)
+        label.textColor = style.theme.noteTextColor(isPointerInside ? .text : .text2, paletteID: paletteID, overlay: isPointerInside ? .hover : chipFill)
+        countLabel.textColor = style.theme.noteTextColor(.text3, paletteID: paletteID, overlay: isPointerInside ? .hover : chipFill)
         needsLayout = true
         needsDisplay = true
     }
@@ -83,9 +83,11 @@ final class ReminderBadgeView: ClickableView {
         countLabel.stringValue.isEmpty ? 0 : measuredWidth(countLabel) + style.theme.component(.badgeGap)
     }
 
+    private var chipFill: ColorToken { style.theme.appearance == .dark ? .surface3 : .surface2 }
+
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
-        chip.layer?.backgroundColor = style.cgColor(isPointerInside ? .hover : .surface2, in: self)
+        chip.layer?.backgroundColor = style.cgColor(isPointerInside ? .hover : chipFill, in: self)
         chip.layer?.cornerRadius = style.theme.shape(.chipRadius)
         dot.layer?.backgroundColor = style.cgColor(.warn, in: self)
     }
@@ -96,7 +98,7 @@ final class ReminderBadgeView: ClickableView {
         let pad = theme.component(.badgePad), side = theme.component(.badgeDot)
         let height = theme.component(.badgeHeight)
         chip.frame = CGRect(x: 0, y: bounds.midY - height / 2, width: bounds.width, height: height)
-        dot.frame = CGRect(x: pad, y: (bounds.height - side) / 2, width: side, height: side)
+        dot.frame = CGRect(x: pad, y: (bounds.height - side) / 2 - theme.component(.badgeDotDrop), width: side, height: side)
         dot.layer?.cornerRadius = side / 2
         let x = dot.frame.maxX + theme.component(.badgeGap)
         let h = label.intrinsicContentSize.height
