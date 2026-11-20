@@ -1,5 +1,5 @@
 #if DEBUG
-import Foundation
+import AppKit
 import Testing
 @testable import FloatingNotes
 
@@ -10,6 +10,15 @@ import Testing
 
     private func cleanUp() {
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func sidebarEndScrollsAPlainDocumentWithoutResponderCommands() {
+        final class Flipped: NSView { override var isFlipped: Bool { true } }
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 180, height: 100))
+        let document = Flipped(frame: NSRect(x: 0, y: 0, width: 180, height: 500))
+        scroll.documentView = document
+        DebugLibraryInput.scrollToEnd(scroll)
+        #expect(scroll.documentVisibleRect.maxY == document.bounds.maxY)
     }
 
     @Test func eachLaunchWritesAFreshOwnerOnlyToken() throws {

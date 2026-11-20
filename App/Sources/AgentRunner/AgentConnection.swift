@@ -125,12 +125,41 @@ public struct AgentConnection: Sendable {
         try command(installation, provider == .claude ? ["auth", "login"] : ["login"], directory: config)
     }
 
+    private func rememberLogin() throws {
+        if !FileManager.default.fileExists(atPath: loginMarker.path) {
+            try Data().write(to: loginMarker, options: .atomic)
+        }
+    }
+
+    private var loginMarker: URL { config.appending(path: "float-connected") }
+
+    public func logout(_ installation: AgentInstallation) async throws {
+        try await onWorker {
+            let args = provider == .claude ? ["auth", "logout"] : ["logout"]
+            let (code, _) = try command(installation, args, directory: config).capture()
+            guard code == 0 else { throw AgentError.failed(code) }
+            if FileManager.default.fileExists(atPath: loginMarker.path) {
+                try FileManager.default.removeItem(at: loginMarker)
+            }
+        }
+    }
+
+    public func isExpired(_ account: AgentAccount, now: Date = .now) -> Bool {
+        if let raw = account.expiresAt {
+            let date = (try? Date(raw, strategy: .iso8601)) ?? (try? Date(raw, strategy: .iso8601.time(includingFractionalSeconds: true)))
+            if let date, date <= now { return true }
+        }
+        let credential = config.appending(path: provider == .claude ? ".credentials.json" : "auth.json")
+        return !account.loggedIn && [loginMarker, credential].contains { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
     public func account(_ installation: AgentInstallation) async throws -> AgentAccount {
         try await onWorker {
             let args = provider == .claude ? ["auth", "status", "--json"] : ["login", "status"]
             let (status, data) = try command(installation, args, directory: config).capture(mergeDiagnostics: provider == .codex)
             if provider == .claude, let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let loggedIn = fields["loggedIn"] as? Bool, status == (loggedIn ? 0 : 1) {
+                if loggedIn { try rememberLogin() }
                 return AgentAccount(loggedIn: loggedIn, method: fields["authMethod"] as? String,
                                     email: fields["email"] as? String, subscription: fields["subscriptionType"] as? String,
                                     tier: fields["planTier"] as? String, expiresAt: fields["loginExpiresAt"] as? String)
@@ -142,7 +171,10 @@ public struct AgentConnection: Sendable {
                 if (status == 0 && method != nil) || (status == 1 && lines.contains("Not logged in")) {
                     // 일부 버전은 API 키 일부를 출력한다. 인증 방식만 돌려준다.
                     let label = method.map { $0.hasPrefix("ChatGPT") ? "ChatGPT" : ($0.hasPrefix("an API key") ? "API key" : "other") }
-                    return AgentAccount(loggedIn: status == 0, method: label, email: nil, subscription: nil, tier: nil, expiresAt: nil)
+                    if status == 0 { try rememberLogin() }
+                    let identity = label == "ChatGPT" || status == 1 ? CodexIdentity.read(in: config) : nil
+                    return AgentAccount(loggedIn: status == 0, method: label, email: identity?.email,
+                                        subscription: identity?.plan, tier: nil, expiresAt: nil)
                 }
             }
             throw status == 0 ? AgentError.invalidOutput : AgentError.failed(status)

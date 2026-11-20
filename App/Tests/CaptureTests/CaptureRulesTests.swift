@@ -153,7 +153,7 @@ import Testing
         )
         #expect(frame == CGRect(x: 610, y: 150, width: 580, height: 42))
         #expect(frame.midX == visible.midX)
-        // Dock을 뺀 영역의 아래 끝에서 바 아래쪽까지가 영역 높이의 10%다(D-147).
+        // Dock을 뺀 영역의 아래 끝에서 바 아래쪽까지가 영역 높이의 10%다(D-156).
         #expect(frame.minY - visible.minY == 100)
         #expect(frame.maxY < visible.midY)
     }

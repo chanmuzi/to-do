@@ -37,7 +37,7 @@ package struct SettingsButton: ButtonStyle {
         configuration.label
             .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
             .foregroundStyle(theme.color(enabled ? (selected || hovered ? .text : .text2) : .text3))
-            .background(selected ? theme.color(selection) : ((hovered || configuration.isPressed) && enabled ? theme.color(.hover) : .clear),
+            .background(selected ? theme.color(selection) : ((hovered || configuration.isPressed) && enabled ? theme.color(selection == .settingsSelection ? .settingsHover : .hover) : .clear),
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             .contentShape(Rectangle()).onHover { hovered = $0 }
             .animation(reduced ? nil : theme.motion.animation, value: hovered || selected || configuration.isPressed)

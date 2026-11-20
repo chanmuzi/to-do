@@ -7,6 +7,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface3 = "surface-3"
     case connectFill = "connect-fill"
     case selected
+    case settingsHover = "settings-hover"
     case settingsSelection = "settings-selection"
     case rowTitle = "row-title"
     case hover
@@ -182,6 +183,20 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case settingsPopupGap = "settings-popup-gap"
     case settingsChevronWidth = "settings-chevron-w"
     case settingsChevronHeight = "settings-chevron-h"
+    case settingsSegmentH = "settings-segment-h"
+    case settingsSegmentPad = "settings-segment-pad"
+    case settingsSegmentRadius = "settings-segment-radius"
+    case settingsSidebarRow = "settings-sidebar-row"
+    case settingsSliderW = "settings-slider-w"
+    case settingsChipPad = "settings-chip-pad"
+    case settingsChipH = "settings-chip-h"
+    case settingsTipTail = "settings-tip-tail"
+    case settingsBannerH = "settings-banner-h"
+    case settingsLogo = "settings-logo"
+    case settingsLogoSmall = "settings-logo-small"
+    case settingsAlertW = "settings-alert-w"
+    case settingsPreviewHead = "settings-preview-head"
+    case settingsPreviewFoot = "settings-preview-foot"
     case settingsRow = "settings-row"
     case segmentHeight = "segment-h"
     case segmentItem = "segment-item-h"
@@ -298,6 +313,7 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case bellPivot = "bell-pivot"
     case bellEase = "bell-ease"
     /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(`TextCaret`).
+    case settingsFlash = "settings-flash"
     case caretBlink = "caret-blink"
     /// 짧은 알림(토스트)이 떠 있는 시간(D-041, 임시 값). 지나면 `dur` 동안 사라진다.
     case toastHold = "toast-hold"

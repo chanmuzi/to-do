@@ -82,8 +82,8 @@ private final class ValueButton: NSButton {
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
     override func mouseExited(with event: NSEvent) { hovered = false; needsDisplay = true }
     override func draw(_ dirtyRect: NSRect) {
-        if hovered || isHighlighted {
-            theme.nsColor(.hover).setFill()
+        if inSettings || hovered || isHighlighted {
+            theme.nsColor(inSettings ? .settingsSelection : .hover).setFill()
             let radius = theme.shape(.controlRadius)
             NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
         }
@@ -96,7 +96,7 @@ private final class ValueButton: NSButton {
         let width = chevronWidth, height = inSettings ? theme.component(.settingsChevronHeight) : theme.space(.sp3)
         let x = textX + ceil(value.size().width) + valueGap, y = bounds.midY
         let path = NSBezierPath()
-        for sign: CGFloat in [-1, 1] {
+        for sign: CGFloat in (inSettings ? [isFlipped ? 1 : -1] : [-1, 1]) {
             path.move(to: NSPoint(x: x, y: y + sign * height / 6))
             path.line(to: NSPoint(x: x + width / 2, y: y + sign * height / 2))
             path.line(to: NSPoint(x: x + width, y: y + sign * height / 6))
@@ -115,6 +115,15 @@ private final class ValueButton: NSButton {
     }
     @objc private func selectChoice(_ sender: NSMenuItem) { choose?(sender) }
     @objc private func openChoices() {
-        menu?.popUp(positioning: menu?.items.first { $0.state == .on }, at: NSPoint(x: 0, y: bounds.midY), in: self)
+        guard let menu else { return }
+        if inSettings { popUpSettingsMenu(menu) }
+        else { menu.popUp(positioning: menu.items.first { $0.state == .on }, at: NSPoint(x: 0, y: bounds.midY), in: self) }
+    }
+}
+
+extension NSView {
+    package func popUpSettingsMenu(_ menu: NSMenu) {
+        let origin = NSPoint(x: bounds.maxX - menu.size.width, y: isFlipped ? bounds.maxY : bounds.minY)
+        menu.popUp(positioning: nil, at: origin, in: self)
     }
 }

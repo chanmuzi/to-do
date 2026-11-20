@@ -30,7 +30,7 @@ import Theme
         #expect(model.pane == .general)
         #expect(window.frame.size == NSSize(width: 700, height: 540))
         #expect(window.isMovableByWindowBackground && !window.styleMask.contains(.resizable))
-        #expect(window.standardWindowButton(.closeButton)?.isHidden == true)
+        #expect(window.standardWindowButton(.closeButton)?.isHidden == false)
         window.cancelOperation(nil)
         #expect(!window.isVisible)
         #expect(router.route(.openShortcuts) == .handled)
@@ -71,7 +71,7 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
-    @Test func editorPopupLayoutAndChoice() throws {
+    @Test func fontSliderAndCalendarDefaultChoice() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
@@ -79,30 +79,36 @@ import Theme
         let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let coordinator = SettingsCoordinator(model: model, theme: fixture.theme)
         coordinator.allowsKeyWindows = false
-        coordinator.show(.editor)
+        coordinator.show(.appearance)
         let window = try #require(coordinator.window)
         defer { window.close() }
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         let root = try #require(window.contentView)
         root.layoutSubtreeIfNeeded()
-        func popups(_ view: NSView) -> [NSButton] {
-            if let button = view as? NSButton, button.accessibilityRole() == .popUpButton { return [button] }
-            return view.subviews.flatMap(popups)
+        func first<T: NSView>(_ type: T.Type, in view: NSView, where matches: (T) -> Bool = { _ in true }) -> T? {
+            if let control = view as? T, matches(control) { return control }
+            for child in view.subviews {
+                if let found = first(type, in: child, where: matches) { return found }
+            }
+            return nil
         }
-        let buttons = popups(root)
-        #expect(buttons.count == 4)
-        #expect(buttons.allSatisfy { $0.font?.pointSize == 12 })
-        let code = try #require(buttons.first { $0.accessibilityLabel() == "코드 글자색" })
-        let checkbox = try #require(buttons.first { $0.accessibilityLabel() == "체크박스" })
-        let spacing = abs(code.convert(code.bounds, to: root).midY - checkbox.convert(checkbox.bounds, to: root).midY)
-        #expect(spacing >= 40 && spacing <= 44)
-        let menu = try #require(code.menu)
-        let index = menu.indexOfItem(withTitle: "흑백")
-        #expect(index >= 0)
-        if index >= 0 { menu.performActionForItem(at: index) }
-        #expect(store.settings.inlineCode == "plain")
+        let slider = try #require(first(NSSlider.self, in: root))
+        #expect(slider.numberOfTickMarks == 6 && slider.minValue == 12 && slider.maxValue == 17)
+        slider.integerValue = 16
+        slider.sendAction(slider.action, to: slider.target)
+        #expect(store.settings.bodySize == 16)
+        coordinator.show(.schedule)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let button = try #require(first(NSButton.self, in: root) { $0.accessibilityLabel() == "기본 캘린더" })
+        let menu = try #require(button.menu)
+        #expect(menu.items.first?.title == "캘린더 앱 기본값" && menu.items.first?.state == .on)
+        let work = try #require(menu.items.firstIndex { $0.representedObject as? String == "work" })
+        menu.performActionForItem(at: work)
+        #expect(store.settings.calendarID == "work")
+        menu.performActionForItem(at: 0)
+        #expect(store.settings.calendarID == nil)
         for (key, chars, flags) in [(UInt16(53), "\\u{1b}", NSEvent.ModifierFlags()), (UInt16(13), "w", .command)] {
-            coordinator.show(.about)
+            coordinator.show(.general)
             let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
                 timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: chars,
                 charactersIgnoringModifiers: chars, isARepeat: false, keyCode: key))

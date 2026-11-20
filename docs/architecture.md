@@ -509,6 +509,6 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ## 7단계 설정
 
-- Feature `FloatSettings`는 Theme, Models, Scheduling, Store, AgentRunner에 의존한다. AgentSettings는 엔진별 계정 확인과 명시적인 로그인, 시험의 수명을 관리한다. SettingsValues는 저장 형식, SettingsModel은 저장 콜백과 권한별 대상 선택, SettingsCoordinator는 단일 창을 맡는다. 다른 Feature를 import하지 않는다.
+- Feature `FloatSettings`는 Theme, Models, Scheduling, Store, AgentRunner에 의존한다. AgentSettings는 엔진별 계정 확인과 명시적인 로그인, 취소, 로그아웃의 수명을 관리한다. SettingsValues는 저장 형식, SettingsModel은 저장 콜백과 권한별 대상 선택, SettingsCoordinator는 단일 창을 맡는다. 다른 Feature를 import하지 않는다.
 - AppSettingsStore가 JSON을 원자적으로 쓴 뒤 SettingsApplication과 NoteEditorFactory가 이미 열린 화면을 갱신한다. AppDelegate가 ShortcutTable의 표시 행, 저장소, ScheduleService를 주입한다.
 - CalendarBridge가 권한 상태, 쓰기 가능한 대상, 시스템 기본값을 제공한다. ID 선택은 새 항목 생성과 E2가 공유하고 연결된 항목은 기존 대상을 유지한다.

@@ -59,7 +59,7 @@ import FieldTestSupport
         #expect(capture.displayedSpace == "회사")
         if let screen = window.screen {
             #expect(abs(window.frame.midX - screen.visibleFrame.midX) <= 1)
-            // 화면 아래쪽에 뜬다(Dock 위로 영역 높이의 10%, D-147).
+            // 화면 아래쪽에 뜬다(Dock 위로 영역 높이의 10%, D-156).
             #expect(window.frame.maxY < screen.visibleFrame.midY)
             #expect(window.frame.minY > screen.visibleFrame.minY)
             // 나타나는 중이면 아직 `capture-rise`(6)만큼 아래에서 올라오는 중일 수 있다.
