@@ -31,6 +31,14 @@ final class NoteWindowController: NSObject {
     // 창 크기(`+Sizing`)
     var contentHeight: CGFloat = 0
     var liveResizeTop: CGFloat?
+    /// 사용자가 직접 정한 높이(D-158). 있으면 내용이 바뀌어도 창 높이를 바꾸지 않고 본문이 스크롤된다. 창을 닫으면 잊는다.
+    var manualHeight: CGFloat?
+    /// 가장자리를 끄는 중에 높이가 바뀌었다.
+    var isDraggingHeight = false
+    /// 이 컨트롤러가 마지막으로 알고 있는 창 높이. 이와 다른 높이로 바뀌었으면 앱 밖(창 크기 조절 명령 등)에서 바꾼 것이다.
+    var knownHeight: CGFloat?
+    /// 내용 높이를 따라 이 컨트롤러가 높이를 바꾸는 중이다.
+    var isSettingHeight = false
     /// 높이가 움직이는 중이면 그 목표.
     var heightTarget: CGFloat?
     var heightAnimation: Task<Void, Never>?
@@ -100,6 +108,7 @@ final class NoteWindowController: NSObject {
         orderFront()
         if !isShown {
             isShown = true
+            knownHeight = panel.frame.height
             environment.recorder.recordOpened(noteID, frame: panel.frame, isPinned: isPinned)
         }
         environment.recorder.recordFronted(noteID)

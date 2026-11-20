@@ -1,7 +1,8 @@
 import AppKit
 
 /// 창 크기와 자리(spec 5.6, 19). 너비는 사용자가 끌어 바꾸고, 높이는 내용을 따라
-/// 위쪽 가장자리를 고정한 채 아래로 늘거나 준다.
+/// 위쪽 가장자리를 고정한 채 아래로 늘거나 준다(한도: 화면의 `note-h-max-screen`).
+/// 사용자가 높이를 직접 바꾸면(가장자리 끌기, 창 크기 조절 명령) 그 높이를 지키고, 화면 표시 영역 전체까지 된다(D-158).
 extension NoteWindowController: NSWindowDelegate {
     func applySizeLimits() {
         let policy = environment.sizePolicy
@@ -11,9 +12,13 @@ extension NoteWindowController: NSWindowDelegate {
 
     /// 내용 높이에 창 높이를 맞춘다. 한도(화면 높이의 몫, 화면 아래 끝)에 닿으면 거기서 멈추고 본문이 스크롤된다.
     func applyContentHeight(animated: Bool) {
-        guard contentHeight > 0 else { return }
+        guard contentHeight > 0, !isDraggingHeight else { return }
         let top = liveResizeTop ?? panel.frame.maxY
         let visible = (panel.screen ?? NSScreen.main)?.visibleFrame
+        if let manualHeight {
+            applyManualHeight(manualHeight, top: top, screenHeight: visible?.height ?? .greatestFiniteMagnitude)
+            return
+        }
         let target = environment.sizePolicy.frame(
             current: panel.frame, top: top, contentHeight: contentHeight,
             screenHeight: visible?.height ?? .greatestFiniteMagnitude,
@@ -43,10 +48,31 @@ extension NoteWindowController: NSWindowDelegate {
         if isShown { environment.recorder.recordFrame(noteID, frame: target) }
     }
 
+    /// 직접 정한 높이를 지킨다. 화면이 바뀌어 한도가 줄었으면 거기에 맞춘다.
+    private func applyManualHeight(_ height: CGFloat, top: CGFloat, screenHeight: CGFloat) {
+        heightAnimation?.cancel()
+        heightAnimation = nil
+        heightTarget = nil
+        let clamped = environment.sizePolicy.manualHeight(height, screenHeight: screenHeight)
+        if clamped != panel.frame.height {
+            setHeight(clamped, top: top)
+            panel.invalidateShadow()
+        }
+        recordFrameIfSettled()
+    }
+
     /// 높이만 바꾼다. 가로 자리와 너비는 그때의 창을 따르므로 움직이는 중에 창을 끌어도 어긋나지 않는다.
     private func setHeight(_ height: CGFloat, top: CGFloat) {
         let frame = panel.frame
+        isSettingHeight = true
+        defer { isSettingHeight = false }
         panel.setFrame(NSRect(x: frame.minX, y: top - height, width: frame.width, height: height), display: true)
+        knownHeight = panel.frame.height
+    }
+
+    /// 화면 표시 영역의 높이(직접 정한 높이의 한도).
+    private var visibleScreenHeight: CGFloat {
+        (panel.screen ?? NSScreen.main)?.visibleFrame.height ?? .greatestFiniteMagnitude
     }
 
     private func run(_ transition: HeightTransition) async {
@@ -75,18 +101,31 @@ extension NoteWindowController: NSWindowDelegate {
 
     // MARK: - NSWindowDelegate
 
-    /// 사용자가 가장자리를 끌 때는 너비만 바뀐다. 높이는 내용이 정한다.
+    /// 사용자가 가장자리를 끌면 너비와 높이가 바뀐다. 높이를 바꾸면 그때부터 그 높이를 지키고(D-158),
+    /// 한도는 내용을 따라 자랄 때의 몫이 아니라 화면 표시 영역 전체다. 이 컨트롤러가 내용에 맞추는 변경은 그대로 둔다.
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        guard sender.inLiveResize else { return frameSize }
-        return NSSize(width: environment.sizePolicy.clampedWidth(frameSize.width), height: sender.frame.height)
+        guard !isSettingHeight else { return frameSize }
+        let policy = environment.sizePolicy
+        let heightChanges = abs(frameSize.height - sender.frame.height) >= 0.5
+        if sender.inLiveResize, heightChanges { isDraggingHeight = true }
+        let height = heightChanges || manualHeight != nil
+            ? policy.manualHeight(frameSize.height, screenHeight: visibleScreenHeight)
+            : sender.frame.height
+        return NSSize(width: policy.clampedWidth(frameSize.width), height: height)
     }
 
     func windowWillStartLiveResize(_ notification: Notification) {
         liveResizeTop = panel.frame.maxY
+        isDraggingHeight = false
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
         liveResizeTop = nil
+        if isDraggingHeight {
+            isDraggingHeight = false
+            manualHeight = panel.frame.height
+            knownHeight = panel.frame.height
+        }
         applyContentHeight(animated: false)
         panel.invalidateShadow()
         recordFrameIfSettled()
@@ -95,9 +134,29 @@ extension NoteWindowController: NSWindowDelegate {
     /// 투명한 창의 그림자는 내용의 모양에서 만들어 두고 다시 쓰인다. 크기가 바뀔 때마다(높이가 움직이는
     /// 동안의 매 단계, 가장자리를 끄는 동안) 다시 재게 해, 줄어든 창 밖에 옛 그림자가 남지 않게 한다.
     func windowDidResize(_ notification: Notification) {
+        noteOutsideHeightChange()
         root.syncHover()
         root.syncButtonHover()
         panel.invalidateShadow()
+    }
+
+    /// 앱 밖에서 바꾼 높이(`setFrame`으로 오는 창 크기 조절 명령은 `windowWillResize`를 거치지 않는다)를
+    /// 직접 정한 높이로 적고, 화면 표시 영역을 넘었으면 위쪽 가장자리를 둔 채 줄인다.
+    private func noteOutsideHeightChange() {
+        let height = panel.frame.height
+        guard !isSettingHeight, !panel.inLiveResize else { return }
+        guard isShown, let knownHeight, abs(height - knownHeight) >= 0.5 else {
+            knownHeight = height
+            return
+        }
+        heightAnimation?.cancel()
+        heightAnimation = nil
+        heightTarget = nil
+        let clamped = environment.sizePolicy.manualHeight(height, screenHeight: visibleScreenHeight)
+        manualHeight = clamped
+        self.knownHeight = height
+        if clamped != height { setHeight(clamped, top: panel.frame.maxY) }
+        recordFrameIfSettled()
     }
 
     func windowDidMove(_ notification: Notification) {
