@@ -94,3 +94,7 @@ SF Symbols 이름은 SF Symbols 앱에서 한 번 확인하세요. 버전에 따
 
 `fonts/`의 woff2는 `design.html`을 보기 위한 것이고 앱에는 넣지 않습니다.
 
+
+### 에이전트 설정 로고
+
+App/Resources/AgentLogos의 Claude와 OpenAI 벡터는 Simple Icons 13.21.0의 CC0 원본 경로를 사용한다. Claude는 주황 타일과 흰 그림, OpenAI는 흰 타일과 검은 그림이다. 목록 타일은 28pt, 상세 제목 타일은 20pt에 그림 12pt다. [Simple Icons 13.21.0](https://github.com/simple-icons/simple-icons/tree/13.21.0)

@@ -15,6 +15,7 @@ public enum AgentError: Error, Equatable, Sendable {
     case invalidOutput
     case isolation(String)
     case failed(Int32)
+    case loginExpired
     case providerFailure
     case unsupportedEngine
 }

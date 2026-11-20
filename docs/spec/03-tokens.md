@@ -167,6 +167,8 @@
 
 노트 찾기는 `browse-w` 300, `browse-r` 12, `browse-pad` 5, `browse-find-h` 30, `browse-header-h` 20, `browse-row-h` 26, `browse-gap` 9, `browse-row-r` 6, `browse-pin-w` 20을 쓴다. 메뉴 바탕은 `menu-surface`, 선택은 `menu-highlight`, 검색 자리 글자는 `text-4`다.
 
-### 설정 창 2판 (D-144)
+### 설정 창 (D-147, D-148)
 
-창 너비와 높이는 settings-w 700, settings-content-h 540이다. 사이드바 너비는 settings-sidebar-w 184, 행은 segment-h 26, 아이콘은 icon-m 14다. 선택 바탕은 settings-selection(라이트 검정, 다크 흰색 6%)이다. 오른쪽 시작은 settings-top 26, 좌우는 settings-body-inset 28이다. 카드는 surface-2와 r-window 10, 행은 settings-row 최소 40이다. 제목은 fs-schedule-title 17/600, 팝업은 fs-micro 12, 설명은 fs-library-section 11이다. 닫기는 connect-h 22, settings-close-icon 10, 스위치는 settings-switch-w/h 30/16이다.
+창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 24이며 선택과 호버 불투명도는 각각 6%, 3.5%다. 제목은 library-header-font 15, 굵기 600이다.
+
+카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 단축키 칩 높이는 22다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.

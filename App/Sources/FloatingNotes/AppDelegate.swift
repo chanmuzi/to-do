@@ -87,6 +87,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 let system = SystemReminderNotifier()
                 system.openNote = { [weak router] id in router?.route(.openNote(id)) }
+                system.openAgent = { [weak self] provider in self?.settingsWindow?.showAgent(provider) }
+                system.installDelegate()
                 notifier = system
                 makeBridge = { EventKitBridge() }
             }
@@ -378,11 +380,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
         let store = environment.settings
         let table = ShortcutTable.standard
-        let sections = ShortcutGroup.allCases.map { group in
+        let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .aiPanel, .markdownInput]
+        let sections = groups.map { group in
             let title = group == .aiPanel ? "AI 패널 (예정)" : group == .global ? "어디서나" : group.rawValue
             return ShortcutSection(title, rows: table.entries(in: group).map { entry in
                 let action = entry.command?.isConnected == false ? entry.action + " (예정)" : entry.action
-                return (action, entry.keyLabels.joined(separator: group == .markdownInput ? " 또는 " : " "))
+                switch entry.keys {
+                case .chords(let chords): return (action, chords.map { $0.labels.joined() })
+                case .typed(let labels): return (action, labels)
+                }
             })
         }
         var agentDirectory: URL?

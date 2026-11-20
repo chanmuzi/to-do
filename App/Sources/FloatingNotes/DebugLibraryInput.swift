@@ -3,6 +3,15 @@ import AppKit
 
 /// 이 프로세스의 라이브러리 창에만 입력한다. 좌표는 창 내용의 왼쪽 위부터 pt 단위다.
 enum DebugLibraryInput {
+    static func scrollToEnd(_ scroll: NSScrollView) {
+        guard let document = scroll.documentView else { return }
+        let clip = scroll.contentView
+        let bounds = clip.documentRect
+        let y = document.isFlipped ? max(bounds.minY, bounds.maxY - clip.bounds.height) : bounds.minY
+        clip.scroll(to: NSPoint(x: clip.bounds.minX, y: y))
+        scroll.reflectScrolledClipView(clip)
+    }
+
     private static weak var hovered: NSView?
     static func state(window: NSWindow?) -> [String: Any] {
         guard let window else { return [:] }

@@ -203,9 +203,8 @@ final class DebugControl {
                 if let scroll = view as? NSScrollView { return scroll }
                 return view.subviews.lazy.compactMap(sidebar).first
             }
-            if let root = library?.window?.contentView, let document = sidebar(in: root)?.documentView {
-                let end = document.isFlipped ? document.bounds.maxY - 1 : document.bounds.minY
-                document.scrollToVisible(NSRect(x: 0, y: end, width: 1, height: 1))
+            if let root = library?.window?.contentView, let scroll = sidebar(in: root) {
+                DebugLibraryInput.scrollToEnd(scroll)
             }
         case ("library-space-menu", let name?, let rest) where isPassive:
             let label = name.rawValue + (rest.map { " " + $0 } ?? "") + " 더 보기"
@@ -328,13 +327,21 @@ final class DebugControl {
                 self?.write(NSApp.windows.first { $0.isVisible && $0.parent === library.window }, to: url)
                 library.model.editingViews = false
             }
-        case ("settings-popup-snapshot", let name?, _) where isPassive:
+        case ("settings-agent-detail", let provider?, _) where isPassive:
+            settingsWindow?.showAgent(provider.rawValue)
+        case ("settings-fake-login", _, _) where isPassive:
+            settingsWindow?.model.detailEngine?.loginForVerification()
+        case ("settings-agent-cancel", _, _) where isPassive:
+            settingsWindow?.model.detailEngine?.cancel()
+        case ("settings-install-tip", let flag?, _) where isPassive:
+            settingsWindow?.model.setInstallTipForVerification(flag.rawValue == "on")
+        case ("settings-popup-snapshot", let name?, let label) where isPassive:
             func findPicker(_ view: NSView) -> NSView? {
-                if view.accessibilityLabel() == "기본 캘린더", view.menu != nil { return view }
+                if view.accessibilityLabel() == (label ?? "기본 캘린더"), view.menu != nil { return view }
                 return view.subviews.lazy.compactMap(findPicker).first
             }
             if let root = settingsWindow?.window?.contentView, let button = findPicker(root), let menu = button.menu,
-               let url = output(named: name.rawValue) { snapshotLiveMenu(menu, anchor: button, to: url) }
+               let url = output(named: name.rawValue) { DebugSettingsMenu.capture(menu, at: button, to: url) }
         case ("settings-format-bar", let mode?, _) where isPassive:
             guard NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) != nil else { return }
             settingsWindow?.model.change { $0.formatBar = mode.rawValue }
@@ -343,11 +350,9 @@ final class DebugControl {
         case ("settings-reset-sheet", _, _) where isPassive:
             settingsWindow?.confirmReset()
         case ("settings-sheet-snapshot", let name?, _) where isPassive:
-            if let url = output(named: name.rawValue) { write(settingsWindow?.window?.attachedSheet, to: url) }
+            if let url = output(named: name.rawValue) { write(settingsWindow?.window, to: url, audit: false) }
         case ("settings-reset-answer", let value?, _) where isPassive:
-            if let sheet = settingsWindow?.window?.attachedSheet {
-                settingsWindow?.window?.endSheet(sheet, returnCode: value.rawValue == "restore" ? .alertFirstButtonReturn : .alertSecondButtonReturn)
-            }
+            settingsWindow?.answerReset(value.rawValue == "restore")
         case ("format-bold", let id?, _) where isPassive:
             editor(of: id)?.perform(.bold)
         case ("settings-close", _, _) where isPassive:
@@ -365,7 +370,7 @@ final class DebugControl {
             } catch { AppLog.warning("설정 상태를 쓰지 못했습니다: \(error)") }
         case ("settings-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
-            write(settingsWindow?.window, to: url)
+            write(settingsWindow?.window, to: url, audit: false)
         case ("settings-fake-access", let mode?, _) where isPassive:
             fakeCalendar?.accessByKind = switch mode.rawValue {
             case "new": [.event: .needsRequest, .reminder: .needsRequest]
@@ -609,7 +614,7 @@ final class DebugControl {
     }
 
     /// 창의 내용 뷰를 앱 안에서 그려 PNG로 쓴다.
-    private func write(_ window: NSWindow?, to url: URL) {
+    private func write(_ window: NSWindow?, to url: URL, audit: Bool = true) {
         guard let view = window?.contentView?.superview ?? window?.contentView,
               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
         else {
@@ -625,7 +630,7 @@ final class DebugControl {
                 return
             }
             try data.write(to: url, options: .atomic)
-            try DebugViewAudit.write(view, to: url.appendingPathExtension("json"))
+            if audit { try DebugViewAudit.write(view, to: url.appendingPathExtension("json")) }
         } catch {
             AppLog.warning("확인용 그림을 쓰지 못했습니다(\(url.path)): \(error)")
         }
