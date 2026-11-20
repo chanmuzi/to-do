@@ -22,7 +22,7 @@ let package = Package(
             name: "Theme",
             dependencies: ["Models"],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
-            resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts")]
+            resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts"), .copy("Resources/AgentLogos")]
         ),
         .target(name: "AgentRunner", dependencies: ["Store"]),
         .target(name: "Models"),
