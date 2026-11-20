@@ -130,4 +130,21 @@ import Testing
         )
         #expect(frame == CGRect(x: 500, y: 114, width: 200, height: 34))
     }
+
+    /// 동작 글자는 끝 글자까지 다 그려지고("되돌리기"의 "기"가 잘리지 않음), 안내 글과 같은 기준선에 앉는다.
+    @Test(arguments: [("휴지통으로 보냈습니다", "되돌리기"), ("“장보기”에 넣었습니다", "열기")])
+    func actionTitleIsNotClippedAndSharesTheBaseline(message: String, action: String) throws {
+        let view = ToastView(theme: fixture.theme, message: message, actionTitle: action)
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(maxWidth: 600))
+        view.layoutSubtreeIfNeeded()
+        let labels = view.actionButton.subviews.compactMap { $0 as? NSTextField }
+        let actionLabel = try #require(labels.first)
+        let needed = try #require(actionLabel.cell?.cellSize)
+        #expect(actionLabel.frame.width >= needed.width)
+        #expect(actionLabel.frame.maxX <= view.actionButton.bounds.maxX)
+        #expect(view.actionButton.frame.maxX <= view.bounds.maxX)
+        let message = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
+        #expect(message.frame.width >= (message.cell?.cellSize.width ?? .infinity))
+        #expect(abs(view.baselines.message - view.baselines.action) < 0.5)
+    }
 }

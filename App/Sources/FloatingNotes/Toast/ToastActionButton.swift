@@ -33,12 +33,21 @@ final class ToastActionButton: NSView {
 
     var title: String { label.stringValue }
 
+    /// 글자를 다 그리는 크기. `intrinsicContentSize`는 굵은 글꼴의 너비를 4pt쯤 덜 잡아 끝 글자("되돌리기"의 "기")가
+    /// 잘렸다. 셀이 실제로 그리는 크기(`cellSize`)를 쓴다.
+    var labelSize: NSSize {
+        let size = label.cell?.cellSize ?? label.intrinsicContentSize
+        return NSSize(width: size.width.rounded(.up), height: size.height.rounded(.up))
+    }
+
+    /// 글자의 기준선 위치(이 뷰의 위에서). 옆의 안내 글과 기준선을 맞출 때 쓴다.
+    var labelBaselineFromTop: CGFloat {
+        label.frame.minY + label.firstBaselineOffsetFromTop
+    }
+
     /// 글자 너비에 좌우 `sp-2`, 높이 `ctl-h`.
     var preferredSize: NSSize {
-        NSSize(
-            width: (label.intrinsicContentSize.width + theme.space(.sp2) * 2).rounded(.up),
-            height: theme.component(.controlHeight)
-        )
+        NSSize(width: labelSize.width + theme.space(.sp2) * 2, height: theme.component(.controlHeight))
     }
 
     override var isFlipped: Bool { true }
@@ -54,10 +63,10 @@ final class ToastActionButton: NSView {
 
     override func layout() {
         super.layout()
-        let size = label.intrinsicContentSize
+        let size = labelSize
         label.frame = NSRect(
             x: ((bounds.width - size.width) / 2).rounded(), y: ((bounds.height - size.height) / 2).rounded(),
-            width: size.width.rounded(.up), height: size.height.rounded(.up)
+            width: size.width, height: size.height
         )
     }
 
