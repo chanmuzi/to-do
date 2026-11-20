@@ -149,24 +149,24 @@ import Testing
     @Test func barIsCenteredInTheLowerPartOfTheVisibleFrame() {
         let visible = CGRect(x: 100, y: 50, width: 1600, height: 1000)
         let frame = CapturePlacement.frame(
-            size: CGSize(width: 580, height: 42), visibleFrame: visible, bottomRatio: 0.2
+            size: CGSize(width: 580, height: 42), visibleFrame: visible, bottomRatio: 0.1
         )
-        #expect(frame == CGRect(x: 610, y: 250, width: 580, height: 42))
+        #expect(frame == CGRect(x: 610, y: 150, width: 580, height: 42))
         #expect(frame.midX == visible.midX)
-        // Dock을 뺀 영역의 아래 끝에서 바 아래쪽까지가 영역 높이의 20%다.
-        #expect(frame.minY - visible.minY == 200)
+        // Dock을 뺀 영역의 아래 끝에서 바 아래쪽까지가 영역 높이의 10%다(D-147).
+        #expect(frame.minY - visible.minY == 100)
         #expect(frame.maxY < visible.midY)
     }
 
     @Test func offstageFrameIsTheSameSizeALittleLower() {
-        let frame = CGRect(x: 610, y: 250, width: 580, height: 42)
-        #expect(CapturePlacement.offstageFrame(for: frame, rise: 6) == CGRect(x: 610, y: 244, width: 580, height: 42))
+        let frame = CGRect(x: 610, y: 150, width: 580, height: 42)
+        #expect(CapturePlacement.offstageFrame(for: frame, rise: 6) == CGRect(x: 610, y: 144, width: 580, height: 42))
     }
 
     @Test func barShrinksToANarrowScreenAndStaysInside() {
         let visible = CGRect(x: 0, y: 0, width: 400, height: 30)
         let frame = CapturePlacement.frame(
-            size: CGSize(width: 580, height: 42), visibleFrame: visible, bottomRatio: 0.2
+            size: CGSize(width: 580, height: 42), visibleFrame: visible, bottomRatio: 0.1
         )
         #expect(frame.width == 400)
         #expect(frame.minX == 0)
