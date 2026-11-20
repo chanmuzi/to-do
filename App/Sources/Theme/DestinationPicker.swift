@@ -26,7 +26,7 @@ package struct DestinationPicker: View {
 
     package var body: some View {
         let destination = choices.first { $0.id == selectedID }?.destination ?? current
-        ValuePopup(label: title, value: destination?.name ?? "시스템 기본값",
+        ValuePopup(label: title, value: destination?.name ?? "캘린더 앱 기본값",
                    dot: destination?.color.map { Self.dot($0, theme: theme) }, theme: theme, inSettings: inSettings,
                    makeMenu: makeMenu) { item in choose(item.representedObject as? String) }
     }
@@ -35,15 +35,18 @@ package struct DestinationPicker: View {
         let list = NSMenu()
         list.autoenablesItems = false
         list.minimumWidth = theme.component(.menuWidth)
-        func add(_ title: String, destination: ScheduleDestination?, id: String?, header: Bool = false) {
+        func add(_ title: String, destination: ScheduleDestination?, id: String?, header: Bool = false, subtitle: String? = nil) {
             let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
             item.representedObject = id
             item.isEnabled = !header
             let selected = !header && selectedID == id
             item.state = selected ? .on : .off
-            item.view = DestinationRow(theme: theme, text: title, dot: destination?.color.map { Self.dot($0, theme: theme) },
-                                       header: header, selected: selected)
+            item.view = PickerMenuRow(theme: theme, text: title, dot: destination?.color.map { Self.dot($0, theme: theme) },
+                                       header: header, selected: selected, subtitle: subtitle)
             list.addItem(item)
+        }
+        if includesDefault {
+            add("캘린더 앱 기본값", destination: nil, id: nil, subtitle: current?.name)
         }
         var seen: Set<String> = []
         let accounts = choices.map(\.account).filter { seen.insert($0).inserted }
@@ -53,10 +56,6 @@ package struct DestinationPicker: View {
             for choice in choices where choice.account == account {
                 add(choice.destination.name, destination: choice.destination, id: choice.id)
             }
-        }
-        if includesDefault {
-            if !list.items.isEmpty { list.addItem(.separator()) }
-            add("시스템 기본값", destination: nil, id: nil)
         }
         return list
     }
@@ -72,13 +71,15 @@ package struct DestinationPicker: View {
 
 }
 
-private final class DestinationRow: NSView {
+package final class PickerMenuRow: NSView {
     let theme: Theme
     let text: String
     let dot: NSImage?
     let header: Bool
     let selected: Bool
-    init(theme: Theme, text: String, dot: NSImage?, header: Bool, selected: Bool) {
+    let subtitle: String?
+    package init(theme: Theme, text: String, dot: NSImage?, header: Bool = false, selected: Bool, subtitle: String? = nil) {
+        self.subtitle = subtitle
         self.theme = theme
         self.text = text
         self.dot = dot
@@ -89,14 +90,14 @@ private final class DestinationRow: NSView {
         autoresizingMask = [.width]
     }
     @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-    override func draw(_ dirtyRect: NSRect) {
-        theme.nsColor(.surface).setFill()
+    package required init?(coder: NSCoder) { fatalError() }
+    package override func draw(_ dirtyRect: NSRect) {
+        theme.nsColor(.menuSurface).setFill()
         bounds.fill()
-        fillEnclosingMenuBackground(with: theme.nsColor(.surface).cgColor)
+        fillEnclosingMenuBackground(with: theme.nsColor(.menuSurface).cgColor)
         let inset = theme.component(.badgeGap)
-        if !header, enclosingMenuItem?.isHighlighted == true {
-            theme.nsColor(.selected).setFill()
+        if !header, enclosingMenuItem?.isEnabled == true, enclosingMenuItem?.isHighlighted == true {
+            theme.nsColor(.menuHighlight).setFill()
             let radius = theme.shape(.controlRadius)
             NSBezierPath(roundedRect: bounds.insetBy(dx: inset, dy: 0), xRadius: radius, yRadius: radius).fill()
         }
@@ -115,11 +116,17 @@ private final class DestinationRow: NSView {
             }
         }
         let value = NSAttributedString(string: text, attributes: [
-            .font: theme.nsFont(.body, size: theme.tokens.textStyle(header ? .micro : .ui).size), .foregroundColor: theme.nsColor(header ? .text3 : .text)])
+            .font: theme.nsFont(.body, size: theme.tokens.textStyle(header ? .micro : .ui).size), .foregroundColor: theme.nsColor(header || enclosingMenuItem?.isEnabled == false ? .text3 : .text)])
         value.draw(in: CGRect(x: x, y: (bounds.height - value.size().height) / 2,
                               width: bounds.width - x - inset, height: value.size().height))
+        if let subtitle {
+            let hint = NSAttributedString(string: subtitle, attributes: [.font: theme.nsFont(.micro), .foregroundColor: theme.nsColor(.text3)])
+            let start = x + value.size().width + gap
+            hint.draw(in: CGRect(x: start, y: (bounds.height - hint.size().height) / 2,
+                                 width: max(0, bounds.width - start - inset), height: hint.size().height))
+        }
     }
-    override func mouseUp(with event: NSEvent) {
+    package override func mouseUp(with event: NSEvent) {
         guard let item = enclosingMenuItem, item.isEnabled, let menu = item.menu else { return }
         menu.cancelTracking()
         menu.performActionForItem(at: menu.index(of: item))

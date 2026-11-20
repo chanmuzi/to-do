@@ -11,6 +11,8 @@ public enum ThemeResources {
         try locate("Fonts")
     }
 
+    package static func agentLogo(_ name: String) throws -> URL { try locate("AgentLogos/logo-\(name).svg") }
+
     private static func locate(_ name: String) throws -> URL {
         let fileManager = FileManager.default
         if let url = Bundle.main.resourceURL?.appendingPathComponent(name),

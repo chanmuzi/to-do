@@ -1,41 +1,34 @@
 import Models
-import Scheduling
 import SwiftUI
 import Theme
 
 struct SettingsView: View {
     let model: SettingsModel
     let theme: Theme
-    let reset: () -> Void
-    let close: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            ZStack(alignment: .topTrailing) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: theme.space(.sp4)) {
-                        header
-                        contents
-                        if let error = model.error { Text(error).foregroundStyle(theme.color(.warn)) }
+        ZStack {
+            HStack(spacing: 0) {
+                sidebar
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    if model.pane == .general {
+                        general
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: theme.space(.sp4)) {
+                                contents
+                                if let error = model.error { Text(error).foregroundStyle(theme.color(.warn)) }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, theme.space(.sp5))
+                        }.id(model.pane)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, theme.component(.settingsBodyInset))
-                    .padding(.top, theme.component(.settingsTop))
-                    .padding(.bottom, theme.space(.sp5))
-                }.id(model.pane)
-                Button(action: close) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: theme.component(.settingsCloseIcon)))
-                        .frame(width: theme.component(.connectHeight), height: theme.component(.connectHeight))
-                }.buttonStyle(SettingsButton(theme: theme, selected: false))
-                    .padding(theme.space(.sp3)).accessibilityLabel("설정 닫기")
-            }
+                }.padding(.horizontal, theme.component(.settingsBodyInset))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }.disabled(model.confirmingReset).accessibilityHidden(model.confirmingReset)
+            if model.confirmingReset { resetDialog }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
-        .foregroundStyle(theme.color(.text)).background(theme.color(.surface))
-        .tint(theme.color(.accent))
+        .foregroundStyle(theme.color(.text)).background(theme.color(.surface)).tint(theme.color(.accent))
     }
 
     private var sidebar: some View {
@@ -51,9 +44,12 @@ struct SettingsView: View {
                 .padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.space(.sp1))
             link(.assistant, "sparkles")
             Spacer()
-            separator
-            link(.about, "info.circle")
-        }.padding(.horizontal, theme.space(.sp2)).padding(.top, theme.space(.sp4)).padding(.bottom, theme.space(.sp2))
+            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                Text("Float " + version).font(theme.font(.librarySection)).foregroundStyle(theme.color(.text4))
+                    .frame(maxWidth: .infinity, alignment: .trailing).padding(.trailing, theme.component(.chromeGap))
+            }
+        }.padding(.horizontal, theme.component(.settingsSegmentPad))
+            .padding(.top, theme.component(.settingsTop)).padding(.bottom, theme.space(.sp3))
             .frame(width: theme.component(.settingsSidebarWidth)).background(theme.color(.surface2))
             .overlay(alignment: .trailing) { Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth)) }
     }
@@ -62,54 +58,88 @@ struct SettingsView: View {
         let selected = model.pane == pane || (pane == .assistant && model.pane == .accounts)
         return Button { model.pane = pane } label: {
             HStack(spacing: theme.space(.sp2)) {
-                Image(systemName: symbol).font(.system(size: theme.component(.iconMedium)))
-                    .frame(width: theme.component(.iconMedium))
+                Image(systemName: symbol).frame(width: theme.component(.iconLarge))
                 Text(pane.rawValue)
-            }.padding(.horizontal, theme.space(.sp2)).frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: theme.component(.segmentHeight))
+                Spacer()
+                if pane == .assistant && model.agents?.engines.contains(where: { $0.status == .expired }) == true {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.color(.warn))
+                        .accessibilityLabel("다시 로그인 필요")
+                }
+            }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.settingsSegmentH))
         }.buttonStyle(SettingsButton(theme: theme, selected: selected, selection: .settingsSelection))
-            .accessibilityAddTraits(selected ? .isSelected : [])
+            .frame(height: theme.component(.settingsSidebarRow)).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var separator: some View {
-        rule.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.component(.chromeGap))
+        rule.padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.component(.settingsChipPad))
     }
     var rule: some View { Rectangle().fill(theme.color(.line)).frame(height: theme.shape(.borderWidth)) }
     var valueFont: Font { theme.font(.body, size: theme.tokens.textStyle(.micro).size) }
     private var header: some View {
-        VStack(alignment: .leading, spacing: theme.component(.iconGap)) {
-            if model.pane == .accounts {
-                textButton("‹ AI 비서") { model.pane = .assistant }.accessibilityLabel("AI 비서로 돌아가기")
-            }
-            Text(model.pane.rawValue).font(theme.font(.scheduleTitle)).accessibilityAddTraits(.isHeader)
-            Text(model.pane.summary).font(valueFont).foregroundStyle(theme.color(.text3))
-        }
+        HStack(spacing: theme.component(.chromeGap)) {
+            if model.pane == .accounts, let engine = model.detailEngine {
+                Button { model.pane = .assistant } label: {
+                    Image(systemName: "chevron.left").frame(width: theme.component(.settingsChipH), height: theme.component(.settingsChipH))
+                }.buttonStyle(.plain).accessibilityLabel("에이전트 목록으로")
+                logo(engine, small: true)
+                Text(engine.name)
+            } else { Text(model.pane.rawValue) }
+        }.font(theme.font(.paneTitle, size: theme.component(.libraryHeaderFont)))
+            .frame(height: theme.component(.settingsTop)).accessibilityAddTraits(.isHeader)
+    }
+
+    private var general: some View {
+        VStack(spacing: theme.space(.sp4)) {
+            card { toggle("메뉴 막대 아이콘", \.showsMenuBarIcon) }
+            Spacer()
+            if let error = model.error { Text(error).foregroundStyle(theme.color(.warn)) }
+            card { row("모든 설정을 처음 상태로") { actionButton("되돌리기", ink: .warn) { model.confirmingReset = true } } }
+        }.padding(.bottom, theme.space(.sp5))
+    }
+
+    private var resetDialog: some View {
+        ZStack {
+            theme.color(.outline).ignoresSafeArea()
+            VStack(spacing: theme.space(.sp3)) {
+                Text("모든 설정을 되돌릴까요?").font(theme.font(.paneTitle))
+                Text("노트와 에이전트 연결은 그대로 남아요").font(valueFont)
+                HStack {
+                    actionButton("취소") { model.confirmingReset = false }.keyboardShortcut(.cancelAction)
+                    actionButton("되돌리기", fill: .warn) {
+                        model.confirmingReset = false
+                        model.restoreDefaults(theme: theme)
+                    }
+                }
+            }.padding(theme.space(.sp4)).frame(width: theme.component(.settingsAlertW))
+                .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
+                .shadow(color: theme.color(.outline), radius: theme.space(.sp3))
+        }.accessibilityElement(children: .contain).accessibilityAddTraits(.isModal)
     }
 
     @ViewBuilder private var contents: some View {
         switch model.pane {
-        case .general:
-            card("앱") { toggle("메뉴 막대 아이콘", "메뉴 막대에서 Float 열기", \.showsMenuBarIcon) }
-        case .appearance: appearance
-        case .editor: editor
+        case .appearance, .editor:
+            SettingsPreview(theme: theme, values: model.values)
+            if model.pane == .appearance { appearance } else { editor }
         case .schedule: schedule
         case .shortcuts:
             ForEach(model.shortcuts) { section in
                 card(section.title) {
                     ForEach(section.rows, id: \.action) { item in
-                        row(item.action) { Text(item.keys).font(theme.font(.ui)) }
+                        row(item.action) {
+                            HStack(spacing: theme.space(.sp1)) {
+                                ForEach(item.keys, id: \.self) { key in
+                                    Text(key).font(theme.font(.ui)).padding(.horizontal, theme.component(.settingsChipPad))
+                                        .frame(height: theme.component(.settingsChipH)).modifier(WhiteControl(theme: theme))
+                                }
+                            }
+                        }
                     }
                 }
             }
         case .assistant: assistant
-        case .accounts: accounts
-        case .about:
-            card("Float") {
-                if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-                    row("버전") { Text(version).font(valueFont) }
-                }
-                row("설정 초기화", "노트와 일정을 보존하고 설정을 되돌려요") { textButton("기본값으로", action: reset) }
-            }
+        case .accounts: if let engine = model.detailEngine { accountDetail(engine) }
+        case .general: EmptyView()
         }
     }
 
@@ -130,54 +160,63 @@ struct SettingsView: View {
         }
     }
 
-    func row<Control: View>(_ title: String, _ detail: String? = nil, @ViewBuilder control: () -> Control) -> some View {
-        HStack(spacing: theme.space(.sp3)) {
-            VStack(alignment: .leading, spacing: theme.shape(.borderWidth)) {
-                Text(verbatim: title)
-                if let detail {
-                    Text(verbatim: detail).font(theme.font(.body, size: theme.tokens.textStyle(.librarySection).size))
-                        .foregroundStyle(theme.color(.text3)).fixedSize(horizontal: false, vertical: true)
-                }
-            }
+    func row<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: theme.space(.sp2)) {
+            Text(verbatim: title)
             Spacer(minLength: 0)
             control()
-        }.padding(.vertical, theme.component(.chromeGap)).frame(minHeight: theme.component(.settingsRow))
+        }.frame(minHeight: theme.component(.settingsRow))
     }
 
-    func textButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title).font(valueFont).padding(.horizontal, theme.space(.sp1))
-                .frame(minHeight: theme.component(.controlHeight)) }
-            .buttonStyle(SettingsButton(theme: theme, selected: false))
+    func actionButton(_ title: String, ink: ColorToken = .text, fill: ColorToken = .surface, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(valueFont).padding(.horizontal, theme.component(.settingsSegmentPad))
+                .frame(height: theme.component(.settingsChipH)).foregroundStyle(theme.color(fill == .surface ? ink : .surface))
+                .modifier(WhiteControl(theme: theme, fill: fill))
+        }.buttonStyle(.plain)
     }
 
-    func popup<Value: Equatable>(_ title: String, _ detail: String, value: Value, choices: [(Value, String)],
-                                 select: @escaping (Value) -> Void) -> some View {
-        row(title, detail) {
-            ValuePopup(label: title, value: choices.first { $0.0 == value }?.1 ?? "기본값", theme: theme, inSettings: true) {
-                let menu = NSMenu()
-                menu.autoenablesItems = false
-                for (index, choice) in choices.enumerated() {
-                    let item = menu.addItem(withTitle: choice.1, action: nil, keyEquivalent: "")
-                    item.tag = index
-                    item.state = choice.0 == value ? .on : .off
+    func segment<Value: Equatable>(_ title: String, value: Value, choices: [(Value, String)], select: @escaping (Value) -> Void) -> some View {
+        row(title) {
+            HStack(spacing: 0) {
+                ForEach(choices.indices, id: \.self) { index in
+                    let choice = choices[index]
+                    Button { select(choice.0) } label: {
+                        Group {
+                            if title == "체크박스", index == 0 { Image(systemName: "square") }
+                            else { Text(choice.1) }
+                        }.font(valueFont).padding(.horizontal, theme.component(.settingsSegmentPad))
+                            .frame(maxHeight: .infinity)
+                            .background(choice.0 == value ? theme.color(.surface) : .clear,
+                                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+                    }.buttonStyle(.plain).accessibilityLabel(choice.1)
+                        .accessibilityAddTraits(choice.0 == value ? .isSelected : [])
                 }
-                return menu
-            } choose: { select(choices[$0.tag].0) }
+            }.padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
+                .background(theme.color(.settingsSelection), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
+                .accessibilityElement(children: .contain).accessibilityLabel(title)
         }
     }
 
-    func setting(_ title: String, _ detail: String, _ key: WritableKeyPath<SettingsValues, String>,
-                 _ choices: [(String, String)]) -> some View {
-        popup(title, detail, value: model.values[keyPath: key], choices: choices) { value in
-            model.change { $0[keyPath: key] = value }
-        }
+    func setting(_ title: String, _ key: WritableKeyPath<SettingsValues, String>, _ choices: [(String, String)]) -> some View {
+        segment(title, value: model.values[keyPath: key], choices: choices) { value in model.change { $0[keyPath: key] = value } }
     }
 
-    func toggle(_ title: String, _ detail: String, _ key: WritableKeyPath<SettingsValues, Bool>) -> some View {
-        row(title, detail) {
+    func toggle(_ title: String, _ key: WritableKeyPath<SettingsValues, Bool>) -> some View {
+        row(title) {
             Toggle(title, isOn: Binding(get: { model.values[keyPath: key] },
                                         set: { value in model.change { $0[keyPath: key] = value } }))
                 .labelsHidden().toggleStyle(SettingsSwitch(theme: theme)).accessibilityLabel(title)
         }
+    }
+}
+
+struct WhiteControl: ViewModifier {
+    let theme: Theme
+    var fill: ColorToken = .surface
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: theme.shape(.controlRadius))
+        content.background(theme.color(fill), in: shape)
+            .overlay { shape.strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)) }
     }
 }

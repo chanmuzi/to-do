@@ -19,17 +19,19 @@ private struct UsageRecord: Encodable {
 
 public struct AgentRunner: Sendable {
     let location: StoreLocation
+    let notifications: AgentExpiryNotifications
     let server: URL
 
-    public init(location: StoreLocation, server: URL? = nil) throws {
+    public init(location: StoreLocation, server: URL? = nil, notifications: AgentExpiryNotifications = .shared) throws {
         guard let executable = server ?? Bundle.main.url(forAuxiliaryExecutable: "FloatMCP")
         else { throw AgentError.missingExecutable("FloatMCP") }
         self.server = executable
         self.location = location
+        self.notifications = notifications
     }
 
     public func run(_ prompt: String, engine: AgentEngine, installation: AgentInstallation,
-                    timeout: Duration = .seconds(120),
+                    taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
                     onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
         let requested: String?
@@ -44,7 +46,25 @@ public struct AgentRunner: Sendable {
             else { throw AgentError.invalidOutput }
         }
         let connection = try AgentConnection(provider: provider, location: location)
-        return try await onWorker {
+        do {
+            return try await executeRun(prompt, provider: provider, requested: requested, connection: connection,
+                                        installation: installation, timeout: timeout, onEvent: onEvent)
+        } catch let error as AgentError {
+            switch error {
+            case .failed, .providerFailure, .invalidOutput:
+                guard let account = try? await connection.account(installation), connection.isExpired(account) else { throw error }
+                // 알림을 보내지 못해도 만료 오류는 그대로 돌려준다.
+                try? await notifications.blocked(connection, taskName: taskName)
+                throw AgentError.loginExpired
+            default: throw error
+            }
+        }
+    }
+
+    private func executeRun(_ prompt: String, provider: AgentProvider, requested: String?, connection: AgentConnection,
+                            installation: AgentInstallation, timeout: Duration,
+                            onEvent: @escaping @Sendable (AgentEvent) -> Void) async throws -> AgentResult {
+        try await onWorker {
             let id = UUID().uuidString
             let folder = connection.state.appending(path: "agents/runs/\(id)", directoryHint: .isDirectory)
             let cwd = folder.appending(path: "work", directoryHint: .isDirectory)

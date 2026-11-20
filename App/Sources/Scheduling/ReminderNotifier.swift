@@ -23,6 +23,8 @@ public final class FakeReminderNotifier: ReminderNotifier {
 @MainActor
 public final class SystemReminderNotifier: NSObject, ReminderNotifier, UNUserNotificationCenterDelegate {
     private var storage: UNUserNotificationCenter?
+    public var openAgent: (@MainActor (String) -> Void)?
+    public func installDelegate() { _ = center() }
     public var openNote: (@MainActor (NoteID) -> Void)?
     public override init() { super.init() }
     private func center() -> UNUserNotificationCenter {
@@ -60,6 +62,11 @@ public final class SystemReminderNotifier: NSObject, ReminderNotifier, UNUserNot
         center.removeDeliveredNotifications(withIdentifiers: [identifier(item, noteID)])
     }
     public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        if let provider = response.notification.request.content.userInfo["floatAgent"] as? String,
+           response.actionIdentifier != UNNotificationDismissActionIdentifier {
+            await MainActor.run { openAgent?(provider) }
+            return
+        }
         guard let raw = response.notification.request.content.userInfo["noteID"] as? String else { return }
         await MainActor.run { openNote?(NoteID(rawValue: raw)) }
     }
