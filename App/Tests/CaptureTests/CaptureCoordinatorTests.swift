@@ -142,7 +142,7 @@ import FieldTestSupport
         try input().pressReturnKey()
 
         #expect(!capture.isVisible)
-        #expect(try fixture.notes.load(note.id).body == "[ ] 우유 사기\n")
+        #expect(try fixture.notes.load(note.id).body == "[ ] 우유 사기")
     }
 
     /// 조합 중이 아닐 때의 ↵도 같은 키 입력 경로로 한 번에 들어간다.
@@ -155,7 +155,7 @@ import FieldTestSupport
         try input().type("우유 사기")
         try input().pressReturnKey()
         #expect(!capture.isVisible)
-        #expect(try fixture.notes.load(note.id).body == "[ ] 우유 사기\n")
+        #expect(try fixture.notes.load(note.id).body == "[ ] 우유 사기")
     }
 
     /// 일본어, 중국어 입력기: 조합 중의 ↵는 입력기가 후보를 확정하는 데 쓰고 명령을 보내지 않는다. 넣지 않는다.
@@ -175,7 +175,7 @@ import FieldTestSupport
 
         try input().pressReturnKey()
         #expect(!capture.isVisible)
-        #expect(try fixture.notes.load(note.id).body == "[ ] 牛乳\n")
+        #expect(try fixture.notes.load(note.id).body == "[ ] 牛乳")
     }
 
     /// 줄바꿈 명령이 왔는데 조합 중인 글자가 남아 있으면(입력기가 확정하지 않고 명령만 보냄) 조합을 끝내기만 한다.
@@ -245,7 +245,7 @@ import FieldTestSupport
         try press(returnKey)
         #expect(!capture.isVisible)
         let saved = try fixture.notes.load(note.id)
-        #expect(saved.body == "[ ] 오늘 09:00 스탠드업\n")
+        #expect(saved.body == "[ ] 오늘 09:00 스탠드업")
         #expect(saved.reminder == nil)
         #expect(fixture.logs.contains { $0.contains("리마인더는 걸지 않았습니다") })
 
@@ -288,7 +288,7 @@ import FieldTestSupport
         let created = try #require(others.first)
         #expect(others.count == 1)
         #expect(created.title == CaptureDestination.title(for: note.created, calendar: .current))
-        #expect(try fixture.fileText(created.id).hasSuffix("---\n[ ] 캡처한 일\n"))
+        #expect(try fixture.fileText(created.id).hasSuffix("---\n[ ] 캡처한 일"))
         // 충돌 중인 노트는 디스크도, 쓰지 못한 변경도 그대로다.
         #expect(try fixture.fileText(note.id) == external)
         #expect(try fixture.notes.load(note.id).body == "처음\n편집 중\n")
@@ -379,7 +379,7 @@ import FieldTestSupport
         try press(returnKey)
         let created = try #require(try fixture.notes.list().notes.first)
         #expect(created.spaceID == home)
-        #expect(created.body == "[ ] 치과 예약\n")
+        #expect(created.body == "[ ] 치과 예약")
 
         capture.show()
         #expect(capture.displayedSpace == nil)
@@ -395,7 +395,7 @@ import FieldTestSupport
         try press(returnKey)
         let created = try #require(try fixture.notes.list().notes.first)
         #expect(created.spaceID == home)
-        #expect(created.body == "[ ] 장보기\n")
+        #expect(created.body == "[ ] 장보기")
     }
 
     @Test func commandRCyclesAManualReminder() throws {
@@ -506,7 +506,7 @@ import FieldTestSupport
         capture.performSubmit()
         #expect(failures.count == 1)
         #expect(!capture.isVisible)
-        #expect(try fixture.fileText(note.id).hasSuffix("[ ] 우유 사기\n"))
+        #expect(try fixture.fileText(note.id).hasSuffix("[ ] 우유 사기"))
     }
 
     @Test func toggleShowsAndHides() async throws {
@@ -555,7 +555,7 @@ import FieldTestSupport
 
         let notes = try fixture.notes.list().notes
         #expect(notes.count == 1)
-        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("---\n[ ] 우유 사기\n"))
+        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("---\n[ ] 우유 사기"))
         #expect(fixture.routes.isEmpty)
 
         // 다시 띄우면 전처럼 글을 받는다.
@@ -563,7 +563,7 @@ import FieldTestSupport
         #expect(try input().isEditable)
         try input().type("빵 사기")
         try press(returnKey)
-        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("[ ] 우유 사기\n[ ] 빵 사기\n"))
+        #expect(try fixture.fileText(#require(notes.first).id).hasSuffix("[ ] 우유 사기\n[ ] 빵 사기"))
     }
 
     /// 창을 내리는 일은 움직임이 끝났다는 알림이 아니라 전환 시간에 걸려 있다: 화면이 꺼져 움직임이 나아가지

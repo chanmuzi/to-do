@@ -97,8 +97,9 @@ import Testing
         try capture("빵 사기")
         #expect(editor.assignments == [body])
         #expect(editor.applied.count + editor.appended.count == 2)
-        #expect(editor.text == captured + "이어서 친 글\n[ ] 빵 사기\n")
-        #expect(try fixture.fileText(today).hasSuffix(captured + "이어서 친 글\n[ ] 빵 사기\n"))
+        // 이번 본문은 줄바꿈으로 끝나지 않으므로 붙인 줄 뒤에도 줄바꿈을 넣지 않는다(D-162).
+        #expect(editor.text == captured + "이어서 친 글\n[ ] 빵 사기")
+        #expect(try fixture.fileText(today).hasSuffix(captured + "이어서 친 글\n[ ] 빵 사기"))
         #expect(fixture.shownFailures.isEmpty)
     }
 

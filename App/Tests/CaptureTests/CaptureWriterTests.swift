@@ -57,13 +57,13 @@ import Testing
         }
         let created = try fixture.notes.load(id)
         #expect(created.spaceID == home)
-        #expect(created.body == "[ ] 치과 예약\n")
+        #expect(created.body == "[ ] 치과 예약")
         #expect(created.reminder == reminder)
         #expect(created.title == CaptureDestination.title(for: now, calendar: .current))
-        #expect(try fixture.fileText(id).hasSuffix("---\n[ ] 치과 예약\n"))
+        #expect(try fixture.fileText(id).hasSuffix("---\n[ ] 치과 예약"))
         // 한 번 더 넣으면 방금 만든 노트에 붙는다.
         #expect(try writer.add(entry("택배 반품", space: home), now: created.created) == .appended(id))
-        #expect(try fixture.notes.load(id).body == "[ ] 치과 예약\n[ ] 택배 반품\n")
+        #expect(try fixture.notes.load(id).body == "[ ] 치과 예약\n[ ] 택배 반품")
     }
 
     /// 어제 만든 노트는 오늘 노트가 아니다(노트는 만든 날짜에 속한다).
@@ -95,7 +95,7 @@ import Testing
 
         #expect(outcome == .appended(note.id))
         let saved = try fixture.fileText(note.id)
-        #expect(saved.hasSuffix("---\n처음 글\n편집기에서 쓰는 중\n[ ] 캡처한 일\n"))
+        #expect(saved.hasSuffix("---\n처음 글\n편집기에서 쓰는 중\n[ ] 캡처한 일"))
         #expect(saved.contains("title: \"고친 제목\""))
         #expect(!fixture.notes.hasPendingChanges(note.id))
         // 편집기가 그 뒤에 제 글을 다시 넘겨도(항목 단위) 제목 같은 다른 항목은 남는다.
@@ -119,7 +119,7 @@ import Testing
         _ = try writer.add(entry("리마인더 없는 일", space: work), now: now)
         let saved = try fixture.notes.load(note.id)
         #expect(saved.reminder == base.addingTimeInterval(1800))
-        #expect(saved.body == "[ ] 늦은 일\n[ ] 이른 일\n[ ] 더 늦은 일\n[ ] 리마인더 없는 일\n")
+        #expect(saved.body == "[ ] 늦은 일\n[ ] 이른 일\n[ ] 더 늦은 일\n[ ] 리마인더 없는 일")
     }
 
     /// 다른 프로그램이 파일을 고친 뒤에도(쓰지 않은 변경이 없을 때) 그 글 뒤에 붙는다. 충돌이 아니다.
@@ -158,7 +158,7 @@ import Testing
         #expect(created.title == CaptureDestination.title(for: note.created, calendar: .current))
         #expect(created.spaceID == work)
         #expect(created.reminder == reminder)
-        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일\n"))
+        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일"))
         #expect(!fixture.notes.hasPendingChanges(createdID))
         // 충돌 중인 노트: 디스크도, 쓰지 못한 변경도 건드리지 않았다. 풀 때 줄이 겹쳐 들어가지 않는다.
         #expect(try fixture.fileText(note.id) == external)
@@ -169,7 +169,7 @@ import Testing
         // 두 노트를 같은 초에 만들었으면 차례가 id로 정해지므로, 어느 쪽을 먼저 봤는지는 견주지 않는다.
         let second = try writer.add(entry("또 캡처한 일", space: work), now: created.created)
         #expect(second.noteID == createdID)
-        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일\n[ ] 또 캡처한 일\n"))
+        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일\n[ ] 또 캡처한 일"))
         #expect(try fixture.notes.list().notes.count == 2)
         #expect(try fixture.notes.load(note.id).body == "처음\n편집 중\n")
 
@@ -177,7 +177,9 @@ import Testing
         _ = try fixture.notes.resolveConflict(note.id, keeping: .mine)
         let third = try writer.add(entry("푼 뒤의 일", space: work), now: created.created)
         #expect(third == .appended(third.noteID))
-        #expect(try fixture.fileText(third.noteID).hasSuffix("[ ] 푼 뒤의 일\n"))
+        // 원래 노트는 줄바꿈으로 끝나 그 끝 줄바꿈이 남고, 캡처가 만든 노트는 줄바꿈 없이 끝난다(D-162).
+        let thirdEnding = third.noteID == note.id ? "[ ] 푼 뒤의 일\n" : "[ ] 푼 뒤의 일"
+        #expect(try fixture.fileText(third.noteID).hasSuffix(thirdEnding))
         #expect(try fixture.notes.list().notes.count == 2)
     }
 
@@ -204,7 +206,7 @@ import Testing
             Issue.record("없어진 노트를 건너뛰고 새 노트에 넣어야 한다: \(outcome)")
             return
         }
-        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일\n"))
+        #expect(try fixture.fileText(createdID).hasSuffix("---\n[ ] 캡처한 일"))
         #expect(try fixture.fileText(note.id).hasSuffix("---\n처음\n"))
         #expect(!fixture.notes.hasPendingChanges(note.id))
     }
@@ -241,7 +243,7 @@ import Testing
         let loose = try fixture.notes.create(NoteDraft(title: "스크래치", body: "", spaceID: nil))
 
         #expect(try writer.add(entry("아무 데나", space: nil), now: loose.created) == .appended(loose.id))
-        #expect(try fixture.notes.load(loose.id).body == "[ ] 아무 데나\n")
+        #expect(try fixture.notes.load(loose.id).body == "[ ] 아무 데나")
     }
 }
 
