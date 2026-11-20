@@ -158,7 +158,7 @@ import Testing
         fixture.capture.performSubmit()
         #expect(fixture.shownFailures.count == 1)
         #expect(!fixture.capture.isVisible)
-        #expect(try fixture.notes.list().notes.map(\.body) == ["[ ] 우유 사기\n"])
+        #expect(try fixture.notes.list().notes.map(\.body) == ["[ ] 우유 사기"])
     }
 
     /// 노트 찾기를 열 때 목록을 읽지 못하면 알린다. 알린 뒤에도 노트 찾기는 떠 있다.

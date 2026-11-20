@@ -64,7 +64,7 @@ struct CaptureWriter {
         var createdID: String?
         try notes.update(id) { current in
             current.body = TodoAppender.append(entry.text, to: current.body)
-            if let item = entry.schedule(now: now, line: max(0, current.body.components(separatedBy: "\n").count - 2), calendar: calendar) {
+            if let item = entry.schedule(now: now, line: TodoAppender.lastLineIndex(of: current.body), calendar: calendar) {
                 current.schedules.append(item)
                 createdID = item.id
             }

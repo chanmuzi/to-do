@@ -48,4 +48,13 @@ import Testing
         let shrunk = policy.frame(current: grown, top: grown.maxY, contentHeight: 48, screenHeight: 1000)
         #expect(shrunk == current)
     }
+
+    /// 직접 정한 높이는 자동 높이의 몫(70%)이 아니라 화면 표시 영역 전체까지 된다(D-158).
+    @Test func manualHeightCanFillTheScreenButNotGoBelowTheMinimum() {
+        #expect(policy.manualHeight(1000, screenHeight: 1000) == 1000)
+        #expect(policy.manualHeight(500, screenHeight: 1000) == 500)
+        #expect(policy.manualHeight(1400, screenHeight: 1000) == 1000)
+        #expect(policy.manualHeight(30, screenHeight: 1000) == 77)
+        #expect(policy.manualHeight(500, screenHeight: 50) == 77)
+    }
 }

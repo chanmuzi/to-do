@@ -10,6 +10,9 @@ import Testing
         #expect(tokens.symbolScale("pin.fill") < 1)
         #expect(tokens.symbolScale("trash") < 1)
         #expect(tokens.symbolScale("xmark") < 1)
+        // 메뉴 안 닫기와 더 보기 그림의 보정(D-159).
+        #expect(tokens.symbolScale("xmark") == 0.85)
+        #expect(tokens.symbolScale("ellipsis") == 0.85)
     }
 
     /// 아이콘은 예전(크기 토큰의 네모 칸에 맞춰 줄여 그림)보다 커지지 않는다: 그림의 긴 변이 칸 안에 든다.

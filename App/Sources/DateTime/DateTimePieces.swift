@@ -85,8 +85,14 @@ nonisolated struct TimeSpec: Hashable, Sendable {
         return isClock24 ? hour : nil
     }
 
-    /// 오전, 오후를 적지 않았을 때 고르는 쪽: 1~7시는 오후, 8~11시는 오전, 12시는 정오(자정이 아니다).
+    /// 오전, 오후를 적지 않은 시각 하나를 읽는 쪽: 1~11시는 오후, 12시는 정오(자정이 아니다). D-157.
     var preferredHour: Int {
+        (1...11).contains(hour) ? hour + 12 : hour
+    }
+
+    /// 양쪽 다 오전, 오후를 적지 않은 범위의 시작: 1~7시는 오후, 8~11시는 오전, 12시는 정오.
+    /// 범위는 근무 시간 꼴(`9-6시`는 09:00~18:00)이 흔해서 시각 하나와 달리 읽는다. D-157.
+    var rangeStartHour: Int {
         (1...7).contains(hour) ? hour + 12 : hour
     }
 

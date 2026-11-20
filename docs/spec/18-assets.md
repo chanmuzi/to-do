@@ -65,7 +65,7 @@
 
 노트 더 보기 메뉴의 그림 크기는 `component.menu-icon`(12pt), 정렬 칸은 `icon-l`(14pt)입니다(D-058).
 
-닫기(`xmark`)와 더 보기(`ellipsis`)는 칸 크기를 유지하고 `iconOptical`의 `.80` 배율로 그림만 줄입니다(D-058, 사용자 확인 전 임시 값).
+SF Symbols로 그리는 닫기(`xmark`, 노트 메뉴의 "창 닫기" 등)와 더 보기(`ellipsis`)는 칸 크기를 유지하고 `iconOptical`의 `.85` 배율로 그림만 줄입니다(D-159). 노트 창 위쪽의 닫기와 더 보기는 확정 시안의 벡터 경로(`NoteButtonGlyph`)로 그려 이 값을 쓰지 않습니다.
 
 SF Symbols 이름은 SF Symbols 앱에서 한 번 확인하세요. 버전에 따라 이름이 다를 수 있습니다.
 

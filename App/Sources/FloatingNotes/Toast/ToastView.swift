@@ -42,9 +42,20 @@ final class ToastView: NSView {
     /// 글과 동작이 다 보이는 크기. 너비는 `maxWidth`를 넘지 않고, 넘치면 글이 말줄임표로 줄어든다.
     func fittingSize(maxWidth: CGFloat) -> NSSize {
         let padding = theme.component(.toastPadding)
-        let natural = padding * 2 + label.intrinsicContentSize.width.rounded(.up)
+        let natural = padding * 2 + messageSize.width
             + theme.component(.toastGap) + actionButton.preferredSize.width
         return NSSize(width: min(natural, maxWidth), height: theme.component(.toastHeight))
+    }
+
+    /// 안내 글을 다 그리는 크기(`cellSize`). `intrinsicContentSize`는 실제보다 좁게 나온다(`ToastActionButton.labelSize`).
+    private var messageSize: NSSize {
+        let size = label.cell?.cellSize ?? label.intrinsicContentSize
+        return NSSize(width: size.width.rounded(.up), height: size.height.rounded(.up))
+    }
+
+    /// 안내 글과 동작 글자의 기준선(이 뷰의 위에서). 둘은 같아야 한다.
+    var baselines: (message: CGFloat, action: CGFloat) {
+        (label.frame.minY + label.firstBaselineOffsetFromTop, actionButton.frame.minY + actionButton.labelBaselineFromTop)
     }
 
     override var isFlipped: Bool { true }
@@ -76,10 +87,15 @@ final class ToastView: NSView {
             x: bounds.width - padding + theme.space(.sp2) - button.width,
             y: ((bounds.height - button.height) / 2).rounded(), width: button.width, height: button.height
         )
-        let labelHeight = label.intrinsicContentSize.height.rounded(.up)
+        actionButton.layoutSubtreeIfNeeded()
+        let labelHeight = messageSize.height
         let labelEnd = actionButton.frame.minX + theme.space(.sp2) - theme.component(.toastGap)
+        // 안내 글은 동작 글자와 같은 기준선에 둔다. 글꼴 굵기가 달라도 글자가 같은 줄에 앉는다.
+        let centered = ((bounds.height - labelHeight) / 2).rounded()
+        let baselineShift = actionButton.frame.minY + actionButton.labelBaselineFromTop
+            - (centered + label.firstBaselineOffsetFromTop)
         label.frame = NSRect(
-            x: padding, y: ((bounds.height - labelHeight) / 2).rounded(),
+            x: padding, y: (centered + baselineShift).rounded(),
             width: max(0, labelEnd - padding), height: labelHeight
         )
     }

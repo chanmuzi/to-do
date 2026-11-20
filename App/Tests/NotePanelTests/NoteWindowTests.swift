@@ -170,6 +170,38 @@ import Theme
         #expect(controller.heightTarget == nil)
     }
 
+    /// 앱 밖에서 높이를 바꾸면(창 크기 조절 명령) 자동 높이 한도(70%)를 넘어 화면 표시 영역까지 커지고,
+    /// 그 뒤로는 글이 늘어도 창 높이를 지킨다(D-158).
+    @Test func manualHeightIsKeptAndMayExceedTheAutomaticLimit() async throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let note = try fixture.notes.create(NoteDraft())
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        let visible = try #require((controller.panel.screen ?? NSScreen.main)?.visibleFrame)
+        let automaticLimit = (visible.height * fixture.theme.ratio(.noteMaxScreenHeight)).rounded(.down)
+        let tall = (visible.height * 0.9).rounded()
+        #expect(tall > automaticLimit)
+
+        let start = controller.panel.frame
+        controller.panel.setFrame(
+            NSRect(x: start.minX, y: visible.minY, width: start.width, height: tall), display: true
+        )
+        #expect(controller.panel.frame.height == tall)
+        #expect(controller.manualHeight == tall)
+
+        try typeText("첫 줄\n둘째 줄\n셋째 줄\n넷째 줄\n다섯째 줄\n여섯째 줄", into: controller)
+        #expect(await fixture.wait { controller.heightTarget == nil })
+        #expect(controller.panel.frame.height == tall)
+
+        // 화면보다 크게 바꾸려 해도 표시 영역에서 멈춘다.
+        controller.panel.setFrame(
+            NSRect(x: start.minX, y: visible.minY - 400, width: start.width, height: visible.height + 400),
+            display: true
+        )
+        #expect(controller.panel.frame.height == visible.height.rounded(.down))
+    }
+
     // MARK: - 상태 저장과 되살리기
 
     @Test func restoreBringsBackOnlyOpenNotesAtTheirFrames() throws {
