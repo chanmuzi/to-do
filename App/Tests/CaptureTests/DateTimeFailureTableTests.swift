@@ -68,18 +68,23 @@ import Testing
         item.check()
     }
 
-    /// 8~11시는 오전이다. 지났다고 밤으로 바꿔 읽지 않고 내일 아침으로 읽는다.
+    /// 8~11시도 오후다(D-157). 다만 양쪽 다 오전, 오후 없는 범위의 시작은 8~11시를 오전으로 읽는다(`9-6시` 근무).
     @Test(arguments: [
-        Case.row("10시 회의", at(11, 17, 10), now: noon30, flags: .meridiem),
-        Case.row("11시 전화", at(11, 17, 11), now: noon30, flags: .meridiem),
-        Case.row("9시 스탠드업", at(11, 17, 9), flags: .meridiem),
+        Case.row("10시 회의", at(11, 16, 22), now: noon30, flags: .meridiem),
+        Case.row("11시 전화", at(11, 16, 23), now: noon30, flags: .meridiem),
+        Case.row("9시 스탠드업", at(11, 16, 21), flags: .meridiem),
+        Case.row("8시 운동", at(11, 16, 20), flags: .meridiem),
+        Case.row("8시 운동", at(11, 17, 20), now: at(11, 16, 20, 30), flags: .meridiem),
         Case.row("9-6시 근무", at(11, 16, 9), to: at(11, 16, 18), flags: [.past, .meridiem], absent: []),
         Case.row("9:00-6:00", at(11, 16, 9), to: at(11, 16, 18), flags: [.past, .meridiem], absent: []),
         Case.row("9-6시 근무", at(11, 16, 9), to: at(11, 16, 18), now: at(11, 16, 8), flags: .meridiem),
-        // `저녁`은 뒤의 말(저녁 예약)에 딸린 것이다. 시각을 밤으로 바꾸지 않는다.
-        Case.one("11시 저녁 예약 전화", "11시", at(11, 16, 11), flags: .meridiem),
+        // `저녁`은 뒤의 말(저녁 예약)에 딸린 것이다. 시각은 오후 규칙 그대로 23:00이다.
+        Case.one("11시 저녁 예약 전화", "11시", at(11, 16, 23), flags: .meridiem),
+        // 양 끝이 제 날을 가진 범위도 시작을 끝보다 앞으로 읽는다.
+        Case.one("내일 9시~내일 11시", "내일 9시~내일 11시", at(11, 17, 9), to: at(11, 17, 11), flags: .meridiem),
+        Case.one("내일 9시~내일 오후 1시", "내일 9시~내일 오후 1시", at(11, 17, 9), to: at(11, 17, 13)),
     ])
-    func morningHoursStayInTheMorning(item: ParseCase) {
+    func bareHoursReadAsAfternoon(item: ParseCase) {
         item.check()
     }
 
@@ -143,7 +148,7 @@ import Testing
         Case.one("11/20 (금) 발표", "11/20 (금)", at(11, 20, 9)),
         Case.one("tomorrow at 3pm", "tomorrow at 3pm", at(11, 17, 15)),
         Case.one("friday at 3pm", "friday at 3pm", at(11, 20, 15)),
-        Case.one("next monday at 10", "next monday at 10", at(11, 23, 10)),
+        Case.one("next monday at 10", "next monday at 10", at(11, 23, 22)),
         Case.one("friday @ 3", "friday @ 3", at(11, 20, 15)),
         Case.one("내일에 3시", "내일에 3시", at(11, 17, 15)),
         Case.one("내일, 3시", "내일, 3시", at(11, 17, 15)),
@@ -193,7 +198,7 @@ import Testing
         Case.one("수욜 3시", "수욜 3시", at(11, 18, 15)),
         Case.one("금욜 회식", "금욜", at(11, 20, 9)),
         Case.one("다음주 화 2시", "다음주 화 2시", at(11, 24, 14)),
-        Case.one("담주 월 10시", "담주 월 10시", at(11, 23, 10)),
+        Case.one("담주 월 10시", "담주 월 10시", at(11, 23, 22)),
         Case.one("담주 금요일", "담주 금요일", at(11, 27, 9)),
         Case.one("차주 금요일", "차주 금요일", at(11, 27, 9)),
         Case.one("다음 달 20일", "다음 달 20일", at(12, 20, 9)),
@@ -212,7 +217,8 @@ import Testing
         Case.one("11월 16일 발표", "11월 16일", at(11, 16, 9), flags: .past),
         Case.one("16일 마감", "16일", at(11, 16, 9), flags: .past),
         Case.one("16일 3시 마감", "16일 3시", at(11, 16, 15), absent: .past),
-        Case.one("월요일 9시", "월요일 9시", at(11, 16, 9), flags: .past),
+        Case.one("월요일 오전 9시", "월요일 오전 9시", at(11, 16, 9), flags: .past),
+        Case.one("월요일 9시", "월요일 9시", at(11, 16, 21)),
         Case.one("금요일 데모", "금요일", at(11, 20, 9), now: friday, flags: .past),
         Case.one("fri", "fri", at(11, 20, 9), now: friday, flags: .past),
         Case.one("일요일", "일요일", at(11, 22, 9), now: sunday, flags: .past),
@@ -327,7 +333,7 @@ import Testing
         Case.one("세 시 회의", "세 시", at(11, 16, 15), flags: .meridiem),
         Case.one("두시 반", "두시 반", at(11, 16, 14, 30)),
         Case.one("열두시 점심", "열두시", at(11, 16, 12)),
-        Case.one("내일 아홉시", "내일 아홉시", at(11, 17, 9)),
+        Case.one("내일 아홉시", "내일 아홉시", at(11, 17, 21)),
     ])
     func durationsAndKoreanNumerals(item: ParseCase) {
         item.check()

@@ -68,7 +68,7 @@ import Testing
     /// `매일 9시`는 다가오는 9시 한 번으로 읽고 되풀이였다고 알린다. 되풀이를 걸어 주지는 않는다.
     @Test func dailyIsReadOnceAndFlagged() throws {
         let found = try #require(parse("매일 9시 스탠드업"))
-        #expect(found.start == ParseCase.at(11, 17, 9))
+        #expect(found.start == ParseCase.at(11, 16, 21))
         #expect(found.end == nil)
         #expect(found.assumptions.contains(.recurring))
         #expect((("매일 9시 스탠드업") as NSString).substring(with: found.range) == "매일 9시")

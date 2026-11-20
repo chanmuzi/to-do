@@ -213,16 +213,17 @@ import FieldTestSupport
     }
 
     /// 오전, 오후를 적지 않아 고른 시각도 오전, 오후를 붙여 보여 준다. 내일로 넘어갔으면 날도 보인다.
+    /// 오전, 오후 없는 9시는 오후다(D-157). 밤 10시에 적으면 내일 밤 9시다.
     @Test func resolvedReadingIsShownWithDayAndMeridiem() throws {
         defer { fixture.cleanUp() }
-        capture.now = { TestClock.now }
+        capture.now = { TestClock.date(11, 16, 22) }
         capture.calendar = TestClock.calendar
         capture.show()
         try input().type("9시 스탠드업")
-        #expect(capture.displayedReminder == "내일 9:00 AM")
+        #expect(capture.displayedReminder == "내일 9:00 PM")
         try input().selectAll(nil)
         try input().type("3시 회의")
-        #expect(capture.displayedReminder == "3:00 PM")
+        #expect(capture.displayedReminder == "내일 3:00 PM")
         try input().selectAll(nil)
         try input().type("내년 12월 1일 정산")
         #expect(capture.displayedReminder == "2027/12/1")
@@ -348,7 +349,7 @@ import FieldTestSupport
         capture.show()
         try input().type("회의 내일 10")
         try input().compose("시")
-        #expect(capture.displayedReminder == "내일 10:00 AM")
+        #expect(capture.displayedReminder == "내일 10:00 PM")
         #expect(try input().hasMarkedText())
         #expect(try input().markedRange() == NSRange(location: 8, length: 1))
         // 조합이 이어진다: 같은 자리의 글자가 바뀐다.
@@ -403,7 +404,7 @@ import FieldTestSupport
         capture.calendar = TestClock.calendar
         capture.show()
         try input().type("내일 10시 회의")
-        #expect(capture.displayedReminder == "내일 10:00 AM")
+        #expect(capture.displayedReminder == "내일 10:00 PM")
         capture.performCycleReminder()
         #expect(capture.displayedReminder == "3:00 PM")
         #expect(capture.underlinedRange == nil)
@@ -414,7 +415,7 @@ import FieldTestSupport
         #expect(capture.displayedReminder == "11/23 9:00 AM")
         // 한 바퀴 돌면 글에서 읽은 시간으로 돌아간다.
         capture.performCycleReminder()
-        #expect(capture.displayedReminder == "내일 10:00 AM")
+        #expect(capture.displayedReminder == "내일 10:00 PM")
         #expect(capture.underlinedRange == NSRange(location: 0, length: 6))
     }
 

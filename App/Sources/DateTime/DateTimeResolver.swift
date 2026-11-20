@@ -2,7 +2,8 @@ import Foundation
 
 /// 적은 날과 시각을 실제 날짜로 푼다. "지금"과 달력(시간대 포함)은 밖에서 받는다. 규칙의 전체 표는 spec 7a.
 ///
-/// - 오전, 오후를 적지 않은 시각은 흔한 쪽으로 읽는다: 1~7시는 오후, 8~11시는 오전, 12시는 정오.
+/// - 오전, 오후를 적지 않은 시각은 오후로 읽는다: 1~11시는 오후, 12시는 정오. 양쪽 다 적지 않은 범위의 시작만
+///   1~7시는 오후, 8~11시는 오전이다(`9-6시`).
 ///   날을 적지 않았으면 그 시각이 오늘 아직 남았을 때 오늘, 지났으면 같은 시각의 내일이다. 날을 적었으면 그날의 그 시각이다.
 /// - 24시간제나 오전, 오후를 적은 시각도 날을 적지 않았으면 다가오는 그 시각이다.
 /// - 날만 적으면 오전 9시다. 때를 가리키는 말이 함께 있으면 `DateTimeDefaults`의 값이다.
@@ -100,9 +101,16 @@ nonisolated struct DateTimeResolver {
     /// 범위. 한 날 안의 시각 범위는 양 끝이 서로 맞게 읽는다(`9-6시`는 09:00~18:00). 끝에 날이 있으면 끝은 제 날로 읽는다.
     /// - Parameter requiresEnd: 끝을 읽지 못하면 범위 전체를 읽지 않는다(`20~22일`).
     func resolveRange(start: Point, end: Point, requiresEnd: Bool = false) -> Outcome? {
-        if let startTime = start.time, let endTime = end.time, end.date == nil,
-           start.fromNow == nil, end.fromNow == nil {
-            return clockRange(start: start, startTime, end: end, endTime)
+        if let startTime = start.time, let endTime = end.time, start.fromNow == nil, end.fromNow == nil {
+            // 끝의 날이 시작과 같으면(`내일 10시~내일 12시`) 한 날 안의 범위와 같게 읽는다.
+            if end.date == nil {
+                return clockRange(start: start, startTime, end: end, endTime)
+            }
+            if end.date == start.date {
+                var sameDay = end
+                sameDay.date = nil
+                return clockRange(start: start, startTime, end: sameDay, endTime)
+            }
         }
         guard var outcome = resolve(start, isAlone: false) else { return nil }
         let endDate = self.end(end, after: outcome.start)
@@ -132,7 +140,7 @@ nonisolated struct DateTimeResolver {
 
     /// 한 날 안의 시각 범위(`3시~5시`, `9-6시`, `오후 2~4시`, `3~5pm`, `밤 11시~1시`).
     ///
-    /// - 양쪽 다 오전, 오후가 없으면 시작은 흔한 쪽으로 읽고, 끝은 시작보다 뒤인 가장 이른 시각이다.
+    /// - 양쪽 다 오전, 오후가 없으면 시작은 흔한 쪽(`TimeSpec.rangeStartHour`)으로 읽고, 끝은 시작보다 뒤인 가장 이른 시각이다.
     /// - 한쪽에만 있으면 다른 쪽이 따라간다: 끝은 시작보다 뒤인 가장 이른 시각, 시작은 끝보다 앞인 가장 늦은 시각.
     /// - 같은 날에 시작보다 뒤로 읽을 길이 없을 때만 끝이 다음 날로 넘어간다.
     /// - 날을 적지 않았으면 끝이 아직 남은 가장 가까운 날이다. 시작이 이미 지났으면(진행 중) `.past`로 알린다.
@@ -152,11 +160,11 @@ nonisolated struct DateTimeResolver {
             endMinutes = minutes(endTime, hour: endHour)
             let written = minutes(startTime, hour: startTime.hour % 12)
             startMinutes = [written + halfDay, written].first { $0 < endMinutes }
-                ?? minutes(startTime, hour: startTime.preferredHour)
+                ?? minutes(startTime, hour: startTime.rangeStartHour)
             if endMinutes <= startMinutes { endMinutes += 2 * halfDay }
         case let (startHour, nil):
             if startHour == nil || startTime.part == nil { assumptions.insert(.meridiem) }
-            startMinutes = minutes(startTime, hour: startHour ?? startTime.preferredHour)
+            startMinutes = minutes(startTime, hour: startHour ?? startTime.rangeStartHour)
             let written = minutes(endTime, hour: endTime.hour % 12)
             endMinutes = [written, written + halfDay, written + 2 * halfDay, written + 3 * halfDay]
                 .first { $0 > startMinutes } ?? written + 2 * halfDay
