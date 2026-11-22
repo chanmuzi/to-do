@@ -13,6 +13,7 @@
 | 본문 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-body` 400 |
 | 본문 굵게 | Pretendard | `fs-body` 14px / `lh-body` 24px | `fw-strong` 650 |
 | 라이브러리 목록 제목 | Pretendard | `library-header-font` 15px / `lh-body` 24px | `fw-title` 600 |
+| 라이브러리 묶음 머리 (`libraryListHeading`) | Pretendard | `fs-row` 14px / `lh-row` 18px | `fw-title` 600 |
 | 라이브러리 줄 제목 | Pretendard | `fs-row` 14px / `lh-row` 18px | `fw-selected` 500, 빈 제목 `fw-body` 400 |
 | 라이브러리 줄 미리 보기 | Pretendard | `fs-row-sub` 12.5px / `lh-ui` 16px | `fw-body` 400 |
 | 정보 (시간, 개수) | D2Coding | `fs-ui` 13px / `lh-ui` 16px | `fw-ui` 400 |
@@ -23,6 +24,7 @@
 | 코드 블록 | D2Coding | `fs-code` 12.5px / `lh-code` 20px | `fw-body` 400 |
 | 캡처 입력 | Pretendard | `fs-capture` 14px / `lh-body` 24px | `fw-body` 400 |
 
+- 라이브러리 묶음의 들임 19px은 그림 칸 `icon-s` 13px과 이름까지의 간격 `chrome-pad-end` 6px의 합입니다. 묶음 사이에는 `sp-5` 24px을 씁니다.
 - `font-body`: Pretendard. `font-ui`, `font-micro`, `font-mono`: D2Coding.
 - 본문 글꼴과 크기는 사용자가 바꿀 수 있습니다(12장). 본문 크기는 12~17pt이며 제목과 코드의 크기는 본문에 비례합니다.
 
