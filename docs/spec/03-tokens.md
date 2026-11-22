@@ -132,7 +132,7 @@
 | 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
 | 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
 | 구성 요소 | `menu-icon` | `12px` | 노트 메뉴 그림 크기(정렬 칸은 `icon-l` 14, D-058) |
-| 구성 요소 | `menu-w` | `210px` | 메뉴 최소 너비 |
+| 구성 요소 | `menu-w` | `226px` | 메뉴 최소 너비 |
 | 구성 요소 | `note-w`, `note-w-min`, `note-w-max` | `340px`, `260px`, `560px` | 노트 창 너비: 기본, 최소, 최대 (D-158) |
 | 재질 | `opacity` | `.92` | 창 불투명도 (포커스와 상관없이 같음) |
 | 재질 | `blur` | `24px` | 배경 흐림 반경 |
@@ -151,7 +151,7 @@
 - `library-header-h` 52, `library-section-head-h` 22, `library-section-gap` 11, `library-sidebar-inset` 10. `library-more-size` 20, 그림은 `menu-icon` 12다.
 - `library-row-leading` 20을 양쪽에 쓰고 `library-row-pad-y` 9, `library-row-gap` 3을 적용한다. `upcoming-detail-w` 216, 상세 여백은 10/12/6이다. 일정 호버 지연은 없다.
 - 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다.
-- `library-sidebar-row-gap`: 0, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
+- `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
 
@@ -169,6 +169,6 @@
 
 ### 설정 창 (D-147, D-148)
 
-창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 24이며 선택과 호버 불투명도는 각각 6%, 3.5%다. 제목은 library-header-font 15, 굵기 600이다.
+창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 24이며 선택과 호버는 selected와 hover다. 제목은 library-header-font 15, 굵기 600이다.
 
-카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 단축키 칩 높이는 22다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
+카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
