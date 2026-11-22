@@ -7,7 +7,6 @@ import Theme
 struct LibrarySidebar: View {
     @Bindable var model: LibraryModel
     @State private var deleting: Space?
-    @State private var toggleHovered = false
     private var theme: Theme { model.theme }
     var body: some View {
         VStack(spacing: 0) {
@@ -66,16 +65,10 @@ struct LibrarySidebar: View {
                             UpcomingButton(model: model, entry: entry)
                         }
                         if upcoming.count > collapsedLimit {
-                            Button {
+                            TextActionLink(theme: theme, title: model.showAllUpcoming ? "간단히 보기" : "모두 보기", symbol: "chevron.right") {
                                 model.showAllUpcoming.toggle()
                                 model.dismissUpcoming()
-                            } label: {
-                                Text(model.showAllUpcoming ? "간단히 보기" : "모두 보기")
-                                    .frame(height: theme.component(.libraryMoreSize)).contentShape(Rectangle())
                             }
-                            .font(theme.font(.librarySection, weight: theme.tokens.textStyle(.body).weight))
-                            .foregroundStyle(theme.libraryColor(toggleHovered ? .text2 : .text4))
-                            .buttonStyle(.plain).onHover { toggleHovered = $0 }
                             .padding(.trailing, theme.space(.sp2)).frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }

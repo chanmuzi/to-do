@@ -78,14 +78,14 @@ package final class PickerMenuRow: NSView {
     let header: Bool
     let selected: Bool
     let subtitle: String?
-    package init(theme: Theme, text: String, dot: NSImage?, header: Bool = false, selected: Bool, subtitle: String? = nil) {
+    package init(theme: Theme, text: String, dot: NSImage?, header: Bool = false, selected: Bool, subtitle: String? = nil, width: CGFloat? = nil) {
         self.subtitle = subtitle
         self.theme = theme
         self.text = text
         self.dot = dot
         self.header = header
         self.selected = selected
-        super.init(frame: CGRect(x: 0, y: 0, width: theme.component(.menuWidth),
+        super.init(frame: CGRect(x: 0, y: 0, width: width ?? theme.component(.menuWidth),
                                  height: theme.component(header ? .controlHeight : .segmentHeight)))
         autoresizingMask = [.width]
     }

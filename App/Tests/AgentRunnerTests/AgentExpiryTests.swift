@@ -24,7 +24,7 @@ import Testing
         let sink = Notices()
         let notices = AgentExpiryNotifications(notifier: sink)
         let runner = try AgentRunner(location: location, server: cli, notifications: notices)
-        func run() async throws { _ = try await runner.run("fake", engine: .claude(.haiku), installation: installation, taskName: "오늘 할 일 정리") }
+        func run() async throws { _ = try await runner.run("fake", engine: .claude("haiku"), installation: installation, taskName: "오늘 할 일 정리") }
         await #expect(throws: AgentError.failed(9)) { try await run() }
         try Data().write(to: connection.config.appending(path: ".credentials.json"))
         let account = try await connection.account(installation)

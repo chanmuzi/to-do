@@ -42,9 +42,7 @@ extension SettingsView {
                     model.change { $0.agentProvider = engine.provider.rawValue }
                 }
             }
-            if model.values.agentProvider != "codex" {
-                setting("모델", \.agentModel, [("auto", "자동"), ("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku")])
-            }
+            modelPicker
         }
         card("에이전트") {
             ForEach(engines, id: \.provider) { engine in
@@ -63,7 +61,38 @@ extension SettingsView {
                         Text(engine.detail).font(valueFont).foregroundStyle(theme.color(engine.status == .expired ? .warn : .text3))
                         Image(systemName: "chevron.right").font(valueFont).foregroundStyle(theme.color(.text3))
                     }.frame(height: theme.component(.settingsTop)).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                }.buttonStyle(RowHoverStyle(theme: theme))
+            }
+        }
+    }
+
+    private var modelPicker: some View {
+        let isCodex = model.values.agentProvider == "codex"
+        let available = model.agents?.engines.first { $0.provider == .codex }?.models ?? []
+        let options: [(id: String?, title: String)] = isCodex
+            ? [(nil, "CLI 기본")] + available.map { ($0.slug, $0.displayName) }
+            : [(nil, "자동"), ("fable", "Fable"), ("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku")]
+        let saved = model.values.selectedEngine(codexModels: available).model
+        let selected = options.first { $0.id == saved } ?? options[0]
+        return row("모델") {
+            ValuePopup(label: "모델", value: selected.title, theme: theme, inSettings: true) {
+                let menu = NSMenu()
+                menu.autoenablesItems = false
+                for (index, option) in options.enumerated() {
+                    if index == 1 { menu.addItem(.separator()) }
+                    let item = menu.addItem(withTitle: option.title, action: nil, keyEquivalent: "")
+                    item.representedObject = option.id
+                    item.state = option.id == selected.id ? .on : .off
+                    item.view = PickerMenuRow(theme: theme, text: option.title, dot: nil, selected: item.state == .on,
+                                              width: theme.component(isCodex ? .codexMenuWidth : .claudeMenuWidth))
+                }
+                return menu
+            } choose: { item in
+                let value = item.representedObject as? String
+                model.change {
+                    if isCodex { $0.codexModel = value }
+                    else { $0.agentModel = value ?? "auto" }
+                }
             }
         }
     }
@@ -74,9 +103,9 @@ extension SettingsView {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.color(.warn))
                 Text("로그인이 만료됐어요")
                 Spacer()
-                actionButton("다시 로그인", fill: .text) { engine.login() }
+                actionButton("다시 로그인") { engine.login() }
             }.padding(.horizontal, theme.space(.sp3)).frame(height: theme.component(.settingsBannerH))
-                .background(theme.color(.warn).opacity(theme.rgba(.settingsSelection).alpha),
+                .background(theme.color(.warn).opacity(theme.rgba(.connectFill).alpha),
                             in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
         }
         card {
@@ -105,7 +134,7 @@ extension SettingsView {
                 actionButton("취소") { engine.cancel() }
             } else if engine.activity == nil {
                 if engine.status == .connected { actionButton("로그아웃") { engine.logout() } }
-                if engine.status == .signedOut { actionButton("연결", fill: .text) { engine.login() } }
+                if engine.status == .signedOut { actionButton("연결") { engine.login() } }
             }
         }.frame(height: engine.activity == nil && engine.status == .missing ? 0 : nil)
         if engine.status == .missing { installCard(engine) }
@@ -143,15 +172,18 @@ extension SettingsView {
                     }
             }.zIndex(1)
             HStack {
-                Text(verbatim: command).font(theme.font(.code, size: theme.tokens.textStyle(.micro).size)).textSelection(.enabled)
+                Text(verbatim: command).font(theme.font(.codeBlock))
                 Spacer()
-                Button {
+                ChromeIconButton(theme: theme, title: "설치 명령 복사", symbol: "doc.on.doc") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(command, forType: .string)
-                } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).accessibilityLabel("설치 명령 복사")
-            }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.space(.sp6)).modifier(WhiteControl(theme: theme))
+                }
+            }.padding(.leading, theme.component(.codeBlockPaddingX)).padding(.trailing, theme.component(.codeBlockGap))
+                .frame(height: theme.component(.installCommandHeight))
+                .background(theme.color(.codeBlockBackground), in: RoundedRectangle(cornerRadius: theme.shape(.codeBlockRadius)))
             if let url = URL(string: guide) {
-                Link("다른 설치 방법 ↗", destination: url).font(valueFont).foregroundStyle(theme.color(.text2))
+                TextActionLink(theme: theme, title: "다른 설치 방법", symbol: "arrow.up.right") { openURL(url) }
+                    .accessibilityAddTraits(.isLink)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }.padding(theme.space(.sp3)).background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))

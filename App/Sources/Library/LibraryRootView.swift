@@ -33,9 +33,7 @@ struct LibraryRootView: View {
                             Button(model.showsNewNote ? "새 노트" : "전체 노트") {
                                 if !model.showsNewNote { model.select(.all) }
                                 else { model.newNoteInSelection() }
-                            }.font(theme.font(.body))
-                                .padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.controlHeight))
-                                .buttonStyle(LibraryButtonStyle(theme: theme))
+                            }.buttonStyle(WhiteControl(theme: theme))
                                 .padding(theme.space(.sp3))
                         }
                         let sections = model.sections
@@ -55,7 +53,7 @@ struct LibraryRootView: View {
                         Text(error).font(theme.font(.rowSub)).textSelection(.enabled)
                         Button("다시 시도") { model.error = nil; model.refresh() }
                         Button("닫기") { model.error = nil }
-                    }.padding(theme.space(.sp2))
+                    }.buttonStyle(WhiteControl(theme: theme)).padding(theme.space(.sp2))
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity).background(theme.libraryColor(.surface))
         }.overlayPreferenceValue(UpcomingBounds.self) { anchors in

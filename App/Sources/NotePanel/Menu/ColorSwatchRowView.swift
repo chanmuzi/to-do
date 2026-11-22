@@ -50,7 +50,7 @@ final class ColorSwatchRowView: NSView {
         let theme = style.theme
         let icon = theme.component(.iconLarge)
         let size = theme.component(.swatchSize)
-        let contentX = theme.space(.sp1) + theme.space(.sp2)
+        let contentX = theme.space(.sp1) + theme.space(.sp2) + theme.component(.menuCheckColumn)
         iconView.frame = style.theme.symbolFrame(
             NSRect(x: contentX, y: ((bounds.height - icon) / 2).rounded(), width: icon, height: icon)
         )

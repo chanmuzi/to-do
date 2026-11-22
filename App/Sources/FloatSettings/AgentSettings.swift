@@ -12,6 +12,8 @@ package final class EngineAccount {
     package private(set) var activity: Activity?
     package private(set) var account: AgentAccount?
     package private(set) var message: String?
+    package private(set) var models: [CodexModel] = []
+    private var requestedModels = false
     private let location: StoreLocation
     private let directory: URL?
     private var installation: AgentInstallation?
@@ -41,9 +43,16 @@ package final class EngineAccount {
 
     package func refresh() {
         start(.checking) { connection in
+            let needsModels = self.provider == .codex && !self.requestedModels
+            self.requestedModels = true
             let found = try await connection.discover(in: self.directory)
             try Task.checkCancellation()
             self.installation = found
+            if needsModels {
+                let models = await connection.models(found)
+                try Task.checkCancellation()
+                self.models = models
+            }
             try await self.readAccount(connection, found)
         }
     }
@@ -103,6 +112,8 @@ package final class EngineAccount {
         activity = nil
         message = nil
         installation = nil
+        models = []
+        requestedModels = false
     }
 
     private func start(_ operation: Activity, perform: @escaping (AgentConnection) async throws -> Void) {
@@ -111,7 +122,10 @@ package final class EngineAccount {
         message = nil
         let started = generation
         task = Task {
-            do { try await perform(AgentConnection(provider: provider, location: location)) }
+            do {
+                try Task.checkCancellation()
+                try await perform(AgentConnection(provider: provider, location: location))
+            }
             catch is CancellationError { }
             catch AgentError.missingExecutable where !Task.isCancelled {
                 status = .missing

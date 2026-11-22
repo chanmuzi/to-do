@@ -11,7 +11,7 @@ final class MenuRowView: NSView {
     private var isShowingHighlight = false
 
     /// - Parameters:
-    ///   - isOn: 켜진 항목이면 오른쪽 끝에 체크를 보인다.
+    ///   - isOn: 켜진 항목이면 왼쪽 칸에 체크를 보인다.
     ///   - isDimmed: 누를 수 없는 줄(설명 줄, 아직 이어지지 않은 화면을 여는 항목).
     init(style: PanelStyle, title: String, symbolName: String?, isOn: Bool = false, isDimmed: Bool = false) {
         self.style = style
@@ -54,12 +54,12 @@ final class MenuRowView: NSView {
         }
         highlightView.frame = bounds.insetBy(dx: edge, dy: 0)
         let contentX = edge + theme.space(.sp2)
-        iconView.frame = theme.symbolFrame(centered(x: contentX, width: icon, height: icon))
-        let stateX = bounds.width - contentX - state
-        stateView.frame = theme.symbolFrame(centered(x: stateX, width: state, height: state))
-        let labelX = contentX + icon + theme.space(.sp2)
+        let iconX = contentX + theme.component(.menuCheckColumn)
+        iconView.frame = theme.symbolFrame(centered(x: iconX, width: icon, height: icon))
+        stateView.frame = theme.symbolFrame(centered(x: contentX, width: state, height: state))
+        let labelX = iconX + icon + theme.space(.sp2)
         label.frame = centered(
-            x: labelX, width: max(0, stateX - theme.space(.sp2) - labelX),
+            x: labelX, width: max(0, bounds.width - contentX - labelX),
             height: label.intrinsicContentSize.height.rounded(.up)
         )
     }

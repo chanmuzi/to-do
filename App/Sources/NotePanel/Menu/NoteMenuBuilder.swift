@@ -102,6 +102,7 @@ struct NoteMenuBuilder {
         // 항목은 target을 붙잡지 않는다. 메뉴가 살아 있는 동안 함께 살도록 여기 맡긴다.
         item.representedObject = target
         item.isEnabled = isEnabled
+        item.state = isOn ? .on : .off
         item.view = MenuRowView(style: style, title: title, symbolName: symbol, isOn: isOn, isDimmed: !isEnabled)
         return item
     }

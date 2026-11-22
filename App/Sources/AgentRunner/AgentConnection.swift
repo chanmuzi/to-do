@@ -2,10 +2,17 @@ import Foundation
 import Store
 
 public enum AgentProvider: String, Codable, Sendable { case claude, codex }
-public enum ClaudeModel: String, Sendable { case opus, sonnet, haiku }
 public enum APIProvider: String, Sendable { case anthropic, openAI }
 public enum AgentEngine: Sendable {
-    case claude(ClaudeModel), codex(model: String? = nil), apiKey(APIProvider)
+    case claude(String? = nil), codex(model: String? = nil), apiKey(APIProvider)
+
+    public var model: String? {
+        switch self {
+        case .claude(let alias): alias == "auto" ? nil : alias
+        case .codex(let slug): slug
+        case .apiKey: nil
+        }
+    }
 }
 
 public struct AgentAccount: Sendable {

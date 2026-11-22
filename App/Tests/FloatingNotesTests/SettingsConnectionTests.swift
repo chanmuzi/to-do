@@ -1,9 +1,23 @@
+import AgentRunner
 import Foundation
 import FloatSettings
 import Store
 import Testing
 
 @Suite struct AgentStateTransitionTests {
+    @Test func savedModelFallsBackWithoutOverwritingProviderChoices() throws {
+        var values = try JSONDecoder().decode(SettingsValues.self, from: Data(#"{"agentModel":"sonnet"}"#.utf8))
+        #expect(values.selectedEngine(codexModels: []).model == "sonnet")
+        values.agentProvider = "codex"
+        values.codexModel = "test-slug"
+        #expect(values.selectedEngine(codexModels: []).model == nil)
+        let list = try JSONDecoder().decode([CodexModel].self, from: Data(
+            #"[{"slug":"test-slug","display_name":"Test","visibility":"list","priority":1}]"#.utf8))
+        let reopened = try JSONDecoder().decode(SettingsValues.self, from: JSONEncoder().encode(values))
+        #expect(reopened.selectedEngine(codexModels: list).model == "test-slug")
+        #expect(reopened.agentModel == "sonnet")
+    }
+
     @Test func isolatedLoginCancelVerifyExpiryAndLogout() async throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

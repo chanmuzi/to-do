@@ -7,8 +7,6 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface3 = "surface-3"
     case connectFill = "connect-fill"
     case selected
-    case settingsHover = "settings-hover"
-    case settingsSelection = "settings-selection"
     case rowTitle = "row-title"
     case hover
     case text
@@ -223,6 +221,13 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case swatchSize = "swatch-size"
     case swatchGap = "swatch-gap"
     case swatchRing = "swatch-ring"
+    case claudeMenuWidth = "claude-menu-width"
+    case codexMenuWidth = "codex-menu-width"
+    case menuCheckColumn = "menu-check-column"
+    case settingsSparklesOffset = "settings-sparkles-offset"
+    case shortcutKeyWidth = "shortcut-key-width"
+    case shortcutModifierSpacing = "shortcut-modifier-spacing"
+    case installCommandHeight = "install-command-height"
     case menuWidth = "menu-w"
     /// 노트 창 너비: 기본, 최소, 최대(spec 4.1, 임시 값).
     case noteWidth = "note-w"

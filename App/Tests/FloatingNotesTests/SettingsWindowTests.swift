@@ -71,6 +71,29 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
+    @Test func previewHasNoInteractiveAccessibilityChildren() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let settings = SettingsCoordinator(model: SettingsModel(read: { store.settings }, save: store.update,
+            schedules: service, shortcuts: [], openPrivacy: { _ in }), theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.appearance)
+        defer { settings.window?.close() }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        func preview(in view: NSView) -> NSView? {
+            if view.accessibilityLabel() == "노트 미리보기" { return view }
+            return view.subviews.lazy.compactMap(preview).first
+        }
+        let root = try #require(settings.window?.contentView)
+        let image = try #require(preview(in: root))
+        #expect(image.accessibilityRole() == .image)
+        #expect(image.accessibilityChildren()?.isEmpty != false)
+        #expect(!image.acceptsFirstResponder && !image.accessibilityPerformPress())
+        #expect(image.hitTest(NSPoint(x: image.bounds.midX, y: image.bounds.midY)) == nil)
+    }
+
     @Test func fontSliderAndCalendarDefaultChoice() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }

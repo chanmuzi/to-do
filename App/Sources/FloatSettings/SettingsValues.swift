@@ -1,3 +1,4 @@
+import AgentRunner
 import Foundation
 
 /// 설정 창과 앱이 공유하는 저장 형식.
@@ -14,6 +15,7 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var reminderDisplay = "time"
     package var clockFormat = "koreanMeridiem"
     package var agentProvider = "claude"
+    package var codexModel: String?
     package var agentModel = "auto"
     package var appearance = "system"
     package var bodySize: Int?
@@ -33,10 +35,18 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
         self.scheduleDateFormat = scheduleDateFormat
     }
 
+    package func selectedEngine(codexModels: [CodexModel]) -> AgentEngine {
+        if agentProvider == "codex" {
+            return .codex(model: codexModels.first { $0.slug == codexModel }?.slug)
+        }
+        return .claude(agentModel)
+    }
+
     /// 나중에 더한 항목이 없는 예전 파일도 읽는다(없는 항목은 기본값).
     package init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         agentProvider = try container.decodeIfPresent(String.self, forKey: .agentProvider) ?? "claude"
+        codexModel = try container.decodeIfPresent(String.self, forKey: .codexModel)
         agentModel = try container.decodeIfPresent(String.self, forKey: .agentModel) ?? "auto"
         spaceDisplay = try container.decodeIfPresent(String.self, forKey: .spaceDisplay) ?? "icon"
         reminderDisplay = try container.decodeIfPresent(String.self, forKey: .reminderDisplay) ?? "time"

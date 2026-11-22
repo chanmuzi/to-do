@@ -34,10 +34,10 @@ public struct AgentRunner: Sendable {
                     taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
                     onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
-        let requested: String?
+        let requested = engine.model
         switch engine {
-        case .claude(let alias): (provider, requested) = (.claude, alias.rawValue)
-        case .codex(let model): (provider, requested) = (.codex, model)
+        case .claude: provider = .claude
+        case .codex: provider = .codex
         case .apiKey: throw AgentError.unsupportedEngine
         }
         if let requested {
@@ -105,11 +105,11 @@ public struct AgentRunner: Sendable {
 
     private func arguments(_ provider: AgentProvider, _ model: String?, _ prompt: String, _ cwd: URL, _ folder: URL) throws -> [String] {
         let notes = location.notesDirectory.path
-        if provider == .claude, let model {
+        if provider == .claude {
             let config = folder.appending(path: "mcp.json")
             let data = try JSONSerialization.data(withJSONObject: ["mcpServers": ["float": ["command": server.path, "args": [notes]]]])
             try data.write(to: config, options: .atomic)
-            return ["-p", "--model", model, "--setting-sources", "", "--strict-mcp-config", "--mcp-config", config.path,
+            return ["-p"] + (model.map { ["--model", $0] } ?? []) + ["--setting-sources", "", "--strict-mcp-config", "--mcp-config", config.path,
                     "--tools", "", "--allowedTools", AgentStream.claudeTools.joined(separator: ","), "--disable-slash-commands",
                     "--permission-mode", "dontAsk", "--no-session-persistence", "--output-format", "stream-json",
                     "--verbose", "--include-partial-messages", "--", prompt]

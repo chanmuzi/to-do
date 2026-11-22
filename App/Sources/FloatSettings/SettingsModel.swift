@@ -32,6 +32,10 @@ package final class SettingsModel {
     #if DEBUG
     package func setInstallTipForVerification(_ shown: Bool) { showsInstallTip = shown }
     #endif
+    private(set) var sidebarHover: SettingsPane?
+    #if DEBUG
+    package func setSidebarHoverForVerification(_ pane: SettingsPane?) { sidebarHover = pane }
+    #endif
     var confirmingReset = false
     var showsInstallTip = false
     package let agents: AgentSettings?

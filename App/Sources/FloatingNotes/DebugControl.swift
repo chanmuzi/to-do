@@ -329,6 +329,16 @@ final class DebugControl {
             }
         case ("settings-agent-detail", let provider?, _) where isPassive:
             settingsWindow?.showAgent(provider.rawValue)
+        case ("settings-agent-choose", let provider?, _) where isPassive:
+            guard let model = settingsWindow?.model,
+                  let engine = model.agents?.engines.first(where: { $0.provider.rawValue == provider.rawValue }),
+                  engine.status == .connected else { return }
+            model.change { $0.agentProvider = engine.provider.rawValue }
+        case ("settings-sidebar-hover", let pane?, _) where isPassive:
+            settingsWindow?.model.setSidebarHoverForVerification(SettingsPane(rawValue: pane.rawValue))
+        case ("settings-audit", let name?, _) where isPassive:
+            guard let root = settingsWindow?.window?.contentView, let url = output(named: name.rawValue) else { return }
+            do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("설정 배치 검사 실패: \(error)") }
         case ("settings-fake-login", _, _) where isPassive:
             settingsWindow?.model.detailEngine?.loginForVerification()
         case ("settings-agent-cancel", _, _) where isPassive:

@@ -3,6 +3,7 @@ import SwiftUI
 import Theme
 
 struct SettingsView: View {
+    @Environment(\.openURL) var openURL
     let model: SettingsModel
     let theme: Theme
 
@@ -58,7 +59,7 @@ struct SettingsView: View {
         let selected = model.pane == pane || (pane == .assistant && model.pane == .accounts)
         return Button { model.pane = pane } label: {
             HStack(spacing: theme.space(.sp2)) {
-                Image(systemName: symbol).frame(width: theme.component(.iconLarge))
+                Image(systemName: symbol).offset(x: pane == .assistant ? theme.component(.settingsSparklesOffset) : 0).frame(width: theme.component(.iconLarge))
                 Text(pane.rawValue)
                 Spacer()
                 if pane == .assistant && model.agents?.engines.contains(where: { $0.status == .expired }) == true {
@@ -66,7 +67,7 @@ struct SettingsView: View {
                         .accessibilityLabel("다시 로그인 필요")
                 }
             }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.settingsSegmentH))
-        }.buttonStyle(SettingsButton(theme: theme, selected: selected, selection: .settingsSelection))
+        }.buttonStyle(SettingsButton(theme: theme, selected: selected, showsHover: model.sidebarHover == pane))
             .frame(height: theme.component(.settingsSidebarRow)).accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -80,7 +81,7 @@ struct SettingsView: View {
             if model.pane == .accounts, let engine = model.detailEngine {
                 Button { model.pane = .assistant } label: {
                     Image(systemName: "chevron.left").frame(width: theme.component(.settingsChipH), height: theme.component(.settingsChipH))
-                }.buttonStyle(.plain).accessibilityLabel("에이전트 목록으로")
+                }.buttonStyle(SettingsButton(theme: theme, selected: false)).accessibilityLabel("에이전트 목록으로")
                 logo(engine, small: true)
                 Text(engine.name)
             } else { Text(model.pane.rawValue) }
@@ -105,7 +106,7 @@ struct SettingsView: View {
                 Text("노트와 에이전트 연결은 그대로 남아요").font(valueFont)
                 HStack {
                     actionButton("취소") { model.confirmingReset = false }.keyboardShortcut(.cancelAction)
-                    actionButton("되돌리기", fill: .warn) {
+                    actionButton("되돌리기", ink: .warn) {
                         model.confirmingReset = false
                         model.restoreDefaults(theme: theme)
                     }
@@ -129,8 +130,7 @@ struct SettingsView: View {
                         row(item.action) {
                             HStack(spacing: theme.space(.sp1)) {
                                 ForEach(item.keys, id: \.self) { key in
-                                    Text(key).font(theme.font(.ui)).padding(.horizontal, theme.component(.settingsChipPad))
-                                        .frame(height: theme.component(.settingsChipH)).modifier(WhiteControl(theme: theme))
+                                    ShortcutValue(key: key, theme: theme)
                                 }
                             }
                         }
@@ -168,12 +168,8 @@ struct SettingsView: View {
         }.frame(minHeight: theme.component(.settingsRow))
     }
 
-    func actionButton(_ title: String, ink: ColorToken = .text, fill: ColorToken = .surface, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(valueFont).padding(.horizontal, theme.component(.settingsSegmentPad))
-                .frame(height: theme.component(.settingsChipH)).foregroundStyle(theme.color(fill == .surface ? ink : .surface))
-                .modifier(WhiteControl(theme: theme, fill: fill))
-        }.buttonStyle(.plain)
+    func actionButton(_ title: String, ink: ColorToken = .text, action: @escaping () -> Void) -> some View {
+        Button(title, action: action).buttonStyle(WhiteControl(theme: theme, ink: ink))
     }
 
     func segment<Value: Equatable>(_ title: String, value: Value, choices: [(Value, String)], select: @escaping (Value) -> Void) -> some View {
@@ -189,11 +185,11 @@ struct SettingsView: View {
                             .frame(maxHeight: .infinity)
                             .background(choice.0 == value ? theme.color(.surface) : .clear,
                                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-                    }.buttonStyle(.plain).accessibilityLabel(choice.1)
+                    }.buttonStyle(RowHoverStyle(theme: theme, selected: choice.0 == value)).accessibilityLabel(choice.1)
                         .accessibilityAddTraits(choice.0 == value ? .isSelected : [])
                 }
             }.padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
-                .background(theme.color(.settingsSelection), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
+                .background(theme.color(.connectFill), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
                 .accessibilityElement(children: .contain).accessibilityLabel(title)
         }
     }
@@ -211,12 +207,33 @@ struct SettingsView: View {
     }
 }
 
-struct WhiteControl: ViewModifier {
+
+struct RowHoverStyle: ButtonStyle {
     let theme: Theme
-    var fill: ColorToken = .surface
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: theme.shape(.controlRadius))
-        content.background(theme.color(fill), in: shape)
-            .overlay { shape.strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)) }
+    var selected = false
+    @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(!selected && (hovered || configuration.isPressed) ? theme.color(.hover) : .clear,
+                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .contentShape(Rectangle()).onHover { hovered = $0 }
+            .animation(reduced ? nil : theme.motion.animation, value: hovered || configuration.isPressed)
+    }
+}
+
+private struct ShortcutValue: View {
+    let key: String
+    let theme: Theme
+    var body: some View {
+        let modifiers = key.prefix { "⌃⌥⇧⌘".contains($0) }
+        let character = String(key.dropFirst(modifiers.count))
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Text(verbatim: String(modifiers)).tracking(theme.component(.shortcutModifierSpacing))
+            Text(verbatim: character)
+                .frame(minWidth: theme.component(.shortcutKeyWidth))
+        }.font(.system(size: theme.tokens.textStyle(.ui).size)).foregroundStyle(theme.color(.text2))
+            .fixedSize().accessibilityElement(children: .ignore).accessibilityLabel(key)
     }
 }

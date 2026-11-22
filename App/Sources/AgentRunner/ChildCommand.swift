@@ -132,10 +132,10 @@ extension AgentCommand {
         }
     }
 
-    func capture(mergeDiagnostics: Bool = false) throws -> (Int32, Data) {
+    func capture(mergeDiagnostics: Bool = false, byteLimit: Int = 1024 * 1024) throws -> (Int32, Data) {
         var data = Data()
         let status = try execute(timeout: .seconds(10), mergeDiagnostics: mergeDiagnostics) {
-            guard data.count + $0.count < 1024 * 1024 else { throw AgentError.invalidOutput }
+            guard data.count + $0.count < byteLimit else { throw AgentError.invalidOutput }
             data.append($0)
             data.append(10)
         }
