@@ -345,6 +345,40 @@ import SpaceIcons
         #expect(queries == [.event, .reminder])
     }
 
+    @Test func listRulesStartAtTextAndSkipTheLastNote() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        for title in ["첫 노트", "둘째 노트"] { _ = try f.notes.create(NoteDraft(title: title)) }
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        let root = try #require(f.coordinator.window?.contentView)
+        for selection in [LibrarySelection.today, .all] {
+            f.model.select(selection)
+            RunLoop.main.run(until: Date().addingTimeInterval(f.model.theme.motion.duration + 0.05))
+            root.displayIfNeeded()
+            let notes = f.model.rows
+            let rows = descendants(root).compactMap { $0 as? LibraryRowInputView }
+            let leading = selection == .all ? 39 : 20
+            let bitmap = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
+            root.cacheDisplay(in: root.bounds, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / root.bounds.width
+            for note in notes {
+                let row = try #require(rows.first { $0.note?.id == note.id })
+                let rect = row.convert(row.bounds, to: root)
+                let bottom = root.isFlipped ? rect.maxY : root.bounds.height - rect.minY
+                let y = Int(bottom * scale) - 1
+                let x = Int((rect.minX + CGFloat(leading)) * scale)
+                let right = Int((rect.maxX - 20) * scale)
+                let margin = bitmap.colorAt(x: x - 1, y: y)
+                let outside = bitmap.colorAt(x: right, y: y)
+                #expect(margin == outside)
+                let drawsRule = note.id != notes.last?.id
+                #expect((bitmap.colorAt(x: x, y: y) != outside) == drawsRule)
+                #expect((bitmap.colorAt(x: right - 1, y: y) != outside) == drawsRule)
+            }
+        }
+    }
+
     @Test func selectedNoteFillKeepsSideMarginsAndSeparatorClear() throws {
         let f = try Fixture()
         defer { try? f.close() }

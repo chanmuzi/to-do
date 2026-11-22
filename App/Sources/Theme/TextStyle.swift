@@ -2,7 +2,7 @@ import CoreGraphics
 
 /// 글자 역할(spec 3.1의 표 한 줄씩). 어떤 토큰을 묶는지만 정하고 값은 `tokens.json`에서 온다.
 public enum TextStyle: String, CaseIterable, Sendable {
-    case librarySection, scheduleTitle
+    case librarySection, libraryListHeading, scheduleTitle
     case sectionLabel, scheduleInput, scheduleTime
     case title      // 노트 제목(상단 줄)
     case h1, h2, h3 // 본문 제목
@@ -30,6 +30,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
     var keys: Keys {
         switch self {
         case .librarySection: Keys(font: .body, size: "fs-library-section", lineHeight: "lh-micro", weight: "fw-selected")
+        case .libraryListHeading: Keys(font: .body, size: "fs-row", lineHeight: "lh-row", weight: "fw-title")
         case .scheduleTitle: Keys(font: .body, size: "fs-schedule-title", lineHeight: "lh-body", weight: "fw-title")
         case .sectionLabel: Keys(font: .body, size: "fs-micro", lineHeight: "lh-micro", weight: "fw-ui-strong")
         case .scheduleInput: Keys(font: .body, size: "fs-capture", lineHeight: "lh-body", weight: "fw-title")

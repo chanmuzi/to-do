@@ -76,34 +76,62 @@ public struct LibraryIndex: Sendable {
         Array(Set(notes.filter { $0.spaceID == space && !$0.isArchived }
             .map { calendar.startOfDay(for: $0.created) })).sorted(by: >)
     }
+    enum SectionHeader: Hashable {
+        case pinned, today, date(String)
+
+        var title: String {
+            switch self {
+            case .pinned: "고정됨"
+            case .today: "오늘"
+            case .date(let title): title
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .pinned: "pin"
+            case .today: "sun.max"
+            case .date: "calendar"
+            }
+        }
+    }
+
     struct Section: Identifiable {
-        let id: String
+        let header: SectionHeader?
+        var id: SectionHeader? { header }
         var notes: [Note]
     }
 
     func sections(for selection: LibrarySelection) -> [Section] {
         let rows = rows(for: selection)
+        guard !rows.isEmpty else { return [] }
+        if selection == .today || selection == .floating {
+            return [Section(header: nil, notes: rows)]
+        }
+        let groupsPinned: Bool = switch selection {
+        case .archived, .archive, .trash: false
+        default: true
+        }
         var groups: [Section] = []
         var pinned: [Note] = []
         for note in rows {
-            if selection != .archived && selection != .trash && windows[note.id]?.isPinned == true {
+            if groupsPinned && windows[note.id]?.isPinned == true {
                 pinned.append(note)
                 continue
             }
             let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: note.modified),
                                                to: calendar.startOfDay(for: now)).day ?? 0
-            let title: String
-            switch days {
-            case ...0: title = "오늘"
-            case 1: title = "어제"
-            case 2...7: title = "이전 7일"
-            case 8...30: title = "이전 30일"
-            default: title = "\(calendar.component(.year, from: note.modified))년 \(calendar.component(.month, from: note.modified))월"
+            let header: SectionHeader = switch days {
+            case ...0: .today
+            case 1: .date("어제")
+            case 2...7: .date("이전 7일")
+            case 8...30: .date("이전 30일")
+            default: .date("\(calendar.component(.year, from: note.modified))년 \(calendar.component(.month, from: note.modified))월")
             }
-            if groups.last?.id == title { groups[groups.count - 1].notes.append(note) }
-            else { groups.append(Section(id: title, notes: [note])) }
+            if groups.last?.header == header { groups[groups.count - 1].notes.append(note) }
+            else { groups.append(Section(header: header, notes: [note])) }
         }
-        if !pinned.isEmpty { groups.insert(Section(id: "고정됨", notes: pinned), at: 0) }
+        if !pinned.isEmpty { groups.insert(Section(header: .pinned, notes: pinned), at: 0) }
         return groups
     }
 

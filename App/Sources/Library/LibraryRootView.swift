@@ -29,24 +29,45 @@ struct LibraryRootView: View {
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        if model.rows.isEmpty {
+                        let sections = model.sections
+                        if sections.isEmpty {
                             Button(model.showsNewNote ? "새 노트" : "전체 노트") {
                                 if !model.showsNewNote { model.select(.all) }
                                 else { model.newNoteInSelection() }
                             }.buttonStyle(WhiteControl(theme: theme))
                                 .padding(theme.space(.sp3))
                         }
-                        let sections = model.sections
+                        let viewTitle = model.title(model.selection)
                         ForEach(sections) { section in
-                            Text(section.id).font(theme.font(.librarySection)).foregroundStyle(theme.libraryColor(.text3))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.leading, theme.component(.libraryRowLeading))
-                                .padding(.top, section.id == sections.first?.id ? theme.component(.libraryRowTrailing) : theme.lineHeight(.row))
-                                .padding(.bottom, theme.component(.chromePaddingEnd))
-                                .overlay(alignment: .bottom) { LibraryListRule(theme: theme) }
-                            ForEach(section.notes) { note in LibraryNoteRow(model: model, note: note) }
+                            let header = section.header.flatMap { $0.title == viewTitle ? nil : $0 }
+                            let isFirst = section.id == sections.first?.id
+                            let indent = header != nil || sections.count > 1
+                                ? theme.component(.iconSmall) + theme.component(.chromePaddingEnd) : 0
+                            Section {
+                                ForEach(section.notes) { note in
+                                    LibraryNoteRow(model: model, note: note, indent: indent,
+                                                   showsRule: note.id != section.notes.last?.id)
+                                }
+                            } header: {
+                                if let header {
+                                    HStack(spacing: theme.component(.chromePaddingEnd)) {
+                                        LibrarySymbol(theme: theme, name: header.symbol, size: .iconSmall)
+                                            .foregroundStyle(theme.libraryColor(.text2)).accessibilityHidden(true)
+                                        Text(header.title).font(theme.font(.libraryListHeading))
+                                            .foregroundStyle(theme.libraryColor(.text)).accessibilityAddTraits(.isHeader)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: theme.lineHeight(.libraryListHeading))
+                                    .padding(.horizontal, theme.component(.libraryRowLeading))
+                                    .padding(.top, isFirst ? theme.component(.libraryRowTrailing) : theme.space(.sp5))
+                                    .padding(.bottom, theme.component(.chromePaddingEnd))
+                                    LibraryListRule(theme: theme)
+                                } else if !isFirst {
+                                    LibraryListRule(theme: theme).padding(.top, theme.space(.sp5))
+                                }
+                            }
                         }
-                    }
+                    }.id(model.selection)
                 }
                 if let error = model.error {
                     HStack {
@@ -72,6 +93,8 @@ struct LibraryRootView: View {
 struct LibraryNoteRow: View {
     let model: LibraryModel
     let note: Note
+    let indent: CGFloat
+    let showsRule: Bool
     private var theme: Theme { model.theme }
     var body: some View {
         let preview = LibraryPreview(note)
@@ -89,10 +112,13 @@ struct LibraryNoteRow: View {
                         .foregroundStyle(theme.libraryColor(.text3)).lineLimit(1)
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, theme.component(.libraryRowLeading))
+                .padding(.leading, theme.component(.libraryRowLeading) + indent)
+                .padding(.trailing, theme.component(.libraryRowLeading))
                 .padding(.vertical, theme.component(.libraryRowPaddingY))
         }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
-            .overlay(alignment: .bottom) { LibraryListRule(theme: theme) }
+            .overlay(alignment: .bottom) {
+                if showsRule { LibraryListRule(theme: theme).padding(.leading, indent) }
+            }
     }
 }
 
@@ -100,6 +126,6 @@ private struct LibraryListRule: View {
     let theme: Theme
     var body: some View {
         theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
-            .padding(.horizontal, theme.component(.libraryRowLeading)).allowsHitTesting(false)
+            .padding(.horizontal, theme.component(.libraryRowLeading)).allowsHitTesting(false).accessibilityHidden(true)
     }
 }
