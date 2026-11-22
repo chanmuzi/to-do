@@ -42,7 +42,7 @@ struct LibraryRootView: View {
                             let header = section.header.flatMap { $0.title == viewTitle ? nil : $0 }
                             let isFirst = section.id == sections.first?.id
                             let indent = header != nil || sections.count > 1
-                                ? theme.component(.iconSmall) + theme.component(.chromePaddingEnd) : 0
+                                ? theme.component(.libraryHeadingIcon) + theme.component(.chromePaddingEnd) : 0
                             Section {
                                 ForEach(section.notes) { note in
                                     LibraryNoteRow(model: model, note: note, indent: indent,
@@ -51,7 +51,7 @@ struct LibraryRootView: View {
                             } header: {
                                 if let header {
                                     HStack(spacing: theme.component(.chromePaddingEnd)) {
-                                        LibrarySymbol(theme: theme, name: header.symbol, size: .iconSmall)
+                                        LibrarySymbol(theme: theme, name: header.symbol, size: .libraryHeadingIcon)
                                             .foregroundStyle(theme.libraryColor(.text2)).accessibilityHidden(true)
                                         Text(header.title).font(theme.font(.libraryListHeading))
                                             .foregroundStyle(theme.libraryColor(.text)).accessibilityAddTraits(.isHeader)
@@ -98,7 +98,7 @@ struct LibraryNoteRow: View {
     private var theme: Theme { model.theme }
     var body: some View {
         let preview = LibraryPreview(note)
-        let weight = theme.tokens.textStyle(preview.isEmpty ? .body : .selected).weight
+        let weight = theme.tokens.textStyle(.body).weight
         let insetX = theme.space(.sp2)
         let insetY = theme.component(.libraryRowHighlightInsetY)
         LibrarySelectableRow(model: model, note: note, label: preview.title,

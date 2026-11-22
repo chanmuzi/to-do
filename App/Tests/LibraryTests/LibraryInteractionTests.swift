@@ -358,7 +358,7 @@ import SpaceIcons
             root.displayIfNeeded()
             let notes = f.model.rows
             let rows = descendants(root).compactMap { $0 as? LibraryRowInputView }
-            let leading = selection == .all ? 39 : 20
+            let leading = selection == .all ? 40 : 20
             let bitmap = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
             root.cacheDisplay(in: root.bounds, to: bitmap)
             let scale = CGFloat(bitmap.pixelsWide) / root.bounds.width

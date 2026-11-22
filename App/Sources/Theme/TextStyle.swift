@@ -30,7 +30,7 @@ public enum TextStyle: String, CaseIterable, Sendable {
     var keys: Keys {
         switch self {
         case .librarySection: Keys(font: .body, size: "fs-library-section", lineHeight: "lh-micro", weight: "fw-selected")
-        case .libraryListHeading: Keys(font: .body, size: "fs-row", lineHeight: "lh-row", weight: "fw-title")
+        case .libraryListHeading: Keys(font: .body, size: "fs-list-heading", lineHeight: "lh-list-heading", weight: "fw-title")
         case .scheduleTitle: Keys(font: .body, size: "fs-schedule-title", lineHeight: "lh-body", weight: "fw-title")
         case .sectionLabel: Keys(font: .body, size: "fs-micro", lineHeight: "lh-micro", weight: "fw-ui-strong")
         case .scheduleInput: Keys(font: .body, size: "fs-capture", lineHeight: "lh-body", weight: "fw-title")

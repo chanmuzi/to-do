@@ -212,6 +212,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     /// 노트 상단 줄: 요소 사이, 오른쪽 여백(spec 5.1).
     case chromeGap = "chrome-gap"
     case chromePaddingEnd = "chrome-pad-end"
+    /// 목록 묶음 머리의 그림 크기(머리 글자보다 1pt 작게).
+    case libraryHeadingIcon = "library-heading-icon"
     /// 선 아이콘 크기 세 단계(spec 18.2의 12, 13, 14pt).
     case iconSmall = "icon-s"
     case iconMedium = "icon-m"
