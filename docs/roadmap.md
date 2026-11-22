@@ -62,7 +62,7 @@
 ## 작업 방식 메모
 
 - 구현과 실행 확인은 Codex가, 범위, 리뷰, 커밋과 PR은 Claude가 맡는다(2026-11-17 사용자 결정). Codex는 사용자가 볼 수 있는 Orca 탭에서 돌린다.
-- 사용자가 레포의 `build/FloatingNotes.app`을 실제로 쓰므로 확인용 빌드는 `FLOATING_NOTES_APP_DIR`로 다른 곳에 만들고, 프로세스는 이름이 아니라 띄운 PID로만 끝낸다.
+- 기본 빌드 경로는 `build/Float.app`이다. 사용 중인 묶음을 보호하도록 확인용 빌드는 `FLOATING_NOTES_APP_DIR`로 다른 곳에 만들고, 프로세스는 이름이 아니라 띄운 PID로만 끝낸다.
 - 검증 중 사용자가 이 Mac을 쓰고 있다. 화면에 창을 띄우는 확인은 짧게, 보조 모니터 구석에서, 포커스를 가져가지 않게 한다.
   확인용 묶음은 `FLOATING_NOTES_APP_DIR=<작업 폴더>/app`으로 분리한다. 실행 옵션 `--notes-dir`, `--debug-passive`, `--debug-no-hotkeys`, `--menu-bar-icon off`와 `scripts/debug-send.sh`를 쓴다.
 - 화면이 잠겨 있으면 창 단위 캡처가 실패한다. 앱 안의 스냅숏 명령으로 대신하고, 확인하지 못한 것을 그대로 적는다.

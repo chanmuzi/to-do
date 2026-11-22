@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ko</string>
 	<key>CFBundleDisplayName</key>
-	<string>FloatingNotes</string>
+	<string>Float</string>
 	<key>CFBundleExecutable</key>
 	<string>FloatingNotes</string>
 	<key>CFBundleIconName</key>
@@ -24,8 +24,11 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>LSHasLocalizedDisplayName</key>
-	<true/>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ko</string>
+		<string>en</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>26.0</string>
 	<key>NSHighResolutionCapable</key>

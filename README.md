@@ -18,10 +18,11 @@ scripts/create-signing-identity.sh # 처음 한 번: 이 Mac에서 계속 쓸 �
 scripts/install-app.sh
 ```
 
-- 릴리스 빌드를 만들어 `/Applications/FloatingNotes.app`으로 넣는다. `/Applications`에 쓸 수 없으면 `~/Applications`에 넣는다.
+- 릴리스 빌드를 만들어 `/Applications/Float.app`으로 넣는다. `/Applications`에 쓸 수 없으면 `~/Applications`에 넣는다.
   `sudo`는 쓰지 않는다.
 - 이미 실행 중이면 먼저 정상 종료를 요청하고(저장하지 못한 노트가 있으면 앱이 묻는다) 끝난 뒤 바꿔 넣는다.
-- 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱, Finder, Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `FloatingNotes.app`이다.
+- 같은 설치 폴더에서 이전 이름의 앱을 찾으면 번들 ID를 확인한다. ID가 일치하면 새 앱 설치 후 이전 앱을 휴지통으로 옮기고 옮긴 경로를 출력한다.
+- 설치한 뒤에는 Spotlight나 Launchpad에서 "float"로 찾아 실행한다. 앱, Finder, Spotlight의 표시 이름은 Float이고 앱 파일 이름은 `Float.app`이다.
 - `create-signing-identity.sh`는 로그인 키체인에 `Float Local Code Signing` 자체 서명 인증서와 개인 키를 넣는다.
   유효기간은 10년(3,650일), 용도는 코드 서명이다. 이미 해당 이름의 인증서가 있으면 아무것도 바꾸지 않는다.
   **보통 암호를 묻지 않으며, 키체인이 잠겨 있으면 macOS의 `security`가 직접 묻는다.**
@@ -47,7 +48,7 @@ scripts/install-app.sh
 ### 설치하지 않고 실행
 
 ```sh
-scripts/run.sh          # 릴리스 빌드 후 build/FloatingNotes.app 실행
+scripts/run.sh          # 릴리스 빌드 후 build/Float.app 실행
 scripts/build-app.sh    # 빌드만 (debug 인자를 주면 디버그 빌드)
 ```
 
@@ -106,12 +107,9 @@ swift test --package-path App
 종이 노트 창 아이콘을 사용한다. 빌드는 Icon Composer의 라이트, 다크 겹을 컴파일하고 7개 크기의 PNG로 ICNS를 함께 만든다.
 `swift scripts/generate-brand-icons.swift <미리보기 폴더>`로 앱 아이콘 겹, PNG, 메뉴 막대 SVG와 PDF를 다시 만든다.
 1024px 캔버스의 본체는 824px(80.46875%), 사방 여백은 100px이며 시스템 메모 앱의 본체 비율을 따른다.
-번들 ID, 실행 파일, 타깃, 모듈, 앱 파일 이름, 기존 노트, 설정 저장 위치는 유지한다(D-062).
-
-파일명을 유지하면서 시스템 표시를 Float로 통일하기 위해 원본 `Info.plist`의 `CFBundleDisplayName`은
-`FloatingNotes`, `CFBundleName`은 `Float`, `LSHasLocalizedDisplayName`은 true로 둔다.
-`ko.lproj`와 `en.lproj`의 `InfoPlist.strings`에서는 두 이름 모두 `Float`다. 빌드 스크립트가 이 지역화 폴더를 앱에 복사한다.
-앱 메뉴는 지역화 값을 읽으며 `swift run`과 테스트에서는 Float를 기본값으로 쓴다(D-062).
+앱 파일 이름은 `Float.app`이고 원본 `Info.plist`의 `CFBundleDisplayName`과 `CFBundleName`은 모두 `Float`다(D-175).
+앱 메뉴는 표시 이름을 읽고, `swift run`과 테스트에서는 Float를 기본값으로 쓴다.
+번들 ID, 실행 파일, 타깃, 모듈, 노트와 설정 저장 위치는 D-062를 따른다.
 [Apple 표시 이름 규칙](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPFileSystem/Articles/DisplayNames.html)을 따른다.
 
 ## 리마인더와 캘린더 권한

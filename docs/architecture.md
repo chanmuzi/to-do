@@ -56,9 +56,9 @@ App/
 ├─ Tests/<모듈명>Tests/
 └─ Resources/         tokens.json, Fonts/, AppIcon.appiconset, menubar-icon.pdf, Info.plist
 scripts/
-├─ build-app.sh       빌드해서 ${FLOATING_NOTES_APP_DIR:-build}/FloatingNotes.app 을 만든다 (인자: debug|release, 기본 release)
+├─ build-app.sh       빌드해서 ${FLOATING_NOTES_APP_DIR:-build}/Float.app 을 만든다 (인자: debug|release, 기본 release)
 ├─ run.sh             빌드 뒤 실행. 인자는 앱에 그대로 넘긴다
-├─ install-app.sh     릴리스로 빌드해 /Applications(쓸 수 없으면 ~/Applications)에 "FloatingNotes.app"으로 넣는다. sudo를 쓰지 않고, 실행 중이면 먼저 정상 종료를 요청해 끝날 때까지 기다린다. FLOATING_NOTES_INSTALL_DIR로 넣을 폴더를 바꾼다
+├─ install-app.sh     릴리스로 빌드해 /Applications(쓸 수 없으면 ~/Applications)에 "Float.app"으로 넣는다. sudo를 쓰지 않고, 실행 중이면 먼저 정상 종료를 요청해 끝날 때까지 기다린다. 설치 후 같은 번들 ID의 이전 이름 묶음을 휴지통으로 옮긴다. FLOATING_NOTES_INSTALL_DIR로 넣을 폴더를 바꾼다
 └─ debug-send.sh      실행 중인 디버그 빌드에 확인용 명령을 보낸다 (인자: 출력 폴더, 명령)
 ```
 
@@ -67,7 +67,7 @@ scripts/
 - 실행 인자(확인용): `--notes-dir <경로>`(그 폴더만 읽고 씀), `--appearance light|dark`, `--menu-bar-icon on|off`(저장된 설정과 상관없이 이번 실행에서 메뉴 막대 아이콘을 보이거나 감춤). 환경 변수 `FLOATING_NOTES_DIR`도 같은 일을 한다.
 - 확인용 실행 인자(디버그 빌드에만 있다. `#if DEBUG`로 묶여 릴리스 빌드에는 인자 해석도, 명령을 받는 코드도 들어가지 않는다): `--debug-hover <노트 id>`(그 노트를 마우스가 올라간 모습으로 띄움), `--debug-control <출력 폴더>`(다른 프로세스가 분산 알림 `local.floating-notes.debug`로 보내는 명령을 받음. 명령 목록은 `DebugControl.swift`의 주석). 마우스와 키보드를 건드리지 않고 창 상태를 바꾸고 읽을 때 쓴다.
   - 분산 알림은 이 Mac의 어느 프로세스나 보낼 수 있으므로 두 가지로 막는다. 명령마다 이번 실행의 표가 있어야 한다(켤 때 새로 만들어 `<출력 폴더>/control-token`에 소유자만 읽게 적는다. 알림의 `object`는 `<표> <명령>`). 명령이 쓰는 파일(`snapshot`, `menu`, `dump`)은 출력 폴더 바로 아래의 파일 이름으로만 받는다(경로, `..`, 폴더 밖을 가리키는 링크는 거부).
-  - 자동 확인 실행에는 `--debug-passive`(노트 창이 어떤 경우에도 키 창이 되지 않음. 새 노트처럼 커서를 두는 동작도 키 창을 만들지 않는다), `--debug-no-hotkeys`(전역 단축키를 등록하지 않음), `--menu-bar-icon off`(메뉴 막대 아이콘이 켜고 끌 때마다 나타났다 사라지지 않게)를 함께 준다. 앱은 `open -g -n build/FloatingNotes.app --args …`로 켠다(앞으로 가져오지 않음). 키 창을 봐야 할 때만 `click <id>`(이 앱의 이벤트 줄에만 넣는 누름)나 `focus <id>`로 키 창을 만들고 곧바로 `unfocus`로 물린다. 그 사이에는 사용자가 치는 글자가 그 노트로 들어간다. 테스트의 조립(`NotePanelFixture`, `AppFixture`)도 `allowsKeyWindows`를 끈다.
+  - 자동 확인 실행에는 `--debug-passive`(노트 창이 어떤 경우에도 키 창이 되지 않음. 새 노트처럼 커서를 두는 동작도 키 창을 만들지 않는다), `--debug-no-hotkeys`(전역 단축키를 등록하지 않음), `--menu-bar-icon off`(메뉴 막대 아이콘이 켜고 끌 때마다 나타났다 사라지지 않게)를 함께 준다. 앱은 `open -g -n build/Float.app --args …`로 켠다(앞으로 가져오지 않음). 키 창을 봐야 할 때만 `click <id>`(이 앱의 이벤트 줄에만 넣는 누름)나 `focus <id>`로 키 창을 만들고 곧바로 `unfocus`로 물린다. 그 사이에는 사용자가 치는 글자가 그 노트로 들어간다. 테스트의 조립(`NotePanelFixture`, `AppFixture`)도 `allowsKeyWindows`를 끈다.
   - 창 밖에 그려지는 것(그림자, 모서리)은 `backdrop light|dark|stripes <파일>`로 노트 뒤에 불투명한 창을 깔고 그 안쪽만 `screencapture -R`로 찍어 본다. 확인용 노트는 화면 구석(있으면 보조 화면)에 두고, 깐 창은 찍는 동안만 둔다.
   - 보내기: `scripts/build-app.sh debug`로 만든 묶음을 `--notes-dir <폴더> --debug-control <출력 폴더>`로 켜고 `scripts/debug-send.sh <출력 폴더> dump state.json`처럼 보낸다.
 
@@ -412,7 +412,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 앱 메뉴와 활성화
 
-- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: Float(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 이름은 지역화된 `CFBundleDisplayName`이다. 원본 Info.plist의 DisplayName은 파일명과 같은 FloatingNotes, CFBundleName은 Float이며 ko/en InfoPlist.strings의 두 이름은 Float다(D-062). SwiftPM 실행, 테스트에서는 Float를 기본값으로 쓴다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
+- 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 `MainMenu`가 보인다: Float(관하여, 설정, 종료), 파일, 편집, 보기(노트 모두 숨기기), 창(다음 노트로), 도움말(단축키). 앱 메뉴 이름은 원본 Info.plist의 `CFBundleDisplayName`에서 읽는다. 파일 이름은 Float.app이고 `CFBundleDisplayName`과 `CFBundleName`은 모두 Float다(D-175). SwiftPM 실행, 테스트에서는 Float를 기본값으로 쓴다. 보이는 항목에는 단축키를 적지 않는다(규칙 4).
 - `AppRouter.activateApp`: `.openNote`, `.newNote`를 해낸 뒤 부른다(기본은 아무것도 하지 않고 `AppDelegate`가 넣는다. 확인용 실행 `--debug-passive`에서는 넣지 않는다).
 - `applicationDidBecomeActive`: 키 창인 노트가 없을 때만 맨 앞 노트를 키 창으로 만들고, 노트를 눌러 앞으로 온 경우 그 누름이 먼저 처리되도록 한 차례 미룬다.
 
