@@ -24,7 +24,8 @@ extension SettingsView {
             row("사용할 에이전트") {
                 ValuePopup(label: "사용할 에이전트", value: selected?.name ?? "Claude",
                            dot: selected.flatMap { logoImage($0, size: theme.component(.iconLarge)) },
-                           theme: theme, inSettings: true) {
+                           theme: theme, inSettings: true,
+                           menuOffset: CGSize(width: theme.space(.sp3), height: theme.space(.sp2))) {
                     let menu = NSMenu()
                     menu.autoenablesItems = false
                     for engine in engines {
@@ -33,7 +34,7 @@ extension SettingsView {
                         item.isEnabled = engine.status == .connected && engine.activity == nil
                         item.state = engine === selected ? .on : .off
                         item.view = PickerMenuRow(theme: theme, text: engine.name,
-                            dot: logoImage(engine, size: theme.component(.iconLarge)), selected: engine === selected)
+                            dot: logoImage(engine, size: theme.component(.iconSmall)), selected: engine === selected, width: theme.component(.agentMenuWidth))
                     }
                     return menu
                 } choose: { item in
@@ -108,36 +109,39 @@ extension SettingsView {
                 .background(theme.color(.warn).opacity(theme.rgba(.connectFill).alpha),
                             in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
         }
-        card {
-            if engine.activity != nil {
-                row("계정") {
-                    HStack(spacing: theme.space(.sp1)) {
-                        ProgressView().controlSize(.small)
-                        Text(engine.detail)
-                    }.foregroundStyle(theme.color(.text2))
+        VStack(alignment: .trailing, spacing: theme.component(.settingsActionGap)) {
+            card {
+                if engine.activity != nil {
+                    row("계정") {
+                        HStack(spacing: theme.space(.sp1)) {
+                            ProgressView().controlSize(.small)
+                            Text(engine.detail)
+                        }.foregroundStyle(theme.color(.text2))
+                    }
+                } else if engine.status == .connected || engine.status == .expired {
+                    if let email = engine.account?.email { infoRow("계정", email) }
+                    else if engine.status == .expired || engine.provider == .claude { infoRow("계정", "확인할 수 없음") }
+                    if let plan = engine.account?.subscription ?? engine.account?.tier { infoRow("요금제", plan.capitalized) }
+                    else if engine.status == .expired { infoRow("요금제", "확인할 수 없음") }
+                    if engine.status == .connected, let method = engine.account?.method {
+                        infoRow("로그인 방식", method == "claude.ai" ? "Claude 구독" : method)
+                    }
+                } else {
+                    infoRow("계정", engine.status == .missing ? "설치 안 됨" : engine.detail)
                 }
-            } else if engine.status == .connected || engine.status == .expired {
-                if let email = engine.account?.email { infoRow("계정", email) }
-                else if engine.status == .expired || engine.provider == .claude { infoRow("계정", "확인할 수 없음") }
-                if let plan = engine.account?.subscription ?? engine.account?.tier { infoRow("요금제", plan.capitalized) }
-                else if engine.status == .expired { infoRow("요금제", "확인할 수 없음") }
-                if engine.status == .connected, let method = engine.account?.method {
-                    infoRow("로그인 방식", method == "claude.ai" ? "Claude 구독" : method)
-                }
-            } else {
-                infoRow("계정", engine.status == .missing ? "설치 안 됨" : engine.detail)
             }
+            .settingsMeasure("account")
+            Group {
+                if engine.activity == .login {
+                    actionButton("취소") { engine.cancel() }
+                } else if engine.activity == nil && engine.status == .connected {
+                    actionButton("로그아웃") { engine.logout() }
+                } else if engine.activity == nil && engine.status == .signedOut {
+                    actionButton("연결") { engine.login() }
+                }
+            }.settingsMeasure("action")
         }
-        HStack {
-            Spacer()
-            if engine.activity == .login {
-                actionButton("취소") { engine.cancel() }
-            } else if engine.activity == nil {
-                if engine.status == .connected { actionButton("로그아웃") { engine.logout() } }
-                if engine.status == .signedOut { actionButton("연결") { engine.login() } }
-            }
-        }.frame(height: engine.activity == nil && engine.status == .missing ? 0 : nil)
-        if engine.status == .missing { installCard(engine) }
+        if engine.status == .missing && engine.activity == nil { installCard(engine).settingsMeasure("install") }
         if let error = engine.message { Text(error).font(valueFont).foregroundStyle(theme.color(.warn)) }
     }
 
@@ -154,8 +158,8 @@ extension SettingsView {
         let tipOffset = theme.component(.iconLarge) + theme.space(.sp1)
         let tip = "설치가 끝나면 이 화면이 알아서 바뀌어요"
         return VStack(alignment: .leading, spacing: theme.space(.sp2)) {
-            HStack(spacing: theme.space(.sp1)) {
-                Text("터미널에서 실행")
+            HStack(spacing: theme.component(.chromeGap)) {
+                Text("터미널에서 실행").font(valueFont).foregroundStyle(theme.color(.text2))
                 Image(systemName: "info.circle").foregroundStyle(theme.color(.text3))
                     .frame(width: theme.component(.iconLarge), height: theme.component(.iconLarge))
                     .onHover { model.showsInstallTip = $0 }.accessibilityLabel(tip)
@@ -170,7 +174,7 @@ extension SettingsView {
                             }.fixedSize().offset(y: -tipOffset).allowsHitTesting(false)
                         }
                     }
-            }.zIndex(1)
+            }.settingsMeasure("heading").zIndex(1)
             HStack {
                 Text(verbatim: command).font(theme.font(.codeBlock))
                 Spacer()
@@ -181,9 +185,10 @@ extension SettingsView {
             }.padding(.leading, theme.component(.codeBlockPaddingX)).padding(.trailing, theme.component(.codeBlockGap))
                 .frame(height: theme.component(.installCommandHeight))
                 .background(theme.color(.codeBlockBackground), in: RoundedRectangle(cornerRadius: theme.shape(.codeBlockRadius)))
+                .settingsMeasure("command")
             if let url = URL(string: guide) {
-                TextActionLink(theme: theme, title: "다른 설치 방법", symbol: "arrow.up.right") { openURL(url) }
-                    .accessibilityAddTraits(.isLink)
+                TextActionLink(theme: theme, title: "다른 설치 방법", symbol: "arrow.up.right", minimumHeight: 0) { openURL(url) }
+                    .accessibilityAddTraits(.isLink).settingsMeasure("guide")
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }.padding(theme.space(.sp3)).background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))

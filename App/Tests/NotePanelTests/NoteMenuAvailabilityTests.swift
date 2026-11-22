@@ -15,22 +15,19 @@ import Theme
         ) { chosen.append($0) }
 
         #expect(menu.items.filter { !$0.isSeparatorItem }.map(\.title) == [
-            "새 노트", "리마인더 설정", "스페이스 옮기기", "항상 위에 고정", "노트 색", "노트 찾기", "라이브러리", "창 닫기",
+            "새 노트", "리마인더 설정", "스페이스 옮기기", "항상 위에 고정 해제", "노트 색", "노트 찾기", "라이브러리", "창 닫기",
             "보관함으로", "휴지통으로 보내기",
         ])
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
             "리마인더 설정", "스페이스 옮기기",
         ])
-        let pinned = try #require(menu.item(withTitle: "항상 위에 고정"))
+        let pinned = try #require(menu.item(withTitle: "항상 위에 고정 해제"))
         let row = try #require(pinned.view)
         row.layoutSubtreeIfNeeded()
         let images = row.subviews.compactMap { $0 as? NSImageView }
-        #expect(pinned.state == .on && row.bounds.width == 226)
-        let icon = try #require(images.first)
-        let check = try #require(images.last)
-        let checkWidth = try #require(check.image?.size.width)
-        let iconWidth = try #require(icon.image?.size.width)
-        #expect(check.frame.midX + checkWidth / 2 <= icon.frame.midX - iconWidth / 2)
+        #expect(pinned.state == .off && row.bounds.width == 210 && menu.minimumWidth == 210)
+        #expect(pinned.accessibilityLabel() == pinned.title && images.count == 1)
+        #expect(row.subviews.compactMap { $0 as? NSTextField }.first?.frame.minX == 36)
         // 고를 수 없는 항목은 눌러도 동작이 가지 않고, 고를 수 있는 항목은 간다.
         menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "리마인더 설정" }))
         #expect(chosen.isEmpty)
@@ -48,6 +45,8 @@ import Theme
 
         // 모두 이어져 있으면(기본) 전부 고를 수 있다.
         let all = builder.moreMenu(isPinned: false, selectedPaletteID: nil) { _ in }
+        let unpinned = try #require(all.item(withTitle: "항상 위에 고정"))
+        #expect(unpinned.accessibilityLabel() == unpinned.title && unpinned.state == .off)
         #expect(all.items.filter { !$0.isSeparatorItem && $0.action != nil && !$0.isEnabled }.isEmpty)
     }
 }

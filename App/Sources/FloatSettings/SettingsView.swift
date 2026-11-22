@@ -17,7 +17,7 @@ struct SettingsView: View {
                         general
                     } else {
                         ScrollView {
-                            VStack(alignment: .leading, spacing: theme.space(.sp4)) {
+                            VStack(alignment: .leading, spacing: theme.space(model.pane == .accounts ? .sp3 : .sp4)) {
                                 contents
                                 if let error = model.error { Text(error).foregroundStyle(theme.color(.warn)) }
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, theme.space(.sp5))
@@ -28,6 +28,10 @@ struct SettingsView: View {
             }.disabled(model.confirmingReset).accessibilityHidden(model.confirmingReset)
             if model.confirmingReset { resetDialog }
         }
+        #if DEBUG
+        .coordinateSpace(name: "settingsLayout")
+        .onPreferenceChange(SettingsLayoutFrames.self) { model.layoutFrames = $0 }
+        #endif
         .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
         .foregroundStyle(theme.color(.text)).background(theme.color(.surface)).tint(theme.color(.accent))
     }
@@ -66,8 +70,10 @@ struct SettingsView: View {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.color(.warn))
                         .accessibilityLabel("다시 로그인 필요")
                 }
-            }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.settingsSegmentH))
+            }.padding(.horizontal, theme.space(.sp2))
+                .frame(height: theme.component(.settingsSidebarRow) - 2 * theme.component(.settingsSidebarInsetY))
         }.buttonStyle(SettingsButton(theme: theme, selected: selected, showsHover: model.sidebarHover == pane))
+            .settingsMeasure(pane.rawValue)
             .frame(height: theme.component(.settingsSidebarRow)).accessibilityAddTraits(selected ? .isSelected : [])
     }
 

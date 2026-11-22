@@ -48,7 +48,7 @@ struct NoteMenuBuilder {
             row("스페이스 옮기기", symbol: "briefcase", isEnabled: isAvailable(.moveToSpace)) {
                 handler(.moveToSpace)
             },
-            row("항상 위에 고정", symbol: "pin", isOn: isPinned) { handler(.togglePin) },
+            row(isPinned ? "항상 위에 고정 해제" : "항상 위에 고정", symbol: "pin") { handler(.togglePin) },
             colorRow(selectedPaletteID: selectedPaletteID) { handler(.setColor($0)) },
             separator(),
             row("노트 찾기", symbol: "magnifyingglass") { handler(.findNote) },
@@ -88,12 +88,12 @@ struct NoteMenuBuilder {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.minimumWidth = style.theme.component(.menuWidth)
+        menu.minimumWidth = style.theme.component(.noteMenuWidth)
         return menu
     }
 
     private func row(
-        _ title: String, symbol: String?, isOn: Bool = false, isEnabled: Bool = true,
+        _ title: String, symbol: String?, isEnabled: Bool = true,
         action: @escaping () -> Void
     ) -> NSMenuItem {
         let target = MenuActionTarget(action)
@@ -102,8 +102,8 @@ struct NoteMenuBuilder {
         // 항목은 target을 붙잡지 않는다. 메뉴가 살아 있는 동안 함께 살도록 여기 맡긴다.
         item.representedObject = target
         item.isEnabled = isEnabled
-        item.state = isOn ? .on : .off
-        item.view = MenuRowView(style: style, title: title, symbolName: symbol, isOn: isOn, isDimmed: !isEnabled)
+        item.setAccessibilityLabel(title)
+        item.view = MenuRowView(style: style, title: title, symbolName: symbol, isDimmed: !isEnabled)
         return item
     }
 

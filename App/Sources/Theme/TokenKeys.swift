@@ -11,6 +11,9 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case hover
     case text
     case text2 = "text-2"
+    case valueMenuSurface = "value-menu-surface"
+    case valueMenuRule = "value-menu-rule"
+    case valueMenuDisabled = "value-menu-disabled"
     case menuSurface = "menu-surface"
     case menuHighlight = "menu-highlight"
     case text4 = "text-4"
@@ -221,6 +224,13 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case swatchSize = "swatch-size"
     case swatchGap = "swatch-gap"
     case swatchRing = "swatch-ring"
+    case noteMenuWidth = "note-menu-width"
+    case agentMenuWidth = "agent-menu-width"
+    case valueMenuCheck = "value-menu-check"
+    case calendarMenuWidth = "calendar-menu-width"
+    case valueMenuBorder = "value-menu-border"
+    case settingsActionGap = "settings-action-gap"
+    case settingsSidebarInsetY = "settings-sidebar-inset-y"
     case claudeMenuWidth = "claude-menu-width"
     case codexMenuWidth = "codex-menu-width"
     case menuCheckColumn = "menu-check-column"
@@ -285,6 +295,7 @@ public enum ComponentToken: String, CaseIterable, Sendable {
 
 /// 치수가 아니라 비율로 적는 구성 요소 값(`component` 구역, `%` 표기).
 public enum RatioToken: String, CaseIterable, Sendable {
+    case disabledIconOpacity = "value-menu-disabled-icon-opacity"
     /// 노트 창 높이 한도: 화면 높이에서 차지할 수 있는 몫(spec 5.6, 임시 값).
     case noteMaxScreenHeight = "note-h-max-screen"
     /// 캡처 바가 뜨는 높이: 화면(메뉴 막대와 Dock을 뺀 영역) 아래 끝에서 바 아래쪽까지의 몫(spec 4.1 "화면 가운데 아래쪽", 임시 값).

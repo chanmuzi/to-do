@@ -68,6 +68,13 @@ package final class EngineAccount {
     }
 
     #if DEBUG
+    /// 화면 배치 검사에서 CLI를 실행하지 않고 표시할 계정 상태를 만든다.
+    convenience init(previewing status: Status, activity: Activity? = nil, location: StoreLocation) {
+        self.init(.codex, location: location, directory: nil)
+        self.status = status
+        self.activity = activity
+    }
+
     package func loginForVerification() {
         guard let directory, FileManager.default.fileExists(atPath: directory.appending(path: "float-fake-cli").path) else { return }
         login()

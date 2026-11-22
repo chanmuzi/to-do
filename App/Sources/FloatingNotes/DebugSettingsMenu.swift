@@ -2,41 +2,51 @@
 import AppKit
 import Theme
 
-/// 시스템 메뉴와 그 아래의 설정 창만 같은 좌표계에 그린다.
+/// 실제 버튼을 열어 자식 창의 내용과 화면 좌표를 기록한다.
 enum DebugSettingsMenu {
-    static func capture(_ menu: NSMenu, at anchor: NSView, to url: URL) {
+    static func capture(at anchor: NSButton, to url: URL, image: Bool) {
         guard let parent = anchor.window else { return }
-        let render: @MainActor () -> Void = {
-            defer { menu.cancelTracking() }
-            guard let popup = menu.items.compactMap({ $0.view?.window }).first,
-                  let base = bitmap(parent), let overlay = bitmap(popup) else {
-                AppLog.warning("설정 메뉴 창을 그릴 수 없어요")
-                return
-            }
-            let size = parent.frame.size
-            let image = NSImage(size: size)
-            image.lockFocus()
-            base.draw(in: NSRect(origin: .zero, size: size))
-            overlay.draw(in: popup.frame.offsetBy(dx: -parent.frame.minX, dy: -parent.frame.minY))
-            image.unlockFocus()
-            do {
-                guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-                      let png = rep.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-                try png.write(to: url, options: .atomic)
-            } catch { AppLog.warning("설정 메뉴 그림을 저장할 수 없어요") }
+        let before = Set((parent.childWindows ?? []).map(ObjectIdentifier.init))
+        anchor.sendAction(anchor.action, to: anchor.target)
+        guard let popup = parent.childWindows?.first(where: { !before.contains(ObjectIdentifier($0)) && $0.isVisible }),
+              let view = popup.contentView else {
+            AppLog.warning("설정 값 메뉴 창이 열리지 않았어요")
+            return
         }
-        let timer = Timer(timeInterval: 0.4, repeats: false) { _ in MainActor.assumeIsolated { render() } }
-        RunLoop.main.add(timer, forMode: .common)
-        anchor.popUpSettingsMenu(menu)
-        timer.invalidate()
-    }
-
-    private static func bitmap(_ window: NSWindow) -> NSBitmapImageRep? {
-        guard let view = window.contentView?.superview ?? window.contentView else { return nil }
+        defer { popup.close() }
         view.layoutSubtreeIfNeeded()
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        return rep
+        do {
+            let button = parent.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+            struct Row: Encodable {
+                let title: String
+                let frame: CGRect
+                let font: String
+                let size: CGFloat
+            }
+            func rows(in node: NSView) -> [Row] {
+                if let row = node as? PickerMenuRow {
+                    return [Row(title: row.accessibilityLabel() ?? "", frame: row.convert(row.bounds, to: view),
+                                font: row.textFont.fontName, size: row.textFont.pointSize)]
+                }
+                return node.subviews.flatMap { rows(in: $0) }
+            }
+            struct Layout: Encodable {
+                let button: CGRect
+                let popup: CGRect
+                let shadow: Bool
+                let rows: [Row]
+            }
+            let layout = Layout(button: button, popup: popup.frame, shadow: popup.hasShadow, rows: rows(in: view))
+            let layoutURL = image ? url.deletingPathExtension().appendingPathExtension("json") : url
+            try JSONEncoder().encode(layout).write(to: layoutURL, options: .atomic)
+            if image {
+                popup.displayIfNeeded()
+                guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw CocoaError(.fileWriteUnknown) }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                guard let data = rep.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
+                try data.write(to: url, options: .atomic)
+            }
+        } catch { AppLog.warning("설정 값 메뉴 저장 실패: \(error)") }
     }
 }
 #endif

@@ -32,13 +32,15 @@ package struct TextActionLink: View {
     let title: String
     let symbol: String
     let action: () -> Void
+    let minimumHeight: CGFloat
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
-    package init(theme: Theme, title: String, symbol: String, action: @escaping () -> Void) {
+    package init(theme: Theme, title: String, symbol: String, minimumHeight: CGFloat? = nil, action: @escaping () -> Void) {
         self.theme = theme
         self.title = title
         self.symbol = symbol
+        self.minimumHeight = minimumHeight ?? theme.component(.libraryMoreSize)
         self.action = action
     }
 
@@ -49,7 +51,7 @@ package struct TextActionLink: View {
                 Image(systemName: symbol).accessibilityHidden(true)
             }.font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
                 .foregroundStyle(theme.color(hovered ? .text : .text2))
-                .frame(minHeight: theme.component(.libraryMoreSize)).contentShape(Rectangle())
+                .frame(minHeight: minimumHeight).contentShape(Rectangle())
         }.buttonStyle(.plain).onHover { hovered = $0 }
             .animation(reduced ? nil : theme.motion.animation, value: hovered)
     }
