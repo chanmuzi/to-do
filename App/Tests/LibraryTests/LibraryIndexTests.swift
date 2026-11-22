@@ -78,9 +78,37 @@ import Testing
         let index = LibraryIndex(notes: [old, pinned, today], windows: [pinned.id: .init(isPinned: true)],
                                  now: now, calendar: calendar)
         let groups = index.sections(for: .all)
-        #expect(groups.map(\.id) == ["고정됨", "오늘", "2026년 10월"])
+        #expect(groups.map(\.header) == [.pinned, .today, .date("2026년 10월")])
         #expect(groups.flatMap(\.notes).map(\.id) == [pinned.id, today.id, old.id])
     }
+    @Test func todayAndPinnedKeepRowOrderWithoutHeadings() throws {
+        let fresh = note("오늘 작성", day: 17)
+        var pinned = note("이전 작성", day: 14, reminder: now)
+        pinned.modified = date(2026, 11, 15)
+        let index = LibraryIndex(notes: [pinned, fresh], windows: [pinned.id: .init(isPinned: true)],
+                                 now: now, calendar: calendar)
+        for selection in [LibrarySelection.today, .floating] {
+            let sections = index.sections(for: selection)
+            #expect(sections.count == 1)
+            let section = try #require(sections.first)
+            #expect(section.header == nil)
+            #expect(section.notes == index.rows(for: selection))
+            #expect(section.notes == (selection == .today ? [fresh, pinned] : [pinned]))
+        }
+        #expect(LibraryIndex(notes: []).sections(for: .today).isEmpty)
+    }
+
+    @Test func archiveAndTrashGroupPinnedNotesByDate() {
+        var old = note("보관된 노트", day: 16)
+        old.isArchived = true
+        old.modified = date(2026, 11, 16)
+        let index = LibraryIndex(notes: [old], trash: [old], windows: [old.id: .init(isPinned: true)],
+                                 now: now, calendar: calendar)
+        for selection in [LibrarySelection.archived, .archive("2026-11"), .trash] {
+            #expect(index.sections(for: selection).map(\.header) == [.date("어제")])
+        }
+    }
+
     @Test func upcomingMergesOccurrencesDeduplicatesLinksWithoutTruncating() {
         let interval = LibraryIndex.upcomingInterval(now: now, calendar: calendar)
         let link = ScheduleItem.Link(localID: "회의", externalID: "회사-회의", kind: .event)
