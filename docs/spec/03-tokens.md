@@ -132,6 +132,7 @@
 | 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
 | 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
 | 구성 요소 | `menu-icon` | `12px` | 노트 메뉴 그림 크기(정렬 칸은 `icon-l` 14, D-058) |
+| 구성 요소 | `note-menu-width` | `210px` | 노트 더 보기 메뉴 너비 |
 | 구성 요소 | `menu-w` | `226px` | 메뉴 최소 너비 |
 | 구성 요소 | `note-w`, `note-w-min`, `note-w-max` | `340px`, `260px`, `560px` | 노트 창 너비: 기본, 최소, 최대 (D-158) |
 | 재질 | `opacity` | `.92` | 창 불투명도 (포커스와 상관없이 같음) |
@@ -169,6 +170,6 @@
 
 ### 설정 창 (D-147, D-148)
 
-창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 24이며 선택과 호버는 selected와 hover다. 제목은 library-header-font 15, 굵기 600이다.
+창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 26이며 선택과 호버는 selected와 hover다. 제목은 library-header-font 15, 굵기 600이다.
 
 카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
