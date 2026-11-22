@@ -30,7 +30,12 @@ package final class SettingsModel {
     package var pane = SettingsPane.general
     package var detailEngine: EngineAccount?
     #if DEBUG
+    @ObservationIgnored package var layoutFrames: [String: CGRect] = [:]
     package func setInstallTipForVerification(_ shown: Bool) { showsInstallTip = shown }
+    #endif
+    private(set) var sidebarHover: SettingsPane?
+    #if DEBUG
+    package func setSidebarHoverForVerification(_ pane: SettingsPane?) { sidebarHover = pane }
     #endif
     var confirmingReset = false
     var showsInstallTip = false

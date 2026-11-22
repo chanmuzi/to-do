@@ -62,6 +62,9 @@ package final class SettingsCoordinator: NSObject, NSWindowDelegate {
     package func windowDidBecomeKey(_ notification: Notification) { model.agents?.refreshMissing() }
 
     package func windowWillClose(_ notification: Notification) {
+        #if DEBUG
+        model.setSidebarHoverForVerification(nil)
+        #endif
         model.confirmingReset = false
         model.detailEngine = nil
         model.agents?.close()

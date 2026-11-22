@@ -1,6 +1,6 @@
 import AppKit
 @_spi(Verification) import Editor
-import FloatSettings
+@testable import FloatSettings
 import Library
 import Models
 import Scheduling
@@ -71,6 +71,72 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
+    @Test func previewHasNoInteractiveAccessibilityChildren() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let settings = SettingsCoordinator(model: SettingsModel(read: { store.settings }, save: store.update,
+            schedules: service, shortcuts: [], openPrivacy: { _ in }), theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.appearance)
+        defer { settings.window?.close() }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        func preview(in view: NSView) -> NSView? {
+            if view.accessibilityLabel() == "노트 미리보기" { return view }
+            return view.subviews.lazy.compactMap(preview).first
+        }
+        let root = try #require(settings.window?.contentView)
+        let image = try #require(preview(in: root))
+        #expect(image.accessibilityRole() == .image)
+        #expect(image.accessibilityChildren()?.isEmpty != false)
+        #expect(!image.acceptsFirstResponder && !image.accessibilityPerformPress())
+        #expect(image.hitTest(NSPoint(x: image.bounds.midX, y: image.bounds.midY)) == nil)
+    }
+
+    #if DEBUG
+    @Test func sidebarAndAccountDetailSpacing() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(read: { SettingsValues() }, save: { _ in }, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let coordinator = SettingsCoordinator(model: model, theme: fixture.theme)
+        coordinator.allowsKeyWindows = false
+        coordinator.show(.appearance)
+        defer { coordinator.window?.close() }
+        func layout() -> [String: CGRect] {
+            coordinator.window?.contentView?.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            return model.layoutFrames
+        }
+        let sidebar = layout()
+        let appearance = try #require(sidebar["모양"])
+        let editor = try #require(sidebar["편집기"])
+        #expect(editor.midY - appearance.midY == 28 && editor.minY - appearance.maxY == 2)
+        for (status, activity): (EngineAccount.Status, EngineAccount.Activity?) in [
+            (.signedOut, nil), (.signedOut, .login), (.connected, nil), (.missing, nil)
+        ] {
+            model.detailEngine = EngineAccount(previewing: status, activity: activity, location: fixture.location)
+            model.pane = .accounts
+            let frames = layout()
+            let account = try #require(frames["account"])
+            if status == .missing {
+                let install = try #require(frames["install"])
+                let heading = try #require(frames["heading"])
+                let command = try #require(frames["command"])
+                let guide = try #require(frames["guide"])
+                #expect(install.minY - account.maxY == 12)
+                #expect(heading.minY - install.minY == 12 && install.maxY - guide.maxY == 12)
+                #expect(command.minX - install.minX == 12 && install.maxX - command.maxX == 12)
+                #expect(command.minY - heading.maxY == 8 && guide.minY - command.maxY == 8 && command.height == 34)
+            } else {
+                let action = try #require(frames["action"])
+                #expect(action.minY - account.maxY == 10 && action.maxX == account.maxX)
+            }
+        }
+    }
+    #endif
+
     @Test func fontSliderAndCalendarDefaultChoice() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
@@ -102,8 +168,19 @@ import Theme
         let button = try #require(first(NSButton.self, in: root) { $0.accessibilityLabel() == "기본 캘린더" })
         let menu = try #require(button.menu)
         #expect(menu.items.first?.title == "캘린더 앱 기본값" && menu.items.first?.state == .on)
-        let work = try #require(menu.items.firstIndex { $0.representedObject as? String == "work" })
-        menu.performActionForItem(at: work)
+        button.sendAction(button.action, to: button.target)
+        let popup = try #require(window.childWindows?.first(where: { $0.isVisible }))
+        let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
+        #expect(popup.frame.width == 210 && popup.frame.maxX - anchor.maxX == 12 && anchor.minY - popup.frame.maxY == 4)
+        let surface = try #require(popup.contentView)
+        let workRow = try #require(first(PickerMenuRow.self, in: surface) { $0.accessibilityLabel() == "업무" })
+        #expect(workRow.window === popup && workRow.frame.height == 26 && workRow.frame.width == 200)
+        let menuRows = try #require(workRow.superview).subviews.compactMap { $0 as? PickerMenuRow }
+        for (previous, next) in zip(menuRows, menuRows.dropFirst()) {
+            #expect(previous.frame.maxY <= next.frame.minY)
+        }
+        #expect(workRow.accessibilityPerformPress())
+        #expect(!popup.isVisible)
         #expect(store.settings.calendarID == "work")
         menu.performActionForItem(at: 0)
         #expect(store.settings.calendarID == nil)

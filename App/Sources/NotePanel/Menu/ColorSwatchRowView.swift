@@ -14,7 +14,7 @@ final class ColorSwatchRowView: NSView {
         let entries: [PaletteColor?] = [nil] + theme.palette.map { Optional($0) }
         swatches = entries.map { SwatchView(style: style, palette: $0, isSelected: $0?.id == selectedPaletteID) }
         super.init(frame: NSRect(
-            x: 0, y: 0, width: theme.component(.menuWidth), height: theme.component(.rowHeight)
+            x: 0, y: 0, width: theme.component(.noteMenuWidth), height: theme.component(.rowHeight)
         ))
         wantsLayer = true
         autoresizingMask = [.width]

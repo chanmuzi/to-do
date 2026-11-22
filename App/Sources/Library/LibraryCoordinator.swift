@@ -147,12 +147,23 @@ private struct SpacePickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: model.theme.space(.sp1)) {
             Text("스페이스 옮기기").font(model.theme.font(.row))
-            Button("스페이스 없음") { move(nil) }
-            ForEach(model.spaceList) { space in Button(space.name) { move(space.id) } }
+            choice("스페이스 없음", id: nil)
+            ForEach(model.spaceList) { space in choice(space.name, id: space.id) }
             if let error = model.error { Text(error).font(model.theme.font(.rowSub)) }
         }.focusEffectDisabled().buttonStyle(LibraryButtonStyle(theme: model.theme)).font(model.theme.font(.body))
             .padding(model.theme.space(.sp3)).frame(width: model.theme.component(.iconPickerWidth))
             .onExitCommand(perform: dismiss)
+    }
+    private func choice(_ title: String, id: SpaceID?) -> some View {
+        let selected = model.index.notes.first { $0.id == noteID }?.spaceID == id
+        return Button { move(id) } label: {
+            HStack(spacing: model.theme.space(.sp2)) {
+                Image(systemName: "checkmark").opacity(selected ? 1 : 0)
+                    .frame(width: model.theme.component(.menuCheckColumn)).accessibilityHidden(true)
+                Text(title)
+                Spacer()
+            }.frame(height: model.theme.component(.rowHeight)).contentShape(Rectangle())
+        }.accessibilityAddTraits(selected ? .isSelected : [])
     }
     private func move(_ id: SpaceID?) {
         do { try model.move(noteID, to: id); dismiss() } catch { model.error = error.localizedDescription }

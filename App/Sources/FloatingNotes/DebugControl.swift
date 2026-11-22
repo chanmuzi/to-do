@@ -329,19 +329,33 @@ final class DebugControl {
             }
         case ("settings-agent-detail", let provider?, _) where isPassive:
             settingsWindow?.showAgent(provider.rawValue)
+        case ("settings-agent-choose", let provider?, _) where isPassive:
+            guard let model = settingsWindow?.model,
+                  let engine = model.agents?.engines.first(where: { $0.provider.rawValue == provider.rawValue }),
+                  engine.status == .connected else { return }
+            model.change { $0.agentProvider = engine.provider.rawValue }
+        case ("settings-sidebar-hover", let pane?, _) where isPassive:
+            settingsWindow?.model.setSidebarHoverForVerification(SettingsPane(rawValue: pane.rawValue))
+        case ("settings-layout", let name?, _) where isPassive:
+            guard let model = settingsWindow?.model, let url = output(named: name.rawValue) else { return }
+            do { try JSONEncoder().encode(model.layoutFrames).write(to: url, options: .atomic) }
+            catch { AppLog.warning("설정 좌표 저장 실패: \(error)") }
+        case ("settings-audit", let name?, _) where isPassive:
+            guard let root = settingsWindow?.window?.contentView, let url = output(named: name.rawValue) else { return }
+            do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("설정 배치 검사 실패: \(error)") }
         case ("settings-fake-login", _, _) where isPassive:
             settingsWindow?.model.detailEngine?.loginForVerification()
         case ("settings-agent-cancel", _, _) where isPassive:
             settingsWindow?.model.detailEngine?.cancel()
         case ("settings-install-tip", let flag?, _) where isPassive:
             settingsWindow?.model.setInstallTipForVerification(flag.rawValue == "on")
-        case ("settings-popup-snapshot", let name?, let label) where isPassive:
+        case (let command?, let name?, let label) where isPassive && ["settings-popup-snapshot", "settings-popup-layout"].contains(command):
             func findPicker(_ view: NSView) -> NSView? {
                 if view.accessibilityLabel() == (label ?? "기본 캘린더"), view.menu != nil { return view }
                 return view.subviews.lazy.compactMap(findPicker).first
             }
-            if let root = settingsWindow?.window?.contentView, let button = findPicker(root), let menu = button.menu,
-               let url = output(named: name.rawValue) { DebugSettingsMenu.capture(menu, at: button, to: url) }
+            if let root = settingsWindow?.window?.contentView, let button = findPicker(root) as? NSButton,
+               let url = output(named: name.rawValue) { DebugSettingsMenu.capture(at: button, to: url, image: command == "settings-popup-snapshot") }
         case ("settings-format-bar", let mode?, _) where isPassive:
             guard NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) != nil else { return }
             settingsWindow?.model.change { $0.formatBar = mode.rawValue }

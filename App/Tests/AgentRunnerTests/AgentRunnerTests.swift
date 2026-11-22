@@ -39,7 +39,8 @@ private struct Fixture {
 }
 
 @Suite struct AgentRunnerTests {
-    @Test func claudeIsolationStreamAndUsage() async throws {
+    @Test(arguments: ["fable", "opus", "sonnet", "haiku", "auto"])
+    func claudeIsolationStreamAndUsage(_ model: String) async throws {
         let start = String(decoding: try JSONSerialization.data(withJSONObject: initEvent), as: UTF8.self)
         let fx = try Fixture(.claude, #"""
         test "$(ls -A)" = ""
@@ -59,7 +60,7 @@ private struct Fixture {
         """#)
         defer { try! fx.cleanup() }
         let events = Mutex<[AgentEvent]>([])
-        let result = try await fx.runner.run("--user-prompt", engine: .claude(.haiku), installation: fx.installation) { event in
+        let result = try await fx.runner.run("--user-prompt", engine: .claude(model), installation: fx.installation) { event in
             events.withLock { $0.append(event) }
         }
         #expect(result.text == "가")
@@ -70,7 +71,8 @@ private struct Fixture {
         let bin = fx.installation.executable.deletingLastPathComponent()
         let args = try String(contentsOf: bin.appending(path: "args"), encoding: .utf8).components(separatedBy: "\n")
         let conf = try #require(args.firstIndex(of: "--mcp-config")).advanced(by: 1)
-        #expect(args == ["-p", "--model", "haiku", "--setting-sources", "", "--strict-mcp-config", "--mcp-config", args[conf],
+        let prefix = model == "auto" ? ["-p"] : ["-p", "--model", model]
+        #expect(args == prefix + [ "--setting-sources", "", "--strict-mcp-config", "--mcp-config", args[conf],
                          "--tools", "", "--allowedTools", "mcp__float__list_notes,mcp__float__read_note", "--disable-slash-commands",
                          "--permission-mode", "dontAsk", "--no-session-persistence", "--output-format", "stream-json",
                          "--verbose", "--include-partial-messages", "--", "--user-prompt", ""])
@@ -110,12 +112,13 @@ private struct Fixture {
         defer { try! fx.cleanup() }
         let reason = field == "missing" ? "skills" : field == "beforeInit" ? "init" : field
         await #expect(throws: AgentError.isolation(reason)) {
-            try await fx.runner.run("prompt", engine: .claude(.sonnet), installation: fx.installation, timeout: .seconds(3))
+            try await fx.runner.run("prompt", engine: .claude("sonnet"), installation: fx.installation, timeout: .seconds(3))
         }
         #expect(try fx.journal()["outcome"] as? String == "isolation")
     }
 
-    @Test func codexEnvironmentAndResult() async throws {
+    @Test(arguments: ["gpt-test", nil] as [String?])
+    func codexEnvironmentAndResult(_ model: String?) async throws {
         let fx = try Fixture(.codex, #"""
         test "$(ls -A)" = ""
         test -n "$USER" && test -n "$LOGNAME"
@@ -132,24 +135,26 @@ private struct Fixture {
         JSON
         """#)
         defer { try! fx.cleanup() }
-        let result = try await fx.runner.run("prompt", engine: .codex(model: "gpt-test"), installation: fx.installation)
+        let result = try await fx.runner.run("prompt", engine: .codex(model: model), installation: fx.installation)
         #expect(result.text == "ok")
         #expect(result.actualModel == nil)
         #expect(result.usage == AgentUsage(inputTokens: 11, outputTokens: 3, costUSD: nil))
         let args = try String(contentsOf: fx.root.appending(path: "bin/args"), encoding: .utf8).components(separatedBy: "\n")
         #expect(Array(args.prefix(7)) == ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "-C"])
-        #expect(Array(args[8..<12]) == ["-s", "read-only", "-m", "gpt-test"])
+        #expect(Array(args[8..<10]) == ["-s", "read-only"])
+        if let model { #expect(Array(args[10..<12]) == ["-m", model]) }
+        else { #expect(!args.contains("-m")) }
         #expect(args.contains("mcp_servers.float.command=\"\(fx.runner.server.path)\""))
         #expect(args.contains("mcp_servers.float.args=[\"\(fx.root.path)\"]"))
         #expect(args.contains("features.shell_tool=false"))
-        #expect(try fx.journal()["requestedModel"] as? String == "gpt-test")
+        #expect(try fx.journal()["requestedModel"] as? String == (model ?? "auto"))
     }
 
     @Test func timeoutReapsGroup() async throws {
         let fx = try Fixture(.claude, #"sleep 20 & child=$!; echo "$child" > "${0%/*}/child"; wait"#)
         defer { try! fx.cleanup() }
         await #expect(throws: AgentError.timeout) {
-            try await fx.runner.run("prompt", engine: .claude(.opus), installation: fx.installation, timeout: .seconds(2))
+            try await fx.runner.run("prompt", engine: .claude("opus"), installation: fx.installation, timeout: .seconds(2))
         }
         let child = try String(contentsOf: fx.root.appending(path: "bin/child"), encoding: .utf8)
         let pid = try #require(Int32(child.trimmingCharacters(in: .whitespacesAndNewlines)))
@@ -187,5 +192,26 @@ private struct Fixture {
         #expect(try codex.loginCommand(other.installation).arguments == ["login"])
         let disconnected = try await codex.account(other.installation)
         #expect(!disconnected.loggedIn && disconnected.email == nil)
+    }
+}
+
+@Suite struct CodexModelListTests {
+    @Test(arguments: ["list", "failed", "wrongShape", "absent"])
+    func readsOnlyVisibleModelsInPriorityOrder(_ scenario: String) async throws {
+        let fx = try Fixture(.codex, #"""
+        test "$*" = "debug models"
+        test "$CODEX_HOME" = "$(dirname "$(dirname "$0")")/.state/agents/codex"
+        case "\#(scenario)" in
+          failed) exit 7 ;;
+          wrongShape) echo '{"models":{}}' ;;
+          *) echo '{"models":[{"slug":"b","display_name":"Second","visibility":"list","priority":2},{"slug":"x","display_name":"Hidden","visibility":"hide","priority":0},{"slug":"a","display_name":"First","visibility":"list","priority":1}]}' ;;
+        esac
+        """#)
+        defer { try! fx.cleanup() }
+        if scenario == "absent" { try FileManager.default.removeItem(at: fx.installation.executable) }
+        let connection = try AgentConnection(provider: .codex, location: fx.location)
+        let list = await connection.models(fx.installation)
+        #expect(list.map(\.slug) == (scenario == "list" ? ["a", "b"] : []))
+        #expect(list.map(\.displayName) == (scenario == "list" ? ["First", "Second"] : []))
     }
 }

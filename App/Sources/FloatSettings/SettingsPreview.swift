@@ -55,7 +55,9 @@ struct SettingsPreview: View {
             .modifier(PreviewFlash(theme: theme, value: [values.appearance, values.formatBar, String(values.recognizesDates)]))
             .padding(.vertical, theme.space(.sp4)).frame(maxWidth: .infinity)
             .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
-            .accessibilityLabel("노트 미리보기")
+            .allowsHitTesting(false).focusable(false)
+            .accessibilityHidden(true)
+            .background { PreviewAccessibilityImage() }
     }
 
     private var separator: some View { Rectangle().fill(theme.color(.line)).frame(height: theme.shape(.borderWidth)) }
@@ -65,6 +67,22 @@ struct SettingsPreview: View {
             else { Image(systemName: done ? "checkmark.square.fill" : "square") }
         }.font(.system(size: theme.component(.checkSize))).modifier(PreviewFlash(theme: theme, value: values.checkbox))
     }
+}
+
+/// VoiceOver에는 샘플 전체를 이미지 하나로 제공한다.
+private struct PreviewAccessibilityImage: NSViewRepresentable {
+    final class SampleImage: NSView {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override var acceptsFirstResponder: Bool { false }
+    }
+    func makeNSView(context: Context) -> SampleImage {
+        let image = SampleImage()
+        image.setAccessibilityElement(true)
+        image.setAccessibilityRole(.image)
+        image.setAccessibilityLabel("노트 미리보기")
+        return image
+    }
+    func updateNSView(_ view: SampleImage, context: Context) {}
 }
 
 private struct PreviewFlash<Value: Equatable>: ViewModifier {

@@ -67,7 +67,7 @@ import Theme
         root.layoutSubtreeIfNeeded()
         let rows = LibraryInteractionTests().descendants(root).compactMap { $0 as? LibraryRowInputView }
         #expect(rows.contains { $0.accessibilityLabel() == "제목 대신 첫 줄" })
-        #expect(f.model.theme.component(.librarySidebarRowGap) == 0)
+        #expect(f.model.theme.component(.librarySidebarRowGap) == 2)
         #expect(f.model.theme.component(.libraryRowPaddingY) == 9)
         f.model.beginSpaceEditing()
         RunLoop.main.run(until: Date().addingTimeInterval(0.08))

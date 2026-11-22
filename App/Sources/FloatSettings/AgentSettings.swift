@@ -12,6 +12,8 @@ package final class EngineAccount {
     package private(set) var activity: Activity?
     package private(set) var account: AgentAccount?
     package private(set) var message: String?
+    package private(set) var models: [CodexModel] = []
+    private var requestedModels = false
     private let location: StoreLocation
     private let directory: URL?
     private var installation: AgentInstallation?
@@ -41,9 +43,16 @@ package final class EngineAccount {
 
     package func refresh() {
         start(.checking) { connection in
+            let needsModels = self.provider == .codex && !self.requestedModels
+            self.requestedModels = true
             let found = try await connection.discover(in: self.directory)
             try Task.checkCancellation()
             self.installation = found
+            if needsModels {
+                let models = await connection.models(found)
+                try Task.checkCancellation()
+                self.models = models
+            }
             try await self.readAccount(connection, found)
         }
     }
@@ -59,6 +68,13 @@ package final class EngineAccount {
     }
 
     #if DEBUG
+    /// 화면 배치 검사에서 CLI를 실행하지 않고 표시할 계정 상태를 만든다.
+    convenience init(previewing status: Status, activity: Activity? = nil, location: StoreLocation) {
+        self.init(.codex, location: location, directory: nil)
+        self.status = status
+        self.activity = activity
+    }
+
     package func loginForVerification() {
         guard let directory, FileManager.default.fileExists(atPath: directory.appending(path: "float-fake-cli").path) else { return }
         login()
@@ -103,6 +119,8 @@ package final class EngineAccount {
         activity = nil
         message = nil
         installation = nil
+        models = []
+        requestedModels = false
     }
 
     private func start(_ operation: Activity, perform: @escaping (AgentConnection) async throws -> Void) {
@@ -111,7 +129,10 @@ package final class EngineAccount {
         message = nil
         let started = generation
         task = Task {
-            do { try await perform(AgentConnection(provider: provider, location: location)) }
+            do {
+                try Task.checkCancellation()
+                try await perform(AgentConnection(provider: provider, location: location))
+            }
             catch is CancellationError { }
             catch AgentError.missingExecutable where !Task.isCancelled {
                 status = .missing

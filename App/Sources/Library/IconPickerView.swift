@@ -31,7 +31,7 @@ struct IconPickerView: View {
                 iconView(icon == .none ? LibraryModel.defaultSpaceIcon : icon)
                 Text(space?.name ?? model.spaceName).lineLimit(1)
                 Spacer(minLength: 0)
-                Button("아이콘 없음") { model.setIcon(.none, for: spaceID) }.buttonStyle(.plain)
+                Button("아이콘 없음") { model.setIcon(.none, for: spaceID) }.buttonStyle(WhiteControl(theme: theme))
             }
             HStack(spacing: 0) {
                 ForEach(Array(["기호", "이모지", "이미지"].enumerated()), id: \.offset) { index, title in
@@ -45,7 +45,7 @@ struct IconPickerView: View {
             if tab == 2 { images } else { searchable }
             if let error = model.error ?? catalog.warning { Text(error).font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text2)) }
             Divider()
-            HStack { Spacer(); Button("완료", action: close).buttonStyle(LibraryButtonStyle(theme: theme)) }
+            HStack { Spacer(); Button("완료", action: close).buttonStyle(WhiteControl(theme: theme)) }
         }.focusEffectDisabled().font(theme.font(.body)).foregroundStyle(theme.libraryColor(.text))
             .padding(theme.component(.iconPickerPadding)).frame(width: theme.component(.iconPickerWidth))
             .background(theme.libraryColor(.surface))
@@ -66,7 +66,7 @@ struct IconPickerView: View {
             HStack {
                 Text("최근에 쓴 것").foregroundStyle(theme.libraryColor(.text3))
                 Spacer()
-                Button("지우기") { model.changeSettings { $0.recentIcons.removeAll(where: matchesTab) } }.buttonStyle(.plain)
+                Button("지우기") { model.changeSettings { $0.recentIcons.removeAll(where: matchesTab) } }.buttonStyle(WhiteControl(theme: theme))
             }.font(theme.font(.rowSub))
             grid(model.settings.recentIcons.filter(matchesTab))
             Text("전체").font(theme.font(.rowSub)).foregroundStyle(theme.libraryColor(.text3))
@@ -173,7 +173,7 @@ struct IconPickerView: View {
             VStack(spacing: theme.space(.sp2)) {
                 Image(systemName: "photo")
                 Text("이미지를 여기에 끌어다 놓기").foregroundStyle(theme.libraryColor(.text3))
-                Button("파일 고르기", action: chooseFile).buttonStyle(.plain)
+                Button("파일 고르기", action: chooseFile).buttonStyle(WhiteControl(theme: theme))
             }.frame(maxWidth: .infinity).frame(height: theme.component(.iconPickerDropHeight))
                 .overlay(RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).stroke(theme.libraryColor(.line), style: StrokeStyle(lineWidth: theme.shape(.borderWidth), dash: [theme.space(.sp1)])))
                 .dropDestination(for: URL.self) { urls, _ in

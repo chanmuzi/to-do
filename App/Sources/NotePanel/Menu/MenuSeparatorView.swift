@@ -11,7 +11,7 @@ final class MenuSeparatorView: NSView {
         self.style = style
         let theme = style.theme
         super.init(frame: NSRect(
-            x: 0, y: 0, width: theme.component(.menuWidth), height: theme.space(.sp2) + theme.shape(.borderWidth)
+            x: 0, y: 0, width: theme.component(.noteMenuWidth), height: theme.space(.sp2) + theme.shape(.borderWidth)
         ))
         wantsLayer = true
         autoresizingMask = [.width]
