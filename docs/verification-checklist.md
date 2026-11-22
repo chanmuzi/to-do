@@ -146,7 +146,7 @@
 
 ## 설치
 
-- [ ] `scripts/install-app.sh`: 실행 중인 앱이 있으면 저장하고 끝난 뒤 `/Applications/FloatingNotes.app`(쓸 수 없으면 `~/Applications`)에 새로 들어가고 그 경로가 찍힌다. Finder와 Dock에 "Float"로 보인다.
+- [ ] `scripts/install-app.sh`: 실행 중인 앱이 있으면 저장하고 끝난 뒤 `/Applications/Float.app`(쓸 수 없으면 `~/Applications`)에 새로 들어가고 그 경로가 찍힌다. 번들 ID가 같은 이전 이름 묶음은 휴지통에 있고 출력 경로와 일치한다. Finder와 Spotlight에서 Float를 찾아 열고 Dock 고정 항목과 로그인 항목도 새 앱을 여는지 확인한다.
 
 ## 메뉴 막대 아이콘을 끈 상태
 
@@ -239,7 +239,7 @@
 
 ## 6단계: 설치 앱과 iPhone에서 직접 확인
 
-자동 검증은 격리 노트와 가짜 CalendarBridge/ReminderNotifier만 사용한다. 아래는 사용자가 설치한 Float에서 실행할 순서다. 검증 에이전트는 `/Applications/FloatingNotes.app`과 실제 노트, 계정에 접근하지 않았다.
+자동 검증은 격리 노트와 가짜 CalendarBridge/ReminderNotifier만 사용한다. 아래는 사용자가 설치한 Float에서 실행할 순서다. 자동 검증에는 설치된 앱과 실제 노트, 계정을 사용하지 않는다.
 
 1. **준비:** Mac의 Apple 캘린더에 Google 일정이 보이는지 확인한다. 캘린더 설정에서 원하는 기본 캘린더를, 미리 알림 설정에서 원하는 기본 목록을 고른다. iPhone과 Mac에서 같은 Apple 계정의 iCloud 미리 알림을 켠다. Google 캘린더는 iPhone 캘린더/Google Calendar에도 같은 계정으로 켠다.
 2. **설치:** 작업 중인 노트를 저장하고, README의 고정 서명 인증서 생성(아직 없다면 한 번)과 설치 방법을 따른다. 사용자가 직접 설치한다. 설치 직후 앱을 켜기만 해서는 캘린더, 미리 알림 권한 창이 나오지 않아야 한다.
