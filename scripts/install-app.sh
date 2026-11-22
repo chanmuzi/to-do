@@ -1,5 +1,5 @@
 #!/bin/bash
-# 릴리스 빌드를 만들어 응용 프로그램 폴더에 "FloatingNotes.app"으로 넣는다. sudo를 쓰지 않는다.
+# 릴리스 빌드를 만들어 응용 프로그램 폴더에 "Float.app"으로 넣는다. sudo를 쓰지 않는다.
 # 사용: scripts/install-app.sh
 #   넣을 폴더: /Applications. 쓸 수 없으면 ~/Applications.
 #   FLOATING_NOTES_INSTALL_DIR=<폴더> 로 넣을 폴더를 바꾼다(확인용으로 임시 폴더에 넣을 때).
@@ -7,8 +7,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="FloatingNotes.app"
-# 끝낼 앱의 번들 ID. 확인용으로 다른 값을 주면 실행 중인 앱을 건드리지 않는다.
+APP_NAME="Float.app"
+# 종료 요청과 이전 묶음 판별에 같은 번들 ID를 쓴다.
 BUNDLE_ID="${FLOATING_NOTES_BUNDLE_ID:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$ROOT/App/Resources/Info.plist")}"
 QUIT_TIMEOUT="${FLOATING_NOTES_QUIT_TIMEOUT:-30}"
 
@@ -78,5 +78,16 @@ if ! mv "$STAGING" "$DEST"; then
   exit 1
 fi
 rm -rf "$BACKUP"
+
+LEGACY="$DEST_DIR/FloatingNotes.app"
+if [ -d "$LEGACY" ] && [ ! -L "$LEGACY" ]; then
+  if legacy_id="$(/usr/bin/plutil -extract CFBundleIdentifier raw -expect string -o - "$LEGACY/Contents/Info.plist")"; then
+    if [ "$legacy_id" = "$BUNDLE_ID" ]; then
+      swift "$ROOT/scripts/trash-old-app.swift" "$LEGACY" "$HOME/.Trash"
+    fi
+  else
+    echo "이전 앱의 번들 ID를 확인할 수 없어 제자리에 두었습니다: $LEGACY" >&2
+  fi
+fi
 
 echo "$DEST"

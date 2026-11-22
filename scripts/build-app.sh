@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE="$ROOT/App"
 RESOURCES="$PACKAGE/Resources"
 # FLOATING_NOTES_APP_DIR로 묶음을 둘 폴더를 바꾼다(기본 build/). 실행 중인 묶음과 분리할 때 사용.
-APP="${FLOATING_NOTES_APP_DIR:-$ROOT/build}/FloatingNotes.app"
+APP="${FLOATING_NOTES_APP_DIR:-$ROOT/build}/Float.app"
 
 # -v는 신뢰되지 않은 자체 서명 인증서를 숨기므로 전체 identity에서 찾는다.
 IDENTITY_QUERY=(security find-identity -p codesigning)
@@ -37,8 +37,6 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/FloatMCP" "$APP/Contents/MacOS/FloatMCP"
 cp "$BIN_DIR/FloatingNotes" "$APP/Contents/MacOS/FloatingNotes"
 cp "$RESOURCES/Info.plist" "$APP/Contents/Info.plist"
-# 원본 DisplayName은 파일명과 맞추고, 시스템 표시 이름은 지역화 리소스에서 읽는다(D-062).
-cp -R "$RESOURCES/ko.lproj" "$RESOURCES/en.lproj" "$APP/Contents/Resources/"
 cp "$RESOURCES/tokens.json" "$APP/Contents/Resources/tokens.json"
 cp -R "$RESOURCES/AgentLogos" "$APP/Contents/Resources/"
 cp -R "$RESOURCES/Fonts" "$APP/Contents/Resources/Fonts"
