@@ -188,3 +188,7 @@
 작업 중 가장자리 주기는 3초, 글자 띠는 2.2초다. 밝은 agent-shimmer는 #6A5B9E, 알림 바탕 agent-bg-a/m/b는 #EEEBF7, #F5F0F2, #F9EFE8이다. 다크 초안은 D-220을 따른다. 대기 줄 높이는 24pt, 레이블 11pt, 요청 글 12.5pt, 묶음 좌우 12pt, 아래 6pt다. agent-queue-action-size(20pt)와 agent-queue-action-gap(2pt)은 각각 독립적으로 바꾼다.
 
 대화 줄과 사이드바는 notice-dot 6pt, warn을 공유한다. corner-button 40pt 원 안에 agent-face-large 20pt를 놓는다. shadow-agent-corner는 표시 시안의 12pt 아래, 흐림 32pt, 퍼짐 -8pt와 0.5pt 윤곽이다. 어두운 그림자 농도는 기존 팝오버에서 가져온 초안이다.
+
+### 대화 메뉴와 다시 보내기
+
+대화 명령 메뉴는 `conversation-menu-width` 170pt, 재사용하는 삭제 확인은 `confirmation-width` 236pt를 쓴다. 두 표면의 모서리는 `r-window` 10pt다.

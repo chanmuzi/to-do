@@ -1,7 +1,7 @@
 import AppKit
 @_spi(Verification) import Editor
 import Models
-import NotePanel
+@testable import NotePanel
 import Store
 import Scheduling
 import Reminders
@@ -61,8 +61,8 @@ import Theme
 
         type("\n다섯\n여섯", into: adapter)
         let target = before + fixture.theme.lineHeight(.body) * 2
-        let deadline = Date().addingTimeInterval(3)
-        while window.frame.height != target, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        // 병렬 시험의 메인 액터 대기 시간과 무관하게 이 창이 예약한 마지막 전환까지 확인한다.
+        while let animation = fixture.notePanels.controllers[id]?.heightAnimation { await animation.value }
 
         #expect(window.frame.height == target)
         #expect(window.frame.maxY == top)

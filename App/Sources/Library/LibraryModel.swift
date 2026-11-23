@@ -23,6 +23,8 @@ public final class LibraryModel {
     public var error: String?
     public var settings: LibraryPreferences { preferences.value }
     package var conversations: () -> [AgentConversation] = { [] }
+    package var renameConversation: (UUID, String) -> Void = { _, _ in }
+    package var deleteConversation: (UUID) -> Void = { _ in }
     package var openConversation: (UUID) -> Void = { _ in }
     package var newConversation: () -> Void = {}
     package var selectedConversation: UUID?

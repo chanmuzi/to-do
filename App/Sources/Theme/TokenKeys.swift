@@ -265,6 +265,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case swatchGap = "swatch-gap"
     case swatchRing = "swatch-ring"
     case noteMenuWidth = "note-menu-width"
+    case conversationMenuWidth = "conversation-menu-width"
+    case confirmationWidth = "confirmation-width"
     case agentMenuWidth = "agent-menu-width"
     case valueMenuCheck = "value-menu-check"
     case calendarMenuWidth = "calendar-menu-width"

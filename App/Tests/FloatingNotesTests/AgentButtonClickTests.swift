@@ -183,3 +183,138 @@ extension AgentButtonClickTests {
         #expect(!sidebar.opensLastSelection)
     }
 }
+
+extension AgentButtonClickTests {
+    @Test func confirmationCommandsAndHeldQueueWidths() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: AgentStore(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        let note = try fx.open("검사")
+        let draft = try agent.record(for: note)
+        let frame = CGRect(x: 40, y: 100, width: 340, height: 240)
+        agent.open(record: draft, title: "", frame: frame, visible: .init(x: 0, y: 0, width: 900, height: 800))
+        let window = try #require(agent.window(for: note))
+        defer { window.close() }
+
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        func settle() async throws { try await Task.sleep(for: .milliseconds(120)); window.contentView?.layoutSubtreeIfNeeded() }
+        try await settle()
+        let root = try #require(window.contentView)
+        let anchor = try #require(root.conversationButton(draft.conversation.id))
+        anchor.showMenu()
+        let emptyMenu = try #require(window.childWindows?.last)
+        let emptyItems = descendants(try #require(emptyMenu.contentView)).compactMap { $0 as? PickerMenuRow }
+        #expect(emptyItems.map { $0.accessibilityLabel() } == ["이름 바꾸기", "지우기"])
+        #expect(emptyItems.allSatisfy { !$0.isAccessibilityEnabled() })
+        emptyMenu.close()
+
+        var request = AgentRequest(id: UUID(), text: "원래 이름", engine: "fixture", model: nil)
+        request.status = .failed
+        draft.change {
+            $0.requests.append(request)
+            $0.queued = [.init(text: "첫째"), .init(text: "둘째")]
+        }
+        draft.queueHeld = true
+        try await settle()
+        anchor.showMenu()
+        let menu = try #require(window.childWindows?.last)
+        #expect(menu.frame.width == 170)
+        #expect(!menu.canBecomeKey)
+        let items = descendants(try #require(menu.contentView)).compactMap { $0 as? PickerMenuRow }
+        #expect(items.first?.accessibilityPerformPress() == true)
+        try await settle()
+        let field = try #require(descendants(root).compactMap { $0 as? CommandInputField }.first { $0.accessibilityLabel() == "대화 이름" })
+        field.stringValue = "고친 이름"
+        field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+        let editor = NSTextView()
+        #expect(field.delegate?.control?(field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))) == true)
+        #expect(draft.conversation.name == "고친 이름")
+        #expect(draft.rename("   ") && draft.conversation.name == "고친 이름")
+        try await settle()
+        anchor.confirmDeletion()
+        let confirmation = try #require(window.childWindows?.last as? ConfirmationPopover)
+        #expect(confirmation.frame.width == 236 && !confirmation.canBecomeKey)
+        #expect(confirmation.handleKey(36) && confirmation.isVisible)
+        #expect(confirmation.handleKey(53) && !confirmation.isVisible && !draft.deleted)
+        anchor.confirmDeletion()
+        let second = try #require(window.childWindows?.last as? ConfirmationPopover)
+        second.pressed(in: window)
+        #expect(!second.isVisible && !draft.deleted)
+        var sent = false
+        agent.sendAll = { _ in sent = true }
+        for width in [340, 300, 260] {
+            window.setContentSize(.init(width: CGFloat(width), height: window.frame.height))
+            try await settle()
+            let controls = buttons(in: window)
+            let remove = try #require(controls["모두 빼기"])
+            let send = try #require(controls["모두 보내기"])
+            let left = try #require(remove.accessibilityFrame?()), right = try #require(send.accessibilityFrame?())
+            #expect(left.height == 22 && right.height == 22 && abs(right.minX - left.maxX - 6) <= 1)
+            if width == 300 { #expect(send.accessibilityPerformPress?() == true && sent) }
+            if width == 260 { #expect(remove.accessibilityPerformPress?() == true && draft.conversation.queued.isEmpty) }
+        }
+        anchor.confirmDeletion()
+        let final = try #require(window.childWindows?.last)
+        try await settle()
+        #expect(buttons(in: final)["삭제"]?.accessibilityPerformPress?() == true)
+        try await settle()
+        #expect(draft.deleted && agent.window(for: note) == nil)
+    }
+}
+
+extension AgentButtonClickTests {
+    @Test func libraryMenuEditsOnlyItsRowAndOpensTheSameConversation() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: AgentStore(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        fx.router.agent = agent
+        let draft = agent.newRecord()
+        draft.change {
+            var request = AgentRequest(id: UUID(), text: "첫 이름", engine: "fixture", model: nil)
+            request.status = .completed
+            $0.requests.append(request)
+        }
+        let library = LibraryCoordinator(theme: fx.theme, notes: fx.notes, spaces: fx.spaces, windows: fx.windowStates,
+                                        preferences: try LibraryPreferencesStore(location: fx.location), router: fx.router)
+        fx.router.connectHistory(library.model, agent: agent)
+        var opens: [UUID] = []
+        library.model.openConversation = { opens.append($0) }
+        library.allowsKeyWindows = false
+        library.show()
+        defer { library.close() }
+        library.model.select(.conversations)
+        library.model.previewHistoryHover = draft.conversation.id
+        try await Task.sleep(for: .milliseconds(180))
+        let win = try #require(library.window), root = try #require(win.contentView)
+        func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+        root.layoutSubtreeIfNeeded()
+        let anchor = try #require(root.conversationButton(draft.conversation.id))
+        #expect(anchor.bounds.size == CGSize(width: 24, height: 24))
+        func items() throws -> [PickerMenuRow] {
+            let popup = try #require(win.childWindows?.last?.contentView)
+            return views(popup).compactMap { $0 as? PickerMenuRow }
+        }
+        let row = try #require(views(root).compactMap { $0 as? HistoryRowInputView }.first)
+        let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: win.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        row.rightMouseDown(with: event)
+        let contextItems = try items()
+        #expect(contextItems.map { $0.accessibilityLabel() } == ["열기", "이름 바꾸기", "지우기"])
+        #expect(contextItems[0].accessibilityPerformPress())
+        #expect(opens == [draft.conversation.id])
+        anchor.showMenu()
+        #expect(try items()[1].accessibilityPerformPress())
+        try await Task.sleep(for: .milliseconds(120))
+        let field = try #require(views(root).compactMap { $0 as? CommandInputField }.first { $0.accessibilityLabel() == "대화 이름" })
+        field.stringValue = "취소할 이름"
+        field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+        #expect(field.delegate?.control?(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))) == true)
+        #expect(draft.conversation.name == "첫 이름" && !win.isKeyWindow)
+    }
+}

@@ -2,12 +2,14 @@ import SwiftUI
 
 package struct WhiteControl: ButtonStyle {
     let theme: Theme
+    let horizontalPadding: CGFloat
     let ink: ColorToken
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduced
     @State private var hovered = false
 
-    package init(theme: Theme, ink: ColorToken = .text) {
+    package init(theme: Theme, ink: ColorToken = .text, horizontalPadding: CGFloat? = nil) {
+        self.horizontalPadding = horizontalPadding ?? theme.component(.settingsSegmentPad)
         self.theme = theme
         self.ink = ink
     }
@@ -17,7 +19,7 @@ package struct WhiteControl: ButtonStyle {
         configuration.label
             .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size, weight: theme.tokens.textStyle(.selected).weight))
             .foregroundStyle(theme.color(enabled ? ink : .text3))
-            .padding(.horizontal, theme.component(.settingsSegmentPad)).frame(height: theme.component(.settingsChipH))
+            .padding(.horizontal, horizontalPadding).frame(height: theme.component(.settingsChipH))
             .background {
                 shape.fill(theme.color(.surface))
                 if enabled && (hovered || configuration.isPressed) { shape.fill(theme.color(.hover)) }

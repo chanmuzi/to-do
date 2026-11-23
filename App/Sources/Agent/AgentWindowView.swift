@@ -10,7 +10,11 @@ struct AgentWindowView: View {
     let openHistory: (UUID) -> Void
     let newChat: () -> Void
     @State private var selection: UUID?
+    @State private var editingTitle = false
+    @State private var editedName = ""
+    let delete: () -> Void
     let send: () -> Void
+    let sendAll: () -> Void
     let retry: (UUID) -> Void
     let sendNow: (UUID) -> Void
     let openNote: (NoteID) -> Void
@@ -60,6 +64,12 @@ struct AgentWindowView: View {
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
                 }.defaultScrollAnchor(.bottom)
                 if !draft.conversation.queued.isEmpty {
+                    if draft.queueHeld {
+                        AgentQueueHeader(theme: theme, count: draft.conversation.queued.count, remove: {
+                            if draft.change({ $0.queued.removeAll() }) { draft.queueHeld = false }
+                        }, send: sendAll)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                    }
                     ScrollView {
                         VStack(spacing: theme.component(.iconButtonGap)) {
                             ForEach(draft.conversation.queued) { item in
@@ -101,6 +111,7 @@ struct AgentWindowView: View {
     }
 
     @State private var conversationHeight: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
     private var queueHeight: CGFloat {
         CGFloat(draft.conversation.queued.count) * (theme.component(.iconButton) + theme.component(.iconButtonGap))
             - theme.component(.iconButtonGap)
@@ -108,7 +119,8 @@ struct AgentWindowView: View {
     private var queueLimit: CGFloat { theme.component(.scheduleListMaxHeight) }
     private var requiredHeight: CGFloat {
         let targetHeight = draft.conversation.targets.isEmpty ? 0 : theme.component(.iconButton) + theme.space(.sp2)
-        return conversationHeight + targetHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
+        let heldHeight = draft.queueHeld && !draft.conversation.queued.isEmpty ? headerHeight : 0
+        return conversationHeight + heldHeight + targetHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
             + max(0, min(queueHeight, queueLimit) + theme.component(.agentRowInset)) + theme.component(.agentEdgeIdle) * 2
     }
 
@@ -123,11 +135,24 @@ struct AgentWindowView: View {
     private var header: some View {
         HStack(spacing: theme.component(.iconButtonGap)) {
             AgentFace(theme: theme, state: draft.conversation.requests.last?.face ?? .idle, forceStill: still).padding(.trailing, theme.component(.agentFaceTitleGap) - theme.component(.iconButtonGap))
-            Text(draft.showsHistory ? "지난 대화" : draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+            if editingTitle {
+                CommandTextField(text: $editedName, theme: theme, placeholder: "대화 이름", style: .title, submit: {
+                    if draft.rename(editedName) { editingTitle = false }
+                }, cancel: { editingTitle = false })
+                .frame(height: theme.lineHeight(.title))
+            } else {
+                Text(draft.showsHistory ? "지난 대화" : !draft.conversation.hasSubmitted ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+            }
             Spacer(minLength: 0)
             control("지난 대화", .clock) { draft.showsHistory.toggle() }
             control("새 대화", .plus, action: newChat)
-            control("더 보기", .more)
+            ConversationMenu(theme: theme, id: draft.conversation.id, enabled: draft.conversation.hasSubmitted,
+                             rename: {
+                                 draft.showsHistory = false
+                                 editedName = draft.conversation.name
+                                 editingTitle = true
+                             }, delete: delete)
+                .frame(width: theme.component(.iconButton), height: theme.component(.iconButton))
             Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth), height: theme.component(.iconMedium))
                 .padding(.horizontal, theme.space(.sp1))
             control("창 닫기", .close, action: close)

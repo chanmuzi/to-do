@@ -80,7 +80,9 @@ package final class PickerMenuRow: NSView {
     let header: Bool
     let selected: Bool
     let subtitle: String?
-    package init(theme: Theme, text: String, dot: NSImage?, header: Bool = false, selected: Bool, subtitle: String? = nil, width: CGFloat? = nil) {
+    let command: Bool
+    package init(theme: Theme, text: String, dot: NSImage?, header: Bool = false, selected: Bool, subtitle: String? = nil, width: CGFloat? = nil, command: Bool = false) {
+        self.command = command
         self.preferredWidth = width ?? theme.component(.menuWidth)
         self.subtitle = subtitle
         self.theme = theme
@@ -89,7 +91,7 @@ package final class PickerMenuRow: NSView {
         self.header = header
         self.selected = selected
         super.init(frame: CGRect(x: 0, y: 0, width: preferredWidth,
-                                 height: theme.component(header ? .controlHeight : .segmentHeight)))
+                                 height: theme.component(command ? .rowHeight : header ? .controlHeight : .segmentHeight)))
         autoresizingMask = [.width]
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.inVisibleRect, .activeAlways, .mouseEnteredAndExited],
                                        owner: self, userInfo: nil))
@@ -97,6 +99,7 @@ package final class PickerMenuRow: NSView {
     @available(*, unavailable)
     package required init?(coder: NSCoder) { fatalError() }
     package var textFont: NSFont {
+        if command { return theme.nsFont(.body, size: theme.tokens.textStyle(.title).size) }
         if choiceItem != nil {
             return NSFont.systemFont(ofSize: theme.tokens.textStyle(header ? .librarySection : .rowSub).size,
                                      weight: header ? .medium : .regular)
@@ -113,7 +116,7 @@ package final class PickerMenuRow: NSView {
 
     func popupRow(for item: NSMenuItem) -> PickerMenuRow {
         let row = PickerMenuRow(theme: theme, text: text, dot: dot, header: header, selected: selected,
-                                subtitle: subtitle, width: preferredWidth)
+                                subtitle: subtitle, width: preferredWidth, command: command)
         row.choiceItem = item
         return row
     }
@@ -143,7 +146,7 @@ package final class PickerMenuRow: NSView {
                 check.draw(at: NSPoint(x: x + (theme.component(checkSize) - check.size.width) / 2, y: (bounds.height - check.size.height) / 2),
                            from: .zero, operation: .sourceOver, fraction: 1)
             }
-            x += theme.component(checkSize) + gap
+            if !command { x += theme.component(checkSize) + gap }
             if let dot {
                 let opacity = popup != nil && item?.isEnabled == false ? theme.ratio(.disabledIconOpacity) : 1
                 dot.draw(at: NSPoint(x: x, y: (bounds.height - dot.size.height) / 2),

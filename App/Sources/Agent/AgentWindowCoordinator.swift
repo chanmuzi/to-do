@@ -22,16 +22,32 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         var records: [UUID: AgentDraft] = [:]
     }
     private let catalog = Catalog()
-    package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter { !$0.requests.isEmpty } }
+    package var drafts: [AgentDraft] { Array(catalog.records.values) }
+    package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter(\.hasSubmitted) }
     package func record(id: UUID) -> AgentDraft? { catalog.records[id] }
     package var present: (AgentDraft, String) -> Void = { _, _ in }
     private var loaded = false
     package var send: (AgentDraft) -> Void = { _ in }
+    package var sendAll: (AgentDraft) -> Void = { _ in }
     package var sendNow: (AgentDraft, UUID) -> Void = { _, _ in }
     package var retry: (AgentDraft, UUID) -> Void = { _, _ in }
     package var openNote: (NoteID) -> Void = { _ in }
     package var chooseTarget: (AgentDraft) -> Void = { _ in }
     package var titleForNote: (NoteID) -> String? = { _ in nil }
+    package var stopBeforeDelete: (AgentDraft) async throws -> Void = { _ in }
+
+    package var finishDeletion: (AgentDraft) -> Void = { _ in }
+
+    package func delete(_ draft: AgentDraft) async throws {
+        let id = draft.conversation.id
+        guard catalog.records[id] === draft, !draft.deleting, draft.conversation.hasSubmitted else { return }
+        draft.deleting = true
+        defer { draft.deleting = false; finishDeletion(draft) }
+        try await stopBeforeDelete(draft)
+        try draft.deleteFile()
+        sessions[id]?.panel.close()
+        catalog.records.removeValue(forKey: id)
+    }
     package var onClose: () -> Void = {}
 
     package func restore() throws {
@@ -39,7 +55,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         for var value in try store.loadConversations(warning: warning) {
             if value.requests.contains(where: { $0.status == .running }) {
                 for i in value.requests.indices where value.requests[i].status == .running {
-                    value.requests[i].status = .interrupted
+                    value.interruptForShutdown(at: i)
                 }
                 try store.save(value)
             }
@@ -121,7 +137,14 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                            present(newRecord(targets: draft.conversation.targets), "new")
                                            panel?.close()
                                        },
+                                       delete: { [weak self] in
+                                           Task {
+                                               do { try await self?.delete(draft) }
+                                               catch { draft.writeError = error }
+                                           }
+                                       },
                                        send: { [weak self] in self?.send(draft) },
+                                       sendAll: { [weak self] in self?.sendAll(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
                                        openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
