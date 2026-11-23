@@ -67,6 +67,53 @@ public final class FileNoteStore: NoteStoring {
         }
     }
 
+    /// 제안 영수증의 지문에는 머리, BOM, 줄바꿈을 포함한 파일 바이트가 모두 들어간다.
+    package func proposalText(_ id: NoteID) throws -> String {
+        let name = id.rawValue
+        guard !name.isEmpty, !name.hasPrefix("."), !name.contains("/"), !name.utf8.contains(0),
+              !hasPendingChanges(id) else { throw StoreError.conflict(id) }
+        let url = files.url(id, in: location.notesDirectory)
+        let info = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard info.isRegularFile == true, info.isSymbolicLink != true else { throw StoreError.noteNotFound(id) }
+        return try files.readText(id, in: location.notesDirectory)
+    }
+
+    /// 미리보기를 그리는 동안 열린 편집기의 충돌 기준을 바꾸지 않는다.
+    package func proposalNote(_ id: NoteID) throws -> Note {
+        if let entry = pending[id] { return entry.note }
+        return try files.read(id, in: location.notesDirectory).note
+    }
+
+    package func flushProposalTarget(_ id: NoteID) throws {
+        if pending[id] != nil { _ = try commit(id) }
+    }
+
+    package func prepareTodos(_ lines: [String], text: String) throws -> AgentProposal.Receipt {
+        guard TodoSubmission.valid(lines: lines) else { throw CocoaError(.fileReadCorruptFile) }
+        let header = NoteFileCodec.Header(text)
+        let start = header?.bodyStart ?? text.startIndex
+        let body = lines.reduce(String(text[start...])) { TodoAppender.append($1, to: $0) }
+        let separator = header.flatMap { $0.endsWithoutNewline ? $0.newline : nil } ?? ""
+        let result = text[..<start] + separator + body
+        return .init(before: Data(text.utf8), after: Data(result.utf8))
+    }
+
+    package func applyTodos(_ receipt: AgentProposal.Receipt, to id: NoteID, undo: Bool) throws {
+        let bytes = try Data(proposalText(id).utf8)
+        let expected = undo ? receipt.appliedFingerprint : receipt.previousFingerprint
+        guard TodoSubmission.fingerprint(bytes) == expected,
+              let minus = undo ? receipt.addedTail : receipt.removedTail,
+              let plus = undo ? receipt.removedTail : receipt.addedTail,
+              bytes.suffix(minus.count) == minus else { throw StoreError.conflict(id) }
+        let result = Data(bytes.dropLast(minus.count)) + plus
+        guard TodoSubmission.fingerprint(result) == (undo ? receipt.previousFingerprint : receipt.appliedFingerprint),
+              let text = String(validating: result, as: UTF8.self) else { throw StoreError.conflict(id) }
+        try files.write(text, id)
+        known[id] = text
+        snapshot[id] = try files.stamp(id, in: location.notesDirectory)
+        emit(.init(id: id, kind: .updated, origin: .local))
+    }
+
     // MARK: - 읽기
 
     public func list() throws -> NoteListing {

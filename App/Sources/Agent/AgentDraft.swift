@@ -62,11 +62,11 @@ import Store
     }
 
     /// 줄에서 꺼내기와 전송 예약은 디스크에 반영된 뒤에만 화면에도 반영한다.
-    @discardableResult package func change(_ edit: (inout AgentConversation) -> Void) -> Bool {
+    @discardableResult package func change(recordsActivity: Bool = true, _ edit: (inout AgentConversation) -> Void) -> Bool {
         guard !deleted, !deleting else { return false }
         var next = conversation
         edit(&next)
-        next.updatedAt = Date()
+        if recordsActivity { next.updatedAt = Date() }
         do {
             try store.save(next)
             conversation = next
