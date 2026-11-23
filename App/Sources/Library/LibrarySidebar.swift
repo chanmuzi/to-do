@@ -34,7 +34,7 @@ struct LibrarySidebar: View {
                         row(item, symbol: symbol(item))
                             .modifier(SidebarPan(item, section: section, drag: model.reorder, move: model.moveSidebar))
                             .contextMenu { actions.menu }.reorderAccess(actions)
-                            .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.settingsNavHoverRadius))
+                            .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.sidebarReorderRadius))
                             .reorderPosition(item, in: section, drag: model.reorder, theme: theme)
                     }
                 }
@@ -55,7 +55,7 @@ struct LibrarySidebar: View {
                                 LibrarySpaceRow(model: model, space: space,
                                     rename: { model.beginSpaceEditing(space.id) }, delete: { deleting = space }, section: section)
                                     .modifier(SidebarPan(item, section: section, drag: model.reorder, move: model.moveSidebar))
-                                    .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.settingsNavHoverRadius))
+                                    .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.sidebarReorderRadius))
                             }
                             if model.expanded.contains(space.id) {
                                 ForEach(model.index.days(in: space.id), id: \.self) { day in

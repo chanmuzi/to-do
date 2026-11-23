@@ -44,7 +44,7 @@ extension SettingsView {
                         .overlay(alignment: .top) { if view != section.rows.first && !model.reorder.lifted(view, in: section) { rule } }
                         .padding(.horizontal, theme.space(.sp3))
                         .settingsMeasure("row-" + title)
-                        .reorderSurface(model.reorder.lifted(view, in: section), theme: theme, radius: theme.shape(.codeBlockRadius))
+                        .reorderSurface(model.reorder.lifted(view, in: section), theme: theme, radius: theme.component(.settingsReorderRadius))
                         .contextMenu { actions.menu }
                         .reorderPosition(view, in: section, drag: model.reorder, theme: theme)
                 }

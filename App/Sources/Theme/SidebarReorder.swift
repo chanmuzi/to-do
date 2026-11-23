@@ -145,7 +145,7 @@ extension View {
     @MainActor package func reorderSurface(_ lifted: Bool, theme: Theme, radius: CGFloat) -> some View {
         background {
             if lifted {
-                let layers = theme.shadow(.agentCorner)
+                let layers = theme.shadow(.reorder)
                 let inset = layers.map { $0.blur + abs($0.y) + abs($0.spread) }.max() ?? 0
                 Canvas { context, size in
                     let row = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
