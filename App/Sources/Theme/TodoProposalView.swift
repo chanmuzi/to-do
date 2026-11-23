@@ -26,28 +26,28 @@ package struct TodoProposalView: View {
     package let theme: Theme
     package let proposal: AgentProposal
     package let note: Note?
+    package let spaceName: String?
     package let full: Bool
     package let review: () -> Void
     package let conversation: (() -> Void)?
     package let accept: () -> Void
     package let discard: () -> Void
 
-    package init(theme: Theme, proposal: AgentProposal, note: Note?, full: Bool, review: @escaping () -> Void,
+    package init(theme: Theme, proposal: AgentProposal, note: Note?, full: Bool, spaceName: String? = nil, review: @escaping () -> Void,
                  conversation: (() -> Void)? = nil, accept: @escaping () -> Void, discard: @escaping () -> Void) {
+        self.spaceName = spaceName
         self.theme = theme; self.proposal = proposal; self.note = note; self.full = full
         self.review = review; self.conversation = conversation; self.accept = accept; self.discard = discard
     }
 
     private var pending: Bool { proposal.status == .pending }
-    private var preview: [(String, Bool)] {
-        guard let note else { return [] }
-        let body = pending ? proposal.lines.reduce(note.body) { TodoAppender.append($1, to: $0) } : note.body
-        var rows = body.components(separatedBy: .newlines)
-        if body.contains("\r\n") { rows = body.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") }
-        if rows.last == "" { rows.removeLast() }
-        let firstAdded = pending ? rows.count - proposal.lines.count : rows.count
-        return rows.enumerated().compactMap { index, text in
-            full || index >= firstAdded ? (text, index >= firstAdded) : nil
+    @ViewBuilder private var noteBody: some View {
+        if case .newNote(_, let markdown) = proposal.content {
+            ProposalNoteBody(theme: theme, markdown: markdown, addedLines: pending ? nil : 0, compact: !full)
+        } else if let note {
+            let additions = pending ? proposal.lines : []
+            let markdown = additions.reduce(note.body) { TodoAppender.append($1, to: $0) }
+            ProposalNoteBody(theme: theme, markdown: markdown, addedLines: additions.count, compact: !full)
         }
     }
 
@@ -57,7 +57,7 @@ package struct TodoProposalView: View {
                 AgentFace(theme: theme, state: .done)
                 Text(proposal.title).fontWeight(.semibold)
             }
-            if note == nil { Text("대상 노트를 찾을 수 없어요").foregroundStyle(theme.color(.text3)) }
+            if note == nil && proposal.createdNoteID == nil { Text("대상 노트를 찾을 수 없어요").foregroundStyle(theme.color(.text3)) }
             else if full {
                 rows.padding(theme.component(.agentInputInset))
                     .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
@@ -71,7 +71,7 @@ package struct TodoProposalView: View {
                 if pending {
                     Button("버리기", action: discard)
                     if proposal.requiresReview == true { Button("다시 미리보기", action: review) }
-                    else { Button("받기", action: accept).disabled(note == nil) }
+                    else { Button("받기", action: accept).disabled(note == nil && proposal.createdNoteID == nil) }
                 } else { Text(proposal.status.label).foregroundStyle(theme.color(.text3)) }
             }.buttonStyle(WhiteControl(theme: theme))
         }.font(theme.font(.body, size: theme.component(.proposalFont))).foregroundStyle(theme.color(.text))
@@ -80,29 +80,23 @@ package struct TodoProposalView: View {
             .background { if !full { Color.clear.proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius)) } }
     }
 
-    private var rows: some View {
+    private var previewTitle: String {
+        if case .newNote(let title, _) = proposal.content { return title }
+        return note.flatMap { $0.title.isEmpty ? nil : $0.title } ?? "제목 없음"
+    }
+
+    @ViewBuilder private var rows: some View {
+        if let item = proposal.scheduleItem {
+            ScheduleProposalPreview(theme: theme, note: note, proposed: item, pending: pending, full: full)
+        } else { textRows }
+    }
+
+    private var textRows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(note.flatMap { $0.title.isEmpty ? nil : $0.title } ?? "제목 없음")
+            Text(previewTitle)
                 .font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3)).padding(.horizontal, theme.space(.sp3))
-            let values = preview
-            ForEach(Array((full ? values[...] : values.prefix(3)).enumerated()), id: \.offset) { _, row in
-                HStack(spacing: theme.space(.sp1)) {
-                    Text(row.1 ? "+" : "").frame(width: theme.component(.proposalGutter))
-                    if let match = row.0.firstMatch(of: /^\s*(?:[-*+]\s+)?\[([ xX])\]\s+(.*)$/) {
-                        let done = match.1 != " "
-                        let shape = RoundedRectangle(cornerRadius: theme.shape(.checkRadius))
-                        ZStack {
-                            if done {
-                                shape.fill(theme.color(.text3))
-                                Image(systemName: "checkmark").foregroundStyle(theme.color(.surface))
-                            } else { shape.strokeBorder(theme.color(.text2), lineWidth: theme.component(.editorGlyphStroke)) }
-                        }.frame(width: theme.component(.checkSize), height: theme.component(.checkSize))
-                        Text(String(match.2)).strikethrough(done)
-                    } else { Text(row.0) }
-                    Spacer(minLength: 0)
-                }.padding(.trailing, theme.space(.sp3)).frame(minHeight: theme.component(.proposalLineHeight))
-                    .background(row.1 ? theme.color(.diffAdd) : .clear)
-            }
+            if let spaceName { Text(spaceName).font(theme.font(.micro)).padding(.horizontal, theme.space(.sp3)) }
+            noteBody
         }.padding(.vertical, theme.space(.sp2))
             .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.space(.sp2)))
     }

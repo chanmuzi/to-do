@@ -71,18 +71,24 @@ final class TodoProposalController {
     private func record(_ id: UUID) -> AgentDraft? { agent.drafts.first { $0.proposal(id) != nil && !$0.deleting } }
 
     func open(_ id: UUID, source: String) {
-        guard let draft = record(id), let p = draft.proposal(id), let target = p.targetID else { return }
-        selected[target] = id
+        guard let draft = record(id), let p = draft.proposal(id) else { return }
         router.traceActivation("proposal-open " + source)
-        guard router.route(.openNote(target)) == .handled else { return }
+        if let target = p.status == .accepted ? p.createdNoteID ?? p.targetID : p.cardNoteID {
+            selected[target] = id
+            guard router.route(.openNote(target)) == .handled else { return }
+        } else {
+            guard router.route(.openLibrary) == .handled, let model = router.library?.model else { return }
+            model.select(.proposals)
+            model.selectProposal(id)
+        }
         do { try draft.markProposalSeen(id) } catch { showError("제안 열람을 저장하지 못했어요") }
         refreshCards()
     }
 
     func review(_ id: UUID) {
-        guard let draft = record(id), let target = draft.proposal(id)?.targetID else { return }
+        guard let draft = record(id), let p = draft.proposal(id) else { return }
         do {
-            try flush(target)
+            if let target = p.targetID { try flush(target) }
             try draft.reviewProposal(id, notes: notes)
             expanded.insert(id)
             refreshCards()
@@ -101,35 +107,61 @@ final class TodoProposalController {
         var chain: [NoteID: (base: String, applied: String)] = [:]
         var failed = false
         for id in ids {
-            guard let draft = record(id), let p = draft.proposal(id), let target = p.targetID, p.status == .pending else { continue }
+            guard let draft = record(id), let p = draft.proposal(id), p.status == .pending else { continue }
             do {
-                try flush(target)
-                if let own = chain[target], own.base == p.baseVersion, p.requiresReview != true,
+                if case .newNote(_, let space?) = p.target, router.library?.model.spaces.space(for: space) == nil {
+                    throw SpaceStore.MutationError.missingSpace
+                }
+                if let target = p.targetID { try flush(target) }
+                if let target = p.targetID, let own = chain[target], own.base == p.baseVersion, p.requiresReview != true,
                    try TodoSubmission.fingerprint(Data(notes.proposalText(target).utf8)) == own.applied {
                     try draft.reviewProposal(id, notes: notes)
                 }
-                if try draft.acceptProposal(id, notes: notes), let receipt = draft.proposal(id)?.receipt {
+                if try draft.acceptProposal(id, notes: notes) {
                     accepted.append(id)
-                    chain[target] = (chain[target]?.base ?? receipt.previousFingerprint, receipt.appliedFingerprint)
+                    if let target = p.targetID, let receipt = draft.proposal(id)?.receipt {
+                        let applied = try TodoSubmission.fingerprint(Data(notes.proposalText(target).utf8))
+                        chain[target] = (chain[target]?.base ?? receipt.previousFingerprint, applied)
+                        if let item = p.scheduleItem { router.onScheduleCreated?(target, item.id) }
+                    }
+                    if let newID = p.createdNoteID, ids.count == 1 { router.route(.openNote(newID)) }
                 }
             } catch { failed = true }
         }
         guard !accepted.isEmpty else { if failed { showError("노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.") }; return }
-        showToast(failed ? "일부 제안을 받았어요. 남은 제안을 확인해 주세요." : "할 일을 추가했어요", "되돌리기") { [weak self, accepted] in
+        showToast(failed ? "일부 제안을 받았어요. 남은 제안을 확인해 주세요." : (accepted.count == 1 ? successMessage(accepted[0]) : "제안을 받았어요"), "되돌리기") { [weak self, accepted] in
             self?.undo(accepted)
+        }
+    }
+
+    private func successMessage(_ id: UUID) -> String {
+        switch record(id)?.proposal(id)?.content {
+        case .todos: "할 일을 추가했어요"
+        case .newNote: "새 노트를 만들었어요"
+        case .schedule(let kind, _, _, _, _, _): kind == .event ? "일정을 추가했어요" : "리마인더를 추가했어요"
+        default: "제안을 받았어요"
         }
     }
 
     private func undo(_ ids: [UUID]) {
         var failed = false
+        var editedNewNote = false
+        let scheduleTargets = Set(ids.compactMap { id -> NoteID? in
+            guard let p = record(id)?.proposal(id), p.scheduleItem != nil else { return nil }
+            return p.targetID
+        })
         for id in ids.reversed() {
-            guard let draft = record(id), let target = draft.proposal(id)?.targetID else { continue }
+            guard let draft = record(id), let p = draft.proposal(id), let target = p.createdNoteID ?? p.targetID else { continue }
             do {
                 try flush(target)
-                try draft.undoProposal(id, notes: notes)
-            } catch { failed = true }
+                try draft.undoProposal(id, notes: notes, sharedScheduleTarget: scheduleTargets.contains(target))
+            } catch {
+                failed = true
+                if case StoreError.conflict = error, p.createdNoteID != nil { editedNewNote = true }
+            }
         }
-        if failed { showError("노트가 바뀌어 되돌릴 수 없는 제안이 있어요") }
+        if editedNewNote { showError("새 노트를 고쳐서 되돌릴 수 없어요") }
+        else if failed { showError("노트가 바뀌어 되돌릴 수 없는 제안이 있어요") }
     }
 
     private func flush(_ id: NoteID) throws {
@@ -137,18 +169,24 @@ final class TodoProposalController {
         try notes.flushProposalTarget(id)
     }
 
+    private func spaceName(for p: AgentProposal) -> String? {
+        guard case .newNote(_, let space?) = p.target else { return nil }
+        return router.library?.model.spaces.space(for: space)?.name
+    }
+
     private func refreshCards() {
         let pending = agent.history.sorted { $0.updatedAt > $1.updatedAt }.flatMap(\.requests).flatMap(\.proposals)
             .filter { $0.status == .pending }
         var visible: Set<NoteID> = []
         for id in panels.openNoteIDs {
-            let candidates = pending.filter { $0.targetID == id }
+            let candidates = pending.filter { $0.cardNoteID == id }
             guard let parent = panels.window(for: id), let p = candidates.first(where: { $0.id == selected[id] }) ?? candidates.first else { continue }
             visible.insert(id)
             let panel = cards[id] ?? CardPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.isReleasedWhenClosed = false; panel.hidesOnDeactivate = false
             panel.backgroundColor = .clear; panel.isOpaque = false; panel.hasShadow = true
             let view = TodoProposalView(theme: theme, proposal: p, note: try? notes.proposalNote(id), full: expanded.contains(p.id),
+                                        spaceName: spaceName(for: p),
                                         review: { [weak self] in self?.review(p.id) },
                                         accept: { [weak self] in self?.accept([p.id], source: "card") },
                                         discard: { [weak self] in self?.discard(p.id, source: "card") })

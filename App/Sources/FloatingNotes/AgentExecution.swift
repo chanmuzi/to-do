@@ -62,7 +62,7 @@ struct AgentExecution {
     }
 
     private struct Prompt: Encodable {
-        var toolInstruction = "노트를 바꾸려면 직접 쓰지 말고 propose_change로 제안하세요."
+        var toolInstruction = "할 일(add_todos), 리마인더(add_reminder), 일정(add_event), 새 노트(create_note)는 직접 쓰지 말고 propose_change로 제안하세요. 일정의 현지 시작과 끝, 날짜만 여부, 시간대를 구조화하세요. 직접 요청한 새 노트도 승인이 필요합니다."
         var instructions: String
         var targets: [String]
         var history: [AgentConversation.Message]

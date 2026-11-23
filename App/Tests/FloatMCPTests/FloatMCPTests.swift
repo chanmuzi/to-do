@@ -49,7 +49,7 @@ private final class BundleMarker: NSObject {}
             try send("tools/call", id: index + 3, ["name": "read_note", "arguments": ["name": name]])
         }
         try send("tools/call", id: 8, ["name": "add_todo"])
-        let submissions: [Object] = [
+        var submissions: [Object] = [
             ["kind": "add_todos", "note_id": "메모", "lines": ["약속 확인"]],
             ["kind": "add_todos", "note_id": "메모", "lines": ["약속 확인"]],
             ["kind": "unknown", "note_id": "메모", "lines": ["약속 확인"]],
@@ -57,6 +57,14 @@ private final class BundleMarker: NSObject {}
             ["kind": "add_todos", "note_id": "link", "lines": ["약속 확인"]],
             ["kind": "add_todos", "note_id": "메모", "lines": [String(repeating: "a", count: 1025)]]
         ]
+        let reminder: Object = ["kind": "add_reminder", "note_id": "메모", "title": "반납", "date_only": true,
+                                "start": "2028-02-29", "time_zone": "Asia/Seoul"]
+        let event = reminder.merging(["kind": "add_event", "date_only": false, "start": "2028-02-29T14:30:00", "end": "2028-02-29T15:30:00"]) { _, new in new }
+        let newNote: Object = ["kind": "create_note", "title": "정리", "markdown": "본문"]
+        submissions += [reminder, event, newNote, event, reminder.merging(["start": "2027-02-29"]) { _, n in n },
+                        event.merging(["end": "2028-02-28T15:30:00"]) { _, n in n },
+                        reminder.merging(["time_zone": "없는 시간대"]) { _, n in n },
+                        newNote.merging(["note_id": "link"]) { _, n in n }]
         for (i, submission) in submissions.enumerated() {
             try send("tools/call", id: 9 + i, ["name": "propose_change", "arguments": submission])
         }
@@ -67,7 +75,7 @@ private final class BundleMarker: NSObject {}
         let responses = try bytes.split(separator: 10).map { data in
             try #require(JSONSerialization.jsonObject(with: Data(data)) as? Object)
         }
-        try #require(responses.count == 15)
+        try #require(responses.count == 9 + submissions.count)
         #expect(responses[0]["id"] as? String == "start")
         #expect((responses[0]["result"] as? Object)?["protocolVersion"] as? String == "2025-06-18")
         let tools = (responses[1]["result"] as? Object)?["tools"] as? [Object]
@@ -77,18 +85,18 @@ private final class BundleMarker: NSObject {}
             return content?.first?["text"] as? String
         }
         let files = try fm.contentsOfDirectory(atPath: inbox.path)
-        #expect(files.count == (proposals ? 1 : 0))
+        #expect(files.count == (proposals ? 4 : 0))
         #expect(files.allSatisfy { $0.hasSuffix(".json") })
         #expect(try Data(contentsOf: outside) == Data("outside".utf8))
         #expect(try Data(contentsOf: notes.appending(path: "메모.md")) == Data("# 메모\n본문".utf8))
         if proposals {
             #expect(text(9) == text(10))
-            for i in 11...14 {
+            for i in Array(11...14) + Array(19...22) {
                 #expect((responses[i]["result"] as? Object)?["isError"] as? Bool == true)
                 #expect(text(i)?.isEmpty == false)
             }
         } else {
-            for i in 9...14 { #expect((responses[i]["error"] as? Object)?["code"] as? Int == -32602) }
+            for i in 9..<responses.count { #expect((responses[i]["error"] as? Object)?["code"] as? Int == -32602) }
         }
         #expect(text(2) == "메모.md")
         #expect(text(3) == "# 메모\n본문")

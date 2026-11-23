@@ -99,7 +99,7 @@ package struct ConversationHistoryList: View {
             }.lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             Group {
                 Text(ReminderPresentation.clock(value.updatedAt, format: .koreanMeridiem, calendar: calendar))
-                    .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size).monospacedDigit()).foregroundStyle(theme.color(.text3))
+                    .font(theme.libraryNumberFont).foregroundStyle(theme.color(.text3))
                 if value.needsAnswer {
                     ConversationNoticeDot(theme: theme).padding(.leading, theme.space(.sp2))
                         .padding(.trailing, theme.space(.sp1))

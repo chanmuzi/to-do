@@ -254,6 +254,7 @@ final class DebugControl {
                 "candidateTitles": model?.candidates.map { $0.title } ?? [],
                 "candidateLabels": model.map { model in model.candidates.map { model.presentation($0).accessibilityLabel(title: $0.title) } } ?? [],
                 "items": model?.items.map { ["id": $0.id, "title": $0.title, "kind": $0.kind.rawValue] } ?? [],
+                "saves": fakeCalendar?.saves ?? -1, "remoteItems": fakeCalendar?.items.count ?? -1,
                 "permissionRequests": fakeCalendar?.authorizationPromptAttempts.count ?? -1,
                 "error": model?.error ?? ""]
             do { try JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]).write(to: url) }
@@ -270,6 +271,8 @@ final class DebugControl {
         case ("reminder-candidate", let value?, _): if let index = Int(value.rawValue) { reminderEditor?.model?.candidateIndex = index }
         case ("reminder-submit", _, _): reminderEditor?.model?.submitCandidate()
         case ("reminder-toggle", let value?, _): reminderEditor?.model?.toggleCompleted(value.rawValue)
+        case ("fake-save-failure", let mode?, _) where isPassive:
+            fakeCalendar?.failure = mode.rawValue == "on" ? .readOnly : nil
         case ("fake-access", let value?, _):
             fakeCalendar?.isAllowed = value.rawValue == "on"
             reminderEditor?.model?.reload()
@@ -570,6 +573,15 @@ final class DebugControl {
             guard let url = output(named: name.rawValue) else { return }
             write(agentCorner?.window, to: url)
         case ("request-bar", _, _) where isPassive: router.route(.requestAgent)
+        case ("global-request", let first?, let rest) where isPassive:
+            guard let agent, let draft = try? agent.record(for: nil) else { return }
+            agent.present(draft, "bar")
+            draft.update(first.rawValue + (rest.map { " " + $0 } ?? ""))
+            agent.send(draft)
+        case ("global-snapshot", let name?, _) where isPassive:
+            if let draft = try? agent?.record(for: nil), let url = output(named: name.rawValue) {
+                write(agent?.window(id: draft.conversation.id), to: url)
+            }
         case ("agent-action", let id?, let action?) where isPassive:
             agent?.performForVerification(action, for: id)
         case ("agent-open", let id?, "face") where isPassive:

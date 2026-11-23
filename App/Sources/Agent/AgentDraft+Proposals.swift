@@ -30,15 +30,35 @@ extension AgentDraft {
     }
 
     @discardableResult package func acceptProposal(_ id: UUID, notes: FileNoteStore) throws -> Bool {
-        guard let p = proposal(id), p.status == .pending, p.operation == nil, let target = p.targetID else { return false }
-        let text = try notes.proposalText(target)
-        let receipt = try notes.prepareTodos(p.lines, text: text)
-        guard p.requiresReview != true, receipt.previousFingerprint == p.baseVersion else {
-            try updateProposal(id) { $0.requiresReview = true }
-            throw StoreError.conflict(target)
-        }
+        guard let p = proposal(id), p.status == .pending, p.operation == nil else { return false }
+        let receipt: AgentProposal.Receipt
+        let write: () throws -> Void
+        if case .newNote(let target, let space) = p.target, case .newNote(let title, let body) = p.content {
+            guard !notes.proposalFileExists(target), !notes.proposalFileExists(target, trash: true) else {
+                throw StoreError.noteAlreadyExists(target)
+            }
+            let draft = NoteDraft(title: title, body: body, spaceID: space)
+            let expected = notes.newNoteText(draft, created: p.createdAt)
+            receipt = .init(previousFingerprint: "", appliedFingerprint: TodoSubmission.fingerprint(Data(expected.utf8)))
+            write = { try notes.create(draft, id: target, created: p.createdAt) }
+        } else if let target = p.targetID {
+            let text = try notes.proposalText(target)
+            let version = TodoSubmission.fingerprint(Data(text.utf8))
+            guard p.requiresReview != true, version == p.baseVersion else {
+                try updateProposal(id) { $0.requiresReview = true }
+                throw StoreError.conflict(target)
+            }
+            if let item = p.scheduleItem {
+                guard try !notes.proposalNote(target).schedules.contains(where: { $0.id == item.id }) else { throw StoreError.conflict(target) }
+                receipt = .init(previousFingerprint: version, appliedFingerprint: "")
+                write = { try notes.writeSchedule(item, in: target) }
+            } else {
+                receipt = try notes.prepareTodos(p.lines, text: text)
+                write = { try notes.applyTodos(receipt, to: target, undo: false) }
+            }
+        } else { return false }
         try updateProposal(id) { $0.receipt = receipt; $0.operation = .accept }
-        do { try notes.applyTodos(receipt, to: target, undo: false) }
+        do { try write() }
         catch {
             try recoverProposals(notes: notes)
             throw error
@@ -47,13 +67,22 @@ extension AgentDraft {
         return true
     }
 
-    package func undoProposal(_ id: UUID, notes: FileNoteStore) throws {
+    package func undoProposal(_ id: UUID, notes: FileNoteStore, sharedScheduleTarget: Bool = false) throws {
         guard let p = proposal(id), p.status == .accepted, p.operation == nil,
-              let target = p.targetID, let receipt = p.receipt else { return }
-        guard try TodoSubmission.fingerprint(Data(notes.proposalText(target).utf8)) == receipt.appliedFingerprint
-        else { throw StoreError.conflict(target) }
-        try updateProposal(id) { $0.operation = .undo }
-        do { try notes.applyTodos(receipt, to: target, undo: true) }
+              let target = p.createdNoteID ?? p.targetID, var receipt = p.receipt else { return }
+        if p.scheduleItem == nil {
+            let text = try notes.proposalText(target)
+            if TodoSubmission.fingerprint(Data(text.utf8)) != receipt.appliedFingerprint {
+                guard sharedScheduleTarget, case .todos = p.content else { throw StoreError.conflict(target) }
+                receipt = try notes.rebaseTodoUndo(receipt, text: text, id: target)
+            }
+        }
+        try updateProposal(id) { $0.receipt = receipt; $0.operation = .undo }
+        do {
+            if p.createdNoteID != nil { try notes.moveToTrash(target) }
+            else if let item = p.scheduleItem { try notes.removeSchedule(item.id, in: target) }
+            else { try notes.applyTodos(receipt, to: target, undo: true) }
+        }
         catch {
             try recoverProposals(notes: notes)
             throw error
@@ -63,10 +92,22 @@ extension AgentDraft {
 
     package func recoverProposals(notes: FileNoteStore) throws {
         for p in conversation.requests.flatMap(\.proposals) {
-            guard let operation = p.operation, let target = p.targetID, let receipt = p.receipt else { continue }
+            guard let operation = p.operation, let target = p.createdNoteID ?? p.targetID, let receipt = p.receipt else { continue }
             let current = try? TodoSubmission.fingerprint(Data(notes.proposalText(target).utf8))
+            let item = p.scheduleItem.flatMap { item in
+                try? notes.proposalNote(target).schedules.first { $0.id == item.id }
+            }
             try updateProposal(p.id) {
-                if current == receipt.appliedFingerprint { $0.status = .accepted }
+                if p.scheduleItem != nil {
+                    if let item, !item.isDeleted { $0.status = .accepted }
+                    else if operation == .undo && current != nil { $0.status = .undone }
+                    else if current == receipt.previousFingerprint { $0.status = .pending }
+                    else { $0.requiresReview = true }
+                } else if p.createdNoteID != nil && !notes.proposalFileExists(target) {
+                    if operation == .undo && notes.proposalFileExists(target, trash: true) { $0.status = .undone }
+                    else if operation == .accept && !notes.proposalFileExists(target, trash: true) { $0.status = .pending }
+                    else { $0.requiresReview = true }
+                } else if current == receipt.appliedFingerprint { $0.status = .accepted }
                 else if current == receipt.previousFingerprint { $0.status = operation == .undo ? .undone : .pending }
                 else { $0.requiresReview = true }
                 $0.operation = nil

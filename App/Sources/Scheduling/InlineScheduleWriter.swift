@@ -36,7 +36,7 @@ import Store
         if previous == nil { next.title = request.todo?.text ?? request.source.text }
         if let todo = request.todo { next.isCompleted = todo.completed(in: request.nextText) ?? false }
         next.modified = Date(); next.isDeleted = false
-        try write(next, in: id)
+        try notes.writeSchedule(next, in: id)
         service.register(id, itemID: next.id, requestPermission: true)
         let accepted = next
         return InlineDateEffect(undo: { [self] in
@@ -49,12 +49,6 @@ import Store
         })
     }
 
-    private func write(_ item: ScheduleItem, in id: NoteID) throws {
-        try notes.update(id) { note in
-            if let index = note.schedules.firstIndex(where: { $0.id == item.id }) { note.schedules[index] = item }
-            else { note.schedules.append(item) }
-        }
-    }
     private func restore(_ item: ScheduleItem, in id: NoteID) throws {
         let latest = try notes.load(id).schedules.first { $0.id == item.id }
         var restored = item
@@ -62,14 +56,10 @@ import Store
         restored.link = latest?.link; restored.syncedAt = latest?.syncedAt
         restored.syncBaseline = latest?.syncBaseline; restored.syncError = nil
         restored.modified = Date(); restored.isDeleted = false
-        try write(restored, in: id)
+        try notes.writeSchedule(restored, in: id)
     }
     private func remove(_ itemID: String, in id: NoteID) throws {
-        try notes.update(id) { note in
-            guard let index = note.schedules.firstIndex(where: { $0.id == itemID }) else { return }
-            if note.schedules[index].link == nil { note.schedules.remove(at: index) }
-            else { note.schedules[index].isDeleted = true; note.schedules[index].modified = Date() }
-        }
+        try notes.removeSchedule(itemID, in: id)
         service.enqueue(id)
     }
 }

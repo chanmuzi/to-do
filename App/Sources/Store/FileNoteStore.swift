@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Models
 
@@ -95,7 +96,19 @@ public final class FileNoteStore: NoteStoring {
         let body = lines.reduce(String(text[start...])) { TodoAppender.append($1, to: $0) }
         let separator = header.flatMap { $0.endsWithoutNewline ? $0.newline : nil } ?? ""
         let result = text[..<start] + separator + body
-        return .init(before: Data(text.utf8), after: Data(result.utf8))
+        var receipt = AgentProposal.Receipt(before: Data(text.utf8), after: Data(result.utf8))
+        receipt.bodyUndo = .init(before: Data(text[start...].utf8), after: Data(body.utf8))
+        return receipt
+    }
+
+    /// 같은 묶음의 일정 동기화가 머리만 바꿨으면 본문 역연산을 현재 머리에 적용한다.
+    package func rebaseTodoUndo(_ receipt: AgentProposal.Receipt, text: String, id: NoteID) throws -> AgentProposal.Receipt {
+        let start = NoteFileCodec.Header(text)?.bodyStart ?? text.startIndex
+        let body = Data(text[start...].utf8)
+        guard let delta = receipt.bodyUndo, TodoSubmission.fingerprint(body) == delta.applied,
+              body.suffix(delta.added.count) == delta.added else { throw StoreError.conflict(id) }
+        let restored = Data(text[..<start].utf8) + body.dropLast(delta.added.count) + delta.removed
+        return .init(before: restored, after: Data(text.utf8))
     }
 
     package func applyTodos(_ receipt: AgentProposal.Receipt, to id: NoteID, undo: Bool) throws {
@@ -134,16 +147,42 @@ public final class FileNoteStore: NoteStoring {
     // MARK: - 쓰기
 
     public func create(_ draft: NoteDraft) throws -> Note {
-        let id = NoteID.make()
+        try create(draft, id: .make(), created: Date())
+    }
+
+    package func newNoteText(_ draft: NoteDraft, created: Date) -> String {
+        NoteFileCodec.encode(NoteFileContent(
+            title: NoteTitle.singleLine(draft.title), spaceID: draft.spaceID, colorID: draft.colorID,
+            reminder: draft.schedules?.map(\.start).min() ?? draft.reminder.map(NoteFileCodec.truncatedToSeconds),
+            schedules: draft.schedules, created: NoteFileCodec.truncatedToSeconds(created), body: draft.body
+        ))
+    }
+
+    package func proposalFileExists(_ id: NoteID, trash: Bool = false) -> Bool {
+        files.itemExists(id, in: trash ? location.trashDirectory : location.notesDirectory)
+    }
+
+    @discardableResult package func create(_ draft: NoteDraft, id: NoteID, created: Date) throws -> Note {
+        guard UUID(uuidString: id.rawValue) != nil, !proposalFileExists(id, trash: true) else {
+            throw StoreError.noteAlreadyExists(id)
+        }
         guard !files.itemExists(id, in: location.notesDirectory) else {
             throw StoreError.noteAlreadyExists(id)
         }
-        let now = NoteFileCodec.truncatedToSeconds(Date())
-        let text = NoteFileCodec.encode(NoteFileContent(
-            title: NoteTitle.singleLine(draft.title), spaceID: draft.spaceID, colorID: draft.colorID,
-            reminder: draft.schedules?.map(\.start).min() ?? draft.reminder.map(NoteFileCodec.truncatedToSeconds), schedules: draft.schedules, created: now, body: draft.body
-        ))
-        try files.write(text, id)
+        let text = newNoteText(draft, created: created)
+        // 같은 ID가 검사 뒤에 생겨도 기존 파일을 보존한다.
+        let directory = location.notesDirectory
+        let temporary = directory.appending(path: "." + UUID().uuidString)
+        let destination = files.url(id, in: directory)
+        do {
+            try Data(text.utf8).write(to: temporary, options: .withoutOverwriting)
+            defer { try? FileManager.default.removeItem(at: temporary) }
+            guard renamex_np(temporary.path, destination.path, UInt32(RENAME_EXCL)) == 0 else {
+                if errno == EEXIST { throw StoreError.noteAlreadyExists(id) }
+                throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+            }
+        } catch let error as StoreError { throw error }
+        catch { throw StoreError.writeFailed(id, message: error.localizedDescription) }
         let file = try files.read(id, in: location.notesDirectory)
         known[id] = file.text
         snapshot[id] = file.stamp

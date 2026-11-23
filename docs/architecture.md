@@ -23,7 +23,7 @@ Core         모든 기능이 공유하는 바탕
 | Core | `Theme` | `tokens.json` 읽기, 라이트, 다크, 사용자 테마 덮어쓰기, 글꼴 등록 | 03 |
 | Core | `SpaceIcons` | 스페이스 아이콘의 공용 AppKit, SwiftUI 표시, GIF 재생, 이미지 가져오기. Theme, Models만 참조 | 10, 16, 18 |
 | Core | `DateTime` | 캡처, 본문, 제목 공용 날짜 읽기, UTF-16 인식 범위, InlineDateProposal, Acceptance, Effect. Models만 참조 | 07a |
-| Core | `MarkdownSyntax` | 편집기와 라이브러리가 함께 읽는 줄, 인라인 서식과 숨김 범위. Foundation만 참조 | 06, 09 |
+| Core | `MarkdownSyntax` | 편집기, 라이브러리와 Theme의 제안 본문이 함께 읽는 줄, 인라인 서식과 숨김 범위. Foundation만 참조 | 06, 09 |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
 | Core | `Scheduling` | CalendarBridge, ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models, Store만 참조 | 21 |
 | Core | `Store` | 노트 파일 읽기, 쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |

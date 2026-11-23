@@ -71,7 +71,8 @@ struct LibraryProposalPage: View {
                 }.buttonStyle(SettingsButton(theme: theme, selected: false)).accessibilityLabel("모두 받기")
             } else if let date = request.proposals.first?.createdAt {
                 Text(ReminderPresentation.clock(date, format: .koreanMeridiem, calendar: model.index.calendar))
-                    .font(theme.font(.micro)).foregroundStyle(theme.color(.text3))
+                    .font(theme.libraryNumberFont).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+                    .foregroundStyle(theme.color(.text3))
             }
         }.font(theme.font(.libraryListHeading))
             .frame(minHeight: theme.component(.rowHeight))
@@ -87,7 +88,8 @@ struct LibraryProposalPage: View {
         return HStack(spacing: theme.space(.sp2)) {
             VStack(alignment: .leading, spacing: theme.component(.libraryRowGap)) {
                 Text(p.title).font(theme.font(.row))
-                Text(note?.title ?? "대상 노트 없음").font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3))
+                let summary = subtitle(p, note: note)
+                if !summary.isEmpty { Text(summary).font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3)) }
             }.lineLimit(1)
             Spacer()
             if p.status != .pending { Text(p.status.label).font(theme.font(.micro)).foregroundStyle(theme.color(.text3)) }
@@ -118,8 +120,21 @@ struct LibraryProposalPage: View {
         if inside { hovered = id } else if hovered == id { hovered = nil }
     }
 
+    private func subtitle(_ p: AgentProposal, note: Note?) -> String {
+        if case .newNote(let title, let body) = p.content {
+            return LibraryPreview(title: title, markdown: body).subtitle
+        }
+        if let item = p.scheduleItem { return [note?.title, item.title].compactMap { $0 }.joined(separator: "  ") }
+        return note?.title ?? "대상 노트 없음"
+    }
+
+    private func spaceName(_ p: AgentProposal) -> String? {
+        guard case .newNote(_, let space?) = p.target else { return nil }
+        return model.spaces.space(for: space)?.name
+    }
+
     private func detail(_ p: AgentProposal) -> some View {
-        TodoProposalView(theme: theme, proposal: p, note: model.index.notes.first { $0.id == p.targetID }, full: true,
+        TodoProposalView(theme: theme, proposal: p, note: model.index.notes.first { $0.id == p.targetID }, full: true, spaceName: spaceName(p),
                          review: { model.reviewProposal(p.id) }, conversation: {
             if let c = model.conversations().first(where: { $0.requests.contains { $0.id == p.requestID } }) { model.openConversation(c.id) }
         }, accept: { model.acceptProposals([p.id]) }, discard: { model.discardProposal(p.id) })

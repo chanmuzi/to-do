@@ -1,3 +1,4 @@
+import Library
 import Agent
 import Store
 import AppKit
@@ -112,5 +113,34 @@ extension AppActivationTests {
         agent.window(for: note)?.close()
         #expect(events == ["request-open bar", "request-close restore", "agent-open note", "agent-close", "agent-open toast", "agent-close"])
         #expect(activations == 2)
+    }
+}
+
+extension AppActivationTests {
+    @Test func globalNewNoteResultOpensPreviewThenReservedNote() async throws {
+        defer { fixture.cleanUp() }
+        let agent = AgentWindowCoordinator(store: .init(location: fixture.location), theme: fixture.theme) { Issue.record("\($0)") }
+        let library = LibraryCoordinator(theme: fixture.theme, notes: fixture.notes, spaces: fixture.spaces, windows: fixture.windowStates,
+                                         preferences: try .init(location: fixture.location), router: fixture.router)
+        library.allowsKeyWindows = false
+        defer { library.close() }
+        fixture.router.library = library
+        fixture.router.connectHistory(library.model, agent: agent)
+        let controller = TodoProposalController(agent: agent, notes: fixture.notes, panels: fixture.notePanels, theme: fixture.theme, router: fixture.router)
+        controller.connect(library.model)
+        let draft = try agent.record(for: nil)
+        var request = AgentRequest(id: UUID(), text: "새 노트", engine: "fixture", model: nil)
+        let args = try JSONDecoder().decode(ProposalArguments.self, from: Data(#"{"kind":"create_note","title":"정리","markdown":"내용"}"#.utf8))
+        let reserved = NoteID.make()
+        let p = try AgentProposal.submitted(.init(arguments: args, version: nil), key: "new", request: request, source: nil, reservedID: reserved)
+        request.proposals = [p]
+        draft.change { $0.requests = [request] }
+        controller.open(p.id, source: "conversation")
+        #expect(activations == 1 && library.model.selectedProposal == p.id)
+        #expect(try fixture.notes.list().notes.isEmpty)
+        controller.accept([p.id], source: "library")
+        #expect(activations == 2 && fixture.notePanels.window(for: reserved) != nil)
+        try await agent.delete(draft)
+        #expect(try fixture.notes.load(reserved).title == "정리")
     }
 }
