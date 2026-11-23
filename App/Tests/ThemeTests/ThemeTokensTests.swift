@@ -85,6 +85,8 @@ import Testing
         #expect(Set(try section("motion").keys) == Set(MotionToken.allCases.map(\.rawValue)).union(AgentFaceTiming.allCases.map(\.rawValue)))
         #expect(Set(try section("fonts").keys) == Set(FontRole.allCases.map(\.rawValue)))
 
+        #expect(tokens.component(.noticeDot) == 6 && tokens.component(.cornerButton) == 40)
+        #expect(tokens.shadow(.agentCorner, .light).first?.blur == 32)
         #expect(tokens.space(.sp4) == 16)
         #expect(tokens.shape(.windowRadius) == 10)
         #expect(tokens.shape(.chromeHeight) == TokenValueParser.length(try section("shape")["chrome-h"]!))

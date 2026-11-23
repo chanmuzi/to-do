@@ -87,7 +87,7 @@ final class AgentCorner: NSObject {
         window?.orderFrontRegardless()
     }
 
-    private var diameter: CGFloat { theme.component(.agentFaceLarge) * 2 }
+    private var diameter: CGFloat { theme.component(.cornerButton) }
     private var inset: CGFloat { theme.component(.agentInputInset) }
 
     static func circleFrame(visible: CGRect, diameter: CGFloat, inset: CGFloat) -> CGRect {
@@ -136,7 +136,7 @@ private struct CornerButton: View {
         .accessibilityLabel("에이전트 열기").accessibilityValue(state.rawValue)
         .padding(inset)
         .background {
-            let layers = theme.shadow(.pop)
+            let layers = theme.shadow(.agentCorner)
             Canvas { context, size in
                 let circle = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
                 context.withCGContext { cg in

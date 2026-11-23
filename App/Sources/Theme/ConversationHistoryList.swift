@@ -102,7 +102,7 @@ package struct ConversationNoticeDot: View {
     package init(theme: Theme) { self.theme = theme }
     package var body: some View {
         Circle().fill(theme.color(.warn))
-            .frame(width: theme.component(.agentRowInset), height: theme.component(.agentRowInset))
+            .frame(width: theme.component(.noticeDot), height: theme.component(.noticeDot))
             .accessibilityLabel("답변 필요")
     }
 }
