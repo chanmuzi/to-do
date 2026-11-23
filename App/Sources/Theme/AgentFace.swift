@@ -23,18 +23,20 @@ public enum AgentFaceSize: CaseIterable, Sendable {
 public struct AgentFace: View {
     let theme: Theme
     let state: AgentFaceState
+    let forceStill: Bool
     let size: AgentFaceSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(theme: Theme, state: AgentFaceState = .idle, size: AgentFaceSize = .regular) {
+    public init(theme: Theme, state: AgentFaceState = .idle, size: AgentFaceSize = .regular, forceStill: Bool = false) {
         self.theme = theme
         self.state = state
+        self.forceStill = forceStill
         self.size = size
     }
 
     public var body: some View {
         Group {
-            if reduceMotion || state == .done || state == .blocked {
+            if forceStill || reduceMotion || state == .done || state == .blocked {
                 glyph(at: nil)
             } else {
                 TimelineView(.animation) { glyph(at: $0.date.timeIntervalSinceReferenceDate) }

@@ -75,7 +75,7 @@ final class ToastView: NSView {
         layer.cornerRadius = theme.shape(.windowRadius)
         layer.borderWidth = theme.shape(.borderWidth)
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            tint?.colors = [ColorToken.surface, .surface, .surface].map { theme.nsColor($0).cgColor }
+            tint?.colors = [ColorToken.agentBgA, .agentBgM, .agentBgB].map { theme.nsColor($0).cgColor }
             tint?.startPoint = .zero
             tint?.endPoint = CGPoint(x: 1, y: 1)
             tint?.cornerRadius = theme.shape(.windowRadius)

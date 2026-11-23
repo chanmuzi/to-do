@@ -39,10 +39,10 @@ struct AgentTurnView: View {
         VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
             Text(request.userText)
                 .padding(.horizontal, theme.component(.agentBubbleInset)).padding(.vertical, theme.component(.agentRowInset))
-                .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.space(.sp3)))
+                .background(theme.color(.agentMessage), in: RoundedRectangle(cornerRadius: theme.space(.sp3)))
                 .frame(maxWidth: .infinity, alignment: .trailing)
             HStack(alignment: .top, spacing: 0) {
-                AgentFace(theme: theme, state: request.face)
+                AgentFace(theme: theme, state: request.face, forceStill: still)
                     .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
                 VStack(alignment: .leading, spacing: theme.component(.agentRowInset)) {
                     if !request.steps.isEmpty {
@@ -56,7 +56,7 @@ struct AgentTurnView: View {
                                         let t = timeline.date.timeIntervalSinceReferenceDate / theme.tokens.period(.agentShimmerPeriod)
                                         let x = (t - floor(t)) * 2 - 1
                                         Text(summary).foregroundStyle(LinearGradient(colors: [theme.color(.text3),
-                                            theme.color(.text2), theme.color(.text3)],
+                                            theme.color(.agentShimmer), theme.color(.text3)],
                                             startPoint: .init(x: x, y: 0), endPoint: .init(x: x + 1, y: 0)))
                                     }
                                 } else { Text(summary) }

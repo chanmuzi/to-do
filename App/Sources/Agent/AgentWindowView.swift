@@ -114,7 +114,7 @@ struct AgentWindowView: View {
 
     private var header: some View {
         HStack(spacing: theme.component(.iconButtonGap)) {
-            AgentFace(theme: theme, state: draft.conversation.requests.last?.face ?? .idle).padding(.trailing, theme.component(.agentFaceTitleGap) - theme.component(.iconButtonGap))
+            AgentFace(theme: theme, state: draft.conversation.requests.last?.face ?? .idle, forceStill: still).padding(.trailing, theme.component(.agentFaceTitleGap) - theme.component(.iconButtonGap))
             Text(draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
             Spacer(minLength: 0)
             control("지난 대화", .clock)
