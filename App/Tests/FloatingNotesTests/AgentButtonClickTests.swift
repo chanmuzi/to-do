@@ -183,3 +183,57 @@ extension AgentButtonClickTests {
         #expect(!sidebar.opensLastSelection)
     }
 }
+
+extension AgentButtonClickTests {
+    @Test func libraryMenuEditsOnlyItsRowAndOpensTheSameConversation() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: AgentStore(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        fx.router.agent = agent
+        let draft = agent.newRecord()
+        draft.change {
+            var request = AgentRequest(id: UUID(), text: "첫 이름", engine: "fixture", model: nil)
+            request.status = .completed
+            $0.requests.append(request)
+        }
+        let library = LibraryCoordinator(theme: fx.theme, notes: fx.notes, spaces: fx.spaces, windows: fx.windowStates,
+                                        preferences: try LibraryPreferencesStore(location: fx.location), router: fx.router)
+        fx.router.connectHistory(library.model, agent: agent)
+        var opens: [UUID] = []
+        library.model.openConversation = { opens.append($0) }
+        library.allowsKeyWindows = false
+        library.show()
+        defer { library.close() }
+        library.model.select(.conversations)
+        library.model.previewHistoryHover = draft.conversation.id
+        try await Task.sleep(for: .milliseconds(180))
+        let win = try #require(library.window), root = try #require(win.contentView)
+        func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+        root.layoutSubtreeIfNeeded()
+        let anchor = try #require(root.conversationButton(draft.conversation.id))
+        #expect(anchor.bounds.size == CGSize(width: 24, height: 24))
+        func items() throws -> [PickerMenuRow] {
+            let popup = try #require(win.childWindows?.last?.contentView)
+            return views(popup).compactMap { $0 as? PickerMenuRow }
+        }
+        let row = try #require(views(root).compactMap { $0 as? HistoryRowInputView }.first)
+        let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: win.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        row.rightMouseDown(with: event)
+        let contextItems = try items()
+        #expect(contextItems.map { $0.accessibilityLabel() } == ["열기", "이름 바꾸기", "지우기"])
+        #expect(contextItems[0].accessibilityPerformPress())
+        #expect(opens == [draft.conversation.id])
+        anchor.showMenu()
+        #expect(try items()[1].accessibilityPerformPress())
+        try await Task.sleep(for: .milliseconds(120))
+        let field = try #require(views(root).compactMap { $0 as? CommandInputField }.first { $0.accessibilityLabel() == "대화 이름" })
+        field.stringValue = "취소할 이름"
+        field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+        #expect(field.delegate?.control?(field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))) == true)
+        #expect(draft.conversation.name == "첫 이름" && !win.isKeyWindow)
+    }
+}

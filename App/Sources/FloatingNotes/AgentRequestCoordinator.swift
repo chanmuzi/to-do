@@ -26,6 +26,8 @@ final class AgentRequestCoordinator {
     var finished: (AgentDraft, AgentRequest) -> Void = { _, _ in }
     var openSettings: (String) -> Void = { _ in }
     private var order: [Entry] = []
+    private var activeDraft: AgentDraft?
+    private var isolationFailed = false
     private var priority: Entry?
     private var paused = false
     private var closing = false
@@ -102,6 +104,7 @@ final class AgentRequestCoordinator {
     }
 
     private func start(_ draft: AgentDraft, _ request: AgentRequest) {
+        activeDraft = draft
         let snapshot = draft.conversation
         task = Task {
             let (events, continuation) = AsyncStream<AgentEvent>.makeStream()
@@ -175,7 +178,7 @@ final class AgentRequestCoordinator {
             final.status = .completed
         case .failure(let error):
             let groupFailure = (error as? AgentError) == .isolation("process_group")
-            if groupFailure { priority = nil; closing = true }
+            if groupFailure { priority = nil; closing = true; isolationFailed = true }
             let interrupted = !groupFailure && (Task.isCancelled || error is CancellationError)
             final.status = interrupted ? .interrupted : .failed
             if !interrupted {
@@ -192,11 +195,27 @@ final class AgentRequestCoordinator {
         }
         draft.conversation.updatedAt = Date()
         draft.save()
+        activeDraft = nil
         task = nil
+        if draft.deleting { return }
         guard draft.writeError == nil else { paused = true; return }
         if !closing {
             if final.status != .interrupted { finished(draft, final) }
             if settings { openSettings(final.engine) }
+            advance()
+        }
+    }
+
+    func stopBeforeDelete(_ draft: AgentDraft) async throws {
+        if activeDraft === draft, let active = task {
+            active.cancel()
+            await active.value
+        }
+        guard !isolationFailed else { throw AgentError.isolation("process_group") }
+        if priority?.draft === draft { priority = nil }
+        order.removeAll { $0.draft === draft }
+        if !paused || draft.conversation.requests.last?.status == .interrupted {
+            paused = false
             advance()
         }
     }

@@ -55,8 +55,9 @@ final class SettingsValueMenu: NSPanel {
         let opensBelow = desired <= below || below >= above
         let height = min(desired, opensBelow ? below : above)
         guard height > 2 * padding else { return nil }
-        let frame = NSRect(x: min(max(visible.minX, button.maxX + offset.width - width), visible.maxX - width),
-                           y: opensBelow ? button.minY - gap - height : button.maxY + gap, width: width, height: height)
+        let x = min(max(visible.minX, button.maxX + offset.width - width), visible.maxX - width)
+        let yOrigin = opensBelow ? button.minY - gap - height : button.maxY + gap
+        let frame = NSRect(x: x.rounded(), y: yOrigin.rounded(), width: width, height: height)
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isReleasedWhenClosed = false
         backgroundColor = .clear

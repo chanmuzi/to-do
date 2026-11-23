@@ -32,6 +32,18 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var openNote: (NoteID) -> Void = { _ in }
     package var chooseTarget: (AgentDraft) -> Void = { _ in }
     package var titleForNote: (NoteID) -> String? = { _ in nil }
+    package var stopBeforeDelete: (AgentDraft) async throws -> Void = { _ in }
+
+    package func delete(_ draft: AgentDraft) async throws {
+        let id = draft.conversation.id
+        guard catalog.records[id] === draft, !draft.deleting, !draft.conversation.requests.isEmpty else { return }
+        draft.deleting = true
+        defer { draft.deleting = false }
+        try await stopBeforeDelete(draft)
+        try draft.deleteFile()
+        sessions[id]?.panel.close()
+        catalog.records.removeValue(forKey: id)
+    }
     package var onClose: () -> Void = {}
 
     package func restore() throws {
@@ -120,6 +132,12 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                            guard let self else { return }
                                            present(newRecord(targets: draft.conversation.targets), "new")
                                            panel?.close()
+                                       },
+                                       delete: { [weak self] in
+                                           Task {
+                                               do { try await self?.delete(draft) }
+                                               catch { draft.writeError = error }
+                                           }
                                        },
                                        send: { [weak self] in self?.send(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },

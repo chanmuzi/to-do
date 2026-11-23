@@ -10,6 +10,9 @@ struct AgentWindowView: View {
     let openHistory: (UUID) -> Void
     let newChat: () -> Void
     @State private var selection: UUID?
+    @State private var editingTitle = false
+    @State private var editedName = ""
+    let delete: () -> Void
     let send: () -> Void
     let retry: (UUID) -> Void
     let sendNow: (UUID) -> Void
@@ -123,11 +126,24 @@ struct AgentWindowView: View {
     private var header: some View {
         HStack(spacing: theme.component(.iconButtonGap)) {
             AgentFace(theme: theme, state: draft.conversation.requests.last?.face ?? .idle, forceStill: still).padding(.trailing, theme.component(.agentFaceTitleGap) - theme.component(.iconButtonGap))
-            Text(draft.showsHistory ? "지난 대화" : draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+            if editingTitle {
+                CommandTextField(text: $editedName, theme: theme, placeholder: "대화 이름", style: .title, submit: {
+                    if draft.rename(editedName) { editingTitle = false }
+                }, cancel: { editingTitle = false })
+                .frame(height: theme.lineHeight(.title))
+            } else {
+                Text(draft.showsHistory ? "지난 대화" : draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+            }
             Spacer(minLength: 0)
             control("지난 대화", .clock) { draft.showsHistory.toggle() }
             control("새 대화", .plus, action: newChat)
-            control("더 보기", .more)
+            ConversationMenu(theme: theme, id: draft.conversation.id, enabled: !draft.conversation.requests.isEmpty,
+                             rename: {
+                                 draft.showsHistory = false
+                                 editedName = draft.conversation.name
+                                 editingTitle = true
+                             }, delete: delete)
+                .frame(width: theme.component(.iconButton), height: theme.component(.iconButton))
             Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth), height: theme.component(.iconMedium))
                 .padding(.horizontal, theme.space(.sp1))
             control("창 닫기", .close, action: close)

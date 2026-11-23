@@ -35,7 +35,8 @@ struct LibraryRootView: View {
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
                 if model.selection == .conversations {
                     ConversationHistoryList(theme: theme, conversations: model.conversations(), selection: $model.selectedConversation,
-                                            previewHover: historyHover, open: model.openConversation)
+                                            previewHover: historyHover, rename: model.renameConversation,
+                                            delete: model.deleteConversation, open: model.openConversation)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {

@@ -50,13 +50,26 @@ final class AppRouter: Routing {
         model.openConversation = { [weak self, weak agent] id in
             if let draft = agent?.record(id: id) { self?.showAgent(draft, source: "library") }
         }
+        model.renameConversation = { [weak agent, weak model] id, name in
+            guard let draft = agent?.record(id: id) else { return }
+            if !draft.rename(name) { model?.error = draft.writeError?.localizedDescription }
+        }
+        model.deleteConversation = { [weak agent, weak model] id in
+            guard let agent, let draft = agent.record(id: id) else { return }
+            Task {
+                do {
+                    try await agent.delete(draft)
+                    if model?.selectedConversation == id { model?.selectedConversation = nil }
+                } catch { model?.error = error.localizedDescription }
+            }
+        }
         model.newConversation = { [weak self, weak agent] in
             if let draft = agent?.newRecord() { self?.showAgent(draft, source: "library-new") }
         }
     }
 
     func showAgent(_ draft: AgentDraft, source: String) {
-        guard let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first)
+        guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first)
             ?? notePanels?.agentWindowAnchor(for: nil) else { return }
         traceActivation("agent-open " + source)
         agent.open(record: draft, title: anchor.title, frame: anchor.frame, visible: anchor.visible)

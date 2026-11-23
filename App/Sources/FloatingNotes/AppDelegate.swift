@@ -456,6 +456,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agent.onClose = { [weak router] in router?.traceActivation("agent-close") }
         agent.present = { [weak router] draft, source in router?.showAgent(draft, source: source) }
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
+        agent.stopBeforeDelete = coordinator.stopBeforeDelete
         agent.retry = coordinator.retry
         agent.sendNow = coordinator.sendNow
         agent.openNote = { [weak router] id in router?.route(.openNote(id)) }
@@ -481,7 +482,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         coordinator.finished = { [weak self, weak router] draft, request in
             let success = request.status == .completed
-            var message = success ? (request.answer?.split(whereSeparator: \.isNewline).first.map(String.init) ?? "끝났어요")
+            var message = success ? (draft.conversation.customName ?? request.answer?.split(whereSeparator: \.isNewline).first.map(String.init) ?? "끝났어요")
                 : request.failure ?? "막혔어요"
             if let reset = request.resumeTime { message += ". " + reset + "부터 다시 돼요" }
             self?.toasts?.presenter.show(.init(kind: "agent", message: message, actionTitle: success ? "보기" : "다시 시도",
