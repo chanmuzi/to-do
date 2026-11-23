@@ -19,7 +19,10 @@
 | `08-browse.md` | 노트 찾기 | 9 |
 | `09-library.md` | 라이브러리 사이드바와 목록 | 4 |
 | `10-icon-picker.md` | 스페이스 아이콘 고르기 | 4 |
-| `11-ai-panel.md` | AI 패널, 도구 내역, 후보 상자, 에이전트 목록 | 5 |
+| `11-ai-panel.md` | 에이전트: 실행기 계약, 연결과 로그인, 모델 메뉴(구현됨). 아래 세 장의 안내 | 5 |
+| `11a-agent-surfaces.md` | 막대의 두 모드, 에이전트 창, 얼굴, 진행 표시, 에이전트 색, 점, 새 요소 표, 단계(미구현) | |
+| `11b-agent-suggestions.md` | 제안의 반영 방식, 미리보기, 버튼 자리, 제안 페이지(미구현) | |
+| `11c-agent-routines-memory.md` | 루틴, 지우기 확인 팝오버, 메모리, 기억 정리, 선제 알림(미구현) | |
 | `12-settings.md` | 테마 설정 | 6 |
 | `13-shortcuts.md` | 단축키 전체 표 | 7 |
 | `14-states.md` | 상태와 상호작용 요약 | |
@@ -28,5 +31,5 @@
 | `17-accessibility.md` | 접근성 | |
 | `18-assets.md` | 앱 아이콘, 화면 아이콘과 SF Symbols 대응표, 기본 이미지, 글꼴 | |
 | `19-native-notes.md` | AppKit, TextKit 2 구현 메모 | |
-| `20-open-questions.md` | 정해지지 않은 것 13가지와 임시 값 | |
+| `20-open-questions.md` | 정해지지 않은 것 17가지와 임시 값 | |
 | `21-schedule.md` | 여러 예정, 리마인더 설정, EventKit 양방향 연동, 권한과 알림 | |
