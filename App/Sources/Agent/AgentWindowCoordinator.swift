@@ -17,7 +17,40 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         let panel: AgentPanel
         let draft: AgentDraft
     }
-    private var sessions: [NoteID: Session] = [:]
+    private var sessions: [UUID: Session] = [:]
+    private var records: [UUID: AgentDraft] = [:]
+    private var loaded = false
+    package var send: (AgentDraft) -> Void = { _ in }
+    package var sendNow: (AgentDraft, UUID) -> Void = { _, _ in }
+    package var retry: (AgentDraft, UUID) -> Void = { _, _ in }
+    package var openNote: (NoteID) -> Void = { _ in }
+    package var chooseTarget: (AgentDraft) -> Void = { _ in }
+    package var titleForNote: (NoteID) -> String? = { _ in nil }
+    package var onClose: () -> Void = {}
+
+    package func restore() throws {
+        guard !loaded else { return }
+        for var value in try store.loadConversations(warning: warning) {
+            if value.requests.contains(where: { $0.status == .running }) {
+                for i in value.requests.indices where value.requests[i].status == .running {
+                    value.requests[i].status = .interrupted
+                }
+                try store.save(value)
+            }
+            records[value.id] = AgentDraft(value, store: store)
+        }
+        loaded = true
+    }
+
+    package func record(for note: NoteID?) throws -> AgentDraft {
+        try restore()
+        let targets = note.map { [$0] } ?? []
+        if let existing = records.values.filter({ $0.conversation.targets.first == targets.first })
+            .max(by: { $0.conversation.updatedAt < $1.conversation.updatedAt }) { return existing }
+        let record = AgentDraft(AgentConversation(targets: targets), store: store)
+        records[record.conversation.id] = record
+        return record
+    }
     private let store: AgentStore
     private let theme: Theme
     private let warning: (String) -> Void
@@ -30,12 +63,15 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     public func open(note: NoteID, title: String, frame: CGRect, visible: CGRect) throws {
+        try open(record: record(for: note), title: title, frame: frame, visible: visible)
+    }
+
+    package func open(record draft: AgentDraft, title: String, frame: CGRect, visible: CGRect) {
+        let id = draft.conversation.id
         let panel: AgentPanel
-        if let existing = sessions[note] {
+        if let existing = sessions[id] {
             panel = existing.panel
         } else {
-            let previous = try store.loadConversations(warning: warning).first { $0.targets == [note] && $0.requests.isEmpty }
-            let draft = AgentDraft(previous ?? AgentConversation(targets: [note]), store: store)
             panel = AgentPanel(contentRect: frame, styleMask: [.borderless, .resizable, .closable, .nonactivatingPanel],
                                backing: .buffered, defer: false)
             panel.allowsKey = allowsKeyWindows
@@ -52,7 +88,21 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                 if draft?.writeError != nil { draft?.save() }
                 return draft?.writeError == nil
             }
-            let view = AgentWindowView(theme: theme, title: title, draft: draft) { [weak panel] in panel?.close() }
+            let view = AgentWindowView(theme: theme, title: title, draft: draft,
+                                       send: { [weak self] in self?.send(draft) },
+                                       retry: { [weak self] in self?.retry(draft, $0) },
+                                       sendNow: { [weak self] in self?.sendNow(draft, $0) },
+                                       openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
+                                       titleForNote: titleForNote, fit: { [weak panel, theme] height in
+                guard let panel else { return }
+                let maxHeight = visible.height * theme.ratio(.noteMaxScreenHeight)
+                let target = min(maxHeight, max(frame.height, height.rounded(.up)))
+                guard target > panel.frame.height else { return }
+                var rect = panel.frame
+                rect.origin.y = max(visible.minY, rect.maxY - target)
+                rect.size.height = target
+                panel.setFrame(rect, display: true)
+            }) { [weak panel] in panel?.close() }
             let host = NSHostingView(rootView: view)
             host.sizingOptions = []
             // NSHostingView가 창의 크기 제한을 갱신하지 않도록 AppKit 컨테이너가 크기를 소유한다.
@@ -64,7 +114,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
             panel.minSize = CGSize(width: theme.component(.noteWidthMin), height: frame.height)
             panel.maxSize = CGSize(width: theme.component(.noteWidthMax), height: max(frame.height, visible.height))
             panel.setFrame(frame, display: false)
-            sessions[note] = Session(panel: panel, draft: draft)
+            sessions[id] = Session(panel: panel, draft: draft)
         }
         if allowsKeyWindows { panel.makeKeyAndOrderFront(nil) } else { panel.orderFront(nil) }
     }
@@ -73,18 +123,34 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         guard let panel = notification.object as? AgentPanel,
               let id = sessions.first(where: { $0.value.panel === panel })?.key else { return }
         sessions.removeValue(forKey: id)
+        onClose()
     }
 
     public func flushFailedDrafts() throws {
-        for session in sessions.values where session.draft.writeError != nil {
-            session.draft.save()
-            if let error = session.draft.writeError { throw error }
+        for draft in records.values where draft.writeError != nil {
+            draft.save()
+            if let error = draft.writeError { throw error }
         }
     }
 
     #if DEBUG
-    public func window(for note: NoteID) -> NSWindow? { sessions[note]?.panel }
-    public func setDraft(_ text: String, for note: NoteID) { sessions[note]?.draft.update(text) }
-    public func draft(for note: NoteID) -> String? { sessions[note]?.draft.conversation.draft }
+    package func performForVerification(_ action: String, for note: NoteID) {
+        guard let draft = sessions.values.first(where: { $0.draft.conversation.targets.first == note })?.draft else { return }
+        switch action {
+        case "send": send(draft)
+        case "retry": if let id = draft.conversation.requests.last?.id { retry(draft, id) }
+        case "expand": if let id = draft.conversation.requests.last?.id { draft.expanded.insert(id) }
+        case "collapse": draft.expanded.removeAll()
+        case "hover": draft.hovered = draft.conversation.queued.last?.id
+        case "unhover": draft.hovered = nil
+        case "now": if let id = draft.conversation.queued.last?.id { sendNow(draft, id) }
+        case "still": draft.still = true
+        case "motion": draft.still = false
+        default: break
+        }
+    }
+    public func window(for note: NoteID) -> NSWindow? { sessions.values.first { $0.draft.conversation.targets.first == note }?.panel }
+    public func setDraft(_ text: String, for note: NoteID) { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.update(text) }
+    public func draft(for note: NoteID) -> String? { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.conversation.draft }
     #endif
 }

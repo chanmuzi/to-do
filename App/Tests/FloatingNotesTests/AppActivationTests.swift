@@ -1,3 +1,5 @@
+import Agent
+import Store
 import AppKit
 import Models
 @_spi(Verification) @testable import NotePanel
@@ -86,5 +88,29 @@ import Testing
         // 규칙 4: 보이는 항목에는 단축키가 적혀 있지 않다.
         let all = menu.items.compactMap(\.submenu).flatMap(\.items).filter { !$0.isHidden }
         #expect(all.allSatisfy { $0.keyEquivalent.isEmpty })
+    }
+}
+
+extension AppActivationTests {
+    @Test func barAndResultViewRecordFocusIntentWithoutLibraryActivation() throws {
+        defer { fixture.cleanUp() }
+        var events: [String] = []
+        fixture.router.traceActivation = { events.append($0) }
+        fixture.quickPanels.traceActivation = fixture.router.traceActivation
+        let agent = AgentWindowCoordinator(store: AgentStore(location: fixture.location), theme: fixture.theme) { Issue.record("\($0)") }
+        fixture.router.agent = agent
+        agent.allowsKeyWindows = false
+        agent.onClose = { events.append("agent-close") }
+        let note = try fixture.open("대상")
+        fixture.isAppActive = false
+        fixture.router.route(.requestAgent)
+        fixture.router.route(.requestAgent)
+        #expect(activations == 0 && fixture.keyRequests(note) == 0)
+        fixture.router.route(.openAgentWindow(note))
+        agent.window(for: note)?.close()
+        fixture.router.showAgent(try agent.record(for: note), source: "toast")
+        agent.window(for: note)?.close()
+        #expect(events == ["request-open bar", "request-close restore", "agent-open note", "agent-close", "agent-open toast", "agent-close"])
+        #expect(activations == 2)
     }
 }

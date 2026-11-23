@@ -1,5 +1,7 @@
 import AppKit
 import Agent
+import AgentRunner
+import Models
 import Carbon
 import OSLog
 import Scheduling
@@ -22,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var fakeCalendar: FakeCalendarBridge?
     private var settingsWindow: SettingsCoordinator?
     private var library: LibraryCoordinator?
+    private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
     private var commands: AppCommandDispatcher?
@@ -191,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 capture: quickPanels.capture, notes: environment.notes, router: router,
                 undoTrash: { [unowned commands] in commands.undoOrRestoreTrash(nil) }
             )
+            try connectRequests(environment, router: router, agent: agent, panels: quickPanels, notes: notePanels)
             // 노트 찾기를 닫은 누름과 그 누름이 보낸 "노트 찾기 열기"를 한데 묶는다(`QuickPanels`).
             pointerPresses = PointerPressMonitor(
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
@@ -268,10 +272,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppLog.warning("끝내기 전에 저장하지 못했습니다: \(error)")
             guard UnsavedNotesAlert.confirmQuit(after: error) else { return .terminateCancel }
         }
-        if let agents = settingsWindow?.model.agents, agents.hasActiveTasks {
-            agents.cancel()
+        let agents = settingsWindow?.model.agents
+        if requests?.task != nil || agents?.hasActiveTasks == true {
+            agents?.cancel()
             Task {
-                await agents.wait()
+                await requests?.shutdown()
+                await agents?.wait()
+                do { try router?.agent?.flushFailedDrafts() }
+                catch {
+                    if !UnsavedNotesAlert.confirmQuit(after: error) {
+                        requests?.continueAfterCancelledQuit()
+                        sender.reply(toApplicationShouldTerminate: false)
+                        return
+                    }
+                }
                 sender.reply(toApplicationShouldTerminate: true)
             }
             return .terminateLater
@@ -407,6 +421,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     #endif
 
+    private func agentDirectory(_ environment: AppEnvironment) -> URL? {
+        #if DEBUG
+        if let bin = options.debugAgentDirectory { return bin }
+        if options.debugIsPassive { return environment.location.stateDirectory.appending(path: "verification-bin") }
+        #endif
+        return nil
+    }
+
+    private func connectRequests(_ environment: AppEnvironment, router: AppRouter, agent: AgentWindowCoordinator,
+                                 panels: QuickPanels, notes: NotePanelCoordinator) throws {
+        try agent.restore()
+        var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment))
+        #if DEBUG
+        if options.debugIsPassive { execution.notifications = AgentExpiryNotifications(notifier: VerificationExpiryNotifier()) }
+        #endif
+        let coordinator = AgentRequestCoordinator(choice: {
+            let settings = environment.settings.settings
+            let provider = AgentProvider(rawValue: settings.agentProvider) ?? .claude
+            let model = provider == .codex ? settings.codexModel : AgentEngine.claude(settings.agentModel).model
+            return .init(provider: provider, model: model)
+        }, note: { file in
+            guard let item = try? environment.notes.list().notes.first(where: { $0.id.rawValue + ".md" == file }) else { return nil }
+            return (item.id, item.title.isEmpty ? "제목 없음" : item.title)
+        }, execute: execution.run)
+        requests = coordinator
+        router.traceActivation = { [activationLog] event in activationLog.notice("\(event, privacy: .public)") }
+        panels.traceActivation = router.traceActivation
+        agent.onClose = { [weak router] in router?.traceActivation("agent-close") }
+        agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
+        agent.retry = coordinator.retry
+        agent.sendNow = coordinator.sendNow
+        agent.openNote = { [weak router] id in router?.route(.openNote(id)) }
+        agent.titleForNote = { (try? environment.notes.load($0))?.title }
+        agent.chooseTarget = { [weak panels, weak router] draft in
+            panels?.toggleBrowse(anchor: nil)
+            panels?.browse.pickTarget = { id in
+                if !draft.conversation.targets.contains(id) { draft.change { $0.targets.append(id) } }
+                router?.showAgent(draft, source: "target")
+            }
+        }
+        panels.capture.providerName = { environment.settings.settings.agentProvider == "codex" ? "Codex" : "Claude" }
+        panels.capture.onRequest = { [weak agent, weak router] text, opens in
+            guard let draft = try? agent?.record(for: nil), coordinator.submit(draft, text: text, fromInput: false) else { return false }
+            if opens { router?.showAgent(draft, source: "bar") }
+            return true
+        }
+        coordinator.openSettings = { [weak self] in self?.settingsWindow?.showAgent($0) }
+        coordinator.progress = { [weak self, weak coordinator] request in
+            let face = request.face
+            self?.toasts?.presenter.show(.init(kind: "agent-working", message: face.rawValue, actionTitle: "취소", face: face),
+                                         on: self?.toasts?.pointerScreen()) { coordinator?.task?.cancel() }
+        }
+        coordinator.finished = { [weak self, weak router] draft, request in
+            let success = request.status == .completed
+            var message = success ? (request.answer?.split(whereSeparator: \.isNewline).first.map(String.init) ?? "끝났어요")
+                : request.failure ?? "막혔어요"
+            if let reset = request.resumeTime { message += ". " + reset + "부터 다시 돼요" }
+            self?.toasts?.presenter.show(.init(kind: "agent", message: message, actionTitle: success ? "보기" : "다시 시도",
+                                               face: success ? .done : .blocked),
+                                         on: self?.toasts?.pointerScreen()) { [weak self] in
+                router?.showAgent(draft, source: "toast")
+                if !success { self?.requests?.retry(draft, id: request.id) }
+            }
+        }
+    }
+
     private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
         let store = environment.settings
         let table = ShortcutTable.standard
@@ -421,14 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             })
         }
-        var agentDirectory: URL?
-        #if DEBUG
-        agentDirectory = options.debugAgentDirectory
-        if options.debugIsPassive && agentDirectory == nil {
-            agentDirectory = environment.location.stateDirectory.appending(path: "verification-bin")
-        }
-        #endif
-        let agents = AgentSettings(location: environment.location, searchDirectory: agentDirectory)
+        let agents = AgentSettings(location: environment.location, searchDirectory: agentDirectory(environment))
         let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
                                   shortcuts: sections, agents: agents) { [usesFake = options.usesFakeCalendar] kind in
             guard !usesFake else { return }
