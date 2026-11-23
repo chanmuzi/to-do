@@ -91,7 +91,7 @@ private struct ConfirmationContent: View {
             }.padding(.top, theme.space(.sp3) - theme.component(.iconButtonGap))
         }
         .padding(theme.space(.sp3))
-        .frame(width: theme.component(.upcomingWidth) + theme.component(.agentFaceLarge))
+        .frame(width: theme.component(.confirmationWidth))
         .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
         .fixedSize(horizontal: false, vertical: true)
     }

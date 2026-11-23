@@ -93,7 +93,7 @@ package final class ConversationMenuButton: NSButton {
             let image = theme.symbolImage(symbol, size: .iconSmall)?.withSymbolConfiguration(
                 NSImage.SymbolConfiguration(paletteColors: [theme.nsColor(commands.enabled ? .text2 : .text3)]))
             item.view = PickerMenuRow(theme: theme, text: title, dot: image,
-                                      selected: false, width: theme.component(.agentMenuWidth) + theme.component(.agentFaceLarge) + theme.component(.agentProgressHeight),
+                                      selected: false, width: theme.component(.conversationMenuWidth),
                                       command: true)
         }
         if commands.open != nil { add("열기", "macwindow", #selector(openConversation)) }
