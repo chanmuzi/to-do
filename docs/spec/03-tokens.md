@@ -184,3 +184,5 @@
 얼굴은 icon-s 13pt, icon-m 14pt, agent-face-medium 16pt, agent-face-large 20pt다. 에이전트 창의 머리와 입력 높이는 chrome-h, 조작은 icon-btn과 icon-btn-gap을 쓴다. 머리 왼쪽은 14pt, 얼굴과 이름 사이는 9pt, 입력 글자는 13.5pt다. 상태별 주기와 점, 물결의 지연은 motion의 agent 키를 사용한다. 움직임 줄이기에서는 정지 벡터를 그린다.
 
 작업 중 가장자리 주기는 3초, 글자 띠는 2.2초다. 밝은 agent-shimmer는 #6A5B9E, 알림 바탕 agent-bg-a/m/b는 #EEEBF7, #F5F0F2, #F9EFE8이다. 다크 초안은 D-220을 따른다. 대기 줄 높이는 24pt, 레이블 11pt, 요청 글 12.5pt, 묶음 좌우 12pt, 아래 6pt다. agent-queue-action-size(20pt)와 agent-queue-action-gap(2pt)은 각각 독립적으로 바꾼다.
+
+대화 줄과 사이드바는 notice-dot 6pt, warn을 공유한다. corner-button 40pt 원 안에 agent-face-large 20pt를 놓는다. shadow-agent-corner는 표시 시안의 12pt 아래, 흐림 32pt, 퍼짐 -8pt와 0.5pt 윤곽이다. 어두운 그림자 농도는 기존 팝오버에서 가져온 초안이다.

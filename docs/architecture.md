@@ -90,7 +90,9 @@ scripts/
 
 FloatingNotes가 노트의 얼굴과 키 창의 ⌘J를 `.openAgentWindow(NoteID)`로 연결한다. NotePanel은 노트의 현재 제목과 화면 배치를 제공하고 AppRouter가 Agent에 넘긴다. AgentWindowCoordinator는 노트마다 열린 창을 재사용하고, 빈 창은 첫 편집 전까지 메모리에만 둔다.
 
-Models의 AgentConversation과 AgentProposal은 실행기와 독립된 Codable 값이다. Store의 AgentStore는 상태 폴더 아래 `agent/conversations/<UUID>.json`과 UTF-8 `agent/instructions.md`를 원자 교체한다. 대화는 버전 1이며 대상 노트는 ID로 식별한다. 읽을 수 없는 파일은 보존하고 경고를 남긴다. 요청 전 초안은 대화 목록에서 제외한다. 대화 파일에는 표시된 요청과 답을 보관하며 사용량 파일, 제공자 연결 자료와 저장 위치가 다르다.
+Models의 AgentConversation과 AgentProposal은 실행기와 독립된 Codable 값이다. Store의 AgentStore는 상태 폴더 아래 `agent/conversations/<UUID>.json`과 UTF-8 `agent/instructions.md`를 원자 교체한다. 대화는 버전 1이며 대상 노트는 ID로 식별한다. 읽을 수 없는 파일은 보존하고 경고를 남긴다. 요청 전 초안은 대화 목록에서 제외한다. Models의 ConversationDay가 활동 시각을 현지 날짜로 묶고 Theme의 ConversationHistoryList를 Agent와 Library가 공유한다. App이 대화 ID로 같은 AgentDraft를 다시 연다. 선택, 열람, 다음 턴 전송은 별개이며 열람 시각 seenAt은 목록 순서를 바꾸지 않는다. 과거 버전 1 파일에서 빠진 seenAt은 비어 있는 값으로 읽는다. 대화 파일에는 표시된 요청과 답을 보관하며 사용량 파일, 제공자 연결 자료와 저장 위치가 다르다.
+
+App의 AgentCorner는 대화에서 노트별 얼굴을 계산해 NotePanel에 전달하고 마지막으로 사용한 Float 창의 화면에 구석 패널 하나를 배치한다. 화면 변경 시 사용 가능 영역을 다시 읽고 그 화면이 사라지면 주 화면으로 옮긴다.
 
 ### AgentRunner와 FloatMCP
 
