@@ -8,13 +8,21 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     public let createdAt: Date
     public var updatedAt: Date
     public var targets: [NoteID]
+    public var customName: String?
     public var seenAt: Date?
     public var needsAnswer: Bool { requests.contains { $0.status == .awaitingAnswer } }
     public var draft: String
     public struct Queued: Identifiable, Codable, Equatable, Sendable {
         public let id: UUID
         public let text: String
-        package init(text: String) { self.id = UUID(); self.text = text }
+        public let order: Int64?
+        public var heldAfterFailure: Bool?
+        package init(text: String, id: UUID = UUID(), order: Int64? = nil, held: Bool = false) {
+            self.id = id
+            self.text = text
+            self.order = order
+            self.heldAfterFailure = held
+        }
     }
     public var queued: [Queued] = []
     public var messages: [Message]
@@ -29,7 +37,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt
+        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt, customName
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -37,6 +45,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         try c.encode(formatVersion, forKey: .formatVersion)
         try c.encode(id, forKey: .id)
         try c.encodeIfPresent(seenAt, forKey: .seenAt)
+        try c.encodeIfPresent(customName, forKey: .customName)
         try c.encode(name, forKey: .name)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)
@@ -48,7 +57,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     public var name: String {
-        requests.first?.userText.split(whereSeparator: \.isNewline)
+        customName ?? requests.first?.userText.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? "새 대화"
     }
 
@@ -71,6 +80,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
                                                    debugDescription: "지원하지 않는 대화 형식입니다")
         }
         id = try c.decode(UUID.self, forKey: .id)
+        customName = try c.decodeIfPresent(String.self, forKey: .customName)
         seenAt = try c.decodeIfPresent(Date.self, forKey: .seenAt)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
@@ -103,6 +113,19 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
         }
     }
     public var id: UUID
+    public enum StopReason: String, Codable, Sendable { case user, shutdown }
+    public struct StoppedAttempt: Identifiable, Codable, Equatable, Sendable {
+        public let id: UUID
+        public let steps: [Step]
+        public let answer: String?
+        package init(_ request: AgentRequest) {
+            id = request.runID
+            steps = request.steps
+            answer = request.answer
+        }
+    }
+    public var stopReason: StopReason?
+    public var stoppedAttempts: [StoppedAttempt]?
     public var runID: UUID
     public var engine: String
     public var model: String?

@@ -31,10 +31,24 @@ import Models
 
     public func save(_ value: AgentConversation) throws {
         try prepare(conversations)
-        let file = conversations.appending(path: value.id.uuidString.lowercased() + ".json")
+        let file = try fileURL(value.id)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(value).write(to: file, options: .atomic)
+    }
+
+    private func fileURL(_ id: UUID) throws -> URL {
+        let canonical = conversations.appending(path: id.uuidString.lowercased() + ".json")
+        if FileManager.default.fileExists(atPath: canonical.path) { return canonical }
+        do {
+            let files = try FileManager.default.contentsOfDirectory(at: conversations, includingPropertiesForKeys: nil)
+            return files.first { $0.pathExtension == "json" && UUID(uuidString: $0.deletingPathExtension().lastPathComponent) == id } ?? canonical
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile { return canonical }
+    }
+
+    public func deleteConversation(_ id: UUID) throws {
+        do { try FileManager.default.removeItem(at: fileURL(id)) }
+        catch let error as CocoaError where error.code == .fileNoSuchFile { return }
     }
 
     public func readInstructions() throws -> String {

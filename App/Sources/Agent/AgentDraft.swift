@@ -7,6 +7,22 @@ import Store
     package var conversation: AgentConversation
     package var writeError: Error?
     var errorMessage: String? { writeError.map { "대화를 저장하지 못했습니다. " + $0.localizedDescription } }
+    package private(set) var deleted = false
+    package var deleting = false
+
+    @discardableResult package func rename(_ input: String) -> Bool {
+        guard !conversation.requests.isEmpty else { return false }
+        let name = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != conversation.name else { return true }
+        return change { $0.customName = name }
+    }
+
+    package func deleteFile() throws {
+        try store.deleteConversation(conversation.id)
+        deleted = true
+        writeError = nil
+    }
+
     var showsHistory = false
     var expanded: Set<UUID> = []
     var hovered: UUID?
@@ -21,14 +37,14 @@ import Store
     }
 
     package func update(_ text: String) {
-        guard conversation.draft != text else { return }
+        guard !deleted, conversation.draft != text else { return }
         conversation.draft = text
         conversation.updatedAt = Date()
         save()
     }
 
     package func markSeen(at now: Date = Date()) {
-        guard !conversation.requests.isEmpty, conversation.seenAt.map({ $0 < conversation.updatedAt }) ?? true else { return }
+        guard !deleted, !conversation.requests.isEmpty, conversation.seenAt.map({ $0 < conversation.updatedAt }) ?? true else { return }
         var next = conversation
         next.seenAt = now
         do {
@@ -39,12 +55,14 @@ import Store
     }
 
     package func save() {
+        guard !deleted else { return }
         do { try store.save(conversation); writeError = nil }
         catch { writeError = error }
     }
 
     /// 줄에서 꺼내기와 전송 예약은 디스크에 반영된 뒤에만 화면에도 반영한다.
     @discardableResult package func change(_ edit: (inout AgentConversation) -> Void) -> Bool {
+        guard !deleted, !deleting else { return false }
         var next = conversation
         edit(&next)
         next.updatedAt = Date()

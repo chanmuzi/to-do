@@ -4,6 +4,30 @@ import Store
 import Testing
 
 @MainActor @Suite struct AgentStoreTests {
+    @Test func renamedConversationAndStopReasonRoundTripIndependentlyOfUsage() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let location = StoreLocation.isolated(notesDirectory: root)
+        let store = AgentStore(location: location)
+        var value = AgentConversation(targets: [])
+        var request = AgentRequest(id: UUID(), text: "첫 줄\n둘째 줄", engine: "fixture", model: nil)
+        request.status = .interrupted
+        request.stopReason = .shutdown
+        value.requests.append(request)
+        #expect(value.name == "첫 줄")
+        value.customName = "고친 이름"
+        try store.save(value)
+        let saved = try #require(store.loadConversations { Issue.record("\($0)") }.first)
+        #expect(saved.name == "고친 이름" && saved.requests.first?.stopReason == .shutdown)
+        let usage = location.stateDirectory.appending(path: "agent-usage")
+        try FileManager.default.createDirectory(at: usage, withIntermediateDirectories: true)
+        let log = usage.appending(path: request.runID.uuidString)
+        try Data([1]).write(to: log)
+        try store.deleteConversation(value.id)
+        #expect(try store.loadConversations { Issue.record("\($0)") }.isEmpty)
+        #expect(try Data(contentsOf: log) == Data([1]))
+    }
+
     @Test func missingLegacyDamagedAndFutureFilesStayIndependent() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let location = StoreLocation.isolated(notesDirectory: root)
