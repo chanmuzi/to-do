@@ -14,7 +14,7 @@ struct ScheduleProposalPreview: View {
 
     var body: some View {
         let item = note?.schedules.first { $0.id == proposed.id } ?? proposed
-        VStack(spacing: theme.space(.sp3)) {
+        VStack(spacing: theme.component(.proposalPreviewGap)) {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: theme.space(.sp1)) {
                     Text(note?.title ?? "제목 없음").lineLimit(1)
@@ -41,7 +41,7 @@ struct ScheduleProposalPreview: View {
                 if item.syncError != nil {
                     Text("외부 연동 실패, 앱에 저장됨").foregroundStyle(theme.color(.warn)).padding(.horizontal, theme.space(.sp3))
                 }
-            }.padding(.vertical, theme.space(.sp2))
+            }.padding(.vertical, theme.space(.sp2)).frame(maxWidth: theme.component(.proposalUpcomingWidth))
                 .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
         }
     }
@@ -53,7 +53,7 @@ struct ScheduleProposalPreview: View {
             Text(item.title).lineLimit(1).truncationMode(.tail).frame(maxWidth: .infinity, alignment: .leading)
             Text(time(item)).font(theme.libraryNumberFont).lineLimit(1)
                 .foregroundStyle(theme.color(.text3)).layoutPriority(1)
-        }.padding(.trailing, theme.space(.sp3)).frame(minHeight: theme.component(.proposalLineHeight))
+        }.padding(.trailing, theme.space(.sp3)).frame(minHeight: theme.component(.proposalUpcomingRow))
             .background(added ? theme.color(.diffAdd) : .clear)
     }
 }
