@@ -2,6 +2,7 @@ import Agent
 import AgentRunner
 import Foundation
 import Models
+import Store
 
 /// 모든 대화의 실행과 연결 확인을 한 자리에서 직렬화한다.
 final class AgentRequestCoordinator {
@@ -23,6 +24,7 @@ final class AgentRequestCoordinator {
     private let choice: () -> Choice
     private let execute: Execute
     private let note: (String) -> (NoteID, String)?
+    var inbox: ProposalInbox?
     var progress: (AgentRequest) -> Void = { _ in }
     var finished: (AgentDraft, AgentRequest) -> Void = { _, _ in }
     var openSettings: (String) -> Void = { _ in }
@@ -240,10 +242,10 @@ final class AgentRequestCoordinator {
         case .text(let text):
             if request.steps.last?.kind != .write { begin(.write) }
             request.answer = (request.answer ?? "") + text
-        case .tool(let name): begin(name.hasSuffix("read_note") ? .read : .search)
+        case .tool(let name): begin(name.hasSuffix("propose_change") ? .write : name.hasSuffix("read_note") ? .read : .search)
         case let .toolStarted(id, name, file):
             if request.steps.contains(where: { $0.callID == id }) { return }
-            begin(name == "read_note" ? .read : .search, id: id)
+            begin(name == "propose_change" ? .write : name == "read_note" ? .read : .search, id: id)
             if name == "read_note" { files[id] = file }
         case let .toolEnded(id, succeeded):
             guard let i = request.steps.firstIndex(where: { $0.callID == id && $0.endedAt == nil }) else { return }
@@ -269,7 +271,14 @@ final class AgentRequestCoordinator {
         var final = draft.conversation.requests[i]
         for j in final.steps.indices { end(&final.steps[j], now: Date()) }
         var settings = false
-        switch result {
+        let completed = result.flatMap { answer in
+            Result {
+                try Task.checkCancellation()
+                final.proposals = try inbox?.proposals(for: request, source: draft.conversation.targets.first) ?? []
+                return answer
+            }
+        }
+        switch completed {
         case .success(let answer):
             final.answer = answer
             final.status = .completed
@@ -295,6 +304,10 @@ final class AgentRequestCoordinator {
         }
         draft.conversation.updatedAt = Date()
         draft.save()
+        if draft.writeError == nil || final.status != .completed {
+            do { try inbox?.remove(request.runID) }
+            catch { draft.writeError = error }
+        }
         activeDraft = nil
         task = nil
         if draft.deleting { return }

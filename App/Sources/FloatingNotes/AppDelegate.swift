@@ -450,6 +450,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let item = try? environment.notes.list().notes.first(where: { $0.id.rawValue + ".md" == file }) else { return nil }
             return (item.id, item.title.isEmpty ? "제목 없음" : item.title)
         }, execute: execution.run)
+        let inbox = ProposalInbox(location: environment.location)
+        coordinator.inbox = inbox
+        for draft in agent.drafts {
+            try draft.recoverProposals(notes: environment.notes)
+            for request in draft.conversation.requests {
+                try inbox.remove(request.runID)
+            }
+        }
         coordinator.prepareRecovery = execution.prepareRecovery
         requests = coordinator
         router.traceActivation = { [activationLog] event in activationLog.notice("\(event, privacy: .public)") }

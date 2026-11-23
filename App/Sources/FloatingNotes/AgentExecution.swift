@@ -45,8 +45,9 @@ struct AgentExecution {
         let prompt = try Self.prompt(conversation, request, instructions: AgentStore(location: location).readInstructions())
         let runner = try AgentRunner(location: location, server: server, notifications: notifications)
         do {
+            let inbox = try ProposalInbox(location: location).prepare(request.runID)
             let engine: AgentEngine = provider == .claude ? .claude(request.model) : .codex(model: request.model)
-            return try await runner.run(prompt, engine: engine, installation: installation, runID: request.runID, notifyExpiry: notifyExpiry, onEvent: emit).text
+            return try await runner.run(prompt, engine: engine, installation: installation, runID: request.runID, proposalInbox: inbox, notifyExpiry: notifyExpiry, onEvent: emit).text
         } catch AgentError.loginExpired {
             throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
         } catch AgentError.rateLimited(let reset) {
@@ -61,6 +62,7 @@ struct AgentExecution {
     }
 
     private struct Prompt: Encodable {
+        var toolInstruction = "노트를 바꾸려면 직접 쓰지 말고 propose_change로 제안하세요."
         var instructions: String
         var targets: [String]
         var history: [AgentConversation.Message]
