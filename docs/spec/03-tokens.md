@@ -189,6 +189,10 @@
 
 대화 줄과 사이드바는 notice-dot 6pt, warn을 공유한다. corner-button 40pt 원 안에 agent-face-large 20pt를 놓는다. shadow-agent-corner는 표시 시안의 12pt 아래, 흐림 32pt, 퍼짐 -8pt와 0.5pt 윤곽이다. 어두운 그림자 농도는 기존 팝오버에서 가져온 초안이다.
 
+### 할 일 제안
+
+`agent-dash`는 밝을 때 rgba(138,122,180,.55), `diff-add`는 #E4F3E6이다. 어두운 값은 각각 rgba(184,168,219,.65), #304538인 초안이다. 미리보기의 기호 칸은 `proposal-gutter` 28pt, 글은 13pt, 줄은 22pt다. 넓은 제안 페이지 목록 폭은 330pt, 대화 결과 연결 줄의 최소 높이는 30pt다. 점은 기존 6pt, 아이콘 버튼은 24pt다.
+
 ### 대화 메뉴와 다시 보내기
 
 대화 명령 메뉴는 `conversation-menu-width` 170pt, 재사용하는 삭제 확인은 `confirmation-width` 236pt를 쓴다. 두 표면의 모서리는 `r-window` 10pt다.
