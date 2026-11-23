@@ -12,32 +12,6 @@ private final class AgentPanel: NSPanel {
     override func performClose(_ sender: Any?) { close() }
 }
 
-@Observable final class AgentDraft {
-    var conversation: AgentConversation
-    var writeError: Error?
-    var errorMessage: String? { writeError.map { "초안을 저장하지 못했습니다. " + $0.localizedDescription } }
-    private let store: AgentStore
-
-    init(_ conversation: AgentConversation, store: AgentStore) {
-        self.conversation = conversation
-        self.store = store
-    }
-
-    func update(_ text: String) {
-        guard conversation.draft != text else { return }
-        conversation.draft = text
-        conversation.updatedAt = Date()
-        save()
-    }
-
-    func save() {
-        do {
-            try store.save(conversation)
-            writeError = nil
-        } catch { writeError = error }
-    }
-}
-
 public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     private struct Session {
         let panel: AgentPanel
