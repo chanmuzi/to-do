@@ -36,6 +36,7 @@
 | `surface-2` | 사이드바, 보조 바탕 | `#F6F6F6` | `#262626` |
 | `surface-3` | 입력칸 | `#EDEDED` | `#303030` |
 | `selected` | 고른 줄과 세그먼트 바탕 | `#DEDAD4` | `#46423D` |
+| `format-active` | 노트 서식 막대의 켜진 버튼 바탕 | `rgba(96,76,52,.14)` | `rgba(224,208,186,.16)` |
 | `row-title` | 목록 제목 | `#393632` | `#D5D2CE` |
 | `hover` | 마우스를 올렸을 때의 바탕 효과 (버튼, 줄, 칸 공통. 어떤 바탕색 위에서도 보이도록 반투명) | `rgba(96,76,52,.08)` | `rgba(224,208,186,.12)` |
 | `text` | 본문 글자 | `#000000` | `#ECECEC` |
@@ -153,7 +154,7 @@
 - `library-w/h`: 920/640, `library-min-w/h`: 660/400, `library-sidebar-w`: 240.
 - `library-header-h` 52, `library-section-head-h` 22, `library-section-gap` 11, `library-sidebar-inset` 10. `library-more-size` 20, 그림은 `menu-icon` 12다.
 - `library-row-leading` 20을 양쪽에 쓰고 `library-row-pad-y` 9, `library-row-gap` 3을 적용한다. `upcoming-detail-w` 216, 상세 여백은 10/12/6이다. 일정 호버 지연은 없다.
-- 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다. 오른쪽 노트 목록의 맨 아래 여백도 `sp-2` 8을 쓴다(D-181).
+- 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다. 오른쪽 노트 목록의 맨 아래에는 여백이 없다(D-183).
 - `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.
@@ -174,4 +175,4 @@
 
 창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 26이며 선택과 호버는 selected와 hover다. 제목은 library-header-font 15, 굵기 600이다.
 
-카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
+한 줄 이동 줄의 호버 높이는 `settings-nav-single-line-hover-h` 30pt다. 두 줄 이동 줄은 줄 높이에서 위아래로 `settings-nav-two-line-hover-inset-y` 4pt씩 뺀다. 둘 다 반경은 `settings-nav-hover-radius` 6pt, 내용 양끝에서 `settings-nav-hover-outset` 6pt다. 카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
