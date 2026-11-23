@@ -450,12 +450,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let item = try? environment.notes.list().notes.first(where: { $0.id.rawValue + ".md" == file }) else { return nil }
             return (item.id, item.title.isEmpty ? "제목 없음" : item.title)
         }, execute: execution.run)
+        coordinator.prepareRecovery = execution.prepareRecovery
         requests = coordinator
         router.traceActivation = { [activationLog] event in activationLog.notice("\(event, privacy: .public)") }
         panels.traceActivation = router.traceActivation
         agent.onClose = { [weak router] in router?.traceActivation("agent-close") }
         agent.present = { [weak router] draft, source in router?.showAgent(draft, source: source) }
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
+        agent.finishDeletion = coordinator.finishDeletion
         agent.stopBeforeDelete = coordinator.stopBeforeDelete
         agent.retry = coordinator.retry
         agent.sendAll = coordinator.sendAll
@@ -493,6 +495,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !success { self?.requests?.retry(draft, id: request.id) }
             }
         }
+        coordinator.restore(agent.drafts)
     }
 
     private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService, preferences: LibraryPreferencesStore) -> SettingsCoordinator {

@@ -6,7 +6,7 @@ package struct ConversationDay: Identifiable {
     package let conversations: [AgentConversation]
 
     package static func sections(_ conversations: [AgentConversation], calendar: Calendar) -> [Self] {
-        let groups = Dictionary(grouping: conversations.filter { !$0.requests.isEmpty }) {
+        let groups = Dictionary(grouping: conversations.filter(\.hasSubmitted)) {
             calendar.startOfDay(for: $0.updatedAt)
         }
         return groups.keys.sorted(by: >).map { day in

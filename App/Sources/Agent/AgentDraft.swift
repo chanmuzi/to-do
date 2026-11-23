@@ -11,7 +11,7 @@ import Store
     package var deleting = false
 
     @discardableResult package func rename(_ input: String) -> Bool {
-        guard !conversation.requests.isEmpty else { return false }
+        guard conversation.hasSubmitted else { return false }
         let name = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name != conversation.name else { return true }
         return change { $0.customName = name }
@@ -45,7 +45,7 @@ import Store
     }
 
     package func markSeen(at now: Date = Date()) {
-        guard !deleted, !conversation.requests.isEmpty, conversation.seenAt.map({ $0 < conversation.updatedAt }) ?? true else { return }
+        guard !deleted, conversation.hasSubmitted, conversation.seenAt.map({ $0 < conversation.updatedAt }) ?? true else { return }
         var next = conversation
         next.seenAt = now
         do {

@@ -32,7 +32,7 @@ public struct AgentRunner: Sendable {
 
     public func run(_ prompt: String, engine: AgentEngine, installation: AgentInstallation,
                     runID: UUID = UUID(), taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
-                    onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
+                    notifyExpiry: Bool = true, onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
         let requested = engine.model
         switch engine {
@@ -55,7 +55,7 @@ public struct AgentRunner: Sendable {
             case .failed, .providerFailure, .invalidOutput:
                 guard let account = try? await connection.account(installation), connection.isExpired(account) else { throw error }
                 // 알림을 보내지 못해도 만료 오류는 그대로 돌려준다.
-                try? await notifications.blocked(connection, taskName: taskName)
+                if notifyExpiry { try? await notifications.blocked(connection, taskName: taskName) }
                 throw AgentError.loginExpired
             default: throw error
             }

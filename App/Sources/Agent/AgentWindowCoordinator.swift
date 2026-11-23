@@ -22,7 +22,8 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         var records: [UUID: AgentDraft] = [:]
     }
     private let catalog = Catalog()
-    package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter { !$0.requests.isEmpty } }
+    package var drafts: [AgentDraft] { Array(catalog.records.values) }
+    package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter(\.hasSubmitted) }
     package func record(id: UUID) -> AgentDraft? { catalog.records[id] }
     package var present: (AgentDraft, String) -> Void = { _, _ in }
     private var loaded = false
@@ -35,11 +36,13 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var titleForNote: (NoteID) -> String? = { _ in nil }
     package var stopBeforeDelete: (AgentDraft) async throws -> Void = { _ in }
 
+    package var finishDeletion: (AgentDraft) -> Void = { _ in }
+
     package func delete(_ draft: AgentDraft) async throws {
         let id = draft.conversation.id
-        guard catalog.records[id] === draft, !draft.deleting, !draft.conversation.requests.isEmpty else { return }
+        guard catalog.records[id] === draft, !draft.deleting, draft.conversation.hasSubmitted else { return }
         draft.deleting = true
-        defer { draft.deleting = false }
+        defer { draft.deleting = false; finishDeletion(draft) }
         try await stopBeforeDelete(draft)
         try draft.deleteFile()
         sessions[id]?.panel.close()
@@ -52,7 +55,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         for var value in try store.loadConversations(warning: warning) {
             if value.requests.contains(where: { $0.status == .running }) {
                 for i in value.requests.indices where value.requests[i].status == .running {
-                    value.requests[i].status = .interrupted
+                    value.interruptForShutdown(at: i)
                 }
                 try store.save(value)
             }

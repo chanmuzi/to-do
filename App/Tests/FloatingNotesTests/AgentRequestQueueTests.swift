@@ -82,27 +82,20 @@ import Testing
         #expect(!saved.needsAnswer && saved.seenAt != nil && saved.requests.count == 2)
     }
 
-    @Test func relaunchHoldsSavedQueue() async throws {
+    @Test func shutdownMakesOneRetryReservation() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let a = draft()
-        var calls = 0
         let queue = AgentRequestCoordinator(choice: { .init(provider: .codex, model: nil) }, note: { _ in nil }) { _, _, _ in
-            calls += 1
             try await Task.sleep(for: .seconds(3))
             return "답"
         }
         queue.submit(a, text: "첫 요청")
-        queue.submit(a, text: "남겨 둘 요청")
+        queue.submit(a, text: "다음 요청")
         await queue.shutdown()
         let saved = try #require(store.loadConversations { Issue.record("\($0)") }.first)
-        #expect(saved.requests.first?.status == .interrupted)
-        let restored = AgentDraft(saved, store: store)
-        let fresh = AgentRequestCoordinator(choice: { .init(provider: .codex, model: nil) }, note: { _ in nil }) { _, _, _ in
-            Issue.record("저절로 실행됨"); return ""
-        }
-        #expect(fresh.task == nil && calls <= 1)
-        restored.remove(try #require(saved.queued.first?.id), editing: true)
-        #expect(restored.conversation.draft == "남겨 둘 요청" && restored.conversation.queued.isEmpty)
+        #expect(saved.requests.first?.stopReason == .shutdown)
+        #expect(saved.queued.map(\.text) == ["첫 요청", "다음 요청"])
+        #expect(saved.queued.first?.id == saved.requests.first?.id)
     }
 
     @Test(arguments: [AgentProvider.claude, .codex])

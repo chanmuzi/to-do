@@ -66,7 +66,7 @@ struct AgentWindowView: View {
                 if !draft.conversation.queued.isEmpty {
                     if draft.queueHeld {
                         AgentQueueHeader(theme: theme, count: draft.conversation.queued.count, remove: {
-                            draft.change { $0.queued.removeAll() }
+                            if draft.change({ $0.queued.removeAll() }) { draft.queueHeld = false }
                         }, send: sendAll)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                     }
@@ -141,12 +141,12 @@ struct AgentWindowView: View {
                 }, cancel: { editingTitle = false })
                 .frame(height: theme.lineHeight(.title))
             } else {
-                Text(draft.showsHistory ? "지난 대화" : draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+                Text(draft.showsHistory ? "지난 대화" : !draft.conversation.hasSubmitted ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
             }
             Spacer(minLength: 0)
             control("지난 대화", .clock) { draft.showsHistory.toggle() }
             control("새 대화", .plus, action: newChat)
-            ConversationMenu(theme: theme, id: draft.conversation.id, enabled: !draft.conversation.requests.isEmpty,
+            ConversationMenu(theme: theme, id: draft.conversation.id, enabled: draft.conversation.hasSubmitted,
                              rename: {
                                  draft.showsHistory = false
                                  editedName = draft.conversation.name

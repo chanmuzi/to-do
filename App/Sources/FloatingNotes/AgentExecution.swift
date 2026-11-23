@@ -12,6 +12,18 @@ struct AgentExecution {
     func run(_ conversation: AgentConversation, _ request: AgentRequest,
              emit: @escaping @Sendable (AgentEvent) -> Void) async throws -> String {
         let provider = AgentProvider(rawValue: request.engine) ?? .claude
+        let installation = try await connected(provider, notifyExpiry: true)
+        return try await run(conversation, request, installation: installation, notifyExpiry: true, emit: emit)
+    }
+
+    func prepareRecovery(_ selection: AgentRequestCoordinator.Choice) async -> AgentRequestCoordinator.Execute? {
+        guard let installation = try? await connected(selection.provider, notifyExpiry: false) else { return nil }
+        return { conversation, request, emit in
+            try await run(conversation, request, installation: installation, notifyExpiry: false, emit: emit)
+        }
+    }
+
+    private func connected(_ provider: AgentProvider, notifyExpiry: Bool) async throws -> AgentInstallation {
         let connection = try AgentConnection(provider: provider, location: location)
         let installation: AgentInstallation
         do { installation = try await connection.discover(in: directory) }
@@ -20,15 +32,21 @@ struct AgentExecution {
         }
         let account = try await connection.account(installation)
         if connection.isExpired(account) {
-            try? await notifications.blocked(connection, taskName: "에이전트 작업")
+            if notifyExpiry { try? await notifications.blocked(connection, taskName: "에이전트 작업") }
             throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
         }
         guard account.loggedIn else { throw AgentRequestCoordinator.Failure(message: "에이전트 연결이 필요해요", settings: true) }
+        return installation
+    }
+
+    private func run(_ conversation: AgentConversation, _ request: AgentRequest, installation: AgentInstallation,
+                     notifyExpiry: Bool, emit: @escaping @Sendable (AgentEvent) -> Void) async throws -> String {
+        let provider = installation.provider
         let prompt = try Self.prompt(conversation, request, instructions: AgentStore(location: location).readInstructions())
         let runner = try AgentRunner(location: location, server: server, notifications: notifications)
         do {
             let engine: AgentEngine = provider == .claude ? .claude(request.model) : .codex(model: request.model)
-            return try await runner.run(prompt, engine: engine, installation: installation, runID: request.runID, onEvent: emit).text
+            return try await runner.run(prompt, engine: engine, installation: installation, runID: request.runID, notifyExpiry: notifyExpiry, onEvent: emit).text
         } catch AgentError.loginExpired {
             throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
         } catch AgentError.rateLimited(let reset) {

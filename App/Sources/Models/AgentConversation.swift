@@ -17,7 +17,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         public let text: String
         public let order: Int64?
         public var heldAfterFailure: Bool?
-        package init(text: String, id: UUID = UUID(), order: Int64? = nil, held: Bool = false) {
+        package init(text: String, id: UUID = UUID(), order: Int64? = nil, held: Bool? = nil) {
             self.id = id
             self.text = text
             self.order = order
@@ -56,8 +56,20 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         try c.encode(requests, forKey: .requests)
     }
 
+    package var hasSubmitted: Bool { !requests.isEmpty || !queued.isEmpty }
+
+    /// 중단 표시와 맨 앞의 재전송 예약은 한 번의 대화 파일 저장으로 확정한다.
+    package mutating func interruptForShutdown(at index: Int) {
+        requests[index].status = .interrupted
+        requests[index].stopReason = .shutdown
+        let request = requests[index]
+        if !queued.contains(where: { $0.id == request.id }) {
+            queued.insert(Queued(text: request.userText, id: request.id, order: 0), at: 0)
+        }
+    }
+
     public var name: String {
-        customName ?? requests.first?.userText.split(whereSeparator: \.isNewline)
+        customName ?? (requests.first?.userText ?? queued.first?.text)?.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? "새 대화"
     }
 
@@ -124,6 +136,7 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
             answer = request.answer
         }
     }
+    public var failedThroughOrder: Int64?
     public var stopReason: StopReason?
     public var stoppedAttempts: [StoppedAttempt]?
     public var runID: UUID

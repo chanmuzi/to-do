@@ -499,6 +499,32 @@ final class DebugControl {
         case ("history-hover", let item?, _) where isPassive:
             library?.model.previewHistoryHover = UUID(uuidString: item.rawValue)
             library?.model.previewSectionHover = item.rawValue == "section"
+        case ("conversation-control", let id?, let action?) where isPassive:
+            guard let uuid = UUID(uuidString: id.rawValue) else { return }
+            let parts = action.split(separator: " ", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return }
+            let host = parts[0] == "library" ? library?.window : agent?.window(id: uuid)
+            guard let host, let button = host.contentView?.conversationButton(uuid) else { return }
+            switch parts[1] {
+            case "menu": button.showMenu()
+            case "rename": button.beginRename()
+            case "confirm": button.confirmDeletion()
+            case "dismiss": host.childWindows?.forEach { $0.close() }
+            default: break
+            }
+        case ("conversation-popup", let id?, let args?) where isPassive:
+            guard let uuid = UUID(uuidString: id.rawValue) else { return }
+            let parts = args.split(separator: " ", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let url = output(named: parts[1]) else { return }
+            let host = parts[0] == "library" ? library?.window : agent?.window(id: uuid)
+            guard let host, let child = host.childWindows?.last(where: { $0.isVisible }) else { return }
+            write(child, to: url)
+            write(json: ["x": child.frame.minX - host.frame.minX, "y": host.frame.maxY - child.frame.maxY,
+                         "width": child.frame.width, "height": child.frame.height], to: url.appendingPathExtension("frame"))
+        case ("agent-width", let note?, let width?) where isPassive:
+            guard let window = agent?.window(for: note), let width = Double(width),
+                  (window.minSize.width...window.maxSize.width).contains(width) else { return }
+            window.setContentSize(CGSize(width: width, height: window.frame.height))
         case ("history-open", let item?, _) where isPassive:
             if let id = UUID(uuidString: item.rawValue) { library?.model.openConversation(id) }
         case ("history-fixture", let note?, _) where isPassive:
@@ -686,7 +712,9 @@ final class DebugControl {
             NSApplication.shared.appearance = NSAppearance(
                 named: words.dropFirst().first == "dark" ? .darkAqua : .aqua
             )
-        case ("quit", _, _): NSApplication.shared.terminate(nil)
+        case ("quit", _, _):
+            // 분산 알림의 메인 큐 콜백을 먼저 반환한다. AppKit의 종료 대기 중에도 회수 작업이 실행되어야 한다.
+            RunLoop.main.perform { MainActor.assumeIsolated { NSApp.terminate(nil) } }
         case ("capture", _, _): router.route(.openCapture)
         case ("browse", _, _): router.route(.openBrowse(anchor: id))
         case ("panel-snapshot", let target?, let name?):

@@ -41,6 +41,17 @@ struct AgentTurnView: View {
                 .padding(.horizontal, theme.component(.agentBubbleInset)).padding(.vertical, theme.component(.agentRowInset))
                 .background(theme.color(.agentMessage), in: RoundedRectangle(cornerRadius: theme.space(.sp3)))
                 .frame(maxWidth: .infinity, alignment: .trailing)
+            ForEach(request.stoppedAttempts ?? []) { attempt in
+                HStack(alignment: .top, spacing: 0) {
+                    AgentFace(theme: theme, state: .idle, forceStill: still)
+                        .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
+                    VStack(alignment: .leading, spacing: theme.component(.agentRowInset)) {
+                        if !attempt.steps.isEmpty { stepList(attempt.steps) }
+                        if let answer = attempt.answer { Text(answer).textSelection(.enabled) }
+                        stoppedLine("앱을 끄면서 멈췄어요")
+                    }
+                }
+            }
             HStack(alignment: .top, spacing: 0) {
                 AgentFace(theme: theme, state: request.face, forceStill: still)
                     .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
@@ -63,14 +74,13 @@ struct AgentTurnView: View {
                             }
                         }.buttonStyle(.plain).foregroundStyle(theme.color(.text3)).font(smallFont)
                     }
-                    if expanded { steps }
+                    if expanded { stepList(request.steps) }
                     if let answer = request.answer { Text(answer).textSelection(.enabled) }
                     if request.status == .interrupted {
-                        Text("여기서 멈췄어요").font(smallFont).foregroundStyle(theme.color(.text3))
-                            .frame(minHeight: theme.component(.agentProgressHeight))
+                        stoppedLine(request.stopReason == .shutdown ? "앱을 끄면서 멈췄어요" : "여기서 멈췄어요")
                     }
                     if request.status == .failed {
-                        Text(request.failure ?? "막혔어요").font(smallFont)
+                        stoppedLine(request.failure ?? "막혔어요")
                         if let reset = request.resumeTime { Text(reset).font(smallFont) }
                         Button("다시 시도", action: retry).buttonStyle(SettingsButton(theme: theme, selected: false))
                     }
@@ -83,9 +93,14 @@ struct AgentTurnView: View {
 
     private var smallFont: Font { theme.font(.body, size: theme.tokens.textStyle(.micro).size) }
 
-    private var steps: some View {
+    private func stoppedLine(_ text: String) -> some View {
+        Text(text).font(smallFont).foregroundStyle(theme.color(.text3))
+            .frame(minHeight: theme.component(.agentProgressHeight))
+    }
+
+    private func stepList(_ steps: [AgentRequest.Step]) -> some View {
         VStack(alignment: .leading, spacing: theme.component(.iconButtonGap)) {
-            ForEach(request.steps, id: \.id) { step in
+            ForEach(steps, id: \.id) { step in
                 HStack(spacing: theme.component(.agentRowInset)) {
                     if step.endedAt != nil { Image(systemName: step.result == "실패" ? "xmark" : "checkmark") }
                     if let note = step.noteID, let title = step.noteTitle {
