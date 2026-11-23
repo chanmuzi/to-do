@@ -39,6 +39,45 @@ private struct Fixture {
 }
 
 @Suite struct AgentRunnerTests {
+    @Test(arguments: [AgentProvider.claude, .codex])
+    func proposalModeUsesExactlyThreeTools(_ provider: AgentProvider) async throws {
+        var initRow = initEvent
+        initRow["tools"] = ["mcp__float__propose_change", "mcp__float__read_note", "mcp__float__list_notes"]
+        let json = String(decoding: try JSONSerialization.data(withJSONObject: initRow), as: UTF8.self)
+        let body = provider == .claude ? """
+        while [ "$1" != "--mcp-config" ]; do shift; done
+        cp "$2" "$(dirname "$0")/config"
+        echo '\(json)'
+        echo '{"type":"result","is_error":false,"subtype":"success","result":"완료"}'
+        """ : """
+        printf '%s\\n' "$@" > "$(dirname "$0")/args"
+        echo '{"type":"thread.started"}'
+        echo '{"type":"item.started","item":{"type":"mcp_tool_call","server":"float","tool":"propose_change","id":"a"}}'
+        echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"float","tool":"propose_change","id":"a","status":"completed","result":{}}}'
+        echo '{"type":"turn.completed"}'
+        """
+        let fx = try Fixture(provider, body)
+        defer { try! fx.cleanup() }
+        let inbox = fx.root.appending(path: "private inbox")
+        let engine: AgentEngine = provider == .claude ? .claude() : .codex()
+        _ = try await fx.runner.run("요청", engine: engine, installation: fx.installation, proposalInbox: inbox)
+        let bin = fx.installation.executable.deletingLastPathComponent()
+        if provider == .claude {
+            let data = try Data(contentsOf: bin.appending(path: "config"))
+            let config = try #require(JSONSerialization.jsonObject(with: data) as? Object)
+            let servers = try #require(config["mcpServers"] as? [String: Object])
+            #expect(servers["float"]?["args"] as? [String] == [fx.root.path, inbox.path])
+            var stream = AgentStream(provider: .claude, acceptsProposals: true)
+            initRow["tools"] = ["mcp__float__list_notes", "mcp__float__read_note", "mcp__float__propose_change", "extra"]
+            let extra = try JSONSerialization.data(withJSONObject: initRow)
+            #expect(throws: AgentError.isolation("tools")) { try stream.accept(extra) { _ in } }
+        } else {
+            let args = try String(contentsOf: bin.appending(path: "args"), encoding: .utf8)
+            #expect(args.contains(#"mcp_servers.float.enabled_tools=["list_notes","read_note","propose_change"]"#))
+            #expect(args.contains(inbox.path))
+        }
+    }
+
     @Test(arguments: ["fable", "opus", "sonnet", "haiku", "sonnet[1m]", "auto"])
     func claudeIsolationStreamAndUsage(_ model: String) async throws {
         let start = String(decoding: try JSONSerialization.data(withJSONObject: initEvent), as: UTF8.self)

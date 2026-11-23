@@ -31,7 +31,7 @@ public struct AgentRunner: Sendable {
     }
 
     public func run(_ prompt: String, engine: AgentEngine, installation: AgentInstallation,
-                    runID: UUID = UUID(), taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
+                    runID: UUID = UUID(), proposalInbox: URL? = nil, taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
                     notifyExpiry: Bool = true, onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
         let requested = engine.model
@@ -48,7 +48,7 @@ public struct AgentRunner: Sendable {
         }
         let connection = try AgentConnection(provider: provider, location: location)
         do {
-            return try await executeRun(prompt, runID: runID, provider: provider, requested: requested, connection: connection,
+            return try await executeRun(prompt, runID: runID, provider: provider, requested: requested, connection: connection, inbox: proposalInbox,
                                         installation: installation, timeout: timeout, onEvent: onEvent)
         } catch let error as AgentError {
             switch error {
@@ -63,7 +63,7 @@ public struct AgentRunner: Sendable {
     }
 
     private func executeRun(_ prompt: String, runID: UUID, provider: AgentProvider, requested: String?, connection: AgentConnection,
-                            installation: AgentInstallation, timeout: Duration,
+                            inbox: URL?, installation: AgentInstallation, timeout: Duration,
                             onEvent: @escaping @Sendable (AgentEvent) -> Void) async throws -> AgentResult {
         try await onWorker {
             let id = runID.uuidString
@@ -75,9 +75,9 @@ public struct AgentRunner: Sendable {
             try fm.createDirectory(at: cwd, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let date = Date()
             let start = ContinuousClock.now
-            var stream = AgentStream(provider: provider)
+            var stream = AgentStream(provider: provider, acceptsProposals: inbox != nil)
             let result = Result {
-                let args = try arguments(provider, requested, prompt, cwd, folder)
+                let args = try arguments(provider, requested, prompt, cwd, folder, inbox: inbox, tools: stream.tools)
                 let command = try connection.command(installation, args, directory: cwd)
                 let code = try command.execute(timeout: timeout) { try stream.accept($0, emit: onEvent) }
                 guard code == 0 else { throw AgentError.failed(code) }
@@ -104,22 +104,22 @@ public struct AgentRunner: Sendable {
         }
     }
 
-    private func arguments(_ provider: AgentProvider, _ model: String?, _ prompt: String, _ cwd: URL, _ folder: URL) throws -> [String] {
-        let notes = location.notesDirectory.path
+    private func arguments(_ provider: AgentProvider, _ model: String?, _ prompt: String, _ cwd: URL, _ folder: URL, inbox: URL?, tools: [String]) throws -> [String] {
+        let serverArguments = [location.notesDirectory.path] + (inbox.map { [$0.path] } ?? [])
         if provider == .claude {
             let config = folder.appending(path: "mcp.json")
-            let data = try JSONSerialization.data(withJSONObject: ["mcpServers": ["float": ["command": server.path, "args": [notes]]]])
+            let data = try JSONSerialization.data(withJSONObject: ["mcpServers": ["float": ["command": server.path, "args": serverArguments]]])
             try data.write(to: config, options: .atomic)
             return ["-p"] + (model.map { ["--model", $0] } ?? []) + ["--setting-sources", "", "--strict-mcp-config", "--mcp-config", config.path,
-                    "--tools", "", "--allowedTools", AgentStream.claudeTools.joined(separator: ","), "--disable-slash-commands",
+                    "--tools", "", "--allowedTools", tools.map { "mcp__float__" + $0 }.joined(separator: ","), "--disable-slash-commands",
                     "--permission-mode", "dontAsk", "--no-session-persistence", "--output-format", "stream-json",
                     "--verbose", "--include-partial-messages", "--", prompt]
         }
         func literal(_ value: String) throws -> String {
             String(decoding: try JSONEncoder.tomlString.encode(value), as: UTF8.self)
         }
-        let settings = try ["mcp_servers.float.command=" + literal(server.path), "mcp_servers.float.args=[" + literal(notes) + "]",
-                            "mcp_servers.float.enabled_tools=[\"list_notes\",\"read_note\"]",
+        let settings = try ["mcp_servers.float.command=" + literal(server.path), "mcp_servers.float.args=[" + serverArguments.map(literal).joined(separator: ",") + "]",
+                            "mcp_servers.float.enabled_tools=[" + tools.map(literal).joined(separator: ",") + "]",
                             "mcp_servers.float.required=true", "mcp_servers.float.default_tools_approval_mode=\"approve\"",
                             "approval_policy=\"never\"", "web_search=\"disabled\"", "features.shell_tool=false",
                             "features.unified_exec=false", "features.hooks=false", "features.apps=false", "features.plugins=false",

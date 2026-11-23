@@ -6,7 +6,7 @@ private final class BundleMarker: NSObject {}
 @Suite struct FloatMCPTests {
     private typealias Object = [String: Any]
 
-    @Test func stdioRoundTrip() throws {
+    @Test(arguments: [false, true]) func stdioRoundTrip(proposals: Bool) throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appending(path: UUID().uuidString)
         let notes = root.appending(path: "notes")
@@ -26,7 +26,9 @@ private final class BundleMarker: NSObject {}
         let executable = candidates.map { $0.appending(path: "FloatMCP") }.first { fm.isExecutableFile(atPath: $0.path) }
         let binary = try #require(executable)
         process.executableURL = binary
-        process.arguments = [notes.path]
+        let inbox = root.appending(path: "inbox")
+        try fm.createDirectory(at: inbox, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        process.arguments = [notes.path] + (proposals ? [inbox.path] : [])
         let input = Pipe()
         let output = Pipe()
         process.standardInput = input
@@ -47,6 +49,17 @@ private final class BundleMarker: NSObject {}
             try send("tools/call", id: index + 3, ["name": "read_note", "arguments": ["name": name]])
         }
         try send("tools/call", id: 8, ["name": "add_todo"])
+        let submissions: [Object] = [
+            ["kind": "add_todos", "note_id": "메모", "lines": ["약속 확인"]],
+            ["kind": "add_todos", "note_id": "메모", "lines": ["약속 확인"]],
+            ["kind": "unknown", "note_id": "메모", "lines": ["약속 확인"]],
+            ["kind": "add_todos", "note_id": "../outside", "lines": ["약속 확인"]],
+            ["kind": "add_todos", "note_id": "link", "lines": ["약속 확인"]],
+            ["kind": "add_todos", "note_id": "메모", "lines": [String(repeating: "a", count: 1025)]]
+        ]
+        for (i, submission) in submissions.enumerated() {
+            try send("tools/call", id: 9 + i, ["name": "propose_change", "arguments": submission])
+        }
         try input.fileHandleForWriting.close()
         let bytes = try output.fileHandleForReading.readToEnd() ?? Data()
         process.waitUntilExit()
@@ -54,14 +67,28 @@ private final class BundleMarker: NSObject {}
         let responses = try bytes.split(separator: 10).map { data in
             try #require(JSONSerialization.jsonObject(with: Data(data)) as? Object)
         }
-        try #require(responses.count == 9)
+        try #require(responses.count == 15)
         #expect(responses[0]["id"] as? String == "start")
         #expect((responses[0]["result"] as? Object)?["protocolVersion"] as? String == "2025-06-18")
         let tools = (responses[1]["result"] as? Object)?["tools"] as? [Object]
-        #expect(tools?.compactMap { $0["name"] as? String } == ["list_notes", "read_note"])
+        #expect(tools?.compactMap { $0["name"] as? String } == ["list_notes", "read_note"] + (proposals ? ["propose_change"] : []))
         func text(_ i: Int) -> String? {
             let content = (responses[i]["result"] as? Object)?["content"] as? [Object]
             return content?.first?["text"] as? String
+        }
+        let files = try fm.contentsOfDirectory(atPath: inbox.path)
+        #expect(files.count == (proposals ? 1 : 0))
+        #expect(files.allSatisfy { $0.hasSuffix(".json") })
+        #expect(try Data(contentsOf: outside) == Data("outside".utf8))
+        #expect(try Data(contentsOf: notes.appending(path: "메모.md")) == Data("# 메모\n본문".utf8))
+        if proposals {
+            #expect(text(9) == text(10))
+            for i in 11...14 {
+                #expect((responses[i]["result"] as? Object)?["isError"] as? Bool == true)
+                #expect(text(i)?.isEmpty == false)
+            }
+        } else {
+            for i in 9...14 { #expect((responses[i]["error"] as? Object)?["code"] as? Int == -32602) }
         }
         #expect(text(2) == "메모.md")
         #expect(text(3) == "# 메모\n본문")
