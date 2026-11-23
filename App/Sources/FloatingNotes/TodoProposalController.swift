@@ -31,6 +31,11 @@ final class TodoProposalController {
     }
 
     func connect(_ model: LibraryModel) {
+        model.openEvidence = { [weak self] id in
+            guard let self, let draft = record(id), let proposal = draft.proposal(id) else { return }
+            draft.revealRequest(proposal.requestID)
+            router.showAgent(draft, source: "proposal-evidence")
+        }
         model.acceptProposals = { [weak self] in self?.accept($0, source: "library") }
         model.discardProposal = { [weak self] in self?.discard($0, source: "library") }
         model.openProposal = { [weak self] in self?.open($0, source: "library") }
@@ -78,8 +83,8 @@ final class TodoProposalController {
             guard router.route(.openNote(target)) == .handled else { return }
         } else {
             guard router.route(.openLibrary) == .handled, let model = router.library?.model else { return }
-            model.select(.proposals)
-            model.selectProposal(id)
+            if p.target == .instructions && p.status == .accepted { model.select(.memory) }
+            else { model.select(.proposals); model.selectProposal(id) }
         }
         do { try draft.markProposalSeen(id) } catch { showError("제안 열람을 저장하지 못했어요") }
         refreshCards()
@@ -92,7 +97,8 @@ final class TodoProposalController {
             try draft.reviewProposal(id, notes: notes)
             expanded.insert(id)
             refreshCards()
-        } catch { showError("미리보기를 열 수 없어요") }
+        } catch is AgentStore.InstructionConflict { showError("같은 줄을 고쳤어요. 제안을 버리고 다시 요청해 주세요.") }
+        catch { showError("미리보기를 열 수 없어요") }
     }
 
     func discard(_ id: UUID, source: String) {
@@ -105,6 +111,7 @@ final class TodoProposalController {
         router.traceActivation("proposal-accept " + source)
         var accepted: [UUID] = []
         var chain: [NoteID: (base: String, applied: String)] = [:]
+        var instructionConflict = false
         var failed = false
         for id in ids {
             guard let draft = record(id), let p = draft.proposal(id), p.status == .pending else { continue }
@@ -124,11 +131,12 @@ final class TodoProposalController {
                         chain[target] = (chain[target]?.base ?? receipt.previousFingerprint, applied)
                         if let item = p.scheduleItem { router.onScheduleCreated?(target, item.id) }
                     }
+                    if p.target == .instructions, ids.count == 1 { router.library?.model.select(.memory) }
                     if let newID = p.createdNoteID, ids.count == 1 { router.route(.openNote(newID)) }
                 }
-            } catch { failed = true }
+            } catch { failed = true; if p.target == .instructions { instructionConflict = true } }
         }
-        guard !accepted.isEmpty else { if failed { showError("노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.") }; return }
+        guard !accepted.isEmpty else { if failed { showError(instructionConflict ? "지침이 바뀌었어요. 미리보기를 다시 확인해 주세요." : "노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.") }; return }
         showToast(failed ? "일부 제안을 받았어요. 남은 제안을 확인해 주세요." : (accepted.count == 1 ? successMessage(accepted[0]) : "제안을 받았어요"), "되돌리기") { [weak self, accepted] in
             self?.undo(accepted)
         }
@@ -136,6 +144,7 @@ final class TodoProposalController {
 
     private func successMessage(_ id: UUID) -> String {
         switch record(id)?.proposal(id)?.content {
+        case .instructions: "지침을 고쳤어요"
         case .todos: "할 일을 추가했어요"
         case .newNote: "새 노트를 만들었어요"
         case .schedule(let kind, _, _, _, _, _): kind == .event ? "일정을 추가했어요" : "리마인더를 추가했어요"
@@ -145,22 +154,26 @@ final class TodoProposalController {
 
     private func undo(_ ids: [UUID]) {
         var failed = false
+        var editedInstructions = false
         var editedNewNote = false
         let scheduleTargets = Set(ids.compactMap { id -> NoteID? in
             guard let p = record(id)?.proposal(id), p.scheduleItem != nil else { return nil }
             return p.targetID
         })
         for id in ids.reversed() {
-            guard let draft = record(id), let p = draft.proposal(id), let target = p.createdNoteID ?? p.targetID else { continue }
+            guard let draft = record(id), let p = draft.proposal(id) else { continue }
             do {
-                try flush(target)
-                try draft.undoProposal(id, notes: notes, sharedScheduleTarget: scheduleTargets.contains(target))
+                let target = p.createdNoteID ?? p.targetID
+                if let target { try flush(target) }
+                try draft.undoProposal(id, notes: notes, sharedScheduleTarget: target.map(scheduleTargets.contains) ?? false)
             } catch {
                 failed = true
+                if p.target == .instructions { editedInstructions = true }
                 if case StoreError.conflict = error, p.createdNoteID != nil { editedNewNote = true }
             }
         }
-        if editedNewNote { showError("새 노트를 고쳐서 되돌릴 수 없어요") }
+        if editedInstructions { showError("지침을 고쳐서 되돌릴 수 없어요") }
+        else if editedNewNote { showError("새 노트를 고쳐서 되돌릴 수 없어요") }
         else if failed { showError("노트가 바뀌어 되돌릴 수 없는 제안이 있어요") }
     }
 

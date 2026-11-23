@@ -41,8 +41,11 @@ package struct TodoProposalView: View {
     }
 
     private var pending: Bool { proposal.status == .pending }
+    private var missingNote: Bool { note == nil && proposal.createdNoteID == nil && proposal.target != .instructions }
     @ViewBuilder private var noteBody: some View {
-        if case .newNote(_, let markdown) = proposal.content {
+        if case let .instructions(before, after) = proposal.content {
+            InstructionPreview(theme: theme, before: before, after: after)
+        } else if case .newNote(_, let markdown) = proposal.content {
             ProposalNoteBody(theme: theme, markdown: markdown, addedLines: pending ? nil : 0, compact: !full)
         } else if let note {
             let additions = pending ? proposal.lines : []
@@ -57,13 +60,13 @@ package struct TodoProposalView: View {
                 AgentFace(theme: theme, state: .done)
                 Text(proposal.title).fontWeight(.semibold)
             }
-            if note == nil && proposal.createdNoteID == nil { Text("대상 노트를 찾을 수 없어요").foregroundStyle(theme.color(.text3)) }
+            if missingNote { Text("대상 노트를 찾을 수 없어요").foregroundStyle(theme.color(.text3)) }
             else if full {
                 rows.padding(theme.component(.agentInputInset))
                     .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
             }
             else { Button(action: review) { rows }.buttonStyle(.plain).accessibilityLabel("미리보기") }
-            if proposal.requiresReview == true { Text("노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.").foregroundStyle(theme.color(.text2)) }
+            if proposal.requiresReview == true { Text(proposal.target == .instructions ? "지침이 바뀌었어요. 미리보기를 다시 확인해 주세요." : "노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.").foregroundStyle(theme.color(.text2)) }
             HStack(spacing: theme.component(.agentRowInset)) {
                 if !full { TextActionLink(theme: theme, title: "노트로 보기", symbol: "chevron.right", action: review) }
                 Spacer(minLength: 0)
@@ -71,7 +74,7 @@ package struct TodoProposalView: View {
                 if pending {
                     Button("버리기", action: discard)
                     if proposal.requiresReview == true { Button("다시 미리보기", action: review) }
-                    else { Button("받기", action: accept).disabled(note == nil && proposal.createdNoteID == nil) }
+                    else { Button("받기", action: accept).disabled(missingNote) }
                 } else { Text(proposal.status.label).foregroundStyle(theme.color(.text3)) }
             }.buttonStyle(WhiteControl(theme: theme))
         }.font(theme.font(.body, size: theme.component(.proposalFont))).foregroundStyle(theme.color(.text))
@@ -81,6 +84,7 @@ package struct TodoProposalView: View {
     }
 
     private var previewTitle: String {
+        if proposal.target == .instructions { return "지침, 받은 뒤" }
         if case .newNote(let title, _) = proposal.content { return title }
         return note.flatMap { $0.title.isEmpty ? nil : $0.title } ?? "제목 없음"
     }

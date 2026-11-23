@@ -32,6 +32,7 @@ public final class LibraryModel {
     package var newConversation: () -> Void = {}
     package var selectedProposal: UUID?
     package var openProposal: (UUID) -> Void = { _ in }
+    package var openEvidence: (UUID) -> Void = { _ in }
     package var seenProposal: (UUID) -> Void = { _ in }
     package var reviewProposal: (UUID) -> Void = { _ in }
     package var acceptProposals: ([UUID]) -> Void = { _ in }

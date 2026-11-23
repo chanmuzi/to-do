@@ -54,16 +54,24 @@ struct AgentWindowView: View {
                         control("대상 추가", .plus, action: chooseTarget)
                     }.padding(.leading, theme.component(.agentHeaderInset)).padding(.top, theme.space(.sp2))
                 }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
-                        ForEach(draft.conversation.requests) { request in
-                            AgentTurnView(theme: theme, draft: draft, request: request, still: still,
-                                          openNote: openNote, openProposal: openProposal, noteTitle: titleForNote, retry: { retry(request.id) })
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
+                            ForEach(draft.conversation.requests) { request in
+                                AgentTurnView(theme: theme, draft: draft, request: request, still: still,
+                                              openNote: openNote, openProposal: openProposal, noteTitle: titleForNote, retry: { retry(request.id) }).id(request.id)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
+                    }.defaultScrollAnchor(.bottom)
+                        .onChange(of: draft.evidenceRequest, initial: true) {
+                            if let id = draft.evidenceRequest {
+                                proxy.scrollTo(id, anchor: .top)
+                                draft.evidenceRequest = nil
+                            }
                         }
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
-                }.defaultScrollAnchor(.bottom)
+                }
                 if !draft.conversation.queued.isEmpty {
                     if draft.queueHeld {
                         AgentQueueHeader(theme: theme, count: draft.conversation.queued.count, remove: {

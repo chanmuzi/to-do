@@ -24,6 +24,8 @@ import Store
     }
 
     package var queueHeld = false
+    package var evidenceRequest: UUID?
+    package func revealRequest(_ id: UUID) { showsHistory = false; evidenceRequest = id }
     var showsHistory = false
     var expanded: Set<UUID> = []
     var hovered: UUID?
