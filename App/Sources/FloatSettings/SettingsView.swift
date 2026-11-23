@@ -191,7 +191,7 @@ struct SettingsView: View {
                             .frame(maxHeight: .infinity)
                             .background(choice.0 == value ? theme.color(.surface) : .clear,
                                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-                    }.buttonStyle(RowHoverStyle(theme: theme, selected: choice.0 == value)).accessibilityLabel(choice.1)
+                    }.buttonStyle(RowHoverStyle(theme: theme, role: .segment(selected: choice.0 == value))).accessibilityLabel(choice.1)
                         .accessibilityAddTraits(choice.0 == value ? .isSelected : [])
                 }
             }.padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
@@ -216,14 +216,29 @@ struct SettingsView: View {
 
 struct RowHoverStyle: ButtonStyle {
     let theme: Theme
-    var selected = false
+    enum Role {
+        case navigation(twoLines: Bool, showsHover: Bool)
+        case segment(selected: Bool)
+    }
+    let role: Role
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
     func makeBody(configuration: Configuration) -> some View {
+        let active = hovered || configuration.isPressed
         configuration.label
-            .background(!selected && (hovered || configuration.isPressed) ? theme.color(.hover) : .clear,
-                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .background {
+                switch role {
+                case .navigation(let twoLines, let showsHover):
+                    RoundedRectangle(cornerRadius: theme.component(.settingsNavHoverRadius))
+                        .fill(active || showsHover ? theme.color(.hover) : .clear)
+                        .frame(height: twoLines ? nil : theme.component(.settingsNavSingleLineHoverHeight))
+                        .padding(.vertical, twoLines ? theme.component(.settingsNavTwoLineHoverInsetY) : 0)
+                case .segment(let selected):
+                    RoundedRectangle(cornerRadius: theme.shape(.controlRadius))
+                        .fill(active && !selected ? theme.color(.hover) : .clear)
+                }
+            }
             .contentShape(Rectangle()).onHover { hovered = $0 }
             .animation(reduced ? nil : theme.motion.animation, value: hovered || configuration.isPressed)
     }

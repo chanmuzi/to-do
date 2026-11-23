@@ -65,7 +65,7 @@ final class IconButton: ClickableView {
 
     override func updateLayer() {
         layer?.cornerRadius = style.theme.shape(.controlRadius)
-        layer?.backgroundColor = isSelected ? style.cgColor(.selected, in: self) : (isPointerInside ? style.cgColor(.hover, in: self) : CGColor.clear)
+        layer?.backgroundColor = isSelected ? style.cgColor(.formatActive, in: self) : (isPointerInside ? style.cgColor(.hover, in: self) : CGColor.clear)
     }
 
     override func layout() {

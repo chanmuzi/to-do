@@ -4,7 +4,7 @@ import Theme
 
 /// 실제 버튼을 열어 자식 창의 내용과 화면 좌표를 기록한다.
 enum DebugSettingsMenu {
-    static func capture(at anchor: NSButton, to url: URL, image: Bool) {
+    static func capture(at anchor: NSButton, to url: URL, image: Bool, captureParent: ((NSWindow) -> Void)? = nil) {
         guard let parent = anchor.window else { return }
         let before = Set((parent.childWindows ?? []).map(ObjectIdentifier.init))
         anchor.sendAction(anchor.action, to: anchor.target)
@@ -32,14 +32,17 @@ enum DebugSettingsMenu {
             }
             struct Layout: Encodable {
                 let button: CGRect
+                let parent: CGRect
                 let popup: CGRect
                 let shadow: Bool
                 let rows: [Row]
             }
-            let layout = Layout(button: button, popup: popup.frame, shadow: popup.hasShadow, rows: rows(in: view))
+            let layout = Layout(button: button, parent: parent.frame, popup: popup.frame, shadow: popup.hasShadow, rows: rows(in: view))
             let layoutURL = image ? url.deletingPathExtension().appendingPathExtension("json") : url
             try JSONEncoder().encode(layout).write(to: layoutURL, options: .atomic)
             if image {
+                parent.displayIfNeeded()
+                captureParent?(parent)
                 popup.displayIfNeeded()
                 guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { throw CocoaError(.fileWriteUnknown) }
                 view.cacheDisplay(in: view.bounds, to: rep)

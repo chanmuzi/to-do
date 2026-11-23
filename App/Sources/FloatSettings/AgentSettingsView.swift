@@ -61,8 +61,12 @@ extension SettingsView {
                         Spacer()
                         Text(engine.detail).font(valueFont).foregroundStyle(theme.color(engine.status == .expired ? .warn : .text3))
                         Image(systemName: "chevron.right").font(valueFont).foregroundStyle(theme.color(.text3))
-                    }.frame(height: theme.component(.settingsTop)).contentShape(Rectangle())
-                }.buttonStyle(RowHoverStyle(theme: theme))
+                    }.padding(.horizontal, theme.component(.settingsNavHoverOutset))
+                        .frame(height: theme.component(.settingsTop))
+                }.buttonStyle(RowHoverStyle(theme: theme, role: .navigation(
+                    twoLines: true, showsHover: model.hoveredAgent == engine.provider.rawValue
+                )))
+                    .padding(.horizontal, -theme.component(.settingsNavHoverOutset))
             }
         }
     }

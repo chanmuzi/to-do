@@ -345,7 +345,7 @@ import SpaceIcons
         #expect(queries == [.event, .reminder])
     }
 
-    @Test func noteListKeepsShortRowsAtTopAndLeavesEightPointsAtEnd() throws {
+    @Test func noteListKeepsShortRowsAtTopAndEndsAtLastRow() throws {
         let f = try Fixture()
         defer { try? f.close() }
         let first = try f.notes.create(NoteDraft(title: "짧은 목록"))
@@ -374,7 +374,7 @@ import SpaceIcons
         settle()
         let last = try row(try #require(f.model.rows.last).id)
         let lastFrame = last.convert(last.bounds, to: clip)
-        #expect(clip.bounds.maxY - lastFrame.maxY == 8)
+        #expect(clip.bounds.maxY == lastFrame.maxY)
     }
 
     @Test func listRulesStartAtTextAndSkipTheLastNote() throws {

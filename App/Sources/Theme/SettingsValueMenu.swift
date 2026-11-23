@@ -168,7 +168,7 @@ private final class MenuSurface: NSView {
         let radius = theme.shape(.windowRadius)
         let border = theme.component(.valueMenuBorder)
         let path = NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius)
-        theme.nsColor(.valueMenuSurface).setFill()
+        theme.nsColor(.surface).withAlphaComponent(1).setFill()
         path.fill()
         path.addClip()
         theme.nsColor(.guide).setStroke()

@@ -342,6 +342,8 @@ final class DebugControl {
                   let engine = model.agents?.engines.first(where: { $0.provider.rawValue == provider.rawValue }),
                   engine.status == .connected else { return }
             model.change { $0.agentProvider = engine.provider.rawValue }
+        case ("settings-agent-hover", let provider?, _) where isPassive:
+            settingsWindow?.model.setAgentHoverForVerification(provider.rawValue)
         case ("settings-sidebar-hover", let pane?, _) where isPassive:
             settingsWindow?.model.setSidebarHoverForVerification(SettingsPane(rawValue: pane.rawValue))
         case ("settings-layout", let name?, _) where isPassive:
@@ -357,13 +359,19 @@ final class DebugControl {
             settingsWindow?.model.detailEngine?.cancel()
         case ("settings-install-tip", let flag?, _) where isPassive:
             settingsWindow?.model.setInstallTipForVerification(flag.rawValue == "on")
-        case (let command?, let name?, let label) where isPassive && ["settings-popup-snapshot", "settings-popup-layout"].contains(command):
+        case (let command?, let name?, let label) where isPassive && ["settings-popup-snapshot", "settings-popup-window-snapshot", "settings-popup-layout"].contains(command):
             func findPicker(_ view: NSView) -> NSView? {
                 if view.accessibilityLabel() == (label ?? "기본 캘린더"), view.menu != nil { return view }
                 return view.subviews.lazy.compactMap(findPicker).first
             }
             if let root = settingsWindow?.window?.contentView, let button = findPicker(root) as? NSButton,
-               let url = output(named: name.rawValue) { DebugSettingsMenu.capture(at: button, to: url, image: command == "settings-popup-snapshot") }
+               let url = output(named: name.rawValue) {
+                DebugSettingsMenu.capture(at: button, to: url, image: command != "settings-popup-layout") { window in
+                    if command == "settings-popup-window-snapshot" {
+                        self.write(window, to: url.deletingPathExtension().appendingPathExtension("parent.png"), audit: false)
+                    }
+                }
+            }
         case ("settings-format-bar", let mode?, _) where isPassive:
             guard NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) != nil else { return }
             settingsWindow?.model.change { $0.formatBar = mode.rawValue }
