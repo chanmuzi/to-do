@@ -62,7 +62,7 @@ import Theme
         #expect(router.route(.closeNoteWindow(note.id)) == .handled)
         // 아직 화면이 없는 요청은 이어지지 않았다고 답하고, 물어봐도 그렇게 답한다.
         #expect(router.route(.requestAgent) == .unconnected)
-        #expect(!router.isConnected(.requestAgent))
+        #expect(router.isConnected(.requestAgent))
         #expect(router.isConnected(.openNote(note.id)))
         #expect(shown.count == 1)
         #expect(coordinator.openNoteIDs.isEmpty)

@@ -48,18 +48,19 @@ import Testing
         let failures = hotKeys.register(.standard)
 
         #expect(failures.isEmpty)
-        // 빠른 캡처, 노트 모두 숨기기, 라이브러리만 전역 키를 등록한다.
         #expect(hotKeys.registered == [
             .quickCapture: KeyChord(.n, [.control, .option]),
             .toggleNotesHidden: KeyChord(.h, [.control, .option]),
             .library: KeyChord(.l, [.control, .option]),
+            .requestAgent: KeyChord(.a, [.control, .option]),
         ])
-        #expect(hotKeys.skipped == [.requestAgent])
-        #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option]), KeyChord(.l, [.control, .option])])
+        #expect(hotKeys.skipped.isEmpty)
+        #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option]), KeyChord(.l, [.control, .option]), KeyChord(.a, [.control, .option])])
         registrar.press(KeyChord(.n, [.control, .option]))
         registrar.press(KeyChord(.l, [.control, .option]))
         registrar.press(KeyChord(.h, [.control, .option]))
-        #expect(performed == [.quickCapture, .library, .toggleNotesHidden])
+        registrar.press(KeyChord(.a, [.control, .option]))
+        #expect(performed == [.quickCapture, .library, .toggleNotesHidden, .requestAgent])
     }
 
     /// 등록할지는 요청이 이어져 있는지 하나로 정해진다(`Route.isConnected`). 그 값을 바꾸면 따라온다.
@@ -69,9 +70,8 @@ import Testing
         #expect(AppCommand.library.isConnected == Route.openLibrary.isConnected)
         #expect(AppCommand.requestAgent.isConnected == Route.requestAgent.isConnected)
         #expect(AppCommand.findNote.isConnected == Route.openBrowse(anchor: nil).isConnected)
-        // 라이브러리를 열 수 있으며 전역 요청 막대는 아직 연결 전이다.
         #expect(AppCommand.quickCapture.isConnected && AppCommand.findNote.isConnected)
-        #expect(AppCommand.library.isConnected && !AppCommand.requestAgent.isConnected)
+        #expect(AppCommand.library.isConnected && AppCommand.requestAgent.isConnected)
 
         // 화면이 이어진 뒤처럼 넘기면 그 키도 등록된다.
         let registrar = FakeRegistrar()

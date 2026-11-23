@@ -16,7 +16,7 @@ extension Route {
     var isConnected: Bool {
         switch self {
         case .openAgentWindow, .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
-        case .requestAgent: false
+        case .requestAgent: true
         }
     }
 }
@@ -96,7 +96,8 @@ final class AppRouter: Routing {
                 try agent.open(note: id, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
                 activateApp()
             case .requestAgent:
-                return logUnhandled(route)
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleCapture(mode: .request)
             }
             return .handled
         } catch {

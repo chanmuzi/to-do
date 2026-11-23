@@ -180,3 +180,29 @@ import Testing
         #expect(!fixture.quickPanels.isAnyVisible)
     }
 }
+
+extension QuickPanelFocusTests {
+    @Test func requestSwitchKeepsBothDraftsAndReturnsExternalFocus() throws {
+        defer { fixture.cleanUp() }
+        let id = try fixture.open("쓰던 노트")
+        fixture.pretendKey(id)
+        fixture.isAppActive = false
+        fixture.router.route(.requestAgent)
+        let window = fixture.capture.window
+        try type("내일 세 시 회의 요약", into: fixture.capture.inputView)
+        fixture.quickPanels.toggleCapture()
+        try type("메모 초안", into: fixture.capture.inputView)
+        fixture.router.route(.requestAgent)
+        #expect(fixture.capture.window === window && fixture.capture.inputView?.string == "내일 세 시 회의 요약")
+        #expect(fixture.capture.underlinedRanges.isEmpty)
+        fixture.quickPanels.toggleCapture()
+        #expect(fixture.capture.inputView?.string == "메모 초안")
+        fixture.router.route(.requestAgent)
+        var sends: [String] = []
+        fixture.capture.onRequest = { text, opens in sends.append(text); return !opens }
+        fixture.capture.performSubmit()
+        fixture.capture.performSubmit()
+        #expect(sends == ["내일 세 시 회의 요약"] && !fixture.capture.isVisible)
+        #expect(fixture.keyRequests(id) == 0)
+    }
+}

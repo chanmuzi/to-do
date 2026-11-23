@@ -62,7 +62,7 @@ import Theme
         #expect(Set(bound) == Set(AppCommand.allCases))
         #expect(bound.count == AppCommand.allCases.count)
         for entry in table.entries {
-            let isAppRow = [.global, .noteWindow, .agent].contains(entry.group)
+            let isAppRow = [.global, .noteWindow].contains(entry.group) || (entry.group == .agent && entry.chords.first?.key == .j)
             #expect((entry.command != nil) == isAppRow, "\(entry.action)")
         }
         #expect(table.entries(in: .global).allSatisfy { $0.chords.first?.modifiers == [.control, .option] })
@@ -74,7 +74,7 @@ import Theme
     @Test func chordsDoNotCollideWithinTheNoteWindow() {
         let table = ShortcutTable.standard
         let editing = table.entries(in: .editing).filter { $0.action != "현재 줄 날짜 제안 받기" }
-        let heard = (table.entries(in: .global) + table.entries(in: .noteWindow) + table.entries(in: .agent) + editing)
+        let heard = (table.entries(in: .global) + table.entries(in: .noteWindow) + table.entries(in: .agent).filter { $0.command != nil } + editing)
             .flatMap(\.chords)
         #expect(Set(heard).count == heard.count)
         // 앱 메뉴가 따로 듣는 표준 편집 키와도 겹치지 않는다.

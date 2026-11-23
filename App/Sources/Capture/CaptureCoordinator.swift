@@ -11,6 +11,11 @@ import Theme
 /// - ⇥: 스페이스를 차례로 바꾼다. ⌘R: 리마인더를 직접 고른다. esc, 바깥 클릭: 닫는다.
 @MainActor
 public final class CaptureCoordinator {
+    public enum Mode { case memo, request }
+    public private(set) var mode: Mode = .memo
+    public var onRequest: ((String, Bool) -> Bool)?
+    public var providerName: () -> String = { "Claude" }
+    private var drafts: [Mode: String] = [:]
     private let theme: Theme
     private let notes: any NoteStoring
     private let spaces: SpaceStore
@@ -86,7 +91,9 @@ public final class CaptureCoordinator {
     public var isVisible: Bool { panel?.isVisible == true && !isClosing }
 
     /// 마우스가 있는 화면(없으면 주 화면)의 가운데 아래쪽에 띄우고 입력 칸에 커서를 둔다.
-    public func show() {
+    public func show(mode: Mode = .memo) {
+        self.mode = mode
+        drafts = [:]
         let panel = preparedPanel()
         guard let barView else { return }
         closingSettle?.cancel()
@@ -98,6 +105,7 @@ public final class CaptureCoordinator {
         selectedSpace = CaptureSpaceCycle.initial(
             remembered: hasSelectedSpace ? .some(selectedSpace) : nil, in: spaces.spaces
         )
+        barView.setMode(mode)
         barView.input.stringValue = ""
         barView.textView.string = ""
         barView.textView.undoManager?.removeAllActions()
@@ -128,6 +136,19 @@ public final class CaptureCoordinator {
         // 움직임은 꾸밈이다. 제자리에 놓는 일은 `dur` 뒤에 따로 한다(화면이 꺼져 있으면 움직임이 나아가지 않는다).
         entranceSettle?.cancel()
         entranceSettle = style.afterTransition { [weak self] in self?.finishShowing() }
+    }
+
+    public func switchMode(to next: Mode) {
+        guard isVisible, mode != next, let barView, !barView.textView.hasMarkedText() else { return }
+        drafts[mode] = barView.textView.string
+        mode = next
+        let text = drafts[next] ?? ""
+        barView.setMode(next)
+        barView.input.stringValue = text
+        barView.textView.string = text
+        barView.textView.undoManager?.removeAllActions()
+        barView.textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        refresh(animated: false)
     }
 
     private func finishShowing() {
@@ -215,6 +236,10 @@ public final class CaptureCoordinator {
         barView.frame = NSRect(origin: .zero, size: size)
         barView.autoresizingMask = [.width, .height]
         panel.contentView = barView
+        barView.onSwitch = { [weak self] in
+            guard let self else { return }
+            switchMode(to: mode == .memo ? .request : .memo)
+        }
         barView.textView.onCommand = { [weak self] in self?.perform($0) }
         barView.textView.onTextChange = { [weak self] in self?.refresh(animated: true) }
 
@@ -278,6 +303,11 @@ public final class CaptureCoordinator {
 
     private func refresh(animated: Bool) {
         guard let barView else { return }
+        if mode == .request {
+            barView.apply(space: .init(symbolName: nil, symbolSize: .iconMedium, text: providerName(),
+                                       accessibilityLabel: providerName()), reminder: nil, timeRanges: [], animated: animated)
+            return
+        }
         let entry = interpretation()
         // 읽은 때는 지났어도 보여 준다(무엇으로 읽혔는지 알 수 있게). 지난 때는 흐린 글자에 가운데 줄이고, 걸리지 않는다.
         let reminder = entry.resolvedReminder.map { date in
@@ -324,6 +354,20 @@ public final class CaptureCoordinator {
     private func perform(_ command: CaptureCommand) {
         // 닫히는 중의 키 입력은 버린다: ↵를 잇달아 두 번 눌러도 한 번만 들어간다.
         guard !isClosing else { return }
+        if mode == .request {
+            switch command {
+            case .submit, .submitAsNewNote:
+                guard let input = barView?.textView, !input.hasMarkedText(), !input.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                let opens = command == .submitAsNewNote
+                staysOpenWithoutKey = true
+                let sent = onRequest?(input.string, opens) == true
+                staysOpenWithoutKey = false
+                if sent { dismiss(returningFocus: !opens) }
+            case .cancel: hide()
+            default: break
+            }
+            return
+        }
         switch command {
         case .submit: submit()
         case .submitAsNewNote: submitAsNewNote()

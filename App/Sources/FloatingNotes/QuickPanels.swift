@@ -30,6 +30,7 @@ final class QuickPanels {
     private var isSwitching = false
 
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
+    var traceActivation: (String) -> Void = { _ in }
     var presentFailure: (String, Error) -> Void = { RouteFailureAlert.present(title: $0, error: $1) }
     /// 지금 키 창인 노트. 시험은 실제 키 창을 만들지 않으므로 바꿔 넣는다.
     var currentKeyNote: () -> NoteID?
@@ -67,7 +68,10 @@ final class QuickPanels {
                 notePanels.setPinned(pinned, for: id)
             } catch { self.presentFailure("노트를 고정하지 못했습니다", error) }
         }
-        capture.onDismiss = { [unowned self] in panelDismissed(returnsFocus: $0) }
+        capture.onDismiss = { [unowned self] returnsFocus in
+            if capture.mode == .request { traceActivation(returnsFocus ? "request-close restore" : "request-close transfer") }
+            panelDismissed(returnsFocus: returnsFocus)
+        }
         browse.onDismiss = { [unowned self] in
             // 바깥을 눌러 닫혔다(포커스를 돌려주지 않는 닫힘이 누름 중에 왔다). 그 누름이 돋보기였는지는
             // 떼는 순간의 요청으로 안다.
@@ -82,13 +86,18 @@ final class QuickPanels {
     var isAnyVisible: Bool { capture.isVisible || browse.isVisible }
 
     /// 빠른 캡처 바를 띄우거나, 떠 있으면 닫는다(⌃⌥N, 메뉴).
-    func toggleCapture() {
+    func toggleCapture(mode: CaptureCoordinator.Mode = .memo) {
         if capture.isVisible {
-            capture.hide()
+            if capture.mode == mode { capture.hide() }
+            else {
+                capture.switchMode(to: mode)
+                if capture.mode == mode { traceActivation(mode == .request ? "request-open switch" : "request-close switch") }
+            }
             return
         }
         beginSession(closing: browse.isVisible ? { [browse] in browse.hide() } : nil)
-        capture.show()
+        if mode == .request { traceActivation("request-open bar") }
+        capture.show(mode: mode)
     }
 
     /// 노트 찾기를 띄우거나, 떠 있으면 닫는다(⌘P, 돋보기, 메뉴).
