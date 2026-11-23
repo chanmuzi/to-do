@@ -31,6 +31,8 @@ final class TopRowView: NSView {
     private let reminderBadge: ReminderBadgeView
     private let pinButton: IconButton
     private var state: TopRowState?
+    private var animatesPinPlacement = false
+    private var pinTargetFrame: CGRect?
     /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
     private var holdsProblemSlot = false
     /// 표시가 다 사라진 뒤 자리를 비우는 일(`dur` 뒤). 그사이 다시 바뀌면 취소한다.
@@ -108,6 +110,8 @@ final class TopRowView: NSView {
 
     func apply(_ state: TopRowState, animated: Bool) {
         let hadProblem = self.state?.problem != nil || (self.state?.syncFailure == true && self.state?.reminder == nil)
+        animatesPinPlacement = animated && self.state?.pin.isOn == true && state.pin.isOn
+            && self.state?.hoverControlsAlpha != state.hoverControlsAlpha && style.transitionDuration > 0
         self.state = state
         divider.layer?.backgroundColor = style.cgColor(.line, in: self)
         title.paletteID = state.paletteID
@@ -178,6 +182,7 @@ final class TopRowView: NSView {
                 reminderWidth: reminderBadge.fittingWidth,
                 hasSchedules: state?.hasSchedules == true,
                 showsControls: state?.hoverControlsAlpha == 1,
+                isPinned: state?.pin.isOn == true,
                 showsProblem: holdsProblemSlot
             ),
             metrics: TopRowLayout.Metrics(
@@ -205,7 +210,15 @@ final class TopRowView: NSView {
         // 사라지는 중인 것은 자리가 없어져도 마지막 자리에서 사라진다.
         if let problem = frames.problem { problemButton.frame = problem }
         if let reminder = frames.reminder { reminderBadge.frame = reminder }
-        pinButton.frame = frames.pin
+        if pinTargetFrame != frames.pin {
+            pinTargetFrame = frames.pin
+            if animatesPinPlacement {
+                style.animate { pinButton.animator().frame = frames.pin }
+            } else {
+                pinButton.frame = frames.pin
+            }
+        }
+        animatesPinPlacement = false
     }
 
     // MARK: - 끌기와 제목 누르기

@@ -113,7 +113,6 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case editorChevronSize = "editor-chevron-size"
     case editorChevronStroke = "editor-chevron-stroke"
     case editorCountGap = "editor-count-gap"
-    case editorGuideOffset = "editor-guide-offset"
     case editorHighlightPadX = "editor-highlight-pad-x"
     case editorHighlightPadY = "editor-highlight-pad-y"
     case editorLinkFieldGap = "editor-link-field-gap"

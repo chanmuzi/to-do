@@ -19,7 +19,7 @@ struct TopRowState: Hashable {
     /// 제목이 비어 "제목 없음"을 표시하는 중.
     var isTitlePlaceholder: Bool
     var titleColor: ColorToken
-    /// 상단 호버 버튼의 알파. 자리는 늘 차지한다(규칙 7).
+    /// 호버로 나타나는 조작의 알파. 고정 핀은 평소에도 보인다.
     var hoverControlsAlpha: Double
     var hasSchedules: Bool
     var additionalSchedules = 0
@@ -52,7 +52,7 @@ struct TopRowState: Hashable {
             ReminderPresentation(item: $0, now: now, options: reminderOptions, calendar: calendar)
         }
         pin = isPinned
-            ? Pin(symbolName: "pin.fill", alpha: hoverControlsAlpha, color: isHovered ? .text2 : .text3, isOn: true)
+            ? Pin(symbolName: "pin.fill", alpha: 1, color: isHovered ? .text2 : .text3, isOn: true)
             : Pin(symbolName: "pin", alpha: isHovered ? 1 : 0, color: .text2, isOn: false)
         self.problem = problem
         syncFailure = note.schedules.contains { $0.syncError != nil }

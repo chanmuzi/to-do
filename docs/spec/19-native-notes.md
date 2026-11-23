@@ -8,6 +8,7 @@
 - **편집기**: TextKit 2. 마크다운을 속성으로 입히고, 커서가 있는 줄에서만 기호를 보입니다. 인라인 코드와 코드 블록의 둥근 바탕은 `NSTextLayoutFragment`를 상속해 `draw(at:in:)`에서 글자 뒤에 먼저 그립니다. 인라인 구간의 사각형은 `enumerateTextSegments(in:type:options:)`로 얻습니다.
 - **창 높이**: 내용 높이가 바뀌면 `setFrame(_:display:animate:)`로 같은 시간에 맞춰 바꿉니다. 창의 위쪽 가장자리를 고정하고 아래로 늘립니다.
 - **오른쪽 아래 버튼**: 스크롤 뷰 위에 겹친 별도 뷰. 텍스트 뷰의 크기에 영향을 주지 않습니다.
+- 목록, 투두, 토글의 왼쪽 칸은 단계별로 들여 씁니다. 세로 막대는 인용문에 그립니다(D-188).
 - **메뉴 막대**: `NSStatusItem`과 `NSMenu`. 메뉴 항목에 `keyEquivalent`를 넣지 않습니다(단축키를 표시하지 않기 위해).
 - **전역 단축키**: `RegisterEventHotKey`(또는 KeyboardShortcuts 같은 라이브러리). 등록이 실패하면 다른 앱이 쓰는 키입니다.
 - **기본 이미지**: 프레임 PNG를 템플릿으로 읽어 `contentTintColor`로 물들이고, manifest의 순서와 시간대로 바꿉니다. `magnificationFilter = .nearest`.

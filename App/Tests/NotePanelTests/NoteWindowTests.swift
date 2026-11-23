@@ -204,6 +204,36 @@ import Theme
 
     // MARK: - 상태 저장과 되살리기
 
+    @Test func pinLevelsFollowCreationChangesRestorationAndDeactivation() throws {
+        let first = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(first) }
+        let pinned = try first.createNote(NewNoteRequest(draft: NoteDraft(title: "고정")))
+        let normal = try first.createNote(NewNoteRequest(draft: NoteDraft(title: "일반")))
+        func check(_ panel: NSPanel, pinned: Bool) {
+            #expect(panel.level == (pinned ? .floating : .normal))
+            #expect(panel.isFloatingPanel == pinned)
+            #expect(!panel.hidesOnDeactivate && panel.isVisible)
+            #expect(panel.collectionBehavior.contains([.canJoinAllSpaces, .fullScreenAuxiliary]))
+        }
+        let panel = try #require(first.controllers[normal]?.panel)
+        check(panel, pinned: true)
+        for pin in [false, true, false] {
+            first.setPinned(pin, for: normal)
+            check(panel, pinned: pin)
+        }
+        first.controllers.values.forEach { $0.discardWindow() }
+        let restored = try fixture.makeCoordinator()
+        defer { restored.controllers.values.forEach { $0.discardWindow() } }
+        #expect(Set(restored.restoreOpenNotes()) == [pinned, normal])
+        let floatingPanel = try #require(restored.controllers[pinned]?.panel)
+        let normalPanel = try #require(restored.controllers[normal]?.panel)
+        check(floatingPanel, pinned: true)
+        check(normalPanel, pinned: false)
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        check(floatingPanel, pinned: true)
+        check(normalPanel, pinned: false)
+    }
+
     @Test func restoreBringsBackOnlyOpenNotesAtTheirFrames() throws {
         let first = try fixture.makeCoordinator()
         defer { fixture.cleanUp() }

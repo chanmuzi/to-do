@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import OSLog
 import Scheduling
 import FloatSettings
 import Reminders
@@ -10,6 +11,7 @@ import Store
 import Theme
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let activationLog = Logger(subsystem: "local.floating-notes", category: "activation")
     private let options: LaunchOptions
     private var environment: AppEnvironment?
     private var router: AppRouter?
@@ -186,9 +188,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pointerPresses = PointerPressMonitor(
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
                 ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() },
-                inactiveWindowPress: { [weak self, weak notePanels] window in
+                inactiveWindowPress: { [weak self, weak notePanels] window, time in
                     guard let notePanels, notePanels.openNoteIDs.contains(where: { notePanels.window(for: $0) === window }) else { return }
-                    self?.activationFocus.notePressedWhileInactive()
+                    self?.activationFocus.notePressedWhileInactive(at: time)
                 }
             )
             let shortcuts = ShortcutTable.standard
@@ -213,19 +215,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillBecomeActive(_ notification: Notification) {
-        let clickedWindow = ActivationFocusPolicy.activationClickedWindow(GetCurrentEvent())
-            || ActivationFocusPolicy.activationClickedWindow(NSApp.currentEvent?.eventRef.map { EventRef($0) })
-        let target = requestedWindowActivation || router?.isRouting == true || clickedWindow
-            || NSApp.modalWindow != nil || quickPanels?.isAnyVisible == true
+        let carbon = ActivationFocusPolicy.carbonTarget(GetCurrentEvent())
+        let appKit = ActivationFocusPolicy.carbonTarget(NSApp.currentEvent?.eventRef.map { EventRef($0) })
+        let clickedWindow = carbon == .clickedWindow || appKit == .clickedWindow
+        let pointer = ActivationPointer(library: library?.window)
+        let requested = requestedWindowActivation
         requestedWindowActivation = false
-        let showLibrary = activationFocus.shouldShowLibrary(activatedAt: ProcessInfo.processInfo.systemUptime,
-                                                             hasExplicitTarget: target)
-        #if DEBUG
-        if options.debugIsPassive {
-            AppLog.warning("willBecomeActive clickedWindow=\(clickedWindow) showLibrary=\(showLibrary)")
-        }
-        #endif
-        if showLibrary { library?.bringForward() }
+        let routing = router?.isRouting == true
+        let modal = NSApp.modalWindow != nil
+        let quick = quickPanels?.isAnyVisible == true
+        let state = activationFocus.consumeActivation(at: ProcessInfo.processInfo.systemUptime)
+        let reason = state.reason(explicitTarget: requested || routing || modal || quick, carbonWindow: clickedWindow,
+                                  window: pointer.window, mouseAge: pointer.mouseAge, keyAge: pointer.keyAge)
+        let pending = state.pendingAge.map { String(format: "%.3f", $0) } ?? "none"
+        let message = "launch=\(state.launching) requested=\(requested) routing=\(routing) modal=\(modal) quick=\(quick)"
+            + " carbon=\(carbon.rawValue) appKitEvent=\(appKit.rawValue) pendingAge=\(pending) window=\(pointer.window.rawValue)"
+            + String(format: " mouseAge=%.3f keyAge=%.3f", pointer.mouseAge, pointer.keyAge)
+            + " decision=\(reason.rawValue)"
+        activationLog.notice("\(message, privacy: .public)")
+        if reason == .showLibrary { library?.bringForward() }
     }
 
     /// 다른 프로그램이 제자리에서 고친 파일도 앞으로 올 때 다시 읽는다.
@@ -283,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Dock, Spotlight의 재열기는 라이브러리 한 창만 대상으로 한다.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        activationLog.notice("reopen decision=showLibrary")
         library?.bringForward()
         return false
     }

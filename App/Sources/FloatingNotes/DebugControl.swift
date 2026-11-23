@@ -59,6 +59,7 @@ extension NotePanelCoordinator {
 /// - `input-mark|input-commit <id|title:id|capture|browse> <글자>`: 조합/확정 입력.
 /// - `input-check <같은 대상> <파일 이름>`: 자동 입력 설정과 조합 상태를 JSON으로 쓴다.
 /// - `date-suggestion <id> [UTF-16 위치]`, `input-command <id|title:id> tab|escape|undo|redo`: 자기 입력 칸의 날짜 제안, 키 경로 확인.
+/// - `activation-sample <파일 이름> [노트 id]`: 마우스 위치 또는 지정한 노트 중앙의 실제 창과 입력 경과 시간을 읽는다.
 /// - `quit`
 ///
 /// 파일 이름은 출력 폴더 바로 아래의 이름이어야 한다. 경로를 주면 쓰지 않는다.
@@ -309,6 +310,18 @@ final class DebugControl {
             library?.window?.order(.below, relativeTo: window.windowNumber)
         case ("library-close", _, _): library?.close()
         case ("reopen", _, _): reopen()
+        case ("activation-sample", let name?, let id) where isPassive:
+            guard let url = output(named: name.rawValue) else { return }
+            let point: NSPoint
+            if let id {
+                guard let frame = notePanels.window(for: NoteID(rawValue: id))?.frame else { return }
+                point = NSPoint(x: frame.midX, y: frame.midY)
+            } else {
+                point = NSEvent.mouseLocation
+            }
+            let sample = ActivationPointer(library: library?.window, at: point)
+            write(json: ["windowNumber": sample.windowNumber, "kind": sample.window.rawValue,
+                         "mouseAge": String(sample.mouseAge), "keyAge": String(sample.keyAge)], to: url)
         case ("simulate-activation", _, _) where isPassive: simulateActivation()
         case ("library-select", let target?, _):
             let value = target.rawValue

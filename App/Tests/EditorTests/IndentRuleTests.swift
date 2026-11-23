@@ -43,13 +43,6 @@ import Testing
         #expect(s.applying(EditorCommands.outdent(s.doc, selection: s.selection)) == "\t\t본문|")
     }
 
-    // MARK: 안내선
-
-    @Test func guidesOnlyForLevelsWithAParent() {
-        let doc = MarkdownDocument("- a\n\t- b\n\t\t본문\n\t\t\t\t고아\n\t\t\n본문\n\t\t\t\t깊은 고아\n\t- c")
-        #expect(ListStructure.guideLevels(in: doc) == [[], [0], [0, 1], [0, 1], [0, 1], [], [], []])
-    }
-
     /// 하위 줄을 가진 부모 항목(빈 줄은 건너뛰고, 얕은 줄이 나오면 끝난다).
     @Test func hasChildrenLooksOnlyBelowTheLine() {
         let doc = MarkdownDocument("- a\n\n\t- b\n본문\n\t\t고아\n- c\n\t\t깊은\n\t- d\n+ e\n- f")

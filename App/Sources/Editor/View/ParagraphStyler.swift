@@ -49,7 +49,6 @@ nonisolated enum ParagraphStyler {
             self.key = key
             self.style = style
             self.decoration = FragmentDecoration(style: style)
-            self.decoration.endingGuideLevels = key.endingGuideLevels
         }
 
         private var full: NSRange { NSRange(location: 0, length: out.length) }
@@ -157,7 +156,6 @@ nonisolated enum ParagraphStyler {
             hide(line.markerRange)
 
             decoration.gutterX = left
-            decoration.guideLevels = key.guideLevels
             switch key.kind {
             case .todo(let done): decoration.gutter = .checkbox(done: done)
             case .bullet: decoration.gutter = .bullet(key.level % 3)
@@ -280,7 +278,6 @@ nonisolated enum ParagraphStyler {
             decoration.codeBox = (key.isCodeTop, key.isCodeBottom || key.hasTrailingCodeLine)
             decoration.codeBoxCoversExtraLine = key.hasTrailingCodeLine
             decoration.codeBoxX = boxX
-            decoration.guideLevels = key.guideLevels
         }
 
         /// 주석 줄(`//`, `#`으로 시작)은 흐리게 한다. 구문 색은 없다.

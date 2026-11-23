@@ -13,14 +13,14 @@ final class PointerPressMonitor {
     ///   - began: 누른 이벤트가 창에 전달되기 직전.
     ///   - ended: 뗀 이벤트의 처리가 끝난 뒤(메인 큐의 다음 차례).
     init(began: @escaping () -> Void, ended: @escaping () -> Void,
-         inactiveWindowPress: @escaping (NSWindow) -> Void = { _ in }) {
+         inactiveWindowPress: @escaping (NSWindow, TimeInterval) -> Void = { _, _ in }) {
         let downs: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         let ups: NSEvent.EventTypeMask = [.leftMouseUp, .rightMouseUp, .otherMouseUp]
         monitors = [
             NSEvent.addLocalMonitorForEvents(matching: downs) { event in
                 if event.type == .leftMouseDown, !NSApp.isActive,
                    !event.modifierFlags.contains(.command), let window = event.window {
-                    inactiveWindowPress(window)
+                    inactiveWindowPress(window, event.timestamp)
                 }
                 began()
                 return event

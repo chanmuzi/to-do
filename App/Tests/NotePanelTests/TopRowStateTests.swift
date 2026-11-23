@@ -31,17 +31,17 @@ import Theme
         #expect(!resting.isTitlePlaceholder)
         #expect(resting.titleColor == .text3)
         #expect(resting.hoverControlsAlpha == 0)
-        #expect(resting.pin == .init(symbolName: "pin.fill", alpha: 0, color: .text3, isOn: true))
+        #expect(resting.pin == .init(symbolName: "pin.fill", alpha: 1, color: .text3, isOn: true))
     }
 
     @Test func hoverDarkensTheTitleAndRevealsControls() {
         let hovered = state(note(), hovered: true)
         #expect(hovered.titleColor == .text)
         #expect(hovered.hoverControlsAlpha == 1)
-        #expect(hovered.pin.color == .text2)
+        #expect(hovered.pin == .init(symbolName: "pin.fill", alpha: 1, color: .text2, isOn: true))
     }
 
-    @Test func unpinnedPinKeepsItsSlotAndAppearsOnlyOnHover() {
+    @Test func unpinnedPinAppearsOnlyOnHover() {
         #expect(state(note(), pinned: false).pin == .init(symbolName: "pin", alpha: 0, color: .text2, isOn: false))
         #expect(state(note(), pinned: false, hovered: true).pin.alpha == 1)
     }

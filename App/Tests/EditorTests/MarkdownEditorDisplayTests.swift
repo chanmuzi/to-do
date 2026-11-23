@@ -53,7 +53,6 @@ import Theme
         let decoration = try #require(try h.display(line: 2).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
         #expect(decoration.gutter == .checkbox(done: false))
         #expect(decoration.gutterX == h.theme.component(.indent))
-        #expect(decoration.guideLevels == [0])
         let style = try #require(try h.display(line: 2).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
         #expect(style.headIndent == h.theme.component(.indent) + h.theme.component(.gutter))
         #expect(style.minimumLineHeight == h.theme.lineHeight(.body))

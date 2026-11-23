@@ -38,7 +38,6 @@ nonisolated struct EditorStyle {
     let comment: NSColor
     let text3: NSColor
     let surface: NSColor
-    let guide: NSColor
     let accent: NSColor
     let link: NSColor
     let line: NSColor
@@ -107,7 +106,6 @@ nonisolated struct EditorStyle {
         text3 = noteInk(increaseContrast ? .text2 : .text3)
         comment = noteInk(increaseContrast ? .text2 : .text3, on: .codeBlockBackground)
         surface = color(.surface)
-        guide = color(.guide)
         accent = color(.accent)
         link = color(.link)
         line = color(.line)
