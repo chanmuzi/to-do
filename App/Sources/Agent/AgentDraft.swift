@@ -7,6 +7,7 @@ import Store
     package var conversation: AgentConversation
     package var writeError: Error?
     var errorMessage: String? { writeError.map { "대화를 저장하지 못했습니다. " + $0.localizedDescription } }
+    var showsHistory = false
     var expanded: Set<UUID> = []
     var hovered: UUID?
     #if DEBUG
@@ -24,6 +25,17 @@ import Store
         conversation.draft = text
         conversation.updatedAt = Date()
         save()
+    }
+
+    package func markSeen(at now: Date = Date()) {
+        guard !conversation.requests.isEmpty, conversation.seenAt.map({ $0 < conversation.updatedAt }) ?? true else { return }
+        var next = conversation
+        next.seenAt = now
+        do {
+            try store.save(next)
+            conversation = next
+            writeError = nil
+        } catch { writeError = error }
     }
 
     package func save() {

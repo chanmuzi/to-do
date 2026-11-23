@@ -64,6 +64,24 @@ import Testing
         #expect(b.conversation.requests.last?.status == .completed)
     }
 
+    @Test func seeingQuestionPreservesOrderAndOnlyItsNextTurnResolvesIt() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = draft(), b = draft()
+        var question = AgentRequest(id: UUID(), text: "확인", engine: "fixture", model: nil)
+        question.status = .awaitingAnswer
+        a.change { $0.requests.append(question) }
+        let date = a.conversation.updatedAt
+        a.markSeen()
+        #expect(a.conversation.updatedAt == date && a.conversation.needsAnswer)
+        let queue = AgentRequestCoordinator(choice: { .init(provider: .claude, model: nil) }, note: { _ in nil }) { _, _, _ in "답" }
+        queue.submit(b, text: "다른 대화")
+        queue.submit(a, text: "확인했습니다")
+        #expect(a.conversation.needsAnswer)
+        while let active = queue.task { await active.value }
+        let saved = try #require(store.loadConversations { Issue.record("\($0)") }.first { $0.id == a.conversation.id })
+        #expect(!saved.needsAnswer && saved.seenAt != nil && saved.requests.count == 2)
+    }
+
     @Test func relaunchHoldsSavedQueue() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let a = draft()
