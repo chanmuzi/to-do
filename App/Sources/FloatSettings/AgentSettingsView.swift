@@ -178,9 +178,6 @@ extension SettingsView {
         let claude = engine.provider == .claude
         let command = claude ? "curl -fsSL https://claude.ai/install.sh | bash" : "npm install -g @openai/codex"
         let guide = claude ? "https://code.claude.com/docs/en/setup" : "https://github.com/openai/codex#installing-and-running-codex-cli"
-        let tooltipInk = theme.tokens.color(.surface, .light).color
-        let tooltipFill = theme.tokens.color(.text, .light).color
-        let tipOffset = theme.component(.iconLarge) + theme.space(.sp1)
         let tip = "설치가 끝나면 이 화면이 알아서 바뀌어요"
         return VStack(alignment: .leading, spacing: theme.space(.sp2)) {
             HStack(spacing: theme.component(.chromeGap)) {
@@ -190,13 +187,7 @@ extension SettingsView {
                     .onHover { model.showsInstallTip = $0 }.accessibilityLabel(tip)
                     .overlay(alignment: .bottom) {
                         if model.showsInstallTip {
-                            VStack(spacing: 0) {
-                                Text(tip).font(valueFont).foregroundStyle(tooltipInk).fixedSize()
-                                    .padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.component(.settingsPopupGap))
-                                    .background(tooltipFill, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-                                Rectangle().fill(tooltipFill).frame(width: theme.component(.settingsTipTail), height: theme.component(.settingsTipTail))
-                                    .rotationEffect(.degrees(45)).padding(.top, -theme.component(.settingsTipTail) / 2)
-                            }.fixedSize().offset(y: -tipOffset).allowsHitTesting(false)
+                            infoTooltip(tip)
                         }
                     }
             }.settingsMeasure("heading").zIndex(1)

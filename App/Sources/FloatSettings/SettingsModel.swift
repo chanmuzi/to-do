@@ -1,6 +1,7 @@
 import Foundation
 import Models
 import Observation
+import Store
 import Scheduling
 import Theme
 
@@ -27,6 +28,16 @@ struct DestinationMenu {
 
 @Observable
 package final class SettingsModel {
+    package let preferences: LibraryPreferencesStore
+    package let reorder = SidebarReorder()
+    package var showsOpeningTip = false
+    package func changeSidebar(_ change: (inout LibraryPreferences) -> Void) {
+        do { try preferences.update(change); error = nil }
+        catch { self.error = error.localizedDescription }
+    }
+    package func moveView(_ view: LibrarySelection, to target: LibrarySelection) {
+        changeSidebar { $0.moveView(view, to: target, visibleOnly: false) }
+    }
     package var pane = SettingsPane.general
     package var detailEngine: EngineAccount?
     #if DEBUG
@@ -52,8 +63,9 @@ package final class SettingsModel {
     package private(set) var error: String?
     package var values: SettingsValues { read() }
 
-    package init(read: @escaping () -> SettingsValues, save: @escaping ((inout SettingsValues) -> Void) throws -> Void,
+    package init(preferences: LibraryPreferencesStore, read: @escaping () -> SettingsValues, save: @escaping ((inout SettingsValues) -> Void) throws -> Void,
                  schedules: ScheduleService, shortcuts: [ShortcutSection], agents: AgentSettings? = nil, openPrivacy: @escaping (ScheduleItem.Kind) -> Void) {
+        self.preferences = preferences
         self.agents = agents
         self.read = read
         self.save = save
@@ -88,7 +100,17 @@ package final class SettingsModel {
         let prior = theme.overrides
         do {
             if !prior.isEmpty { try theme.setOverrides(ThemeOverrides()) }
-            do { try save { $0 = SettingsValues() } }
+            let sidebar = preferences.value
+            do {
+                var defaults = sidebar
+                defaults.resetSidebar()
+                if defaults != sidebar { try preferences.update { $0 = defaults } }
+                do { try save { $0 = SettingsValues() } }
+                catch {
+                    if defaults != sidebar { try preferences.update { $0 = sidebar } }
+                    throw error
+                }
+            }
             catch {
                 if !prior.isEmpty { try theme.setOverrides(prior) }
                 throw error

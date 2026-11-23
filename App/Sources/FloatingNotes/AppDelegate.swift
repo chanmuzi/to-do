@@ -153,7 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if let error { Task { @MainActor in library?.model.error = error.localizedDescription } }
                 }
             }
-            let settingsWindow = makeSettingsWindow(environment: environment, schedules: schedules)
+            let settingsWindow = makeSettingsWindow(environment: environment, schedules: schedules, preferences: library.model.preferences)
             self.settingsWindow = settingsWindow
             router.settingsWindow = settingsWindow
             schedules.calendarChanged = { [weak self, weak library, weak reminderEditor] in
@@ -493,7 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
+    private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService, preferences: LibraryPreferencesStore) -> SettingsCoordinator {
         let store = environment.settings
         let table = ShortcutTable.standard
         let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .agent, .markdownInput]
@@ -508,7 +508,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             })
         }
         let agents = AgentSettings(location: environment.location, searchDirectory: agentDirectory(environment))
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+        let model = SettingsModel(preferences: preferences, read: { store.settings }, save: store.update, schedules: schedules,
                                   shortcuts: sections, agents: agents) { [usesFake = options.usesFakeCalendar] kind in
             guard !usesFake else { return }
             let anchor = kind == .event ? "Privacy_Calendars" : "Privacy_Reminders"

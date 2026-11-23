@@ -18,7 +18,7 @@ import Theme
         fake.accessByKind = [.event: .needsRequest, .reminder: .blocked]
         let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { fake })
         service.preferredID = { store.settings[idFor: $0] }
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let coordinator = SettingsCoordinator(model: model, theme: fixture.theme)
         coordinator.allowsKeyWindows = false
         let router = AppRouter()
@@ -114,7 +114,7 @@ import Theme
         try store.update { $0.agentProvider = "codex" }
         let agents = AgentSettings(location: fixture.location, searchDirectory: fixture.root)
         let schedules = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update, schedules: schedules,
                                   shortcuts: [], agents: agents, openPrivacy: { _ in })
         let settings = SettingsCoordinator(model: model, theme: fixture.theme)
         settings.allowsKeyWindows = false
@@ -182,7 +182,7 @@ import Theme
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
         let agents = AgentSettings(location: fixture.location, searchDirectory: fixture.root)
         let schedules = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update, schedules: schedules,
                                   shortcuts: [], agents: agents, openPrivacy: { _ in })
         let settings = SettingsCoordinator(model: model, theme: fixture.theme)
         settings.allowsKeyWindows = false
@@ -220,7 +220,7 @@ import Theme
         defer { fixture.cleanUp() }
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
         let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let settings = SettingsCoordinator(model: SettingsModel(read: { store.settings }, save: store.update,
+        let settings = SettingsCoordinator(model: SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update,
             schedules: service, shortcuts: [], openPrivacy: { _ in }), theme: fixture.theme)
         settings.allowsKeyWindows = false
         settings.show(.appearance)
@@ -239,11 +239,67 @@ import Theme
     }
 
     #if DEBUG
+    @Test func generalSidebarGripActionsAndOpeningTooltip() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
+        let prefs = try LibraryPreferencesStore(location: fixture.location)
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(preferences: prefs, read: { SettingsValues() }, save: { _ in },
+                                  schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.general)
+        defer { settings.window?.close() }
+        let root = try #require(settings.window?.contentView)
+        func settle() {
+            root.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        }
+        func elements() -> [AnyObject] {
+            var seen = Set<ObjectIdentifier>()
+            func visit(_ node: AnyObject) -> [AnyObject] {
+                guard seen.insert(ObjectIdentifier(node)).inserted else { return [] }
+                let children = node.accessibilityChildren?() ?? []
+                return [node] + children.flatMap { visit($0 as AnyObject) } + ((node as? NSView)?.subviews.flatMap { visit($0) } ?? [])
+            }
+            return visit(root)
+        }
+        settle()
+        let grip = try #require(elements().first {
+            $0.accessibilityLabel?() == "순서 바꾸기" && $0.accessibilityCustomActions?()?.map(\.name) == ["아래로"]
+        })
+        let actions: [NSAccessibilityCustomAction] = grip.accessibilityCustomActions?() ?? []
+        #expect(actions.map(\.name) == ["아래로"])
+        let down = try #require(actions.first)
+        #expect(down.handler?() == true)
+        settle()
+        #expect(prefs.value.viewOrder.first == .floating)
+        #expect(model.layoutFrames["grip-오늘"]?.width == 14)
+        #expect(model.layoutFrames["row-오늘"]?.height == 36)
+        let window = try #require(settings.window)
+        let frame = try #require(model.layoutFrames["grip-오늘"])
+        let start = CGPoint(x: frame.midX, y: root.bounds.height - frame.midY)
+        for (type, dy) in [(NSEvent.EventType.leftMouseDown, 0.0), (.leftMouseDragged, 12.0),
+                            (.leftMouseDragged, 36.0), (.leftMouseUp, 36.0)] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: .init(x: start.x, y: start.y - dy),
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+            window.sendEvent(event)
+            settle()
+        }
+        #expect(prefs.value.viewOrder == [.floating, .all, .today, .reminders])
+        model.showsOpeningTip = true
+        settle()
+        #expect(elements().contains { $0.accessibilityLabel?() == "끄면 맨 위의 보기에서 열어요" })
+    }
+
     @Test func sidebarAndAccountDetailSpacing() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
         let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { SettingsValues() }, save: { _ in }, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { SettingsValues() }, save: { _ in }, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let coordinator = SettingsCoordinator(model: model, theme: fixture.theme)
         coordinator.allowsKeyWindows = false
         coordinator.show(.appearance)
@@ -286,7 +342,7 @@ import Theme
         defer { fixture.cleanUp() }
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
         let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let coordinator = SettingsCoordinator(model: model, theme: fixture.theme)
         coordinator.allowsKeyWindows = false
         coordinator.show(.appearance)
@@ -343,7 +399,7 @@ import Theme
         defer { fixture.cleanUp() }
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
         let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let settings = SettingsCoordinator(model: model, theme: fixture.theme)
         settings.allowsKeyWindows = false
         defer { settings.window?.close() }
@@ -370,7 +426,7 @@ import Theme
         defer { f.cleanUp() }
         let store = try AppSettingsStore(stateDirectory: f.location.stateDirectory)
         let service = ScheduleService(notes: f.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let settings = SettingsCoordinator(model: SettingsModel(read: { store.settings }, save: store.update,
+        let settings = SettingsCoordinator(model: SettingsModel(preferences: try LibraryPreferencesStore(location: f.location), read: { store.settings }, save: store.update,
             schedules: service, shortcuts: [], openPrivacy: { _ in }), theme: f.theme)
         settings.allowsKeyWindows = false
         defer { settings.window?.close() }
@@ -378,7 +434,7 @@ import Theme
         router.notePanels = f.notePanels
         router.settingsWindow = settings
         let library = LibraryCoordinator(theme: f.theme, notes: f.notes, spaces: try SpaceStore(location: f.location),
-            windows: f.windowStates, preferences: try LibraryPreferencesStore(location: f.location), router: router)
+            windows: f.windowStates, preferences: settings.model.preferences, router: router)
         library.allowsKeyWindows = false
         library.show()
         defer { library.close() }

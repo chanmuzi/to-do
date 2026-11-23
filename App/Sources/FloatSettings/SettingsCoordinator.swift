@@ -65,6 +65,8 @@ package final class SettingsCoordinator: NSObject, NSWindowDelegate {
         #if DEBUG
         model.setSidebarHoverForVerification(nil)
         #endif
+        model.showsOpeningTip = false
+        model.reorder.cancel()
         model.confirmingReset = false
         model.detailEngine = nil
         model.agents?.close()

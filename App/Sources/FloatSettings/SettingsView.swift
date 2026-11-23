@@ -98,6 +98,7 @@ struct SettingsView: View {
     private var general: some View {
         VStack(spacing: theme.space(.sp4)) {
             card { toggle("메뉴 막대 아이콘", \.showsMenuBarIcon) }
+            sidebarViewSettings
             Spacer()
             if let error = model.error { Text(error).foregroundStyle(theme.color(.warn)) }
             card { row("모든 설정을 처음 상태로") { actionButton("되돌리기", ink: .warn) { model.confirmingReset = true } } }
