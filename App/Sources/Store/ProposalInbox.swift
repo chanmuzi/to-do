@@ -16,6 +16,13 @@ package struct ProposalInbox: Sendable {
         return url
     }
 
+    package func prepare(_ request: AgentRequest, instructions: String) throws -> URL {
+        let directory = try prepare(request.runID)
+        let context = InstructionEvidence(request: request, instructions: instructions)
+        try JSONEncoder().encode(context).write(to: directory.appending(path: InstructionEvidence.filename), options: .atomic)
+        return directory
+    }
+
     package func remove(_ run: UUID) throws {
         do { try FileManager.default.removeItem(at: folder(run)) }
         catch let error as CocoaError where error.code == .fileNoSuchFile { return }
@@ -34,6 +41,10 @@ package struct ProposalInbox: Sendable {
             let data = try Data(contentsOf: url)
             let key = url.deletingPathExtension().lastPathComponent
             if let entry = try? JSONDecoder().decode(ProposalSubmission.self, from: data) {
+                if entry.arguments.kind == .instructions {
+                    let context = folder(request.runID).appending(path: InstructionEvidence.filename)
+                    try JSONDecoder().decode(InstructionEvidence.self, from: Data(contentsOf: context)).validate(entry.arguments, for: request)
+                }
                 return try .submitted(entry, key: key, request: request, source: source, reservedID: .make())
             }
             let input = try JSONDecoder().decode(TodoSubmission.self, from: data)

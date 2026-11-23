@@ -16,7 +16,7 @@ import Testing
         let draft = AgentDraft(.init(targets: []), store: AgentStore(location: location))
         var attempts: [UUID] = []
         let execute: AgentRequestCoordinator.Execute = { _, request, _ in
-            let folder = try inbox.prepare(request.runID)
+            let folder = try inbox.prepare(request, instructions: "")
             let input = TodoSubmission(noteID: "a", lines: ["할 일"], version: "기반")
             try JSONEncoder().encode(input).write(to: folder.appending(path: "accepted.json"), options: .atomic)
             for (i, args) in [
@@ -28,6 +28,10 @@ import Testing
                 let entry = ProposalSubmission(arguments: arguments, version: arguments.note_id == nil ? nil : "기반")
                 try JSONEncoder().encode(entry).write(to: folder.appending(path: "item-\(i).json"), options: .atomic)
             }
+            let fields = ["kind": "change_instructions", "before": "", "after": "짧게", "user_message": request.userText]
+            let rule = try JSONDecoder().decode(ProposalArguments.self, from: JSONEncoder().encode(fields))
+            let entry = ProposalSubmission(arguments: rule, version: TodoSubmission.fingerprint(Data()))
+            try JSONEncoder().encode(entry).write(to: folder.appending(path: "rule.json"), options: .atomic)
             attempts.append(request.runID)
             #expect(draft.conversation.requests[0].proposals.isEmpty)
             if attempts.count == 1 {
@@ -42,7 +46,7 @@ import Testing
             return queue
         }
         let first = coordinator()
-        first.submit(draft, text: "요청")
+        first.submit(draft, text: "앞으로 짧게 답해 줘")
         for _ in 0..<100 where attempts.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
         if shutdown { await first.shutdown() } else { await first.task?.value }
         let prior = try #require(draft.conversation.requests.first)
@@ -53,7 +57,7 @@ import Testing
         while let task = next.task { await task.value }
         let request = try #require(draft.conversation.requests.first)
         #expect(attempts.count == 2 && attempts[0] != attempts[1])
-        #expect(request.id == prior.id && request.proposals.count == 4)
+        #expect(request.id == prior.id && request.proposals.count == 5)
         #expect(request.proposals.allSatisfy { $0.runID == attempts.last })
         #expect(!FileManager.default.fileExists(atPath: inbox.folder(request.runID).path))
     }

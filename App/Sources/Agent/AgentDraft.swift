@@ -30,7 +30,7 @@ import Store
     #if DEBUG
     var still = false
     #endif
-    private let store: AgentStore
+    let store: AgentStore
 
     package init(_ conversation: AgentConversation, store: AgentStore) {
         self.conversation = conversation
