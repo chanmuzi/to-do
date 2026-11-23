@@ -109,6 +109,18 @@ import Testing
     }
 
     /// 상태는 전환이 끝났는지에 기대지 않는다: 거두면 곧바로 보이지 않는 것으로 친다.
+    @Test func replacedUndoButtonCannotInvokeNewProposalAction() throws {
+        defer { fixture.cleanUp() }
+        var actions: [String] = []
+        presenter.show(.init(kind: "proposal", message: "첫 제안", actionTitle: "되돌리기"), on: nil) { actions.append("첫째") }
+        let oldView = try #require(presenter.window?.contentView as? ToastView)
+        presenter.show(.init(kind: "proposal", message: "다음 제안", actionTitle: "되돌리기"), on: nil) { actions.append("둘째") }
+        oldView.actionButton.onPress?()
+        #expect(actions.isEmpty)
+        presenter.performAction()
+        #expect(actions == ["둘째"])
+    }
+
     @Test func dismissChangesStateImmediately() {
         presenter.transitionDuration = { 10 }
         presenter.show(.init(kind: "k", message: "글", actionTitle: "동작"), on: NSScreen.main) {}

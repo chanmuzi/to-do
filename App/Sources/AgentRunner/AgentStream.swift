@@ -19,10 +19,11 @@ public enum AgentEvent: Equatable, Sendable {
 
 struct AgentStream {
     typealias Object = [String: Any]
-    static let tools = ["list_notes", "read_note"]
-    static let claudeTools = tools.map { "mcp__float__" + $0 }
+    var tools: [String] { ["list_notes", "read_note"] + (acceptsProposals ? ["propose_change"] : []) }
+    private var claudeTools: [String] { tools.map { "mcp__float__" + $0 } }
 
     let provider: AgentProvider
+    var acceptsProposals = false
     var messageIDs: Set<String> = []
     var calls: Set<String> = []
     var started = false
@@ -43,7 +44,7 @@ struct AgentStream {
     private mutating func claude(_ type: String, _ row: Object, _ emit: (AgentEvent) -> Void) throws {
         if type == "system", row["subtype"] as? String == "init" {
             guard !started else { throw AgentError.isolation("init") }
-            guard let tools = row["tools"] as? [String], tools.sorted() == Self.claudeTools.sorted()
+            guard let tools = row["tools"] as? [String], tools.sorted() == claudeTools.sorted()
             else { throw AgentError.isolation("tools") }
             guard let servers = row["mcp_servers"] as? [Object], servers.count == 1,
                   servers[0]["name"] as? String == "float", servers[0]["status"] as? String == "connected"
@@ -68,7 +69,7 @@ struct AgentStream {
         case "assistant":
             let message = row["message"] as? Object
             for block in message?["content"] as? [Object] ?? [] where block["type"] as? String == "tool_use" {
-                guard let name = block["name"] as? String, Self.claudeTools.contains(name)
+                guard let name = block["name"] as? String, claudeTools.contains(name)
                 else { throw AgentError.isolation("tool_use") }
                 if let id = block["id"] as? String {
                     if calls.insert(id).inserted {
@@ -128,7 +129,7 @@ struct AgentStream {
             guard let item = row["item"] as? Object, let kind = item["type"] as? String else { throw AgentError.invalidOutput }
             switch kind {
             case "mcp_tool_call":
-                guard item["server"] as? String == "float", let name = item["tool"] as? String, Self.tools.contains(name)
+                guard item["server"] as? String == "float", let name = item["tool"] as? String, tools.contains(name)
                 else { throw AgentError.isolation("mcp_tool_call") }
                 if let id = item["id"] as? String {
                     if type == "item.started", calls.insert(id).inserted {

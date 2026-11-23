@@ -104,7 +104,7 @@ import Testing
         let location = StoreLocation.isolated(notesDirectory: root)
         let bin = root.appending(path: "bin")
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-        let initLine = #"{"type":"system","subtype":"init","tools":["mcp__float__list_notes","mcp__float__read_note"],"mcp_servers":[{"name":"float","status":"connected"}],"skills":[],"slash_commands":[],"plugins":[],"model":"test"}"#
+        let initLine = #"{"type":"system","subtype":"init","tools":["mcp__float__list_notes","mcp__float__read_note","mcp__float__propose_change"],"mcp_servers":[{"name":"float","status":"connected"}],"skills":[],"slash_commands":[],"plugins":[],"model":"test"}"#
         let output = provider == .claude ? """
         echo '\(initLine)'
         echo '{"type":"stream_event","event":{"delta":{"type":"text_delta","text":"부분"}}}'

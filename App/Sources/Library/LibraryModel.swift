@@ -27,6 +27,24 @@ public final class LibraryModel {
     package var deleteConversation: (UUID) -> Void = { _ in }
     package var openConversation: (UUID) -> Void = { _ in }
     package var newConversation: () -> Void = {}
+    package var selectedProposal: UUID?
+    package var openProposal: (UUID) -> Void = { _ in }
+    package var seenProposal: (UUID) -> Void = { _ in }
+    package var reviewProposal: (UUID) -> Void = { _ in }
+    package var acceptProposals: ([UUID]) -> Void = { _ in }
+    package var discardProposal: (UUID) -> Void = { _ in }
+    package var proposalRequests: [AgentRequest] {
+        conversations().flatMap(\.requests).filter { !$0.proposals.isEmpty }.sorted {
+            ($0.proposals[0].createdAt, $0.id.uuidString) > ($1.proposals[0].createdAt, $1.id.uuidString)
+        }
+    }
+    package func selectProposal(_ id: UUID, collapsible: Bool = false) {
+        selectedProposal = collapsible && selectedProposal == id ? nil : id
+        if selectedProposal != nil { seenProposal(id) }
+    }
+    #if DEBUG
+    package var previewProposalHover: UUID?
+    #endif
     package var selectedConversation: UUID?
     #if DEBUG
     package var previewHistoryHover: UUID?
@@ -147,6 +165,7 @@ public final class LibraryModel {
     public func select(_ value: LibrarySelection) {
         selectedNoteID = nil
         selectedConversation = nil
+        selectedProposal = nil
         let target: LibrarySelection
         switch value {
         case .archive: target = .archived
@@ -182,7 +201,7 @@ public final class LibraryModel {
 
     var showAllUpcoming = false
     var sections: [LibraryIndex.Section] { index.sections(for: selection) }
-    public var showsNewNote: Bool { selection != .conversations && selection != .trash && selection != .archived }
+    public var showsNewNote: Bool { selection != .proposals && selection != .conversations && selection != .trash && selection != .archived }
     func toggleArchive(_ note: Note) {
         perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
     }
@@ -194,6 +213,10 @@ public final class LibraryModel {
         if clickCount >= 2 { open(note) }
     }
     public func openSelected() {
+        if selection == .proposals {
+            if let selectedProposal { openProposal(selectedProposal) }
+            return
+        }
         if selection == .conversations {
             if let selectedConversation { openConversation(selectedConversation) }
             return
@@ -203,6 +226,14 @@ public final class LibraryModel {
         open(note)
     }
     public func moveSelection(by offset: Int) {
+        if selection == .proposals {
+            let ids = proposalRequests.flatMap(\.proposals).map(\.id)
+            guard !ids.isEmpty else { return }
+            let i = selectedProposal.flatMap { ids.firstIndex(of: $0) }
+            let next = i.map { min(max($0 + offset, 0), ids.count - 1) } ?? (offset < 0 ? ids.count - 1 : 0)
+            selectProposal(ids[next])
+            return
+        }
         if selection == .conversations {
             let ids = ConversationDay.sections(conversations(), calendar: index.calendar).flatMap { $0.conversations.map(\.id) }
             guard !ids.isEmpty else { return }
@@ -293,6 +324,7 @@ public final class LibraryModel {
         case .archived: "보관함"
         case .all: "전체 노트"
         case .reminders: "리마인더 있는 노트"
+        case .proposals: "제안"
         case .conversations: "대화"
         case .trash: "휴지통"
         case .space(let id): id.flatMap { spaces.space(for: $0)?.name } ?? "스페이스 없음"

@@ -55,7 +55,10 @@ final class ToastPresenter {
         let panel = panel ?? ToastPanel()
         self.panel = panel
         let view = ToastView(theme: theme, message: content.message, actionTitle: content.actionTitle, face: content.face, working: content.kind == "agent-working")
-        view.actionButton.onPress = { [unowned self] in performAction() }
+        view.actionButton.onPress = { [weak self, weak view] in
+            guard let self, let view, self.view === view else { return }
+            performAction()
+        }
         panel.contentView = view
         self.view = view
         if let visible = (screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame {

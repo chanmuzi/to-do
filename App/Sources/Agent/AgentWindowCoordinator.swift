@@ -31,6 +31,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var sendAll: (AgentDraft) -> Void = { _ in }
     package var sendNow: (AgentDraft, UUID) -> Void = { _, _ in }
     package var retry: (AgentDraft, UUID) -> Void = { _, _ in }
+    package var openProposal: (UUID) -> Void = { _ in }
     package var openNote: (NoteID) -> Void = { _ in }
     package var chooseTarget: (AgentDraft) -> Void = { _ in }
     package var titleForNote: (NoteID) -> String? = { _ in nil }
@@ -147,7 +148,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                        sendAll: { [weak self] in self?.sendAll(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
-                                       openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
+                                       openProposal: openProposal, openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
                                        titleForNote: titleForNote, fit: { [weak panel, theme] height in
                 guard let panel else { return }
                 let maxHeight = visible.height * theme.ratio(.noteMaxScreenHeight)

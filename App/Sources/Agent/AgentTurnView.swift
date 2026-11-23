@@ -26,6 +26,8 @@ struct AgentTurnView: View {
     let request: AgentRequest
     let still: Bool
     let openNote: (NoteID) -> Void
+    var openProposal: (UUID) -> Void = { _ in }
+    var noteTitle: (NoteID) -> String? = { _ in nil }
     let retry: () -> Void
 
     private var expanded: Bool { draft.expanded.contains(request.id) }
@@ -76,6 +78,18 @@ struct AgentTurnView: View {
                     }
                     if expanded { stepList(request.steps) }
                     if let answer = request.answer { Text(answer).textSelection(.enabled) }
+                    ForEach(request.proposals) { proposal in
+                        Button { openProposal(proposal.id) } label: {
+                            HStack(spacing: theme.space(.sp2)) {
+                                Text(proposal.title)
+                                if let id = proposal.targetID { Text(noteTitle(id) ?? id.rawValue).lineLimit(1) }
+                                Spacer(minLength: 0)
+                                Text(proposal.status.label).font(smallFont).foregroundStyle(theme.color(.text3))
+                            }.padding(.horizontal, theme.component(.agentInputInset))
+                                .frame(minHeight: theme.component(.proposalLinkHeight))
+                                .proposalBackground(theme, pending: proposal.status == .pending, radius: theme.space(.sp2))
+                        }.buttonStyle(.plain)
+                    }
                     if request.status == .interrupted {
                         stoppedLine(request.stopReason == .shutdown ? "앱을 끄면서 멈췄어요" : "여기서 멈췄어요")
                     }

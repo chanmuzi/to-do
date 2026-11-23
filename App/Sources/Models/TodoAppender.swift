@@ -1,7 +1,7 @@
 import Foundation
 
 /// 본문 맨 아래에 투두 한 줄을 붙인다. 투두 표기는 `[ ] 글자`(D-017).
-nonisolated enum TodoAppender {
+package enum TodoAppender {
     static let marker = "[ ] "
     private static let fence = "```"
 
@@ -13,7 +13,7 @@ nonisolated enum TodoAppender {
     /// - 본문이 `\r\n`을 쓰고 있으면 그것을 따른다.
     /// - 본문이 닫히지 않은 코드 블록으로 끝나면 먼저 블록을 닫는다(붙인 줄이 코드가 되지 않게).
     /// - 적은 글이 이미 투두 표기로 시작하면(`[ ] 우유`, `- [ ] 우유`) 표기를 겹쳐 붙이지 않는다.
-    static func append(_ text: String, to body: String) -> String {
+    package static func append(_ text: String, to body: String) -> String {
         let newline = body.contains("\r\n") ? "\r\n" : "\n"
         let line = todoLine(text) + (endsWithNewline(body) ? newline : "")
         var kept = trimmingTrailingBlankLines(body)
@@ -23,7 +23,7 @@ nonisolated enum TodoAppender {
     }
 
     /// 본문 마지막 글 줄의 번호(0부터). 끝 줄바꿈 뒤의 빈 줄은 세지 않는다.
-    static func lastLineIndex(of body: String) -> Int {
+    package static func lastLineIndex(of body: String) -> Int {
         let count = body.components(separatedBy: "\n").count
         return max(0, endsWithNewline(body) ? count - 2 : count - 1)
     }
@@ -34,7 +34,7 @@ nonisolated enum TodoAppender {
     }
 
     /// 투두 한 줄. 적은 글에 붙어 있던 투두 표기(목록 기호 포함)는 하나로 고른다. 끝난 일 표시(`[x]`)는 남긴다.
-    static func todoLine(_ text: String) -> String {
+    package static func todoLine(_ text: String) -> String {
         guard let match = text.firstMatch(of: /^\s*(?:[-*+]\s+)?\[([ xX])\]\s+(.*)$/) else { return marker + text }
         return (match.1 == " " ? marker : "[x] ") + match.2
     }

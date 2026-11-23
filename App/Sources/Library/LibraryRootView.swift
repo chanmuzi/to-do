@@ -33,7 +33,9 @@ struct LibraryRootView: View {
                 }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp3))
                     .frame(height: theme.component(.libraryHeaderHeight))
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
-                if model.selection == .conversations {
+                if model.selection == .proposals {
+                    LibraryProposalPage(model: model)
+                } else if model.selection == .conversations {
                     ConversationHistoryList(theme: theme, conversations: model.conversations(), selection: $model.selectedConversation,
                                             previewHover: historyHover, rename: model.renameConversation,
                                             delete: model.deleteConversation, open: model.openConversation)

@@ -28,7 +28,7 @@ Core         모든 기능이 공유하는 바탕
 | Core | `Scheduling` | CalendarBridge, ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models, Store만 참조 | 21 |
 | Core | `Store` | 노트 파일 읽기, 쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `AgentRunner` | 구독 CLI 탐색, 전용 로그인, 격리된 자식 실행과 로컬 사용량 기록. Store의 경로 계약을 사용 | 11 |
-| 실행 파일 | `FloatMCP` | 앱과 함께 서명하는 읽기 전용 stdio MCP 서버. 지정된 노트 폴더만 읽으며 UI와 실행기를 참조하지 않음 | 11 |
+| 실행 파일 | `FloatMCP` | 노트는 읽기만 하는 stdio MCP 서버. 대화 요청은 실행 전용 접수 폴더에만 제안을 쓴다. Models의 접수 값과 지문을 공유한다 | 11 |
 | Core | `Routing` | 기능 사이 요청을 전달하는 프로토콜 | 04 |
 | Features | `NotePanel` | Float 창, 상단 줄, 호버 동작 | 05 |
 | Features | `Editor` | TextKit 2 마크다운 편집기. 창과 무관하게 단독으로 쓸 수 있어야 한다 | 06 |
@@ -94,12 +94,14 @@ Models의 AgentConversation과 AgentProposal은 실행기와 독립된 Codable �
 
 App의 AgentCorner는 대화에서 노트별 얼굴을 계산해 NotePanel에 전달하고 마지막으로 사용한 Float 창의 화면에 구석 패널 하나를 배치한다. 화면 변경 시 사용 가능 영역을 다시 읽고 그 화면이 사라지면 주 화면으로 옮긴다.
 
+할 일 제안의 식별자와 상태는 요청의 proposals에 저장한다. FloatMCP와 Store가 공유하는 TodoSubmission은 대상, 줄 목록, 접수 당시 파일 지문이다. AgentRequestCoordinator가 정상 종료 때만 ProposalInbox를 읽는다. FileNoteStore는 Models의 TodoAppender로 예상 원문을 만들고 실제 파일 지문을 확인한 뒤 접미부를 바꾼다. 받기와 되돌리기 직전에 AgentDraft가 미완료 연산과 영수증을 대화에 저장한다. 재시작하면 전후 지문으로 상태를 복구하고 다른 내용은 보존한다. App의 TodoProposalController가 노트 카드, 대화와 Library의 동작을 연결한다. NotePanel은 창 수명만 알리고 기능 모듈끼리 참조하지 않는다.
+
 ### AgentRunner와 FloatMCP
 
 - 연결 화면은 `AgentConnection(provider:location:)`에서 `discover()`로 CLI, 버전, Codex용 node를 찾는다. `account(_:)`는 로그인 여부와 CLI가 제공한 계정 정보만 읽는다. `loginCommand(_:)`는 실행 파일, 인자, 환경, cwd만 반환한다. 로그인 시작은 연결 화면의 명시적 동작이다. waitForLogin()은 기존 프로세스 그룹 실행기를 재사용한다. 디버그의 --debug-agent-bin은 해당 폴더에서만 탐색하며 --debug-passive도 실제 CLI로 폴백하지 않는다.
 - 읽기 실행은 `AgentRunner(location:server:)`에서 `run(_:engine:installation:timeout:onEvent:)`를 호출한다. 서버의 기본 위치는 앱의 보조 실행 파일이다. `AgentEvent`는 시작, 본문, 도구 호출, 사용 한도, 사용량을 전달한다. 완료 값은 본문, 확인된 모델, 사용량이다. Swift Task를 취소하면 실행기가 만든 프로세스 그룹을 종료한다.
 - `AgentEngine`은 Claude 별칭, Codex 모델명, API 키 공급자를 구분한다. `APIKeyStoring`의 기본 구현 `KeychainAPIKeyStore`는 공급자별 일반 암호를 읽고 갱신하고 삭제한다. G0에서 API 엔진을 실행하면 `unsupportedEngine`을 반환한다.
-- `FloatMCP <노트 폴더>`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes({})` 결과는 정렬한 파일명이며 `read_note({"name":"파일명.md"})`는 머리를 포함한 UTF-8 원문을 반환한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
+- `FloatMCP <노트 폴더> [실행 전용 접수 폴더]`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes({})` 결과는 정렬한 파일명이며 `read_note({"name":"파일명.md"})`는 머리를 포함한 UTF-8 원문을 반환한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
 
 ### Theme
 

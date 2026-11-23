@@ -152,12 +152,15 @@ package struct ConversationNoticeDot: View {
     }
 }
 
-private struct HistoryRowInput: NSViewRepresentable {
+package struct HistoryRowInput: NSViewRepresentable {
+    package init(id: UUID, contextMenu: Bool, activate: @escaping (Int) -> Void) {
+        self.id = id; self.contextMenu = contextMenu; self.activate = activate
+    }
     let id: UUID
     let contextMenu: Bool
     let activate: (Int) -> Void
-    func makeNSView(context: Context) -> HistoryRowInputView { HistoryRowInputView() }
-    func updateNSView(_ view: HistoryRowInputView, context: Context) {
+    package func makeNSView(context: Context) -> HistoryRowInputView { HistoryRowInputView() }
+    package func updateNSView(_ view: HistoryRowInputView, context: Context) {
         view.hasCommands = contextMenu
         view.id = id
         view.activate = activate

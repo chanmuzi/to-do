@@ -17,6 +17,7 @@ struct AgentWindowView: View {
     let sendAll: () -> Void
     let retry: (UUID) -> Void
     let sendNow: (UUID) -> Void
+    var openProposal: (UUID) -> Void = { _ in }
     let openNote: (NoteID) -> Void
     let chooseTarget: () -> Void
     let titleForNote: (NoteID) -> String?
@@ -57,7 +58,7 @@ struct AgentWindowView: View {
                     VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
                         ForEach(draft.conversation.requests) { request in
                             AgentTurnView(theme: theme, draft: draft, request: request, still: still,
-                                          openNote: openNote, retry: { retry(request.id) })
+                                          openNote: openNote, openProposal: openProposal, noteTitle: titleForNote, retry: { retry(request.id) })
                         }
                     }.frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))

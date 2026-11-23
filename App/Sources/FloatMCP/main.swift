@@ -11,7 +11,7 @@ let tools: [Object] = [
 ]
 
 @MainActor
-func reply(_ line: String, notes: NoteDirectory) -> Object? {
+func reply(_ line: String, notes: NoteDirectory, intake: ProposalIntake?) -> Object? {
     let decoded = try? JSONSerialization.jsonObject(with: Data(line.utf8), options: .fragmentsAllowed)
     let request = decoded as? Object
     let id = request?["id"] ?? NSNull()
@@ -31,7 +31,7 @@ func reply(_ line: String, notes: NoteDirectory) -> Object? {
         result = ["protocolVersion": supported.contains(version) ? version : supported[0],
                   "capabilities": ["tools": [:]], "serverInfo": ["name": "float", "version": "1"]]
     case "ping": result = [:]
-    case "tools/list": result = ["tools": tools]
+    case "tools/list": result = ["tools": tools + (intake == nil ? [] : [ProposalIntake.tool])]
     case "tools/call":
         guard let name = params["name"] as? String else { return error(-32602, "Missing tool name") }
         let arguments = params["arguments"] ?? Object()
@@ -40,6 +40,9 @@ func reply(_ line: String, notes: NoteDirectory) -> Object? {
             let text: String
             switch name {
             case "list_notes" where args.isEmpty: text = try notes.list().joined(separator: "\n")
+            case "propose_change":
+                guard let intake else { return error(-32602, "Unknown tool") }
+                text = try intake.receive(args, notes: notes)
             case "read_note":
                 guard args.count == 1, let filename = args["name"] as? String else { return error(-32602, "Invalid arguments") }
                 text = try notes.read(filename)
@@ -47,17 +50,18 @@ func reply(_ line: String, notes: NoteDirectory) -> Object? {
             }
             result = ["content": [["type": "text", "text": text]]]
         } catch {
-            result = ["isError": true, "content": [["type": "text", "text": "노트를 읽을 수 없습니다."]]]
+            result = ["isError": true, "content": [["type": "text", "text": (error as? IntakeFailure)?.errorDescription ?? "노트를 읽을 수 없습니다."]]]
         }
     default: return error(-32601, "Method not found")
     }
     return ["jsonrpc": "2.0", "id": id, "result": result]
 }
 
-guard CommandLine.arguments.count == 2 else { exit(EX_USAGE) }
+guard [2, 3].contains(CommandLine.arguments.count) else { exit(EX_USAGE) }
 let notes = try NoteDirectory(path: CommandLine.arguments[1])
+let intake = try CommandLine.arguments.dropFirst(2).first.map(ProposalIntake.init(path:))
 while let line = readLine() {
-    if let response = reply(line, notes: notes) {
+    if let response = reply(line, notes: notes, intake: intake) {
         var data = try JSONSerialization.data(withJSONObject: response)
         data.append(0x0A)
         try FileHandle.standardOutput.write(contentsOf: data)
