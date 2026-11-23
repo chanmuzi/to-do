@@ -49,6 +49,7 @@ struct LibrarySidebar: View {
                             }
                         }
                     conversationRow
+                    row(.memory, symbol: "book").accessibilityLabel("메모리")
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     sectionHeader("스페이스", symbol: "plus", label: "새 스페이스") { model.beginSpaceEditing() }

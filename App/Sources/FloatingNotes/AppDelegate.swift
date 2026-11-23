@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var library: LibraryCoordinator?
     private var agentCorner: AgentCorner?
     private var proposalController: TodoProposalController?
+    private var instructionEditor: InstructionEditor?
     private var instructionStore: AgentStore?
     private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
@@ -140,6 +141,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            let instructionEditor = InstructionEditor(theme: environment.theme, store: store)
+            self.instructionEditor = instructionEditor
+            library.model.instructionView = instructionEditor.editor.view
+            library.model.openInstructions = instructionEditor.open
+            library.model.flushInstructions = store.flushInstructions
+            store.instructionSaveFailed = { [weak library] in library?.model.error = $0.localizedDescription }
             router.connectHistory(library.model, agent: agent)
             library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
             library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
@@ -409,6 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
         control.agent = router.agent
+        control.instructionEditor = instructionEditor
         control.proposals = proposalController
         control.agentCorner = agentCorner
         control.theme = environment?.theme
