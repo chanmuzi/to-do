@@ -67,11 +67,23 @@ extension SettingsView {
         }
     }
 
+    private static let codexMenuModelLimit = 5
+
+    private func codexMenuOptions(_ available: [CodexModel], saved: String?) -> [(id: String?, title: String)] {
+        let firstModels = available.prefix(Self.codexMenuModelLimit)
+        var options = firstModels.map { (id: Optional($0.slug), title: $0.displayName) }
+        if let saved, !firstModels.contains(where: { $0.slug == saved }),
+           let model = available.first(where: { $0.slug == saved }) {
+            options.append((model.slug, model.displayName))
+        }
+        return [(nil, "CLI 기본")] + options
+    }
+
     private var modelPicker: some View {
         let isCodex = model.values.agentProvider == "codex"
         let available = model.agents?.engines.first { $0.provider == .codex }?.models ?? []
         let options: [(id: String?, title: String)] = isCodex
-            ? [(nil, "CLI 기본")] + available.map { ($0.slug, $0.displayName) }
+            ? codexMenuOptions(available, saved: model.values.codexModel)
             : [(nil, "자동"), ("fable", "Fable"), ("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku")]
         let saved = model.values.selectedEngine(codexModels: available).model
         let selected = options.first { $0.id == saved } ?? options[0]

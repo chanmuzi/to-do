@@ -153,7 +153,7 @@
 - `library-w/h`: 920/640, `library-min-w/h`: 660/400, `library-sidebar-w`: 240.
 - `library-header-h` 52, `library-section-head-h` 22, `library-section-gap` 11, `library-sidebar-inset` 10. `library-more-size` 20, 그림은 `menu-icon` 12다.
 - `library-row-leading` 20을 양쪽에 쓰고 `library-row-pad-y` 9, `library-row-gap` 3을 적용한다. `upcoming-detail-w` 216, 상세 여백은 10/12/6이다. 일정 호버 지연은 없다.
-- 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다.
+- 라이브러리 목록 선택과 호버의 좌우 여백은 `sp-2` 8, 상하 여백은 `library-row-highlight-inset-y` 2다. 오른쪽 노트 목록의 맨 아래 여백도 `sp-2` 8을 쓴다(D-181).
 - `library-sidebar-row-gap`: 2, `library-upcoming-time-w`: 120. 사이드바 선택 경계와 긴 절대 시간의 말줄임을 위한 값이다.
 - `icon-picker-w/pad`: 248/10, `icon-picker-columns`: 7, `icon-picker-cell-h/icon/ring`: 28/15/1.25.
 - `icon-picker-grid-h/drop-h`: 140/96, `icon-import-max-pixels`: 64.

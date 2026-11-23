@@ -58,6 +58,11 @@ package final class SettingsModel {
         self.schedules = schedules
         self.shortcuts = shortcuts
         self.openPrivacy = openPrivacy
+        agents?.engines.first { $0.provider == .codex }?.didLoadModels = { [weak self] catalog in
+            guard let self, let saved = self.values.codexModel,
+                  !catalog.contains(where: { $0.slug == saved }) else { return }
+            self.change { $0.codexModel = nil }
+        }
     }
 
     @discardableResult

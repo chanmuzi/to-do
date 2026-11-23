@@ -13,6 +13,7 @@ package final class EngineAccount {
     package private(set) var account: AgentAccount?
     package private(set) var message: String?
     package private(set) var models: [CodexModel] = []
+    @ObservationIgnored var didLoadModels: (([CodexModel]) -> Void)?
     private var requestedModels = false
     private let location: StoreLocation
     private let directory: URL?
@@ -43,15 +44,17 @@ package final class EngineAccount {
 
     package func refresh() {
         start(.checking) { connection in
-            let needsModels = self.provider == .codex && !self.requestedModels
-            self.requestedModels = true
             let found = try await connection.discover(in: self.directory)
             try Task.checkCancellation()
             self.installation = found
-            if needsModels {
-                let models = await connection.models(found)
+            if self.provider == .codex && !self.requestedModels {
+                self.requestedModels = true
+                let catalog = await connection.models(found)
                 try Task.checkCancellation()
-                self.models = models
+                if let catalog {
+                    self.models = catalog
+                    self.didLoadModels?(catalog)
+                }
             }
             try await self.readAccount(connection, found)
         }

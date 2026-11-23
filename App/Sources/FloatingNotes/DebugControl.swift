@@ -198,12 +198,16 @@ final class DebugControl {
         case ("library-audit", let name?, _):
             guard let root = library?.window?.contentView, let url = output(named: name.rawValue) else { return }
             do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("라이브러리 검사 실패: \(error)") }
-        case ("library-sidebar-end", _, _) where isPassive:
-            func sidebar(in view: NSView) -> NSScrollView? {
-                if let scroll = view as? NSScrollView { return scroll }
-                return view.subviews.lazy.compactMap(sidebar).first
+        case (let command?, _, _) where isPassive && ["library-sidebar-end", "library-list-end"].contains(command):
+            guard let root = library?.window?.contentView else { return }
+            func scrollViews(in view: NSView) -> [NSScrollView] {
+                if let scroll = view as? NSScrollView { return [scroll] }
+                return view.subviews.flatMap(scrollViews)
             }
-            if let root = library?.window?.contentView, let scroll = sidebar(in: root) {
+            let panes = scrollViews(in: root).sorted {
+                $0.convert($0.bounds, to: root).minX < $1.convert($1.bounds, to: root).minX
+            }
+            if let scroll = command == "library-list-end" ? panes.last : panes.first {
                 DebugLibraryInput.scrollToEnd(scroll)
             }
         case ("library-space-menu", let name?, let rest) where isPassive:
