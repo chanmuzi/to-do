@@ -42,16 +42,47 @@ final class AgentRequestCoordinator {
 
     @discardableResult func submit(_ draft: AgentDraft, text: String, fromInput: Bool = true) -> Bool {
         guard !closing, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        let item = AgentConversation.Queued(text: text)
+        prune()
+        if task == nil && order.isEmpty { paused = false; draft.queueHeld = false }
+        let item = AgentConversation.Queued(text: text, held: paused)
+        if paused { draft.queueHeld = true }
         guard draft.change({
             $0.queued.append(item)
             if fromInput { $0.draft = "" }
         }) else { return false }
-        order.removeAll { entry in !entry.draft.conversation.queued.contains { $0.id == entry.id } }
-        if task == nil && order.isEmpty { paused = false }
         order.append(Entry(draft: draft, id: item.id))
         advance()
         return true
+    }
+
+    private func prune() {
+        order.removeAll { entry in !entry.draft.conversation.queued.contains { $0.id == entry.id } }
+    }
+
+    private func hold(_ drafts: [AgentDraft], afterFailure: Bool) {
+        var seen = Set<UUID>()
+        for draft in drafts where seen.insert(draft.conversation.id).inserted {
+            draft.queueHeld = true
+            if afterFailure {
+                draft.change { value in
+                    for i in value.queued.indices { value.queued[i].heldAfterFailure = true }
+                }
+            }
+        }
+    }
+
+    private func release(_ draft: AgentDraft) {
+        guard draft.change({ value in
+            for i in value.queued.indices { value.queued[i].heldAfterFailure = false }
+        }) else { return }
+        draft.queueHeld = false
+    }
+
+    func sendAll(_ draft: AgentDraft) {
+        guard !closing, !draft.conversation.queued.isEmpty else { return }
+        release(draft)
+        paused = false
+        advance()
     }
 
     func sendNow(_ draft: AgentDraft, id: UUID) {
@@ -70,21 +101,24 @@ final class AgentRequestCoordinator {
             if let index = value.requests.firstIndex(where: { $0.id == id }) { value.requests[index] = request }
             value.messages.removeAll { $0.requestID == id && $0.role == .assistant }
         }) else { return }
+        for entry in order where entry.draft.queueHeld { release(entry.draft) }
         paused = false
         start(draft, request)
     }
 
     private func advance() {
         guard !closing, task == nil, !paused else { return }
+        let expedited = priority?.id
         if let entry = priority {
             priority = nil
             order.removeAll { $0.id == entry.id }
             order.insert(entry, at: 0)
         }
-        while let entry = order.first {
+        while let index = order.firstIndex(where: { !$0.draft.queueHeld || $0.id == expedited }) {
+            let entry = order[index]
             let draft = entry.draft
             guard let item = draft.conversation.queued.first(where: { $0.id == entry.id }) else {
-                order.removeFirst()
+                order.remove(at: index)
                 continue
             }
             let selection = choice()
@@ -97,7 +131,7 @@ final class AgentRequestCoordinator {
                 $0.requests.append(request)
                 $0.messages.append(.init(role: .user, requestID: item.id, text: item.text))
             }) else { paused = true; return }
-            order.removeFirst()
+            order.remove(at: index)
             start(draft, request)
             return
         }
@@ -200,6 +234,7 @@ final class AgentRequestCoordinator {
         if draft.deleting { return }
         guard draft.writeError == nil else { paused = true; return }
         if !closing {
+            if paused { hold(order.map(\.draft), afterFailure: final.status == .failed) }
             if final.status != .interrupted { finished(draft, final) }
             if settings { openSettings(final.engine) }
             advance()

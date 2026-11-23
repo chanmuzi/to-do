@@ -23,6 +23,7 @@ import Store
         writeError = nil
     }
 
+    package var queueHeld = false
     var showsHistory = false
     var expanded: Set<UUID> = []
     var hovered: UUID?

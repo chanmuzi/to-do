@@ -458,6 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
         agent.stopBeforeDelete = coordinator.stopBeforeDelete
         agent.retry = coordinator.retry
+        agent.sendAll = coordinator.sendAll
         agent.sendNow = coordinator.sendNow
         agent.openNote = { [weak router] id in router?.route(.openNote(id)) }
         agent.titleForNote = { (try? environment.notes.load($0))?.title }

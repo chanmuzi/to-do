@@ -27,6 +27,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var present: (AgentDraft, String) -> Void = { _, _ in }
     private var loaded = false
     package var send: (AgentDraft) -> Void = { _ in }
+    package var sendAll: (AgentDraft) -> Void = { _ in }
     package var sendNow: (AgentDraft, UUID) -> Void = { _, _ in }
     package var retry: (AgentDraft, UUID) -> Void = { _, _ in }
     package var openNote: (NoteID) -> Void = { _ in }
@@ -140,6 +141,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                            }
                                        },
                                        send: { [weak self] in self?.send(draft) },
+                                       sendAll: { [weak self] in self?.sendAll(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
                                        openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },

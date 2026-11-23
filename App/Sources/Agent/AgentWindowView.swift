@@ -14,6 +14,7 @@ struct AgentWindowView: View {
     @State private var editedName = ""
     let delete: () -> Void
     let send: () -> Void
+    let sendAll: () -> Void
     let retry: (UUID) -> Void
     let sendNow: (UUID) -> Void
     let openNote: (NoteID) -> Void
@@ -63,6 +64,12 @@ struct AgentWindowView: View {
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
                 }.defaultScrollAnchor(.bottom)
                 if !draft.conversation.queued.isEmpty {
+                    if draft.queueHeld {
+                        AgentQueueHeader(theme: theme, count: draft.conversation.queued.count, remove: {
+                            draft.change { $0.queued.removeAll() }
+                        }, send: sendAll)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                    }
                     ScrollView {
                         VStack(spacing: theme.component(.iconButtonGap)) {
                             ForEach(draft.conversation.queued) { item in
@@ -104,6 +111,7 @@ struct AgentWindowView: View {
     }
 
     @State private var conversationHeight: CGFloat = 0
+    @State private var headerHeight: CGFloat = 0
     private var queueHeight: CGFloat {
         CGFloat(draft.conversation.queued.count) * (theme.component(.iconButton) + theme.component(.iconButtonGap))
             - theme.component(.iconButtonGap)
@@ -111,7 +119,8 @@ struct AgentWindowView: View {
     private var queueLimit: CGFloat { theme.component(.scheduleListMaxHeight) }
     private var requiredHeight: CGFloat {
         let targetHeight = draft.conversation.targets.isEmpty ? 0 : theme.component(.iconButton) + theme.space(.sp2)
-        return conversationHeight + targetHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
+        let heldHeight = draft.queueHeld && !draft.conversation.queued.isEmpty ? headerHeight : 0
+        return conversationHeight + heldHeight + targetHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
             + max(0, min(queueHeight, queueLimit) + theme.component(.agentRowInset)) + theme.component(.agentEdgeIdle) * 2
     }
 
