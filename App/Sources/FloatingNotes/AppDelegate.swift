@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var library: LibraryCoordinator?
     private var agentCorner: AgentCorner?
     private var proposalController: TodoProposalController?
+    private var instructionStore: AgentStore?
     private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -80,7 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
             router.notePanels = notePanels
-            let agent = AgentWindowCoordinator(store: AgentStore(location: environment.location),
+            let store = AgentStore(location: environment.location)
+            instructionStore = store
+            let agent = AgentWindowCoordinator(store: store,
                                                theme: environment.theme, warning: AppLog.warning)
             #if DEBUG
             agent.allowsKeyWindows = !options.debugIsPassive
@@ -269,6 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notePanels?.flushPendingEdits()
         flushWindowStates()
         do {
+            try instructionStore?.flushInstructions()
             try notes.flushPendingSaves()
             try router?.agent?.flushFailedDrafts()
             // 아무것도 적지 않은 노트는 남기지 않는다(D-040). 다 쓴 뒤에만 본다.
@@ -439,7 +443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectRequests(_ environment: AppEnvironment, router: AppRouter, agent: AgentWindowCoordinator,
                                  panels: QuickPanels, notes: NotePanelCoordinator) throws {
         try agent.restore()
-        var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment))
+        var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment), instructionStore: instructionStore)
         #if DEBUG
         if options.debugIsPassive { execution.notifications = AgentExpiryNotifications(notifier: VerificationExpiryNotifier()) }
         #endif

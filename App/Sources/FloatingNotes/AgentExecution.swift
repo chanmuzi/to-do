@@ -6,21 +6,27 @@ import Store
 struct AgentExecution {
     let location: StoreLocation
     let directory: URL?
+    var instructionStore: AgentStore?
     var server: URL?
     var notifications: AgentExpiryNotifications = .shared
 
     func run(_ conversation: AgentConversation, _ request: AgentRequest,
              emit: @escaping @Sendable (AgentEvent) -> Void) async throws -> String {
+        let instructions = try snapshot()
         let provider = AgentProvider(rawValue: request.engine) ?? .claude
         let installation = try await connected(provider, notifyExpiry: true)
-        return try await run(conversation, request, installation: installation, notifyExpiry: true, emit: emit)
+        return try await run(conversation, request, installation: installation, instructions: instructions, notifyExpiry: true, emit: emit)
     }
 
     func prepareRecovery(_ selection: AgentRequestCoordinator.Choice) async -> AgentRequestCoordinator.Execute? {
         guard let installation = try? await connected(selection.provider, notifyExpiry: false) else { return nil }
         return { conversation, request, emit in
-            try await run(conversation, request, installation: installation, notifyExpiry: false, emit: emit)
+            try await run(conversation, request, installation: installation, instructions: snapshot(), notifyExpiry: false, emit: emit)
         }
+    }
+
+    private func snapshot() throws -> String {
+        try (instructionStore ?? AgentStore(location: location)).instructionSnapshot()
     }
 
     private func connected(_ provider: AgentProvider, notifyExpiry: Bool) async throws -> AgentInstallation {
@@ -40,9 +46,9 @@ struct AgentExecution {
     }
 
     private func run(_ conversation: AgentConversation, _ request: AgentRequest, installation: AgentInstallation,
-                     notifyExpiry: Bool, emit: @escaping @Sendable (AgentEvent) -> Void) async throws -> String {
+                     instructions: String, notifyExpiry: Bool, emit: @escaping @Sendable (AgentEvent) -> Void) async throws -> String {
         let provider = installation.provider
-        let prompt = try Self.prompt(conversation, request, instructions: AgentStore(location: location).readInstructions())
+        let prompt = try Self.prompt(conversation, request, instructions: instructions)
         let runner = try AgentRunner(location: location, server: server, notifications: notifications)
         do {
             let inbox = try ProposalInbox(location: location).prepare(request.runID)

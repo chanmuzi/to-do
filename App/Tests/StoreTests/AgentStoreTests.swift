@@ -51,7 +51,16 @@ import Testing
         #expect(warnings.count == 2)
         for (url, data) in zip(paths, invalid) { #expect(try Data(contentsOf: url) == data) }
         let instructions = "# 규칙\n\n  원문\n"
-        try store.saveInstructions(instructions)
+        store.editInstructions("첫 편집", basedOn: "")
+        store.editInstructions(instructions, basedOn: "")
+        #expect(try store.readInstructions().isEmpty)
+        #expect(try store.instructionSnapshot() == instructions)
+        let other = AgentStore(location: location)
+        store.editInstructions("로컬 초안", basedOn: instructions)
+        try other.saveInstructions("외부 편집")
+        #expect(throws: AgentStore.InstructionConflict.self) { try store.flushInstructions() }
+        #expect(try other.readInstructions() == "외부 편집")
+        try other.saveInstructions(instructions)
         #expect(try store.readInstructions() == instructions)
         #expect(try FileNoteStore(location: location).list().notes.isEmpty)
     }

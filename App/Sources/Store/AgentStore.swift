@@ -7,6 +7,12 @@ import Models
     private var conversations: URL { directory.appending(path: "conversations", directoryHint: .isDirectory) }
     private var instructions: URL { directory.appending(path: "instructions.md") }
 
+    private var pendingInstructions: (base: String, value: String)?
+    private var saveTask: Task<Void, Never>?
+    package var collectEditorChange: () -> Void = {}
+    package var instructionsSaved: (String) -> Void = { _ in }
+    package var instructionSaveFailed: (Error) -> Void = { _ in }
+
     public init(location: StoreLocation) {
         directory = location.stateDirectory.appending(path: "agent", directoryHint: .isDirectory)
     }
@@ -59,6 +65,41 @@ import Models
     public func saveInstructions(_ value: String) throws {
         try prepare(directory)
         try value.write(to: instructions, atomically: true, encoding: .utf8)
+        instructionsSaved(value)
+    }
+
+    /// 편집을 시작할 때 본 문서와 디스크가 여전히 같은 경우에만 교체한다.
+    package func editInstructions(_ value: String, basedOn base: String) {
+        pendingInstructions = (pendingInstructions?.base ?? base, value)
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+                try self?.flushInstructions()
+            } catch is CancellationError {} catch { self?.instructionSaveFailed(error) }
+        }
+    }
+
+    package func flushInstructions() throws {
+        collectEditorChange()
+        guard let pending = pendingInstructions else { return }
+        guard try readInstructions().utf8.elementsEqual(pending.base.utf8) else {
+            throw InstructionConflict.changed
+        }
+        try saveInstructions(pending.value)
+        pendingInstructions = nil
+        saveTask?.cancel()
+        saveTask = nil
+    }
+
+    package func instructionSnapshot() throws -> String {
+        try flushInstructions()
+        return try readInstructions()
+    }
+
+    package enum InstructionConflict: LocalizedError {
+        case changed
+        package var errorDescription: String? { "지침이 바뀌었어요. 미리보기를 다시 확인해 주세요." }
     }
 
     private func prepare(_ url: URL) throws {
