@@ -2,7 +2,7 @@ import AppKit
 import Theme
 
 /// 편집기의 텍스트 뷰. 키와 마우스를 받아 `MarkdownEditor`에 넘기는 일만 한다.
-final class EditorTextView: NSTextView {
+final class EditorTextView: PlainTextInputView {
     weak var editor: EditorController?
     /// 본문 안쪽 여백의 왼쪽 위(위와 아래 여백이 달라 직접 정한다).
     var containerOrigin: NSPoint = .zero
@@ -52,17 +52,7 @@ final class EditorTextView: NSTextView {
     }
 
     override func resignFirstResponder() -> Bool {
-        // 조합 중에 포커스를 잃으면 텍스트 뷰가 조합을 끝낸다. `unmarkText`와 같게 다룬다.
-        let wasComposing = hasMarkedText()
-        let accepted = endingComposition { super.resignFirstResponder() }
-        if accepted, hasMarkedText() {
-            // 입력기가 끝내 주지 않았으면 조합 중인 글자를 그대로 확정한다(포커스가 없는 뷰에 조합이 남지 않게).
-            inputContext?.discardMarkedText()
-            unmarkText()
-        } else if wasComposing {
-            editor?.flushPendingChange()
-            editor?.compositionDidChange()
-        }
+        let accepted = super.resignFirstResponder()
         if accepted { editor?.focusDidChange() }
         caret?.refresh(focused: accepted ? false : nil)
         return accepted

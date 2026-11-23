@@ -103,12 +103,38 @@ extension CompositionEndTests {
         h.view.setMarkedText(marked, selectedRange: NSRange(location: 1, length: 0), replacementRange: h.view.selectedRange())
         #expect(h.view.hasMarkedText())
         let attributes = try #require(h.view.markedTextAttributes)
-        #expect(attributes[.underlineStyle] as? Int == 0)
+        #expect(attributes[.underlineStyle] == nil)
         #expect(attributes[.foregroundColor] == nil && attributes[.backgroundColor] == nil)
         let display = try h.display(line: 0).attributes(at: 1, effectiveRange: nil)
         #expect((display[.underlineStyle] as? Int ?? 0) == 0 && display[.backgroundColor] == nil)
         #expect(display[.foregroundColor] as? NSColor != NSColor.red)
         h.commit("한")
         #expect(h.editor.text == "앞한" && !h.view.hasMarkedText())
+    }
+}
+
+extension CompositionEndTests {
+    @Test func movingTheResponderCommitsTheMarkedSyllable() throws {
+        let h = try EditorHarness.at("정|")
+        h.mark("리")
+        h.step { _ = h.window.makeFirstResponder(nil) }
+        #expect(!h.view.hasMarkedText())
+        #expect(h.editor.text == "정리")
+        h.editor.focus()
+        h.type("!")
+        #expect(h.editor.text == "정리!")
+    }
+
+    @Test func losingKeyCommitsTheMarkedSyllableInItsOwnWindow() throws {
+        let h = try EditorHarness.at("첫 줄\nAnthropic, OpenAI key 정|")
+        h.mark("리")
+        let other = NSWindow()
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: other)
+        #expect(h.view.hasMarkedText())
+        h.step { NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: h.window) }
+        #expect(!h.view.hasMarkedText())
+        #expect(h.editor.text == "첫 줄\nAnthropic, OpenAI key 정리")
+        h.type("!")
+        #expect(h.editor.text.hasSuffix("정리!"))
     }
 }

@@ -15,7 +15,7 @@ import AppKit
 /// 시스템의 커서 표시(`NSTextInsertionIndicator`)는 만들지 않는다. `insertionPointColor`를 따로 정할
 /// 필요도 없다(색은 `accent`, 너비는 `caret-w`).
 @MainActor
-open class ThinCaretFieldEditor: NSTextView {
+open class ThinCaretFieldEditor: PlainTextInputView {
     public private(set) var caret: TextCaret?
 
     public convenience init(theme: Theme) {

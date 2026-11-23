@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Scheduling
 import FloatSettings
 import Reminders
@@ -184,7 +185,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 노트 찾기를 닫은 누름과 그 누름이 보낸 "노트 찾기 열기"를 한데 묶는다(`QuickPanels`).
             pointerPresses = PointerPressMonitor(
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
-                ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() }
+                ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() },
+                inactiveWindowPress: { [weak self, weak notePanels] window in
+                    guard let notePanels, notePanels.openNoteIDs.contains(where: { notePanels.window(for: $0) === window }) else { return }
+                    self?.activationFocus.notePressedWhileInactive()
+                }
             )
             let shortcuts = ShortcutTable.standard
             application.mainMenu = MainMenu.make(
@@ -208,12 +213,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillBecomeActive(_ notification: Notification) {
-        let target = requestedWindowActivation || router?.isRouting == true || NSEvent.pressedMouseButtons != 0
+        let clickedWindow = ActivationFocusPolicy.activationClickedWindow(GetCurrentEvent())
+            || ActivationFocusPolicy.activationClickedWindow(NSApp.currentEvent?.eventRef.map { EventRef($0) })
+        let target = requestedWindowActivation || router?.isRouting == true || clickedWindow
             || NSApp.modalWindow != nil || quickPanels?.isAnyVisible == true
         requestedWindowActivation = false
-        if activationFocus.shouldShowLibrary(activatedAt: ProcessInfo.processInfo.systemUptime, hasExplicitTarget: target) {
-            library?.bringForward()
+        let showLibrary = activationFocus.shouldShowLibrary(activatedAt: ProcessInfo.processInfo.systemUptime,
+                                                             hasExplicitTarget: target)
+        #if DEBUG
+        if options.debugIsPassive {
+            AppLog.warning("willBecomeActive clickedWindow=\(clickedWindow) showLibrary=\(showLibrary)")
         }
+        #endif
+        if showLibrary { library?.bringForward() }
     }
 
     /// 다른 프로그램이 제자리에서 고친 파일도 앞으로 올 때 다시 읽는다.

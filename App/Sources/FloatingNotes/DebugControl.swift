@@ -42,7 +42,7 @@ extension NotePanelCoordinator {
 /// - `status-menu <항목 이름>`: 메뉴 막대 메뉴의 그 항목을 고른 것처럼 한다.
 /// - `status-snapshot <파일 이름>`: 메뉴 막대 메뉴의 줄들을 화면에 띄우지 않고 그려 PNG로 쓴다
 ///   (메뉴 창의 바탕과 모서리는 시스템이 그리므로 담기지 않는다).
-/// - `click <id>`: 그 노트 본문을 누른 마우스 이벤트를 이 앱의 이벤트 줄에만 넣는다(시스템에는 보내지 않는다).
+/// - `click <id> [body|title|pin short|long]`: 지정한 노트 부위를 누르고 떼는 이벤트를 앱 안에 넣는다.
 ///   실제로 누른 것과 같은 길로 처리되므로 누르면 키 창이 되는지 볼 때 쓴다.
 /// - `dock-menu <항목 이름>`, `main-menu <항목 이름>`: Dock 메뉴나 앱 메뉴의 보이는 항목을 고른 것처럼 한다.
 /// - `menu-bar-icon on|off`: 메뉴 막대 아이콘을 보이거나 감추고 설정에 적는다.
@@ -299,6 +299,10 @@ final class DebugControl {
             guard let window = library?.window else { return }
             DebugLibraryInput.key(window: window, key: key.rawValue)
         case ("library", _, _): router.route(.openLibrary)
+        case ("library-behind", let id?, _) where isPassive:
+            guard let window = notePanels.window(for: id) else { return }
+            library?.show()
+            library?.window?.order(.below, relativeTo: window.windowNumber)
         case ("library-close", _, _): library?.close()
         case ("reopen", _, _): reopen()
         case ("simulate-activation", _, _) where isPassive: simulateActivation()
@@ -483,14 +487,22 @@ final class DebugControl {
         case ("dump", _, _):
             guard let url = output(named: String(command.dropFirst("dump ".count))) else { return }
             dump(to: url)
+        case ("input-window-resign", let id?, _) where isPassive:
+            guard let window = notePanels.window(for: id) else { return }
+            NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        case ("format-link", let id?, _) where isPassive:
+            editor(of: id)?.perform(.link)
         case ("input-select-all", let target?, _) where isPassive:
             verificationInput(target.rawValue)?.selectAll(nil)
         case ("input-check", let target?, let name?):
             guard let view = verificationInput(target.rawValue), let url = output(named: name) else { return }
             write(json: DebugInputVerification.state(of: view), to: url)
-        case ("input-mark", let target?, let text?):
+        case ("input-mark", let target?, let text?), ("input-mark-ime", let target?, let text?):
             guard let view = verificationInput(target.rawValue) else { return }
-            view.setMarkedText(text, selectedRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            let payload: Any = words[0] == "input-mark-ime"
+                ? NSAttributedString(string: text, attributes: [.underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .underlineColor: NSColor.systemBlue, .markedClauseSegment: 0]) as Any : text
+            view.setMarkedText(payload, selectedRange: NSRange(location: text.utf16.count, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
         case ("input-commit", let target?, let text?):
             verificationInput(target.rawValue)?.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         case ("title-edit", let id?, _): notePanels.beginTitleEditing(for: id)
@@ -548,7 +560,7 @@ final class DebugControl {
         case ("status-snapshot", _, _):
             guard let url = output(named: String(command.dropFirst("status-snapshot ".count))) else { return }
             snapshotStatusMenu(to: url)
-        case ("click", let id?, _): click(id)
+        case ("click", let id?, let gesture): click(id, gesture: gesture)
         case ("dock-menu", _, _): choose(String(command.dropFirst("dock-menu ".count)), in: dockMenu())
         case ("main-menu", _, _):
             choose(String(command.dropFirst("main-menu ".count)), in: NSApplication.shared.mainMenu)
@@ -652,19 +664,40 @@ final class DebugControl {
 
     // MARK: - 누르기와 메뉴
 
-    /// 본문 첫 줄을 누르고 뗀 이벤트를 이 앱의 이벤트 줄에 넣는다. 런 루프가 꺼내 실제 누름과 같은 길로 보낸다.
-    private func click(_ id: NoteID) {
+    /// 기본은 본문 첫 줄이다. 길게 누를 때에는 이벤트 추적 중에도 뗌이 전달되도록 공용 모드 타이머를 쓴다.
+    private func click(_ id: NoteID, gesture: String?) {
         guard let window = notePanels.window(for: id), let view = editors.editor(for: id)?.view else {
             AppLog.warning("그 노트의 창이 없습니다: \(id)")
             return
         }
-        let point = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.minY + 20), to: nil)
-        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            guard let event = NSEvent.mouseEvent(
-                with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
-            ) else { return }
-            NSApplication.shared.postEvent(event, atStart: false)
+        let parts = gesture?.split(separator: " ") ?? []
+        let label = parts.first == "title" ? "제목" : parts.first == "pin" ? "항상 위에 고정" : nil
+        let target: NSView
+        if let label {
+            guard let root = window.contentView,
+                  let control = DebugInputVerification.descendant(in: root, matching: { $0.accessibilityLabel()?.hasPrefix(label) == true })
+            else { return }
+            target = control
+        } else {
+            target = view
+        }
+        let y = label == nil ? view.bounds.minY + 20 : target.bounds.midY
+        let point = target.convert(NSPoint(x: target.bounds.midX, y: y), to: nil)
+        let post: @MainActor @Sendable (NSEvent.EventType) -> Void = { type in
+            guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) else { return }
+            if let gesture { AppLog.warning("note click \(gesture) window=\(window.windowNumber) event=\(type.rawValue) at=\(event.timestamp)") }
+            NSApp.postEvent(event, atStart: false)
+        }
+        post(.leftMouseDown)
+        if parts.last == "long" {
+            let timer = Timer(timeInterval: 0.5, repeats: false) { _ in
+                MainActor.assumeIsolated { post(.leftMouseUp) }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+        } else {
+            post(.leftMouseUp)
         }
     }
 
@@ -747,10 +780,25 @@ final class DebugControl {
 
     private func verificationInput(_ target: String) -> NSTextView? {
         if target == "capture" || target == "browse" { return quickPanels.input(named: target) }
+        if target.hasPrefix("field:") {
+            let label = String(target.dropFirst("field:".count)).replacingOccurrences(of: "_", with: " ")
+            for window in NSApp.windows where window.isVisible {
+                guard let root = window.contentView, let field = DebugInputVerification.descendant(in: root, matching: {
+                    $0 is CommandInputField && !$0.isHiddenOrHasHiddenAncestor && $0.accessibilityLabel() == label
+                }) as? NSTextField, field.isEditable else { continue }
+                if field.currentEditor() == nil { window.makeFirstResponder(field) }
+                return field.currentEditor() as? NSTextView
+            }
+            return nil
+        }
         if target.hasPrefix("title:") {
             let id = NoteID(rawValue: String(target.dropFirst("title:".count)))
+            guard let window = notePanels.window(for: id), let root = window.contentView else { return nil }
+            if let field = DebugInputVerification.descendant(in: root, matching: {
+                $0 is CommandInputField && $0.accessibilityLabel() == "제목"
+            }) as? NSTextField, let editor = field.currentEditor() as? NSTextView { return editor }
             notePanels.beginTitleEditing(for: id)
-            return notePanels.window(for: id)?.firstResponder as? NSTextView
+            return window.firstResponder as? NSTextView
         }
         return editor(of: NoteID(rawValue: target))?.textView
     }

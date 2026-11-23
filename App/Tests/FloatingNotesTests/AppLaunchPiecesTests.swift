@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Foundation
 import Models
 import Routing
@@ -113,6 +114,34 @@ import Testing
         let second = early.shouldShowLibrary(activatedAt: 10.3)
         #expect(!first)
         #expect(second)
+    }
+
+    @Test func activationEventIdentifiesAClickBeforeTheWindowReceivesIt() throws {
+        var created: EventRef?
+        let status = CreateEvent(nil, OSType(kEventClassApplication), UInt32(kEventAppActivated),
+                                 GetCurrentEventTime(), 0, &created)
+        #expect(status == noErr)
+        let event = try #require(created)
+        defer { ReleaseEvent(event) }
+        #expect(!ActivationFocusPolicy.activationClickedWindow(event))
+        var marker = 0
+        withUnsafeMutablePointer(to: &marker) { pointer in
+            var clickedWindow = UnsafeMutableRawPointer(pointer)
+            let set = SetEventParameter(event, EventParamName(kEventParamWindowRef), EventParamType(typeWindowRef),
+                                        MemoryLayout.size(ofValue: clickedWindow), &clickedWindow)
+            #expect(set == noErr)
+            #expect(ActivationFocusPolicy.activationClickedWindow(event))
+        }
+    }
+
+    @Test func releasedNoteClickTargetsOnlyItsActivation() {
+        var policy = ActivationFocusPolicy()
+        policy.launchFinished(at: 0)
+        policy.notePressedWhileInactive()
+        let clicked = policy.shouldShowLibrary(activatedAt: 10)
+        let switched = policy.shouldShowLibrary(activatedAt: 11)
+        #expect(!clicked)
+        #expect(switched)
     }
 
     /// 뒤에서 켠 실행(로그인 항목, `open -g`)에는 켜면서 오는 활성화가 없다. 첫 활성화가 사용자의 것이다.
