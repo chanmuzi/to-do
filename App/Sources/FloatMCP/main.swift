@@ -50,7 +50,7 @@ func reply(_ line: String, notes: NoteDirectory, intake: ProposalIntake?) -> Obj
             }
             result = ["content": [["type": "text", "text": text]]]
         } catch {
-            result = ["isError": true, "content": [["type": "text", "text": (error as? IntakeFailure)?.errorDescription ?? "노트를 읽을 수 없습니다."]]]
+            result = ["isError": true, "content": [["type": "text", "text": (error as? LocalizedError)?.errorDescription ?? "노트를 읽을 수 없습니다."]]]
         }
     default: return error(-32601, "Method not found")
     }
