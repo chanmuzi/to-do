@@ -31,7 +31,12 @@ package struct ProposalInbox: Sendable {
         }.map { url, info in
             guard url.pathExtension == "json", info.isRegularFile == true, info.isSymbolicLink != true,
                   let size = info.fileSize, size <= 256 * 1024 else { throw CocoaError(.fileReadCorruptFile) }
-            let input = try JSONDecoder().decode(TodoSubmission.self, from: Data(contentsOf: url))
+            let data = try Data(contentsOf: url)
+            let key = url.deletingPathExtension().lastPathComponent
+            if let entry = try? JSONDecoder().decode(ProposalSubmission.self, from: data) {
+                return try .submitted(entry, key: key, request: request, source: source, reservedID: .make())
+            }
+            let input = try JSONDecoder().decode(TodoSubmission.self, from: data)
             guard !input.noteID.isEmpty, !input.noteID.hasPrefix("."), !input.noteID.contains("/"), !input.noteID.utf8.contains(0),
                   TodoSubmission.valid(lines: input.lines) else { throw CocoaError(.fileReadCorruptFile) }
             return .submitted(input, key: url.deletingPathExtension().lastPathComponent, request: request, source: source)

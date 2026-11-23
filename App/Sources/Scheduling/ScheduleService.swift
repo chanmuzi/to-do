@@ -94,6 +94,10 @@ public final class ScheduleService {
     }
     private func synchronize(_ id: NoteID, intents: [String: Bool]) async throws {
         var note = try notes.load(id)
+        let currentIDs = Set(note.schedules.map(\.id))
+        for removed in known[id]?.schedules ?? [] where !currentIDs.contains(removed.id) {
+            notifier.cancel(removed, noteID: id)
+        }
         let previousSchedules = note.schedules
         do {
             for index in note.schedules.indices where note.schedules[index].kind == .reminder {

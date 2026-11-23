@@ -19,6 +19,15 @@ import Testing
             let folder = try inbox.prepare(request.runID)
             let input = TodoSubmission(noteID: "a", lines: ["할 일"], version: "기반")
             try JSONEncoder().encode(input).write(to: folder.appending(path: "accepted.json"), options: .atomic)
+            for (i, args) in [
+                #"{"kind":"add_reminder","note_id":"a","title":"반납","date_only":true,"time_zone":"Asia/Seoul","start":"2028-02-29"}"#,
+                #"{"kind":"add_event","note_id":"a","title":"회의","date_only":true,"time_zone":"Asia/Seoul","start":"2028-02-29","end":"2028-03-01"}"#,
+                #"{"kind":"create_note","title":"새 노트","markdown":"[ ] 확인"}"#
+            ].enumerated() {
+                let arguments = try JSONDecoder().decode(ProposalArguments.self, from: Data(args.utf8))
+                let entry = ProposalSubmission(arguments: arguments, version: arguments.note_id == nil ? nil : "기반")
+                try JSONEncoder().encode(entry).write(to: folder.appending(path: "item-\(i).json"), options: .atomic)
+            }
             attempts.append(request.runID)
             #expect(draft.conversation.requests[0].proposals.isEmpty)
             if attempts.count == 1 {
@@ -44,8 +53,8 @@ import Testing
         while let task = next.task { await task.value }
         let request = try #require(draft.conversation.requests.first)
         #expect(attempts.count == 2 && attempts[0] != attempts[1])
-        #expect(request.id == prior.id && request.proposals.count == 1)
-        #expect(request.proposals.first?.runID == attempts.last)
+        #expect(request.id == prior.id && request.proposals.count == 4)
+        #expect(request.proposals.allSatisfy { $0.runID == attempts.last })
         #expect(!FileManager.default.fileExists(atPath: inbox.folder(request.runID).path))
     }
 }
