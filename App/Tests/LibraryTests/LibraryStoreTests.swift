@@ -87,7 +87,7 @@ import Theme
         let preferences = try LibraryPreferencesStore(location: location)
         #expect(preferences.loadWarning == nil)
         #expect(preferences.value.visibleViews == LibraryPreferences().visibleViews)
-        #expect(preferences.value.openingView == nil)
+        #expect(preferences.value.opensLastSelection)
         #expect(preferences.value.lastSelection == .today)
         #expect(preferences.value.pinnedIcons == [.emoji("🏠")])
         #expect(preferences.value.recentIcons == [.image("terminal")])
@@ -101,7 +101,7 @@ import Theme
         let preferences = try LibraryPreferencesStore(location: location)
         let model = LibraryModel(theme: try Theme.bundled(), notes: notes, spaces: spaces,
             windows: try WindowStateStore(location: location), preferences: preferences, router: RouteDispatcher { _ in })
-        model.changeSettings { $0.visibleViews = [.floating]; $0.openingView = .all; $0.pinnedIcons = [.emoji("🏠")] }
+        model.changeSettings { $0.setVisible(.today, false); $0.setVisible(.all, false); $0.opensLastSelection = false; $0.pinnedIcons = [.emoji("🏠")] }
         model.opened()
         #expect(model.selection == .floating)
         let reloaded = try LibraryPreferencesStore(location: location)

@@ -21,7 +21,7 @@ public final class LibraryModel {
     public private(set) var selectedNoteID: NoteID?
     public var displayOptions = NoteDisplayOptions()
     public var error: String?
-    public private(set) var settings = LibraryPreferences()
+    public var settings: LibraryPreferences { preferences.value }
     package var conversations: () -> [AgentConversation] = { [] }
     package var openConversation: (UUID) -> Void = { _ in }
     package var newConversation: () -> Void = {}
@@ -63,7 +63,6 @@ public final class LibraryModel {
                 windows: WindowStateStore, preferences: LibraryPreferencesStore, router: any Routing) {
         self.theme = theme; self.notes = notes; self.spaces = spaces; self.windows = windows
         self.preferences = preferences; self.router = router
-        settings = preferences.value
         observations = [notes.observe { [weak self] _ in self?.scheduleRefresh() },
                         spaces.observe { [weak self] in self?.scheduleRefresh() },
                         windows.observe { [weak self] in self?.scheduleRefresh() }]
@@ -109,7 +108,7 @@ public final class LibraryModel {
 
     public func opened() {
         refreshCalendar()
-        select(validated(settings.openingView ?? settings.lastSelection))
+        select(validated(settings.opensLastSelection ? settings.lastSelection : settings.visibleViews.first ?? .all))
     }
     private func validated(_ value: LibrarySelection) -> LibrarySelection {
         switch value {
@@ -253,7 +252,7 @@ public final class LibraryModel {
         }
     }
     public func changeSettings(_ change: (inout LibraryPreferences) -> Void) {
-        perform { try preferences.update(change); settings = preferences.value }
+        perform { try preferences.update(change) }
     }
     func importImage(_ url: URL, for space: SpaceID?) {
         perform {

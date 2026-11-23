@@ -1,7 +1,8 @@
 import Foundation
 import Models
+import Observation
 
-@MainActor
+@Observable @MainActor
 public final class LibraryPreferencesStore {
     private let file: JSONFile<LibraryPreferences>
     public private(set) var value: LibraryPreferences
@@ -15,6 +16,7 @@ public final class LibraryPreferencesStore {
     public func update(_ change: (inout LibraryPreferences) -> Void) throws {
         var next = value
         change(&next)
+        guard next != value else { return }
         try file.save(next)
         value = next
     }

@@ -14,7 +14,11 @@ import Theme
         #expect(decoded.lastSelection == .space(nil))
         f.model.changeSettings { $0 = decoded }; f.model.opened()
         #expect(f.model.selection == .all)
-        f.model.changeSettings { $0.openingView = .space(nil) }; f.model.opened()
+        f.model.changeSettings { prefs in
+            for view in LibrarySelection.views { prefs.setVisible(view, false) }
+            prefs.opensLastSelection = false
+        }
+        f.model.opened()
         #expect(f.model.selection == .all)
         _ = try f.notes.create(NoteDraft(title: "소속 없음")); f.model.refresh()
         #expect(f.model.rows.count == 1)
