@@ -148,6 +148,15 @@ import Testing
         guard case .note = changedLocalID.first else { Issue.record("노트 연결을 유지해야 합니다"); return }
     }
 
+    @Test func newNoteProposalUsesNoteListSubtitle() {
+        let markdown = "[ ] **소개 글** 고치기\r\n\t- [x] 캡처 준비"
+        let preview = LibraryPreview(title: "이번 주 할 일", markdown: markdown)
+        let note = Note(id: .make(), title: preview.title, body: markdown, created: now, modified: now)
+        #expect(preview.subtitle == "소개 글 고치기, 캡처 준비")
+        #expect(preview.subtitle == LibraryPreview(note).subtitle)
+        #expect(LibraryPreview(title: "빈 노트", markdown: "").subtitle.isEmpty)
+    }
+
     @Test func taskProgressExcludesCode() {
         let summary = LibraryPreview(Note(id: .make(), body: "[ ] a\n- [x] b\n```\n[x] code\n```\n\t[X] c", created: Date(), modified: Date()))
         #expect(summary.completed == 2 && summary.total == 3)

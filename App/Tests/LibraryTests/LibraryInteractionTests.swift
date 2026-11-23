@@ -458,17 +458,32 @@ import SpaceIcons
     @Test func sidebarStaysUnchangedWhenOnlyNoteCountsChange() throws {
         let f = try Fixture(); defer { try? f.close() }
         _ = try f.notes.create(NoteDraft(title: "첫째"))
-        f.coordinator.allowsKeyWindows = false; f.coordinator.show(); settle()
-        let root = try #require(f.coordinator.window?.contentView)
+        f.model.opened()
+        let theme = f.model.theme
+        let rect = NSRect(x: 0, y: 0, width: theme.component(.librarySidebarWidth), height: theme.component(.libraryHeight))
+        let window = NSWindow(contentRect: rect, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = NSHostingView(rootView: LibrarySidebar(model: f.model).transaction { $0.disablesAnimations = true })
+        window.contentView = root
         func sidebar() throws -> Data {
+            settle()
             root.layoutSubtreeIfNeeded()
-            let rect = NSRect(x: 0, y: 0, width: f.model.theme.component(.librarySidebarWidth), height: root.bounds.height)
             let bitmap = try #require(root.bitmapImageRepForCachingDisplay(in: rect))
             root.cacheDisplay(in: rect, to: bitmap)
-            return try #require(bitmap.representation(using: .png, properties: [:]))
+            let bytes = try #require(bitmap.bitmapData)
+            let rowWidth = bitmap.pixelsWide * bitmap.bitsPerPixel / 8
+            var pixels = Data()
+            for y in 0..<bitmap.pixelsHigh {
+                pixels.append(bytes.advanced(by: y * bitmap.bytesPerRow), count: rowWidth)
+            }
+            return pixels
         }
+        #expect(f.model.index.notes.count == 1)
         let before = try sidebar()
-        _ = try f.notes.create(NoteDraft(title: "둘째")); f.model.refresh(); settle()
+        #expect(Set(before).count > 16, "사이드바 글자와 아이콘이 그려져야 한다")
+        _ = try f.notes.create(NoteDraft(title: "둘째")); f.model.refresh()
+        #expect(f.model.index.notes.count == 2)
         let after = try sidebar()
         #expect(before == after, "노트 개수만 바뀌면 사이드바는 그대로 표시한다")
     }

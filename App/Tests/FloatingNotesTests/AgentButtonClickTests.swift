@@ -67,7 +67,7 @@ import Theme
         #expect(events == ["proposal-open toast", "proposal-accept card", "proposal-open library", "proposal-discard card"])
     }
 
-    @Test func requestGroupAcceptsOnlyMatchingTargetsAndUndoesItsOwnWrites() async throws {
+    @Test(arguments: [false, true]) func requestGroupAcceptsOnlyMatchingTargetsAndUndoesItsOwnWrites(mixed: Bool) async throws {
         let fx = try WiringFixture()
         defer { fx.cleanUp() }
         let release = TestAccessibility.enableForTest()
@@ -81,6 +81,20 @@ import Theme
             let bytes = try Data(fx.notes.proposalText(note).utf8)
             let input = TodoSubmission(noteID: note.rawValue, lines: ["항목 \(index)"], version: TodoSubmission.fingerprint(bytes))
             request.proposals.append(.submitted(input, key: String(index), request: request, source: nil))
+        }
+        if mixed {
+            let version = TodoSubmission.fingerprint(before)
+            let base = ["note_id": target.rawValue, "title": "일정 확인", "time_zone": "Asia/Seoul", "start": "2028-02-29"]
+            for kind in ["add_reminder", "add_event", "create_note"] {
+                var args: [String: Any] = base
+                args["kind"] = kind
+                args["date_only"] = true
+                if kind == "add_event" { args["end"] = "2028-03-01" }
+                if kind == "create_note" { args = ["kind": kind, "title": "묶음 노트", "markdown": "본문"] }
+                let input = try JSONDecoder().decode(ProposalArguments.self, from: JSONSerialization.data(withJSONObject: args))
+                request.proposals.append(try .submitted(.init(arguments: input, version: version), key: kind, request: request,
+                                                        source: target, reservedID: .make()))
+            }
         }
         let draft = try agent.record(for: target)
         draft.change { $0.requests = [request] }
@@ -103,10 +117,17 @@ import Theme
         let button = try #require(buttons(in: window)["모두 받기"])
         #expect(button.accessibilityPerformPress?() == true)
         let values = draft.conversation.requests[0].proposals
-        #expect(values.map(\.status) == [.accepted, .accepted, .pending])
-        #expect(values.last?.requiresReview == true)
+        let initial: [AgentProposal.Status] = [.accepted, .accepted, .pending]
+        #expect(values.map(\.status) == initial + (mixed ? [.accepted, .accepted, .accepted] : []))
+        #expect(values[2].requiresReview == true)
         undo?()
-        #expect(try Data(fx.notes.proposalText(target).utf8) == before)
+        if mixed {
+            #expect(try fx.notes.load(target).body.isEmpty)
+            #expect(try fx.notes.load(target).schedules.isEmpty)
+            #expect(try fx.notes.listTrash().notes.first?.id == values.last?.createdNoteID)
+        } else {
+            #expect(try Data(fx.notes.proposalText(target).utf8) == before)
+        }
         #expect(try fx.notes.load(other).body == "나중에 바꾼 글")
         model.selectProposal(values[0].id, collapsible: true)
         #expect(model.selectedProposal == values[0].id)

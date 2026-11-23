@@ -11,7 +11,11 @@ struct LibraryPreview {
     let total: Int
 
     init(_ note: Note) {
-        let document = MarkdownDocument(note.body)
+        self.init(title: note.title, markdown: note.body)
+    }
+
+    init(title noteTitle: String, markdown: String) {
+        let document = MarkdownDocument(markdown)
         var visible: [String] = []
         var checked = 0, todos = 0
         for line in document.lines where line.kind != .fenceOpen && line.kind != .fenceClose {
@@ -31,12 +35,12 @@ struct LibraryPreview {
         }
         completed = checked
         total = todos
-        isEmpty = note.title.isEmpty && visible.isEmpty
-        title = note.title.isEmpty ? visible.first ?? "제목 없음" : note.title
+        isEmpty = noteTitle.isEmpty && visible.isEmpty
+        title = noteTitle.isEmpty ? visible.first ?? "제목 없음" : noteTitle
         if visible.isEmpty && todos > checked {
             subtitle = "투두 \(todos - checked)개 남음"
         } else {
-            subtitle = NotePreviewText.join(visible.dropFirst(note.title.isEmpty ? 1 : 0))
+            subtitle = NotePreviewText.join(visible.dropFirst(noteTitle.isEmpty ? 1 : 0))
         }
     }
 
