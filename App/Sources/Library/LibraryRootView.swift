@@ -67,9 +67,7 @@ struct LibraryRootView: View {
                                 }
                             }
                         }
-                    }
-                    .padding(.bottom, theme.space(.sp2))
-                    .id(model.selection)
+                    }.id(model.selection)
                 }
                 if let error = model.error {
                     HStack {
