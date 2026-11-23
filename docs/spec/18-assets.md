@@ -37,7 +37,8 @@
 | `library.svg` | 라이브러리 | `sidebar.left` | 14 |
 | `capture.svg` | 빠른 캡처 | `terminal` | 14 |
 | `eye-off.svg` | 노트 모두 숨기기 | `eye.slash` | 14 |
-| `sliders.svg` | 설정 | `slider.horizontal.3` | 14, 15 |
+| 순서 손잡이 | 설정의 보기 순서. 16단위에서 x 6, 10과 y 4, 8, 12의 교차점에 반지름 1.1인 원을 그린다 | GRIP 벡터 | 14 |
+| `sliders.svg` | 설정(사이드바 보기에는 쓰지 않음) | `slider.horizontal.3` | 14, 15 |
 | `keyboard.svg` | 단축키 | `keyboard` | 14 |
 | `sun.svg` | 보기: 오늘 | `sun.max` | 14 |
 | `layers.svg` | 보기: 떠 있는 노트 | `square.on.square` | 14 |

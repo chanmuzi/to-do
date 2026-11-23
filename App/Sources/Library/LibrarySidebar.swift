@@ -28,7 +28,15 @@ struct LibrarySidebar: View {
             VStack(alignment: .leading, spacing: theme.component(.librarySectionGap)) {
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     sectionHeader("보기")
-                    ForEach(model.settings.visibleViews, id: \.self) { item in row(item, symbol: symbol(item)) }
+                    let section = model.viewSection
+                    ForEach(section.rows, id: \.self) { item in
+                        let actions = ReorderActions(item, section: section, move: model.moveSidebar)
+                        row(item, symbol: symbol(item))
+                            .modifier(SidebarPan(item, section: section, drag: model.reorder, move: model.moveSidebar))
+                            .contextMenu { actions.menu }.reorderAccess(actions)
+                            .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.sidebarReorderRadius))
+                            .reorderPosition(item, in: section, drag: model.reorder, theme: theme)
+                    }
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     LibrarySectionHeader(theme: theme, title: "에이전트", symbol: nil, label: "에이전트에게 요청",
@@ -37,22 +45,28 @@ struct LibrarySidebar: View {
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     sectionHeader("스페이스", symbol: "plus", label: "새 스페이스") { model.beginSpaceEditing() }
+                    let section = model.spaceSection
                     ForEach(model.spaceList) { space in
-                        if model.editingSpace && model.renamingSpaceID == space.id {
-                            spaceInput
-                        } else {
-                            LibrarySpaceRow(model: model, space: space,
-                                rename: { model.beginSpaceEditing(space.id) }, delete: { deleting = space })
-                        }
-                        if model.expanded.contains(space.id) {
-                            ForEach(model.index.days(in: space.id), id: \.self) { day in
-                                row(.day(space.id, day), symbol: nil, indented: true)
-                                    .overlay(alignment: .leading) {
-                                        theme.libraryColor(.guide).frame(width: theme.shape(.borderWidth))
-                                            .padding(.leading, theme.space(.sp4)).allowsHitTesting(false)
-                                    }
+                        let item = LibrarySelection.space(space.id)
+                        VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                            if model.editingSpace && model.renamingSpaceID == space.id {
+                                spaceInput
+                            } else {
+                                LibrarySpaceRow(model: model, space: space,
+                                    rename: { model.beginSpaceEditing(space.id) }, delete: { deleting = space }, section: section)
+                                    .modifier(SidebarPan(item, section: section, drag: model.reorder, move: model.moveSidebar))
+                                    .reorderSurface(model.reorder.lifted(item, in: section), theme: theme, radius: theme.component(.sidebarReorderRadius))
                             }
-                        }
+                            if model.expanded.contains(space.id) {
+                                ForEach(model.index.days(in: space.id), id: \.self) { day in
+                                    row(.day(space.id, day), symbol: nil, indented: true)
+                                        .overlay(alignment: .leading) {
+                                            theme.libraryColor(.guide).frame(width: theme.shape(.borderWidth))
+                                                .padding(.leading, theme.space(.sp4)).allowsHitTesting(false)
+                                        }
+                                }
+                            }
+                        }.reorderPosition(item, in: section, drag: model.reorder, theme: theme)
                     }
                     if model.editingSpace && model.renamingSpaceID == nil { spaceInput }
                 }
@@ -150,7 +164,7 @@ struct LibrarySidebar: View {
     }
 
     private func row(_ item: LibrarySelection, symbol: String?, indented: Bool = false) -> some View {
-        let selected = model.selection == item
+        let selected = model.selection == item && !model.reorder.lifted(item, in: model.viewSection)
         return Button { model.select(item) } label: {
             let title = Text(model.title(item)).lineLimit(1)
                 .font(theme.font(.body, size: theme.tokens.textStyle(.row).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
@@ -208,6 +222,7 @@ private struct LibrarySpaceRow: View {
     let space: Space
     let rename: () -> Void
     let delete: () -> Void
+    let section: ReorderSection
     @State private var hovered = false
     private var theme: Theme { model.theme }
     private var selected: Bool { model.selection == .space(space.id) }
@@ -229,13 +244,15 @@ private struct LibrarySpaceRow: View {
                     .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: theme.component(.rowHeight)).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+                .reorderAccess(ReorderActions(.space(space.id), section: section, move: model.moveSidebar))
             SpaceMenuControl(model: model, space: space, rename: rename, delete: delete, contextOnly: false)
                 .frame(width: theme.component(.libraryMoreSize), height: theme.component(.libraryMoreSize))
                 .background(theme.libraryColor(.line), in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
                 .opacity(hovered ? 1 : 0)
         }.padding(.trailing, theme.space(.sp1)).frame(height: theme.component(.rowHeight))
             .foregroundStyle(theme.libraryColor(selected || hovered ? .text : .text2))
-            .background(selected ? theme.libraryColor(.selected) : (hovered ? theme.libraryColor(.hover) : .clear),
+            .background(model.reorder.lifted(.space(space.id), in: section) ? .clear :
+                        selected ? theme.libraryColor(.selected) : (hovered ? theme.libraryColor(.hover) : .clear),
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             .background(LibrarySidebarHover(name: space.name) { hovered = $0 })
             .overlay { SpaceMenuControl(model: model, space: space, rename: rename, delete: delete, contextOnly: true) }

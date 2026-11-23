@@ -316,8 +316,9 @@ import SpaceIcons
         let button = try #require(descendants(root).compactMap { $0 as? SpaceMenuButton }.first { !$0.contextOnly })
         let menu = try #require(button.menu)
         #expect(menu.items.map { $0.isSeparatorItem ? "-" : $0.title } ==
-                ["이 스페이스에 새 노트", "-", "아이콘 바꾸기", "이름 바꾸기", "-", "스페이스 지우기"])
+                ["이 스페이스에 새 노트", "-", "아이콘 바꾸기", "이름 바꾸기", "-", "위로", "아래로", "-", "스페이스 지우기"])
         #expect(menu.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.image != nil && $0.view is MenuBarRowView })
+        #expect(menu.item(withTitle: "위로")?.isEnabled == false && menu.item(withTitle: "아래로")?.isEnabled == false)
         menu.performActionForItem(at: 0)
         guard case .newNote(let request) = f.routes.last else { Issue.record("새 노트 요청 누락"); return }
         #expect(request.draft.spaceID == space.id)

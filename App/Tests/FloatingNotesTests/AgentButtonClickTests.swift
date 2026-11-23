@@ -32,8 +32,8 @@ import Theme
     @Test func barAndConversationButtonsDeliverTheirActions() async throws {
         let fx = try WiringFixture()
         defer { fx.cleanUp() }
-        NSApp.accessibilitySetValue(true, forAttribute: .init(rawValue: "AXEnhancedUserInterface"))
-        defer { NSApp.accessibilitySetValue(false, forAttribute: .init(rawValue: "AXEnhancedUserInterface")) }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
         fx.router.route(.requestAgent)
         let bar = try #require(fx.capture.window)
         try await Task.sleep(for: .milliseconds(200))
@@ -76,8 +76,8 @@ extension AgentButtonClickTests {
     @Test func historyLibraryCornerAndSettingsActions() async throws {
         let fx = try WiringFixture()
         defer { fx.cleanUp() }
-        NSApp.accessibilitySetValue(true, forAttribute: .init(rawValue: "AXEnhancedUserInterface"))
-        defer { NSApp.accessibilitySetValue(false, forAttribute: .init(rawValue: "AXEnhancedUserInterface")) }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
         let agent = AgentWindowCoordinator(store: AgentStore(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
         agent.allowsKeyWindows = false
         let note = try fx.open("대상")
@@ -163,7 +163,7 @@ extension AgentButtonClickTests {
         let old = try JSONDecoder().decode(SettingsValues.self, from: Data("{}".utf8))
         #expect(old.showsNoteAgent && !old.showsCornerAgent)
         let service = ScheduleService(notes: fx.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
-        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fx.location), read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
         let settings = SettingsCoordinator(model: model, theme: fx.theme)
         settings.allowsKeyWindows = false
         settings.show(.assistant)
@@ -175,5 +175,11 @@ extension AgentButtonClickTests {
             let saved = try AppSettingsStore(stateDirectory: fx.location.stateDirectory).settings
             #expect(saved.showsNoteAgent == noteOn && saved.showsCornerAgent == cornerOn)
         }
+        settings.show(.general)
+        try await press("리마인더 있는 노트", in: preferences)
+        try await press("마지막으로 본 곳에서 열기", in: preferences)
+        let sidebar = try LibraryPreferencesStore(location: fx.location).value
+        #expect(sidebar.visibleViews.contains(.reminders))
+        #expect(!sidebar.opensLastSelection)
     }
 }

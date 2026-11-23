@@ -56,6 +56,15 @@ public final class SpaceStore {
         try replace(with: spaces.filter { $0.id != id })
     }
 
+    public func move(_ id: SpaceID, to target: SpaceID) throws {
+        guard let from = spaces.firstIndex(where: { $0.id == id }),
+              let to = spaces.firstIndex(where: { $0.id == target }) else { throw MutationError.missingSpace }
+        guard from != to else { return }
+        var next = spaces
+        next.insert(next.remove(at: from), at: to)
+        try replace(with: next)
+    }
+
     /// 목록을 통째로 바꾸고 곧바로 파일에 쓴다.
     public func replace(with newSpaces: [Space]) throws {
         try file.save(newSpaces)

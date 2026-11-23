@@ -177,6 +177,8 @@
 
 한 줄 이동 줄의 호버 높이는 `settings-nav-single-line-hover-h` 30pt다. 두 줄 이동 줄은 줄 높이에서 위아래로 `settings-nav-two-line-hover-inset-y` 4pt씩 뺀다. 둘 다 반경은 `settings-nav-hover-radius` 6pt, 내용 양끝에서 `settings-nav-hover-outset` 6pt다. 카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
 
+설정의 떠 있는 줄은 `settings-reorder-radius` 8pt, 사이드바 줄은 `sidebar-reorder-radius` 6pt다. 카드 여백은 sp-3, 손잡이와 글자 사이는 sp-2, 손잡이는 icon-m, 정보 아이콘은 icon-s다. 두 줄의 그림자 토큰은 `shadow-reorder`다. 밝은 그림자는 확정 CSS의 POP, 어두운 농도는 기존 어두운 팝오버를 따른다.
+
 ### 에이전트 창과 얼굴 (1단계 PR 1)
 
 정지 가장자리는 `agent-edge-idle` 1pt, 밝은 색은 `agent-edge-a` #A597DB와 `agent-edge-b` #E6B89A다. 어두운 초안은 #80759F와 #AD8D79다. 작업 가장자리 1.5pt와 번짐 3pt는 각각 `agent-edge-working`, `agent-edge-glow`에 둔다.

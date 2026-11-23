@@ -27,13 +27,8 @@ struct LibraryRootView: View {
                     Spacer()
                     if model.selection == .conversations {
                         ChromeIconButton(theme: theme, title: "새 대화", symbol: "plus", action: model.newConversation)
-                    } else {
-                        ChromeIconButton(theme: theme, title: "보기 편집", symbol: "line.3.horizontal.decrease") {
-                            model.editingViews.toggle()
-                        }.popover(isPresented: $model.editingViews, arrowEdge: .bottom) { LibraryViewEditor(model: model) }
-                        if model.showsNewNote {
-                            ChromeIconButton(theme: theme, title: "새 노트", symbol: "plus", action: model.newNoteInSelection)
-                        }
+                    } else if model.showsNewNote {
+                        ChromeIconButton(theme: theme, title: "새 노트", symbol: "plus", action: model.newNoteInSelection)
                     }
                 }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp3))
                     .frame(height: theme.component(.libraryHeaderHeight))

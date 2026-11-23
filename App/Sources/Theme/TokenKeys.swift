@@ -63,6 +63,7 @@ public enum HighlightColor: Int, CaseIterable, Sendable {
 public enum ShadowToken: String, CaseIterable, Sendable {
     case window = "shadow-window"
     case pop = "shadow-pop"
+    case reorder = "shadow-reorder"
     case agentCorner = "shadow-agent-corner"
 }
 
@@ -231,6 +232,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case settingsPreviewFoot = "settings-preview-foot"
     case settingsNavSingleLineHoverHeight = "settings-nav-single-line-hover-h"
     case settingsNavTwoLineHoverInsetY = "settings-nav-two-line-hover-inset-y"
+    case settingsReorderRadius = "settings-reorder-radius"
+    case sidebarReorderRadius = "sidebar-reorder-radius"
     case settingsNavHoverRadius = "settings-nav-hover-radius"
     case settingsNavHoverOutset = "settings-nav-hover-outset"
     case settingsRow = "settings-row"
