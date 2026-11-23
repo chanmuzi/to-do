@@ -77,6 +77,7 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var proposals: TodoProposalController?
     weak var agentCorner: AgentCorner?
     weak var agent: AgentWindowCoordinator?
     weak var theme: Theme?
@@ -330,6 +331,7 @@ final class DebugControl {
         case ("library-select", let target?, _):
             let value = target.rawValue
             switch value {
+            case "proposals": library?.model.select(.proposals)
             case "conversations": library?.model.select(.conversations)
             case "today": library?.model.select(.today)
             case "all": library?.model.select(.all)
@@ -527,6 +529,26 @@ final class DebugControl {
             window.setContentSize(CGSize(width: width, height: window.frame.height))
         case ("history-open", let item?, _) where isPassive:
             if let id = UUID(uuidString: item.rawValue) { library?.model.openConversation(id) }
+        case ("proposal-card", let note?, let name?) where isPassive:
+            if let url = output(named: name) { write(proposals?.card(for: note), to: url) }
+        case ("proposal-toast", let name?, _) where isPassive:
+            if let url = output(named: name.rawValue) { write(toastWindow(), to: url) }
+        case ("proposal-width", let width?, _) where isPassive:
+            if let window = library?.window, let width = Double(width.rawValue), width.isFinite {
+                window.setContentSize(.init(width: max(window.minSize.width, width), height: window.frame.height))
+            }
+        case ("proposal-hover", let id?, _) where isPassive:
+            library?.model.previewProposalHover = UUID(uuidString: id.rawValue)
+        case ("proposal-action", let item?, let action?) where isPassive:
+            guard let id = UUID(uuidString: item.rawValue) else { return }
+            switch action {
+            case "select": library?.model.selectProposal(id)
+            case "review": proposals?.review(id)
+            case "accept": proposals?.accept([id], source: "card")
+            case "discard": proposals?.discard(id, source: "card")
+            case "open": proposals?.open(id, source: "library")
+            default: break
+            }
         case ("history-fixture", let note?, _) where isPassive:
             guard let agent, agent.history.isEmpty else { return }
             // 격리 실행에서만 명시적인 확인 대기를 가진 저장 자료를 만든다.

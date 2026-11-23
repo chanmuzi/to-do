@@ -67,6 +67,55 @@ import Theme
         #expect(events == ["proposal-open toast", "proposal-accept card", "proposal-open library", "proposal-discard card"])
     }
 
+    @Test func requestGroupAcceptsOnlyMatchingTargetsAndUndoesItsOwnWrites() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: .init(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        let target = try fx.open("대상")
+        let other = try fx.open("바뀐 대상")
+        let before = try Data(fx.notes.proposalText(target).utf8)
+        var request = AgentRequest(id: UUID(), text: "요청 묶음", engine: "fixture", model: nil)
+        for (index, note) in [target, target, other].enumerated() {
+            let bytes = try Data(fx.notes.proposalText(note).utf8)
+            let input = TodoSubmission(noteID: note.rawValue, lines: ["항목 \(index)"], version: TodoSubmission.fingerprint(bytes))
+            request.proposals.append(.submitted(input, key: String(index), request: request, source: nil))
+        }
+        let draft = try agent.record(for: target)
+        draft.change { $0.requests = [request] }
+        try fx.notes.update(other) { $0.body = "나중에 바꾼 글" }
+        let library = LibraryCoordinator(theme: fx.theme, notes: fx.notes, spaces: fx.spaces, windows: fx.windowStates,
+                                         preferences: try LibraryPreferencesStore(location: fx.location), router: fx.router)
+        library.allowsKeyWindows = false
+        let model = library.model
+        fx.router.connectHistory(model, agent: agent)
+        let controller = TodoProposalController(agent: agent, notes: fx.notes, panels: fx.notePanels, theme: fx.theme, router: fx.router)
+        controller.connect(model)
+        var undo: (() -> Void)?
+        controller.showToast = { _, _, action in undo = action }
+        library.show()
+        defer { library.close() }
+        model.select(.proposals)
+        model.previewProposalHover = request.id
+        try await Task.sleep(for: .milliseconds(160))
+        let window = try #require(library.window)
+        let button = try #require(buttons(in: window)["모두 받기"])
+        #expect(button.accessibilityPerformPress?() == true)
+        let values = draft.conversation.requests[0].proposals
+        #expect(values.map(\.status) == [.accepted, .accepted, .pending])
+        #expect(values.last?.requiresReview == true)
+        undo?()
+        #expect(try Data(fx.notes.proposalText(target).utf8) == before)
+        #expect(try fx.notes.load(other).body == "나중에 바꾼 글")
+        model.selectProposal(values[0].id, collapsible: true)
+        #expect(model.selectedProposal == values[0].id)
+        model.selectProposal(values[0].id, collapsible: true)
+        #expect(model.selectedProposal == nil)
+        try await agent.delete(draft)
+        #expect(model.proposalRequests.isEmpty)
+    }
+
     @Test func barAndConversationButtonsDeliverTheirActions() async throws {
         let fx = try WiringFixture()
         defer { fx.cleanUp() }

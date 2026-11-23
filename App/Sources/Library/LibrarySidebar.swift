@@ -41,6 +41,13 @@ struct LibrarySidebar: View {
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     LibrarySectionHeader(theme: theme, title: "에이전트", symbol: nil, label: "에이전트에게 요청",
                                          action: { model.router.route(.requestAgent) }, agentFace: true, previewHover: headerHover)
+                    row(.proposals, symbol: nil)
+                        .overlay(alignment: .trailing) {
+                            if model.proposalRequests.flatMap(\.proposals).contains(where: { $0.status == .pending && $0.seenAt == nil }) {
+                                ProposalDot(theme: theme).padding(.trailing, theme.space(.sp2) + theme.space(.sp1))
+                                    .allowsHitTesting(false)
+                            }
+                        }
                     conversationRow
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
@@ -170,7 +177,9 @@ struct LibrarySidebar: View {
                 .font(theme.font(.body, size: theme.tokens.textStyle(.row).size, weight: theme.tokens.textStyle(selected ? .selected : .body).weight))
                 .frame(maxWidth: .infinity, alignment: .leading)
             Group {
-                if let symbol {
+                if item == .proposals {
+                    SidebarColumns(theme: theme) { AgentFace(theme: theme) } content: { title }
+                } else if let symbol {
                     SidebarColumns(theme: theme) {
                         LibrarySymbol(theme: theme, name: symbol, size: .iconMedium)
                             .foregroundStyle(theme.libraryColor(selected ? .text : .text2))

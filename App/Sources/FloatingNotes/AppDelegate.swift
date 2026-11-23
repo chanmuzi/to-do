@@ -405,6 +405,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
         control.agent = router.agent
+        control.proposals = proposalController
         control.agentCorner = agentCorner
         control.theme = environment?.theme
         control.settingsWindow = settingsWindow
@@ -474,6 +475,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.toasts?.presenter.show(.init(kind: "proposal-error", message: message, actionTitle: "닫기"), on: self?.toasts?.pointerScreen()) {}
         }
         agent.openProposal = { [weak proposals] in proposals?.open($0, source: "conversation") }
+        if let library { proposals.connect(library.model) }
         proposals.start()
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
         agent.finishDeletion = coordinator.finishDeletion

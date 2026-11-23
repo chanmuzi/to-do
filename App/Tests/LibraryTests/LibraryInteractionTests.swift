@@ -177,8 +177,18 @@ import SpaceIcons
         }
         func clickBelowLastRow(_ rows: [NSRect]) throws {
             let last = try #require(rows.last)
-            try click(window, at: NSPoint(x: last.maxX - theme.space(.sp2) - theme.space(.sp3),
-                                          y: last.minY - theme.component(.librarySidebarRowGap) - theme.component(.libraryMoreSize) / 2))
+            let point = NSPoint(x: last.maxX - theme.space(.sp2) - theme.space(.sp3),
+                                y: last.minY - theme.component(.librarySidebarRowGap) - theme.component(.libraryMoreSize) / 2)
+            // 사이드바가 길면 마지막 줄 다음의 버튼까지 실제로 스크롤한 뒤 누른다.
+            let lastView = try #require(descendants(root).first { view in
+                labels.contains(view.accessibilityLabel() ?? "") && view.convert(view.bounds, to: nil) == last
+            })
+            let document = try #require(lastView.enclosingScrollView?.documentView)
+            let target = document.convert(point, from: nil)
+            let hit = theme.component(.libraryMoreSize)
+            document.scrollToVisible(NSRect(x: target.x - hit / 2, y: target.y - hit / 2, width: hit, height: hit))
+            root.layoutSubtreeIfNeeded()
+            try click(window, at: document.convert(target, to: nil))
         }
 
         let collapsed = visibleRows()

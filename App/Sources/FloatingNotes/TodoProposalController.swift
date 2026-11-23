@@ -1,5 +1,6 @@
 import Agent
 import AppKit
+import Library
 import Models
 import NotePanel
 import Store
@@ -27,6 +28,17 @@ final class TodoProposalController {
 
     init(agent: AgentWindowCoordinator, notes: FileNoteStore, panels: NotePanelCoordinator, theme: Theme, router: AppRouter) {
         self.agent = agent; self.notes = notes; self.panels = panels; self.theme = theme; self.router = router
+    }
+
+    func connect(_ model: LibraryModel) {
+        model.acceptProposals = { [weak self] in self?.accept($0, source: "library") }
+        model.discardProposal = { [weak self] in self?.discard($0, source: "library") }
+        model.openProposal = { [weak self] in self?.open($0, source: "library") }
+        model.reviewProposal = { [weak self] in self?.review($0) }
+        model.seenProposal = { [weak self] id in
+            do { try self?.record(id)?.markProposalSeen(id) }
+            catch { self?.showError("제안 열람을 저장하지 못했어요") }
+        }
     }
 
     func start() {
