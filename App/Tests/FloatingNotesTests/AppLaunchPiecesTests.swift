@@ -80,18 +80,18 @@ import Testing
     @Test func launchActivationIsIgnoredAndLaterActivationsShowTheLibrary() {
         var policy = ActivationFocusPolicy()
         // 다 켜기 전에 온 활성화.
-        let whileLaunching = policy.shouldShowLibrary(activatedAt: 9)
+        let whileLaunching = policy.consumeActivation(at: 9).reason() == .showLibrary
         policy.launchFinished(at: 10)
-        let afterwards = policy.shouldShowLibrary(activatedAt: 10.2)
+        let afterwards = policy.consumeActivation(at: 10.2).reason() == .showLibrary
         #expect(!whileLaunching)
         #expect(afterwards)
 
         var foreground = ActivationFocusPolicy()
         foreground.launchFinished(at: 10)
         // 다 켠 직후의 첫 활성화는 켜면서 온 것이다.
-        let launchActivation = foreground.shouldShowLibrary(activatedAt: 10.05)
+        let launchActivation = foreground.consumeActivation(at: 10.05).reason() == .showLibrary
         // 곧바로 다시 앞으로 가져와도(⌘Tab) 그것은 사용자가 한 것이다.
-        let userActivation = foreground.shouldShowLibrary(activatedAt: 10.4)
+        let userActivation = foreground.consumeActivation(at: 10.4).reason() == .showLibrary
         #expect(!launchActivation)
         #expect(userActivation)
     }
@@ -102,16 +102,16 @@ import Testing
         var policy = ActivationFocusPolicy()
         policy.launchFinished(at: 10)
 
-        let duringAlert = policy.shouldShowLibrary(activatedAt: 500, hasExplicitTarget: true)
-        let afterwards = policy.shouldShowLibrary(activatedAt: 501, hasExplicitTarget: false)
+        let duringAlert = policy.consumeActivation(at: 500).reason(explicitTarget: true) == .showLibrary
+        let afterwards = policy.consumeActivation(at: 501).reason(explicitTarget: false) == .showLibrary
         #expect(!duringAlert)
         #expect(afterwards)
 
         // 다 켠 직후에 알림 창과 함께 온 활성화 다음의 활성화는 사용자의 것이다.
         var early = ActivationFocusPolicy()
         early.launchFinished(at: 10)
-        let first = early.shouldShowLibrary(activatedAt: 10.1, hasExplicitTarget: true)
-        let second = early.shouldShowLibrary(activatedAt: 10.3)
+        let first = early.consumeActivation(at: 10.1).reason(explicitTarget: true) == .showLibrary
+        let second = early.consumeActivation(at: 10.3).reason() == .showLibrary
         #expect(!first)
         #expect(second)
     }
@@ -123,25 +123,61 @@ import Testing
         #expect(status == noErr)
         let event = try #require(created)
         defer { ReleaseEvent(event) }
-        #expect(!ActivationFocusPolicy.activationClickedWindow(event))
+        #expect(ActivationFocusPolicy.carbonTarget(nil) == .noEvent)
+        #expect(ActivationFocusPolicy.carbonTarget(event) == .unspecified)
         var marker = 0
         withUnsafeMutablePointer(to: &marker) { pointer in
             var clickedWindow = UnsafeMutableRawPointer(pointer)
             let set = SetEventParameter(event, EventParamName(kEventParamWindowRef), EventParamType(typeWindowRef),
                                         MemoryLayout.size(ofValue: clickedWindow), &clickedWindow)
             #expect(set == noErr)
-            #expect(ActivationFocusPolicy.activationClickedWindow(event))
+            #expect(ActivationFocusPolicy.carbonTarget(event) == .clickedWindow)
         }
     }
 
     @Test func releasedNoteClickTargetsOnlyItsActivation() {
         var policy = ActivationFocusPolicy()
         policy.launchFinished(at: 0)
-        policy.notePressedWhileInactive()
-        let clicked = policy.shouldShowLibrary(activatedAt: 10)
-        let switched = policy.shouldShowLibrary(activatedAt: 11)
+        policy.notePressedWhileInactive(at: 9.75)
+        let clicked = policy.consumeActivation(at: 10).reason() == .showLibrary
+        let switched = policy.consumeActivation(at: 11).reason() == .showLibrary
         #expect(!clicked)
         #expect(switched)
+    }
+
+    @Test func pointerActivationDecisions() {
+        typealias Window = ActivationDecision.WindowKind
+        typealias Reason = ActivationDecision.Reason
+        let limit = ActivationFocusPolicy.pressLifetime
+        // 창 종류, 왼쪽 누름 경과, 키 누름 경과, 기대 판단.
+        let cases: [(Window, TimeInterval, TimeInterval, Reason)] = [
+            (.floatWindow, 0, 1, .pointer), (.floatWindow, limit, 1, .pointer),
+            (.floatWindow, limit.nextUp, 1, .showLibrary), (.floatWindow, -1, 1, .showLibrary),
+            (.floatWindow, .infinity, .infinity, .showLibrary), (.floatWindow, .nan, 1, .showLibrary),
+            (.library, 0, 1, .showLibrary), (.external, 0, 1, .showLibrary), (.none, 0, 1, .showLibrary),
+            (.floatWindow, 0.2, 0.1, .showLibrary), (.floatWindow, 0.1, 0.2, .pointer),
+        ]
+        let state = ActivationDecision(launching: false, pendingAge: nil)
+        for (window, mouse, key, expected) in cases {
+            #expect(state.reason(window: window, mouseAge: mouse, keyAge: key) == expected)
+        }
+        #expect(state.reason(carbonWindow: true, window: .external) == .carbonWindow)
+        #expect(state.reason(explicitTarget: true, window: .none) == .explicitTarget)
+        let launch = ActivationDecision(launching: true, pendingAge: nil)
+        #expect(launch.reason(window: .external, mouseAge: 0) == .launch)
+    }
+
+    @Test func pendingPressExpiresEvenWhenTheNoteDidNotActivateTheApp() {
+        var policy = ActivationFocusPolicy()
+        policy.launchFinished(at: 0)
+        policy.notePressedWhileInactive(at: 10)
+        let recent = policy.consumeActivation(at: 10 + ActivationFocusPolicy.pressLifetime)
+        #expect(recent.reason() == .localPress)
+        #expect(recent.reason(window: .floatWindow, mouseAge: 0.5, keyAge: 0.1) == .showLibrary)
+        policy.notePressedWhileInactive(at: 20)
+        let expired = policy.consumeActivation(at: (20 + ActivationFocusPolicy.pressLifetime).nextUp)
+        #expect(expired.reason() == .showLibrary)
+        #expect(expired.reason(window: .floatWindow, mouseAge: 0) == .pointer)
     }
 
     /// 뒤에서 켠 실행(로그인 항목, `open -g`)에는 켜면서 오는 활성화가 없다. 첫 활성화가 사용자의 것이다.
@@ -149,8 +185,8 @@ import Testing
         var policy = ActivationFocusPolicy()
         policy.launchFinished(at: 10)
 
-        let first = policy.shouldShowLibrary(activatedAt: 10 + ActivationFocusPolicy.launchGrace)
-        let later = policy.shouldShowLibrary(activatedAt: 500)
+        let first = policy.consumeActivation(at: 10 + ActivationFocusPolicy.launchGrace).reason() == .showLibrary
+        let later = policy.consumeActivation(at: 500).reason() == .showLibrary
         #expect(first)
         #expect(later)
     }
