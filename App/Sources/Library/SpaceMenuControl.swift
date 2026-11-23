@@ -55,14 +55,16 @@ final class SpaceMenuButton: NSButton {
     func spaceMenu() -> NSMenu {
         let menu = NSMenu()
         guard let control else { return menu }
+        menu.autoenablesItems = false
         func separate() {
             let item = NSMenuItem.separator()
             item.view = MenuBarSeparatorView(theme: control.model.theme)
             menu.addItem(item)
         }
-        func add(_ title: String, _ symbol: String, _ selector: Selector) {
+        func add(_ title: String, _ symbol: String, _ selector: Selector, enabled: Bool = true) {
             let item = menu.addItem(withTitle: title, action: selector, keyEquivalent: "")
             item.target = self
+            item.isEnabled = enabled
             item.styleLibraryCommand(symbol, theme: control.model.theme)
         }
         add("이 스페이스에 새 노트", "doc.badge.plus", #selector(createNote))
@@ -70,11 +72,21 @@ final class SpaceMenuButton: NSButton {
         add("아이콘 바꾸기", "photo", #selector(changeIcon))
         add("이름 바꾸기", "pencil", #selector(rename))
         separate()
+        let actions = ReorderActions(.space(control.space.id), section: control.model.spaceSection, move: control.model.moveSidebar)
+        add("위로", "arrow.up", #selector(moveSpaceUp), enabled: actions.available(-1))
+        add("아래로", "arrow.down", #selector(moveSpaceDown), enabled: actions.available(1))
+        separate()
         add("스페이스 지우기", "trash", #selector(deleteSpace))
         return menu
     }
 
     @objc func openMenu() { menu?.popUp(positioning: nil, at: NSPoint(x: bounds.minX, y: bounds.maxY), in: self) }
+    @objc private func moveSpaceUp() { move(by: -1) }
+    @objc private func moveSpaceDown() { move(by: 1) }
+    private func move(by step: Int) {
+        guard let control else { return }
+        ReorderActions(.space(control.space.id), section: control.model.spaceSection, move: control.model.moveSidebar).perform(step)
+    }
     @objc private func createNote() {
         if let control { control.model.newNote(in: control.space.id) }
     }

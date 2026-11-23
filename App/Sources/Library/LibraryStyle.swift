@@ -106,6 +106,6 @@ final class SidebarHoverView: NSView {
 extension NSMenuItem {
     func styleLibraryCommand(_ symbol: String, theme: Theme) {
         image = theme.symbolImage(symbol, size: .menuIcon)
-        view = MenuBarRowView(theme: theme, title: title, symbolName: symbol, iconSize: .menuIcon)
+        view = MenuBarRowView(theme: theme, title: title, symbolName: symbol, iconSize: .menuIcon, isEnabled: isEnabled)
     }
 }

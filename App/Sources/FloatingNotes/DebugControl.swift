@@ -345,13 +345,31 @@ final class DebugControl {
             if let note = library?.model.rows.first(where: { $0.id == id }) { library?.model.open(note) }
         case ("settings-value-hover", _, _) where isPassive:
             if let root = settingsWindow?.window?.contentView { DebugViewAudit.hover(root, label: "기본 캘린더") }
-        case ("library-views-snapshot", let name?, _) where isPassive:
-            guard let library, let url = output(named: name.rawValue) else { return }
-            library.model.editingViews = true
-            Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(350))
-                self?.write(NSApp.windows.first { $0.isVisible && $0.parent === library.window }, to: url)
-                library.model.editingViews = false
+        case ("sidebar-drag", let mode?, _) where isPassive:
+            guard let library, let settingsWindow else { return }
+            let libraryModel = library.model, settings = settingsWindow.model
+            let theme = libraryModel.theme
+            let section = ReorderSection(settings.preferences.value.viewOrder, stride: theme.component(.settingsRow))
+            settings.reorder.cancel()
+            libraryModel.reorder.cancel()
+            switch mode.rawValue {
+            case "settings":
+                settings.reorder.track(.floating, in: section, translation: theme.component(.settingsRow) * 0.8)
+            case "view":
+                libraryModel.reorder.track(.floating, in: libraryModel.viewSection, translation: theme.component(.rowHeight) * 0.8)
+            case "space":
+                let group = libraryModel.spaceSection
+                if group.rows.count > 1 { libraryModel.reorder.track(group.rows[1], in: group, translation: theme.component(.rowHeight) * 0.8) }
+            case "commit":
+                libraryModel.moveSidebar(.floating, to: .all)
+            default: break
+            }
+        case ("settings-opening-tip", let flag?, _) where isPassive:
+            settingsWindow?.model.showsOpeningTip = flag.rawValue == "on"
+        case ("sidebar-menu-snapshot", let name?, _) where isPassive:
+            if let menu = library?.spaceMenuForVerification(), let url = output(named: name.rawValue) {
+                do { try DebugMenuSnapshot.write(menu, to: url) }
+                catch { AppLog.warning("사이드바 메뉴 캡처 실패: \(error)") }
             }
         case ("settings-agent-detail", let provider?, _) where isPassive:
             settingsWindow?.showAgent(provider.rawValue)

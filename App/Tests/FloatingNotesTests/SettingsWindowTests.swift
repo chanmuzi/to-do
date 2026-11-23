@@ -453,6 +453,10 @@ import Theme
             window.sendEvent(event)
         }
         #expect(settings.window?.isVisible == true)
+        settings.model.moveView(.all, to: .today)
+        #expect(library.model.settings.visibleViews == [.all, .today, .floating])
+        library.model.moveSidebar(.today, to: .all)
+        #expect(settings.model.preferences.value.visibleViews == [.today, .all, .floating])
         let opened = try #require(settings.window)
         #expect(router.route(.openSettings) == .handled && settings.window === opened)
     }

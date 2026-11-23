@@ -32,7 +32,24 @@ public final class LibraryModel {
     #endif
     var expanded: Set<SpaceID> = []
     var iconSpace: SpaceID?
-    package var editingViews = false
+    package let reorder = SidebarReorder()
+    package var viewSection: ReorderSection {
+        ReorderSection(settings.visibleViews, stride: sidebarStride)
+    }
+    package var spaceSection: ReorderSection {
+        let extra = Dictionary(uniqueKeysWithValues: expanded.map { id in
+            (LibrarySelection.space(id), CGFloat(index.days(in: id).count) * sidebarStride)
+        })
+        return ReorderSection(spaceList.map { .space($0.id) }, stride: sidebarStride, extra: extra)
+    }
+    private var sidebarStride: CGFloat { theme.component(.rowHeight) + theme.component(.librarySidebarRowGap) }
+    package func moveSidebar(_ row: LibrarySelection, to target: LibrarySelection) {
+        if case .space(let id?) = row, case .space(let other?) = target {
+            perform { try spaces.move(id, to: other) }
+        } else if settings.visibleViews.contains(row), settings.visibleViews.contains(target) {
+            changeSettings { $0.moveView(row, to: target, visibleOnly: true) }
+        }
+    }
     public private(set) var editingSpace = false
     public private(set) var renamingSpaceID: SpaceID?
     static let defaultSpaceIcon = SpaceIcon.symbol(name: "folder", colorID: nil)
@@ -64,7 +81,9 @@ public final class LibraryModel {
         self.theme = theme; self.notes = notes; self.spaces = spaces; self.windows = windows
         self.preferences = preferences; self.router = router
         observations = [notes.observe { [weak self] _ in self?.scheduleRefresh() },
-                        spaces.observe { [weak self] in self?.scheduleRefresh() },
+                        spaces.observe { [weak self] in
+                            guard let self else { return }; spaceList = spaces.spaces; scheduleRefresh()
+                        },
                         windows.observe { [weak self] in self?.scheduleRefresh() }]
         error = preferences.loadWarning
         refresh()

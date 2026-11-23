@@ -77,6 +77,13 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
         }
     }
     #if DEBUG
+    package func spaceMenuForVerification() -> NSMenu? {
+        func freshMenu(_ view: NSView) -> NSMenu? {
+            if let button = view as? SpaceMenuButton, !button.contextOnly { return button.spaceMenu() }
+            return view.subviews.lazy.compactMap(freshMenu).first
+        }
+        return window?.contentView.flatMap(freshMenu)
+    }
     public func importImageForVerification(_ url: URL, space: SpaceID) { model.importImage(url, for: space) }
     public func expandSpaceForVerification(_ id: SpaceID) { model.expanded.insert(id) }
     public func snapshotIconPicker(space: SpaceID, tab: Int? = nil, to url: URL) throws {
@@ -94,7 +101,7 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
         model.dismissUpcoming()
         if !model.choosingDraftIcon { model.cancelSpaceEditing() }
     }
-    public func windowWillClose(_ notification: Notification) { model.dismissUpcoming(); timer?.invalidate(); timer = nil }
+    public func windowWillClose(_ notification: Notification) { model.reorder.cancel(); model.dismissUpcoming(); timer?.invalidate(); timer = nil }
     public func showSpacePicker(for id: NoteID, anchor: NSView?) {
         beforeMove()
         guard let anchor = anchor ?? window?.contentView else { show(); showSpacePicker(for: id, anchor: window?.contentView); return }
