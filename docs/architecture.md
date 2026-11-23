@@ -14,7 +14,7 @@ Core         모든 기능이 공유하는 바탕
 ```
 
 의존은 위에서 아래로만 흐른다. Features의 모듈끼리는 서로 import하지 않는다.
-한 기능이 다른 기능을 열어야 하면(예: 노트 창에서 AI 패널 열기) Core에 정의한 프로토콜을 통해 요청하고, App이 연결한다.
+한 기능이 다른 기능을 열어야 하면(예: 노트 창에서 에이전트 창 열기) Core에 정의한 프로토콜을 통해 요청하고, App이 연결한다.
 
 ## 모듈
 
@@ -37,7 +37,7 @@ Core         모든 기능이 공유하는 바탕
 | Features | `Library` | 라이브러리, 스페이스 아이콘 고르기 | 09, 10 |
 | Features | `Reminders` | 리마인더 설정, 표시, 알림 | |
 | Features | `FloatSettings` | 테마 설정, 단축키 표 | 12, 13 |
-| Features | `Agent` | AI 패널과 에이전트 연결. 연결 대상(Claude, Codex)은 같은 프로토콜의 구현으로 추가한다 | 11 |
+| Features | `Agent` | 노트별 에이전트 창, 초안과 닫기. Models, Store, Routing, Theme에만 의존한다 | 11 |
 
 ## 규칙
 
@@ -86,10 +86,16 @@ scripts/
 
 기능 모듈은 아래만 보고 만든다. 자세한 것은 각 타입의 문서 주석에 있다.
 
+### 에이전트 창과 저장
+
+FloatingNotes가 노트의 얼굴과 키 창의 ⌘J를 `.openAgentWindow(NoteID)`로 연결한다. NotePanel은 노트의 현재 제목과 화면 배치를 제공하고 AppRouter가 Agent에 넘긴다. AgentWindowCoordinator는 노트마다 열린 창을 재사용하고, 빈 창은 첫 편집 전까지 메모리에만 둔다.
+
+Models의 AgentConversation과 AgentProposal은 실행기와 독립된 Codable 값이다. Store의 AgentStore는 상태 폴더 아래 `agent/conversations/<UUID>.json`과 UTF-8 `agent/instructions.md`를 원자 교체한다. 대화는 버전 1이며 대상 노트는 ID로 식별한다. 읽을 수 없는 파일은 보존하고 경고를 남긴다. 요청 전 초안은 대화 목록에서 제외한다. 대화 파일에는 표시된 요청과 답을 보관하며 사용량 파일, 제공자 연결 자료와 저장 위치가 다르다.
+
 ### AgentRunner와 FloatMCP
 
 - 연결 화면은 `AgentConnection(provider:location:)`에서 `discover()`로 CLI, 버전, Codex용 node를 찾는다. `account(_:)`는 로그인 여부와 CLI가 제공한 계정 정보만 읽는다. `loginCommand(_:)`는 실행 파일, 인자, 환경, cwd만 반환한다. 로그인 시작은 연결 화면의 명시적 동작이다. waitForLogin()은 기존 프로세스 그룹 실행기를 재사용한다. 디버그의 --debug-agent-bin은 해당 폴더에서만 탐색하며 --debug-passive도 실제 CLI로 폴백하지 않는다.
-- AI 패널은 `AgentRunner(location:server:)`를 만들고 `run(_:engine:installation:timeout:onEvent:)`를 호출한다. 서버의 기본 위치는 앱의 보조 실행 파일이다. `AgentEvent`는 시작, 본문, 도구 호출, 사용 한도, 사용량을 전달한다. 완료 값은 본문, 확인된 모델, 사용량이다. Swift Task를 취소하면 실행기가 만든 프로세스 그룹을 종료한다.
+- 읽기 실행은 `AgentRunner(location:server:)`에서 `run(_:engine:installation:timeout:onEvent:)`를 호출한다. 서버의 기본 위치는 앱의 보조 실행 파일이다. `AgentEvent`는 시작, 본문, 도구 호출, 사용 한도, 사용량을 전달한다. 완료 값은 본문, 확인된 모델, 사용량이다. Swift Task를 취소하면 실행기가 만든 프로세스 그룹을 종료한다.
 - `AgentEngine`은 Claude 별칭, Codex 모델명, API 키 공급자를 구분한다. `APIKeyStoring`의 기본 구현 `KeychainAPIKeyStore`는 공급자별 일반 암호를 읽고 갱신하고 삭제한다. G0에서 API 엔진을 실행하면 `unsupportedEngine`을 반환한다.
 - `FloatMCP <노트 폴더>`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes({})` 결과는 정렬한 파일명이며 `read_note({"name":"파일명.md"})`는 머리를 포함한 UTF-8 원문을 반환한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
 
@@ -173,7 +179,7 @@ scripts/
 
 ### Routing
 
-- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAIPanel(context: NoteID?)`, `.openSettings`, `.openShortcuts`, `.openReminderEditor(NoteID)`, `.openSpacePicker(NoteID)`.
+- `Route`: `.openNote(NoteID)`, `.newNote(NewNoteRequest)`, `.closeNoteWindow(NoteID)`, `.openCapture`, `.openBrowse(anchor: NoteID?)`, `.toggleAllNotesHidden`, `.openLibrary`, `.openAgentWindow(NoteID)`, `.requestAgent`, `.openSettings`, `.openShortcuts`, `.openReminderEditor(NoteID)`, `.openSpacePicker(NoteID)`.
 - `Routing` (`@MainActor` 프로토콜): `route(_: Route) -> RouteResult`(`@discardableResult`), `isConnected(_: Route) -> Bool`. 기능 모듈은 `any Routing`을 받아 부르기만 한다. SwiftUI는 `@Environment(\.router)`.
   - `RouteResult`: `.handled`(그 일을 했다), `.failed`(하려 했으나 하지 못했다. 사용자에게 알리는 일은 받은 쪽이 이미 했고, 알림 창이 닫힌 뒤에 돌아온다), `.unconnected`(그 화면이 아직 이어져 있지 않다). 보낸 쪽은 이 답으로 닫을지, 적던 글을 둘지, 포커스를 돌려줄지 정한다(D-034).
   - `isConnected(_:)`: 그 요청을 받는 화면이 이어져 있는지. 기능 모듈은 이어지지 않은 요청을 보내는 줄을 내놓지 않거나(노트 찾기의 "라이브러리 열기") 고를 수 없게 둔다(노트의 더 보기 메뉴).
@@ -200,7 +206,7 @@ Float 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routi
   - `displayOptions: NotePanelDisplayOptions`: 스페이스 표시(아이콘, 아이콘+이름, 이름), 리마인더 표시(시간, 남은 시간, 아이콘), 시간 형식, 임박 기준. 설정 화면이 생기면 여기에 넣는다.
 - 노트 창이 하는 일과 하지 않는 일:
   - 제목, 노트 색은 `update`/`scheduleUpdate`로 그 항목만 고친다. 핀과 창 틀, 열림 상태는 `WindowStateStore`에 둔다.
-  - 노트 찾기, 새 노트, 창 닫기, 리마인더 설정, 스페이스 옮기기, AI 패널은 `Route`를 보낸다. 직접 열지 않는다.
+  - 노트 찾기, 새 노트, 창 닫기, 리마인더 설정, 스페이스 옮기기, 에이전트 창은 `Route`를 보낸다. 직접 열지 않는다.
   - 저장소 변경을 받는다. 이 앱의 쓰기(`.updated`/`.local`)든 다른 프로그램의 변경(`.updated`/`.external`)이든 `load`로 다시 읽어 `note`와 상단 줄을 맞추고, 본문이 편집기와 마지막으로 주고받은 것과 다를 때만 편집기에 넣는다(아래 "본문 편집기 이음매"). 이 창이 한 저장은 언제나 주고받은 본문과 같아 편집기를 건드리지 않고, 이 앱의 다른 곳이 쓴 본문(빠른 캡처가 덧붙인 줄)만 들어간다. 그때도 `text`에 통째로 넣지 않고 `appendFromOutside`나 `applyOutsideChange(to:)`로 넘긴다.
   - 충돌(`.conflict`)이나 저장 실패가 나면 사용자가 쓴 글을 그대로 두고 상단 줄에 표시 하나를 띄운다. 누르면 내 내용으로 저장 / 파일의 내용으로 되돌리기(`resolveConflict`), 다시 저장을 고른다. "다시 저장"은 이 노트의 실패만 본다(다른 노트의 실패는 기록만 하고, 이 노트가 충돌이면 충돌 표시로 넘어간다). 쓰지 못한 글이 있는 창은 닫지 않는다.
   - 노트가 없어지면(`.removed`): 이 앱이 휴지통으로 보낸 것이면 창을 내린다. 다른 프로그램이 지운 것이면 쓰지 못한 글이나 풀지 않은 표시가 없을 때만 창을 내리고, 있으면 창을 남겨 표시("노트 파일이 없어졌습니다")를 띄운다. 누르면 "새 노트로 저장"(편집기가 아직 알리지 않은 글을 먼저 받고, 지금 제목, 본문, 스페이스, 색, 리마인더로 `create`한 새 노트를 같은 자리와 핀으로 띄우고 옛 창을 내림. 접힘 같은 창 상태도 새 노트로 옮긴다) / "버리기"(`discardPendingChanges` 뒤 창을 내림)를 고른다. 고를 때까지 닫기와 휴지통으로는 창이 닫히지 않는다. 같은 이름의 파일이 돌아오면 남은 변경을 다시 쓰고, 내용이 달라져 있으면 충돌 표시로 넘어간다.
@@ -423,7 +429,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 ### 요청 전달 (`AppRouter`)
 
-- `Routing` 구현. `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로, `.openCapture`, `.openBrowse(anchor:)`를 `QuickPanels`로 넘기고, `.openLibrary`와 `.openSpacePicker`는 `LibraryCoordinator`로 넘긴다. 나머지(AI 패널, 설정, 단축키 표, 리마인더 설정)는 아직 기록만 하고(`unhandled`) `.unconnected`로 답한다. 어느 요청이 이어져 있는지는 `Route.isConnected`(App의 확장) 한 곳에 적고, `Routing.isConnected(_:)`로 기능 모듈에도 알려 준다. `AppCommand.isConnected`가 그것을 읽고, 전역 단축키는 그 값이 참인 동작만 등록하며, 메뉴 막대 메뉴와 Dock 메뉴와 앱 메뉴는 그 값이 거짓인 항목을 고를 수 없게 둔다. 뒤 단계의 화면을 이을 때도 그 줄을 참 쪽으로 옮기고 `route(_:)`에서 그 화면을 부르면 된다.
+- `Routing` 구현. `.openNote`, `.newNote`, `.closeNoteWindow`, `.toggleAllNotesHidden`을 `NotePanelCoordinator`로, `.openCapture`, `.openBrowse(anchor:)`를 `QuickPanels`로 넘기고, `.openLibrary`와 `.openSpacePicker`는 `LibraryCoordinator`로 넘긴다. 노트의 `.openAgentWindow`는 AgentWindowCoordinator로 넘긴다. 전역 요청 막대인 `.requestAgent`는 기록만 하고(`unhandled`) `.unconnected`로 답한다. 어느 요청이 이어져 있는지는 `Route.isConnected`(App의 확장) 한 곳에 적고, `Routing.isConnected(_:)`로 기능 모듈에도 알려 준다. `AppCommand.isConnected`가 그것을 읽고, 전역 단축키는 그 값이 참인 동작만 등록하며, 메뉴 막대 메뉴와 Dock 메뉴와 앱 메뉴는 그 값이 거짓인 항목을 고를 수 없게 둔다. 뒤 단계의 화면을 이을 때도 그 줄을 참 쪽으로 옮기고 `route(_:)`에서 그 화면을 부르면 된다.
 - 새 노트를 만들거나 노트를 열다가 실패하면 기록과 함께 알림 창으로 까닭을 보여 준 뒤 `.failed`로 답한다(`RouteFailureAlert`). 보낸 쪽이 그 답으로 뒷일을 정한다: 캡처 바는 적은 글을 둔 채 열려 있고, 노트 찾기는 닫히며 쓰던 노트가 다시 키 창이 된다. 캡처 바와 노트 찾기가 보낸 요청(고른 노트의 `.openNote`, "새 노트 만들기"와 캡처 ⌘↵의 `.newNote`)도 같은 길로 돌아오므로 같은 알림이 뜬다. `.openNote`는 그 창을 앞으로 가져오고 키 창으로 만든다(사용자가 고른 것이다, D-025의 "앱이 시킨다").
 
 ### 빠른 캡처와 노트 찾기 (`QuickPanels`)
@@ -457,12 +463,12 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 - 메뉴 막대 아이콘은 꺼 둘 수 있다(`AppSettings.showsMenuBarIcon`, 기본 보임. `AppDelegate.setMenuBarIconShown(_:)`이 적고 곧바로 반영한다. 실행 인자 `--menu-bar-icon on|off`가 그 실행에서만 덮어쓴다). 꺼도 모든 기능에 닿는다: 전역 단축키, 앱 안의 단축키, 앱 메뉴(메뉴 막대 메뉴의 항목이 모두 보이는 항목으로 있다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다), Dock 메뉴(`DockMenu`: 메뉴 막대 메뉴에서 종료만 뺀 같은 항목), Dock 아이콘 누르기(숨긴 노트를 되돌리고, 떠 있는 노트가 없으면 라이브러리를 연다).
 - `StatusItemController`: `NSStatusItem`(너비는 그림에 맞춤, `variableLength`)에 `MenuBarIcon.load()`의 18pt 템플릿 이미지(`App/Resources/menubar-icon.pdf`)를 넣고, 메뉴가 열릴 때마다 `StatusMenuModel.entries(areNotesHidden:)`로 다시 채운다. 노트를 숨긴 중이면 "노트 모두 숨기기" 자리에 "노트 모두 보이기"가 온다.
 - `StatusMenuModel`: 항목의 순서, 이름, 아이콘(SF Symbols, spec 18.2), 동작(`StatusMenuAction`). 이름과 순서는 `tokens.json`의 `navigation.menuBar`와 같은지 테스트가 견준다. `StatusMenuBuilder`가 `NSMenu`로 만들고 줄은 `MenuBarRowView`(노트의 더 보기 메뉴와 같은 모양: `row-h`, 14pt 아이콘, `hover` 바탕, 불투명 `surface` 바탕), 구분선은 `MenuBarSeparatorView`가 그린다(D-039). `keyEquivalent`는 넣지 않는다.
-- 여는 화면이 아직 이어지지 않은 항목(지금은 AI 패널, 설정, 단축키. `StatusMenuAction.isConnected`)은 자리와 이름을 그대로 두되 고를 수 없게 흐려 둔다(글자와 아이콘 `text-3`, `hover` 바탕 없음). 항목과 차례는 spec 4.3 그대로다(D-034). Dock 메뉴와 앱 메뉴도 같다. 노트의 더 보기 메뉴에서도 "리마인더 설정", "AI 패널 열기"가 같은 모습이다. "스페이스 옮기기"는 Library로 연결됐다.
+- 여는 화면이 아직 이어지지 않은 항목(지금은 에이전트에게 요청. `StatusMenuAction.isConnected`)은 자리와 이름을 그대로 두되 고를 수 없게 흐려 둔다(글자와 아이콘 `text-3`, `hover` 바탕 없음). 항목과 차례는 spec 4.3 그대로다(D-034). Dock 메뉴와 앱 메뉴도 같다. "스페이스 옮기기"는 Library로 연결됐다.
 - 고른 항목은 `AppCommandDispatcher.performStatusMenu(_:)`가 받는다. 메뉴 막대에서 연 노트 찾기는 `.openBrowse(anchor: nil)`이다(spec 4.1).
 
 ### 그 밖
 
-- Features 타깃 `Settings`, `Agent`는 아직 없다. 그 화면을 여는 요청은 `AppRouter`가 기록만 하고 `.unconnected`로 답한다.
+- 설정은 FloatSettings, 에이전트 창은 Agent 타깃에 연결되어 있다.
 - 움직임과 상태(D-032): 창이나 뷰의 움직임이 끝났다는 알림(`NSAnimationContext`의 `completionHandler`)에 상태를 걸지 않는다. 화면이 꺼져 있거나 잠겨 있으면 창의 움직임은 나아가지 않고 그 알림도 오지 않는다. 전환이 끝날 때 해야 하는 일(창 내리기, 끝의 값으로 놓기, 숨기고 자리 비우기)은 `Theme`의 `TransitionTimer.after(_:_:)`로 전환 시간 뒤에 잡고, 반대쪽 전환이 시작되면 취소한다. 세 기능의 `animate`(`CaptureStyle`, `BrowseStyle`, `PanelStyle`)는 끝났을 때를 알려 주는 인자가 없다. `swift test`는 화면이 잠겨 있어도 통과해야 한다.
 - 자동으로 확인하지 못한 것(실제 한글 입력, 실제 전역 단축키, 키 창이 넘어가는 모습 등)은 `docs/verification-checklist.md`에 손으로 볼 목록으로 모아 두었다.
 - SF Symbols 아이콘은 모두 `Theme.symbolImage(_:size:)`로 만든다(크기 토큰의 칸 안에 드는 크기, 눈으로 커 보이는 것만 `iconOptical` 표로 줄임, 1 이하만). 이미지 뷰는 그림을 늘리거나 줄이지 않고(`.scaleNone`) `Theme.symbolFrame`의 틀 가운데에 둔다(D-039).

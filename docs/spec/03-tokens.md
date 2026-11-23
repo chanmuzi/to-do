@@ -176,3 +176,9 @@
 창 크기는 settings-w 700, settings-content-h 540이다. settings-top은 52, settings-sidebar-w는 200, settings-sidebar-row는 28이다. 배경 높이는 26이며 선택과 호버는 selected와 hover다. 제목은 library-header-font 15, 굵기 600이다.
 
 한 줄 이동 줄의 호버 높이는 `settings-nav-single-line-hover-h` 30pt다. 두 줄 이동 줄은 줄 높이에서 위아래로 `settings-nav-two-line-hover-inset-y` 4pt씩 뺀다. 둘 다 반경은 `settings-nav-hover-radius` 6pt, 내용 양끝에서 `settings-nav-hover-outset` 6pt다. 카드 행은 settings-row 36, 세그먼트 높이는 24, 슬라이더 폭은 148, 동작 버튼 높이는 22다. 단축키의 글자 칸은 15pt, 보조 키 자간은 1.5pt다. 미리보기 폭은 340, settings-flash는 600ms다. 에이전트 배너 높이는 44, 툴팁 꼬리는 9다. 경고에는 warn을 쓴다.
+
+### 에이전트 창과 얼굴 (1단계 PR 1)
+
+정지 가장자리는 `agent-edge-idle` 1pt, 밝은 색은 `agent-edge-a` #A597DB와 `agent-edge-b` #E6B89A다. 어두운 초안은 #80759F와 #AD8D79다. 작업 가장자리 1.5pt와 번짐 3pt는 각각 `agent-edge-working`, `agent-edge-glow`에 둔다.
+
+얼굴은 icon-s 13pt, icon-m 14pt, agent-face-medium 16pt, agent-face-large 20pt다. 에이전트 창의 머리와 입력 높이는 chrome-h, 조작은 icon-btn과 icon-btn-gap을 쓴다. 머리 왼쪽은 14pt, 얼굴과 이름 사이는 9pt, 입력 글자는 13.5pt다. 상태별 주기와 점, 물결의 지연은 motion의 agent 키를 사용한다. 움직임 줄이기에서는 정지 벡터를 그린다.
