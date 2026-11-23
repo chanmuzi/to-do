@@ -81,6 +81,7 @@ public final class NotePanelCoordinator {
 
     /// 노트를 휴지통으로 보냈다(되돌릴 수 있게 된 뒤에 불린다). 그 노트의 창이 있던 화면을 함께 넘긴다.
     /// App이 "되돌리기"가 붙은 짧은 알림을 띄운다(D-041).
+    package var windowsChanged: () -> Void = {}
     public var onAcceptTitleDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
     public var onMovedToTrash: ((NoteID, NSScreen?) -> Void)?
     /// 휴지통 되돌리기가 끝났다(되살렸거나, "바로 뒤"가 지났다). 알림을 거둔다.
@@ -171,6 +172,7 @@ public final class NotePanelCoordinator {
         controllers[id] = controller
         order.append(id)
         controller.show(focus: focus)
+        windowsChanged()
     }
 
     /// 새 노트를 만들어 지금 노트 옆에 띄운다. 핀이 켜진 채로 뜬다(spec 4.1).
@@ -273,6 +275,8 @@ public final class NotePanelCoordinator {
 
     /// 떠 있는 모든 노트 창에서 고치던 제목을 마무리하고 편집기가 아직 알리지 않은 본문을 받는다.
     /// App이 끝내기 전에 `flushPendingSaves()`보다 먼저 부른다.
+    package func flushPendingEdits(for id: NoteID) { controllers[id]?.flushPendingEdits() }
+
     public func flushPendingEdits() {
         order.compactMap { controllers[$0] }.forEach { $0.flushPendingEdits() }
     }
@@ -499,6 +503,7 @@ public final class NotePanelCoordinator {
         let wasKey = isKeyPanel(controller.panel)
         order.removeAll { $0 == id }
         controller.discardWindow()
+        windowsChanged()
         guard handsOffKey else { return }
         switch KeyHandoff.afterDiscarding(
             wasKey: wasKey, nextVisible: frontmostNoteID, afterTrash: trashInProgress == id

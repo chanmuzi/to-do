@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsCoordinator?
     private var library: LibraryCoordinator?
     private var agentCorner: AgentCorner?
+    private var proposalController: TodoProposalController?
     private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -204,7 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
                 ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() },
                 inactiveWindowPress: { [weak self, weak notePanels] window, time in
-                    guard let notePanels, notePanels.openNoteIDs.contains(where: { notePanels.window(for: $0) === window }) else { return }
+                    guard let notePanels, notePanels.openNoteIDs.contains(where: { notePanels.window(for: $0) === window || notePanels.window(for: $0) === window.parent && window.parent != nil }) else { return }
                     self?.activationFocus.notePressedWhileInactive(at: time)
                 }
             )
@@ -464,6 +465,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panels.traceActivation = router.traceActivation
         agent.onClose = { [weak router] in router?.traceActivation("agent-close") }
         agent.present = { [weak router] draft, source in router?.showAgent(draft, source: source) }
+        let proposals = TodoProposalController(agent: agent, notes: environment.notes, panels: notes, theme: environment.theme, router: router)
+        proposalController = proposals
+        proposals.showToast = { [weak self] message, action, perform in
+            self?.toasts?.presenter.show(.init(kind: "proposal", message: message, actionTitle: action), on: self?.toasts?.pointerScreen(), action: perform)
+        }
+        proposals.showError = { [weak self] message in
+            self?.toasts?.presenter.show(.init(kind: "proposal-error", message: message, actionTitle: "닫기"), on: self?.toasts?.pointerScreen()) {}
+        }
+        agent.openProposal = { [weak proposals] in proposals?.open($0, source: "conversation") }
+        proposals.start()
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
         agent.finishDeletion = coordinator.finishDeletion
         agent.stopBeforeDelete = coordinator.stopBeforeDelete
@@ -499,6 +510,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.toasts?.presenter.show(.init(kind: "agent", message: message, actionTitle: success ? "보기" : "다시 시도",
                                                face: success ? .done : .blocked),
                                          on: self?.toasts?.pointerScreen()) { [weak self] in
+                if let id = request.proposals.first?.id, success { self?.proposalController?.open(id, source: "toast"); return }
                 router?.showAgent(draft, source: "toast")
                 if !success { self?.requests?.retry(draft, id: request.id) }
             }

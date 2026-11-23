@@ -29,6 +29,44 @@ import Theme
         return result
     }
 
+    @Test func proposalCardActionsUseTheDisplayedID() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: AgentStore(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        let id = try fx.open("테스트")
+        let draft = try agent.record(for: id)
+        let bytes = try Data(fx.notes.proposalText(id).utf8)
+        let input = TodoSubmission(noteID: id.rawValue, lines: ["확인"], version: TodoSubmission.fingerprint(bytes))
+        var request = AgentRequest(id: UUID(), text: "정리", engine: "fixture", model: nil)
+        let first = AgentProposal.submitted(input, key: "a", request: request, source: nil)
+        let second = AgentProposal.submitted(input, key: "b", request: request, source: nil)
+        request.proposals = [first, second]
+        draft.change { $0.requests.append(request) }
+        let controller = TodoProposalController(agent: agent, notes: fx.notes, panels: fx.notePanels, theme: fx.theme, router: fx.router)
+        var events: [String] = []
+        fx.router.traceActivation = { events.append($0) }
+        var undo: (() -> Void)?
+        controller.showToast = { _, _, action in undo = action }
+        controller.start()
+        controller.open(first.id, source: "toast")
+        func press(_ name: String) async throws {
+            try await Task.sleep(for: .milliseconds(150))
+            let card = try #require(controller.card(for: id))
+            let button = try #require(buttons(in: card)[name])
+            #expect(button.accessibilityPerformPress?() == true)
+        }
+        try await press("받기")
+        #expect(draft.proposal(first.id)?.status == .accepted)
+        undo?()
+        #expect(try Data(fx.notes.proposalText(id).utf8) == bytes)
+        controller.open(second.id, source: "library")
+        try await press("버리기")
+        #expect(draft.proposal(second.id)?.status == .discarded)
+        #expect(events == ["proposal-open toast", "proposal-accept card", "proposal-open library", "proposal-discard card"])
+    }
+
     @Test func barAndConversationButtonsDeliverTheirActions() async throws {
         let fx = try WiringFixture()
         defer { fx.cleanUp() }
