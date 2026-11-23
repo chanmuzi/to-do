@@ -21,6 +21,7 @@ struct TopRowLayout: Hashable {
         var reminderWidth: CGFloat?
         var hasSchedules = true
         var showsControls = true
+        var isPinned = false
         var showsProblem: Bool
     }
 
@@ -46,12 +47,13 @@ struct TopRowLayout: Hashable {
         close = input.showsControls ? takeTrailing(metrics.iconButton, gap: 0) : .zero
         divider = input.showsControls ? takeTrailing(metrics.dividerWidth, gap: metrics.gap) : .zero
         more = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.gap) : .zero
-        pin = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.buttonGap) : .zero
+        let showsPin = input.showsControls || input.isPinned
+        pin = showsPin ? takeTrailing(metrics.iconButton, gap: input.showsControls ? metrics.buttonGap : 0) : .zero
         if input.hasSchedules && input.showsControls && input.reminderWidth == nil {
             clock = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
         }
         if let width = input.reminderWidth {
-            let gap = input.showsControls ? metrics.gap : 0
+            let gap = showsPin ? metrics.gap : 0
             let reserved = metrics.paddingLeading + metrics.gap + (input.showsProblem ? metrics.iconButton + metrics.buttonGap : 0)
             reminder = takeTrailing(min(width, max(0, trailing - reserved - gap)), gap: gap)
         }

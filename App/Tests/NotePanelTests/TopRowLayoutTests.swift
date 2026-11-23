@@ -42,6 +42,30 @@ import Theme
         #expect(frames.clock.maxX + metrics.buttonGap == frames.pin.minX)
     }
 
+    @Test func restingPinReservesTheTrailingSlotAndTheChipGap() {
+        for pinned in [false, true] {
+            for chip: CGFloat? in [nil, 57] {
+                let frames = TopRowLayout(.init(width: 340, titleWidth: 1000, reminderWidth: chip,
+                                                showsControls: false, isPinned: pinned, showsProblem: false),
+                                          metrics: metrics)
+                let right = 340 - metrics.paddingTrailing
+                #expect(frames.more == .zero && frames.close == .zero && frames.divider == .zero && frames.clock == .zero)
+                if pinned {
+                    #expect(frames.pin.maxX == right && frames.pin.width == metrics.iconButton)
+                } else {
+                    #expect(frames.pin == .zero)
+                }
+                let contentRight = pinned ? frames.pin.minX : right
+                if let reminder = frames.reminder {
+                    #expect(reminder.maxX == contentRight - (pinned ? metrics.gap : 0))
+                    #expect(frames.title.maxX == reminder.minX - metrics.gap)
+                } else {
+                    #expect(frames.title.maxX == contentRight - metrics.gap)
+                }
+            }
+        }
+    }
+
     @Test func longTitleIsCutBeforeTheHoverIconSlots() {
         let frames = layout(title: 1000)
         #expect(frames.title.maxX == (frames.reminder?.minX ?? 0) - metrics.gap)
