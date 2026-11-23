@@ -63,6 +63,7 @@ public enum HighlightColor: Int, CaseIterable, Sendable {
 public enum ShadowToken: String, CaseIterable, Sendable {
     case window = "shadow-window"
     case pop = "shadow-pop"
+    case agentCorner = "shadow-agent-corner"
 }
 
 public enum FontRole: String, CaseIterable, Sendable {
@@ -154,6 +155,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case scheduleRowHeight = "schedule-row-h"
     case scheduleListMaxHeight = "schedule-list-max-h"
     case reminderEditorWidth = "reminder-editor-w"
+    case noticeDot = "notice-dot"
+    case cornerButton = "corner-button"
     case agentFaceMedium = "agent-face-medium"
     case agentFaceLarge = "agent-face-large"
     case agentHeaderInset = "agent-header-inset"

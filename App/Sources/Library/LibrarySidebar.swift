@@ -31,6 +31,11 @@ struct LibrarySidebar: View {
                     ForEach(model.settings.visibleViews, id: \.self) { item in row(item, symbol: symbol(item)) }
                 }
                 VStack(spacing: theme.component(.librarySidebarRowGap)) {
+                    LibrarySectionHeader(theme: theme, title: "에이전트", symbol: nil, label: "에이전트에게 요청",
+                                         action: { model.router.route(.requestAgent) }, agentFace: true, previewHover: headerHover)
+                    conversationRow
+                }
+                VStack(spacing: theme.component(.librarySidebarRowGap)) {
                     sectionHeader("스페이스", symbol: "plus", label: "새 스페이스") { model.beginSpaceEditing() }
                     ForEach(model.spaceList) { space in
                         if model.editingSpace && model.renamingSpaceID == space.id {
@@ -78,6 +83,34 @@ struct LibrarySidebar: View {
         .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, _ in
             model.dismissUpcoming()
         }
+    }
+
+    @State private var hoveringConversation = false
+    @FocusState private var focusedConversation: Bool
+    private var headerHover: Bool {
+        #if DEBUG
+        model.previewSectionHover
+        #else
+        false
+        #endif
+    }
+
+    private var conversationRow: some View {
+        let showsAction = hoveringConversation || focusedConversation
+        return row(.conversations, symbol: "bubble.left")
+            .focused($focusedConversation)
+            .overlay(alignment: .trailing) {
+                if showsAction {
+                    ChromeIconButton(theme: theme, title: "새 대화", symbol: "plus", action: model.newConversation)
+                        .padding(.trailing, theme.space(.sp1))
+                } else if model.conversations().contains(where: \.needsAnswer) {
+                    ConversationNoticeDot(theme: theme)
+                        .padding(.trailing, theme.space(.sp2) + theme.space(.sp1)).allowsHitTesting(false)
+                }
+            }
+            .onHover { hoveringConversation = $0 }
+            .contextMenu { Button("새 대화", action: model.newConversation) }
+            .accessibilityAction(named: "새 대화", model.newConversation)
     }
 
     private var settingsRow: some View {
@@ -220,16 +253,26 @@ private struct LibrarySectionHeader: View {
     let symbol: String?
     let label: String
     let action: () -> Void
+    var agentFace = false
+    var previewHover = false
     @State private var hovered = false
     var body: some View {
         HStack {
             Text(title).font(theme.font(.librarySection)).foregroundStyle(theme.libraryColor(.text3))
             Spacer()
-            if let symbol {
+            if agentFace {
+                Button(action: action) {
+                    AgentFace(theme: theme).frame(width: theme.component(.iconButton), height: theme.component(.iconButton))
+                }.buttonStyle(SettingsButton(theme: theme, selected: false))
+                    .accessibilityLabel(label).opacity(hovered || previewHover ? 1 : 0)
+            } else if let symbol {
                 ChromeIconButton(theme: theme, title: label, symbol: symbol, action: action).opacity(hovered ? 1 : 0)
             }
         }.frame(height: theme.component(.librarySectionHeaderHeight)).padding(.horizontal, theme.space(.sp2))
+            .background(agentFace && (hovered || previewHover) ? theme.libraryColor(.hover) : .clear,
+                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             .contentShape(Rectangle()).onHover { hovered = $0 }
+            .accessibilityActions { if agentFace { Button(label, action: action) } }
             .animation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : theme.motion.animation, value: hovered)
     }
 }

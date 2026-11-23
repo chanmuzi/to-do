@@ -8,6 +8,8 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     public let createdAt: Date
     public var updatedAt: Date
     public var targets: [NoteID]
+    public var seenAt: Date?
+    public var needsAnswer: Bool { requests.contains { $0.status == .awaitingAnswer } }
     public var draft: String
     public struct Queued: Identifiable, Codable, Equatable, Sendable {
         public let id: UUID
@@ -27,13 +29,14 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued
+        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(formatVersion, forKey: .formatVersion)
         try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(seenAt, forKey: .seenAt)
         try c.encode(name, forKey: .name)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)
@@ -68,6 +71,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
                                                    debugDescription: "지원하지 않는 대화 형식입니다")
         }
         id = try c.decode(UUID.self, forKey: .id)
+        seenAt = try c.decodeIfPresent(Date.self, forKey: .seenAt)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         targets = try c.decodeIfPresent([NoteID].self, forKey: .targets) ?? []

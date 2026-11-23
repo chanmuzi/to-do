@@ -108,7 +108,7 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
 private final class LibraryWindow: NSWindow {
     var allowsKey = true
     var handleContentClick: (NSPoint) -> Void = { _ in }
-    private weak var pressedRow: LibraryRowInputView?
+    private weak var pressedRow: NSView?
     override func sendEvent(_ event: NSEvent) {
         // 노트 창과 같은 경로: hosting view의 제스처 처리 전에 줄이 누름/뗌 한 쌍을 소유한다.
         // 특히 두 번째 누름이 SwiftUI 부모에 흡수되어 더블 클릭이 없어지지 않게 한다.
@@ -117,7 +117,8 @@ private final class LibraryWindow: NSWindow {
             handleContentClick(event.locationInWindow)
             pressedRow = nil
             if let content = contentView, let parent = content.superview,
-               let row = content.hitTest(parent.convert(event.locationInWindow, from: nil)) as? LibraryRowInputView {
+               let row = content.hitTest(parent.convert(event.locationInWindow, from: nil)),
+               row is LibraryRowInputView || row is HistoryRowInputView {
                 pressedRow = row
                 if allowsKey, !isKeyWindow { makeKeyAndOrderFront(nil) }
                 row.mouseDown(with: event)

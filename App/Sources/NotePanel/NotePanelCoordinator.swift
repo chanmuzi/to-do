@@ -23,6 +23,13 @@ public final class NotePanelCoordinator {
     public var recognizesDates = true {
         didSet { controllers.values.forEach { $0.root.topRow.recognizesDates = recognizesDates } }
     }
+    package var agentFaces: [NoteID: AgentFaceState] = [:] {
+        didSet {
+            for (id, controller) in controllers where agentFaces[id] != oldValue[id] {
+                controller.refreshChrome(animated: true)
+            }
+        }
+    }
     public var displayOptions = NotePanelDisplayOptions() {
         didSet { controllers.values.forEach { $0.refreshChrome(animated: false) } }
     }
@@ -106,6 +113,7 @@ public final class NotePanelCoordinator {
         environment = NotePanelEnvironment(
             style: PanelStyle(theme: theme), notes: notes, spaces: spaces, router: router,
             recorder: recorder, makeBodyEditor: makeBodyEditor,
+            agentFace: { [weak self] in self?.agentFaces[$0] ?? .idle },
             options: { [unowned self] in displayOptions }, now: { [unowned self] in now() }, log: log
         )
         spaceObservation = spaces.observe { [weak self] in

@@ -77,6 +77,7 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var agentCorner: AgentCorner?
     weak var agent: AgentWindowCoordinator?
     weak var theme: Theme?
     weak var settingsWindow: SettingsCoordinator?
@@ -329,6 +330,7 @@ final class DebugControl {
         case ("library-select", let target?, _):
             let value = target.rawValue
             switch value {
+            case "conversations": library?.model.select(.conversations)
             case "today": library?.model.select(.today)
             case "all": library?.model.select(.all)
             case "floating": library?.model.select(.floating)
@@ -476,6 +478,31 @@ final class DebugControl {
             guard let url = output(named: name), let library else { return }
             do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), to: url) }
             catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
+        case ("history-hover", let item?, _) where isPassive:
+            library?.model.previewHistoryHover = UUID(uuidString: item.rawValue)
+            library?.model.previewSectionHover = item.rawValue == "section"
+        case ("history-open", let item?, _) where isPassive:
+            if let id = UUID(uuidString: item.rawValue) { library?.model.openConversation(id) }
+        case ("history-fixture", let note?, _) where isPassive:
+            guard let agent, agent.history.isEmpty else { return }
+            // 격리 실행에서만 명시적인 확인 대기를 가진 저장 자료를 만든다.
+            for daysAgo in [1, 0] {
+                let draft = agent.newRecord(targets: daysAgo == 0 ? [note] : [])
+                var request = AgentRequest(id: UUID(), text: daysAgo == 0 ? "회의 일정 확인" : "주간 노트 정리",
+                                           engine: "fixture", model: nil)
+                request.status = daysAgo == 0 ? .awaitingAnswer : .completed
+                request.answer = daysAgo == 0 ? "어느 날짜를 확인할까요?" : "주간 노트를 정리했어요."
+                draft.conversation.requests = [request]
+                draft.conversation.messages = [.init(role: .user, requestID: request.id, text: request.userText),
+                                               .init(role: .assistant, requestID: request.id, text: request.answer ?? "")]
+                draft.conversation.updatedAt = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
+                draft.save()
+            }
+        case ("corner-display", let mode?, _) where isPassive:
+            settingsWindow?.model.change { $0.showsCornerAgent = mode.rawValue == "on" }
+        case ("corner-snapshot", let name?, _) where isPassive:
+            guard let url = output(named: name.rawValue) else { return }
+            write(agentCorner?.window, to: url)
         case ("request-bar", _, _) where isPassive: router.route(.requestAgent)
         case ("agent-action", let id?, let action?) where isPassive:
             agent?.performForVerification(action, for: id)

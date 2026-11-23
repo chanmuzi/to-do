@@ -45,6 +45,10 @@ extension SettingsView {
             }
             modelPicker
         }
+        card("에이전트 표시") {
+            toggle("노트에 표시", \.showsNoteAgent)
+            toggle("화면 구석 단추", \.showsCornerAgent)
+        }
         card("에이전트") {
             ForEach(engines, id: \.provider) { engine in
                 Button {

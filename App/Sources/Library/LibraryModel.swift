@@ -22,6 +22,14 @@ public final class LibraryModel {
     public var displayOptions = NoteDisplayOptions()
     public var error: String?
     public private(set) var settings = LibraryPreferences()
+    package var conversations: () -> [AgentConversation] = { [] }
+    package var openConversation: (UUID) -> Void = { _ in }
+    package var newConversation: () -> Void = {}
+    package var selectedConversation: UUID?
+    #if DEBUG
+    package var previewHistoryHover: UUID?
+    package var previewSectionHover = false
+    #endif
     var expanded: Set<SpaceID> = []
     var iconSpace: SpaceID?
     package var editingViews = false
@@ -118,6 +126,7 @@ public final class LibraryModel {
     }
     public func select(_ value: LibrarySelection) {
         selectedNoteID = nil
+        selectedConversation = nil
         let target: LibrarySelection
         switch value {
         case .archive: target = .archived
@@ -153,7 +162,7 @@ public final class LibraryModel {
 
     var showAllUpcoming = false
     var sections: [LibraryIndex.Section] { index.sections(for: selection) }
-    public var showsNewNote: Bool { selection != .trash && selection != .archived }
+    public var showsNewNote: Bool { selection != .conversations && selection != .trash && selection != .archived }
     func toggleArchive(_ note: Note) {
         perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
     }
@@ -165,11 +174,23 @@ public final class LibraryModel {
         if clickCount >= 2 { open(note) }
     }
     public func openSelected() {
+        if selection == .conversations {
+            if let selectedConversation { openConversation(selectedConversation) }
+            return
+        }
         guard let id = selectedNoteID,
               let note = (rows + index.notes).first(where: { $0.id == id }) else { return }
         open(note)
     }
     public func moveSelection(by offset: Int) {
+        if selection == .conversations {
+            let ids = ConversationDay.sections(conversations(), calendar: index.calendar).flatMap { $0.conversations.map(\.id) }
+            guard !ids.isEmpty else { return }
+            let position = selectedConversation.flatMap { ids.firstIndex(of: $0) }
+            let next = position.map { min(max($0 + offset, 0), ids.count - 1) } ?? (offset < 0 ? ids.count - 1 : 0)
+            selectedConversation = ids[next]
+            return
+        }
         guard !rows.isEmpty else { return }
         let rows = sections.flatMap(\.notes)
         let position = selectedNoteID.flatMap { id in rows.firstIndex { $0.id == id } }
@@ -252,6 +273,7 @@ public final class LibraryModel {
         case .archived: "보관함"
         case .all: "전체 노트"
         case .reminders: "리마인더 있는 노트"
+        case .conversations: "대화"
         case .trash: "휴지통"
         case .space(let id): id.flatMap { spaces.space(for: $0)?.name } ?? "스페이스 없음"
         case .archive(let month): month

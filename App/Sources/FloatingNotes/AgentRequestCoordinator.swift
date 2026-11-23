@@ -89,6 +89,9 @@ final class AgentRequestCoordinator {
             let request = AgentRequest(id: item.id, text: item.text, engine: selection.provider.rawValue, model: selection.model)
             guard draft.change({
                 $0.queued.removeAll { $0.id == item.id }
+                for index in $0.requests.indices where $0.requests[index].status == .awaitingAnswer {
+                    $0.requests[index].status = .completed
+                }
                 $0.requests.append(request)
                 $0.messages.append(.init(role: .user, requestID: item.id, text: item.text))
             }) else { paused = true; return }

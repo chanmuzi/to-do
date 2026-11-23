@@ -173,6 +173,8 @@ final class NoteWindowController: NSObject {
             now: Date(),
             calendar: .current
         )
+        root.topRow.allowsAgent = environment.options().showsNoteAgent
+        root.topRow.agentState = environment.agentFace(note.id)
         root.topRow.apply(state, animated: animated)
         root.topRow.underlineMarkedText = environment.options().underlineMarkedText
         if let textView = editor.view as? NSTextView {

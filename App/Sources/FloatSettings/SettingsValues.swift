@@ -14,6 +14,8 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var spaceDisplay = "icon"
     package var reminderDisplay = "time"
     package var clockFormat = "koreanMeridiem"
+    package var showsNoteAgent = true
+    package var showsCornerAgent = false
     package var agentProvider = "claude"
     package var codexModel: String?
     package var agentModel = "auto"
@@ -45,6 +47,8 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     /// 나중에 더한 항목이 없는 예전 파일도 읽는다(없는 항목은 기본값).
     package init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        showsNoteAgent = try container.decodeIfPresent(Bool.self, forKey: .showsNoteAgent) ?? true
+        showsCornerAgent = try container.decodeIfPresent(Bool.self, forKey: .showsCornerAgent) ?? false
         agentProvider = try container.decodeIfPresent(String.self, forKey: .agentProvider) ?? "claude"
         codexModel = try container.decodeIfPresent(String.self, forKey: .codexModel)
         agentModel = try container.decodeIfPresent(String.self, forKey: .agentModel) ?? "auto"

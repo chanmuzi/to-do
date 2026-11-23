@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var fakeCalendar: FakeCalendarBridge?
     private var settingsWindow: SettingsCoordinator?
     private var library: LibraryCoordinator?
+    private var agentCorner: AgentCorner?
     private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -135,6 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            router.connectHistory(library.model, agent: agent)
             library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
             library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
             library.model.openCalendarEvent = { [weak library, fakeCalendar] event in
@@ -166,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             router.library = library
             self.library = library
             refreshSettingsCalendars()
+            let corner = AgentCorner(theme: environment.theme, agent: agent, router: router, notes: notePanels)
+            agentCorner = corner
             SettingsApplication.follow(environment.settings, theme: environment.theme,
                 appearanceOverride: options.appearance, setAppearance: { NSApp.appearance = $0 },
                 applyDisplay: { [weak notePanels, weak library, weak reminderEditor] display, recognizesDates in
@@ -174,7 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     library?.model.displayOptions = display
                     reminderEditor?.displayOptions = display
                     if let reminderEditor { reminderEditor.model?.destination = reminderEditor.destination }
-                }, showMenuIcon: { [weak self] shown in
+                }, showCornerAgent: corner.setEnabled, showMenuIcon: { [weak self] shown in
                     guard let self else { return }
                     menuBarIcon?.apply(shown: options.menuBarIconOverride ?? shown)
                 })
@@ -400,6 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
         control.agent = router.agent
+        control.agentCorner = agentCorner
         control.theme = environment?.theme
         control.settingsWindow = settingsWindow
         control.reminderEditor = reminderEditor
@@ -449,6 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         router.traceActivation = { [activationLog] event in activationLog.notice("\(event, privacy: .public)") }
         panels.traceActivation = router.traceActivation
         agent.onClose = { [weak router] in router?.traceActivation("agent-close") }
+        agent.present = { [weak router] draft, source in router?.showAgent(draft, source: source) }
         agent.send = { _ = coordinator.submit($0, text: $0.conversation.draft) }
         agent.retry = coordinator.retry
         agent.sendNow = coordinator.sendNow
