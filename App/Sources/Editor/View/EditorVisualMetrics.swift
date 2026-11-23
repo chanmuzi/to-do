@@ -13,7 +13,6 @@ nonisolated struct EditorVisualMetrics {
     let chevronSize: CGFloat
     let chevronStroke: CGFloat
     let countGap: CGFloat
-    let guideOffset: CGFloat
     let highlightPadX: CGFloat
     let highlightPadY: CGFloat
     let linkFieldGap: CGFloat
@@ -41,7 +40,6 @@ nonisolated struct EditorVisualMetrics {
         chevronSize = theme.component(.editorChevronSize)
         chevronStroke = theme.component(.editorChevronStroke)
         countGap = theme.component(.editorCountGap)
-        guideOffset = theme.component(.editorGuideOffset)
         highlightPadX = theme.component(.editorHighlightPadX)
         highlightPadY = theme.component(.editorHighlightPadY)
         linkFieldGap = theme.component(.editorLinkFieldGap)
