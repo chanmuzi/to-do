@@ -266,6 +266,7 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         root.topRow.actions = TopRowView.Actions(
+            agent: { router.route(.openAgentWindow(id)) },
             more: { [unowned self] anchor in popUpMoreMenu(from: anchor) },
             reminder: { router.route(.openReminderEditor(id)) },
             pin: { [unowned self] in setPinned(!isPinned) },

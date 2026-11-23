@@ -1,4 +1,5 @@
 import AppKit
+import Agent
 import Carbon
 import OSLog
 import Scheduling
@@ -74,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
             router.notePanels = notePanels
+            let agent = AgentWindowCoordinator(store: AgentStore(location: environment.location),
+                                               theme: environment.theme, warning: AppLog.warning)
+            #if DEBUG
+            agent.allowsKeyWindows = !options.debugIsPassive
+            #endif
+            router.agent = agent
             let reminderEditor = ReminderEditorCoordinator(notes: environment.notes, theme: environment.theme)
             #if DEBUG
             reminderEditor.allowsKeyWindows = !options.debugIsPassive
@@ -254,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flushWindowStates()
         do {
             try notes.flushPendingSaves()
+            try router?.agent?.flushFailedDrafts()
             // 아무것도 적지 않은 노트는 남기지 않는다(D-040). 다 쓴 뒤에만 본다.
             if notePanels?.deleteBlankNotes().isEmpty == false { flushWindowStates() }
         } catch {
@@ -377,6 +385,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
+        control.agent = router.agent
+        control.theme = environment?.theme
         control.settingsWindow = settingsWindow
         control.reminderEditor = reminderEditor
         control.fakeCalendar = fakeCalendar

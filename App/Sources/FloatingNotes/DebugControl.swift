@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import Agent
 @_spi(Verification) import Editor
 import Models
 @_spi(Verification) import NotePanel
@@ -76,6 +77,8 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var agent: AgentWindowCoordinator?
+    weak var theme: Theme?
     weak var settingsWindow: SettingsCoordinator?
     weak var reminderEditor: ReminderEditorCoordinator?
     weak var fakeCalendar: FakeCalendarBridge?
@@ -411,6 +414,18 @@ final class DebugControl {
                 let state: [String: Any] = ["pane": model.pane.rawValue, "engines": engines]
                 try JSONSerialization.data(withJSONObject: state).write(to: url, options: .atomic)
             } catch { AppLog.warning("설정 상태를 쓰지 못했습니다: \(error)") }
+        case ("settings-shortcut-section", let section?, _) where isPassive:
+            guard let settingsWindow, let root = settingsWindow.window?.contentView,
+                  let rect = settingsWindow.model.layoutFrames["shortcut-" + section.rawValue] else { return }
+            func scrolling(_ view: NSView) -> NSScrollView? {
+                (view as? NSScrollView) ?? view.subviews.lazy.compactMap(scrolling).first
+            }
+            if let scroll = scrolling(root) {
+                let clip = scroll.contentView
+                let target = CGPoint(x: 0, y: clip.bounds.minY + rect.minY - scroll.convert(scroll.bounds, to: root).minY)
+                clip.scroll(to: target)
+                scroll.reflectScrolledClipView(clip)
+            }
         case ("settings-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
             write(settingsWindow?.window, to: url, audit: false)
@@ -461,6 +476,30 @@ final class DebugControl {
             guard let url = output(named: name), let library else { return }
             do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), to: url) }
             catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
+        case ("agent-open", let id?, "face") where isPassive:
+            notePanels.openAgentFromFaceForVerification(id)
+        case ("agent-open", let id?, "shortcut") where isPassive:
+            commands.openAgentWindow(keyNote: id)
+        case ("agent-draft", let id?, let draft?) where isPassive:
+            agent?.setDraft(draft, for: id)
+        case ("agent-close", let id?, _) where isPassive:
+            agent?.window(for: id)?.close()
+        case ("agent-state", let id?, let name?) where isPassive:
+            guard let agent, let panel = agent.window(for: id), let url = output(named: name) else { return }
+            write(json: ["target": id.rawValue, "draft": agent.draft(for: id) ?? "", "frame": NSStringFromRect(panel.frame),
+                         "key": panel.isKeyWindow, "minWidth": panel.minSize.width, "maxWidth": panel.maxSize.width], to: url)
+        case ("agent-snapshot", let id?, let name?) where isPassive:
+            guard let url = output(named: name) else { return }
+            write(agent?.window(for: id), to: url)
+        case ("agent-faces", let mode?, let name?) where isPassive:
+            guard let theme, let url = output(named: name) else { return }
+            do { try DebugAgentFaces.write(theme: theme, stationary: mode.rawValue == "still", to: url) }
+            catch { AppLog.warning(error.localizedDescription) }
+        case ("agent-menu", let name?, _) where isPassive:
+            guard let theme, let url = output(named: name.rawValue) else { return }
+            let menu = NSMenu()
+            StatusMenuBuilder(theme: theme).fill(menu, with: StatusMenuModel.entries(areNotesHidden: notePanels.areNotesHidden)) { _ in }
+            do { try DebugMenuSnapshot.write(menu, to: url) } catch { AppLog.warning(error.localizedDescription) }
         case ("open", let id?, _): router.route(.openNote(id))
         case ("close", let id?, _): router.route(.closeNoteWindow(id))
         case ("new", _, _): router.route(.newNote(NewNoteRequest(nextTo: id)))

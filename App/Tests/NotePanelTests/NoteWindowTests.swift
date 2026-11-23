@@ -88,8 +88,7 @@ import Theme
 
         controller.hoverOverride = false
         let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
-        // 더 보기, 닫기, 꺼진 핀.
-        #expect(buttons.count == 3)
+        #expect(Set(buttons.compactMap { $0.accessibilityLabel() }) == ["에이전트 열기", "더 보기", "창 닫기", "항상 위에 고정"])
         #expect(buttons.allSatisfy { $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 
@@ -630,8 +629,8 @@ import Theme
         }
         let all = descendants(of: controller.root)
         let pressable = all.filter { $0 is IconButton || $0 is ReminderBadgeView }
-        // 상단 줄의 버튼 넷(더 보기, 새 노트, 저장 문제 표시, 핀)과 리마인더, 오른쪽 아래의 휴지통과 닫기.
-        #expect(pressable.filter { !$0.isHidden }.count == 4)
+        // 얼굴, 더 보기, 닫기, 핀과 예정 칩이 각자의 커서 영역을 가진다.
+        #expect(pressable.filter { !$0.isHidden }.count == 5)
         let clickables = pressable.compactMap { $0 as? ClickableView }
         #expect(clickables.count == pressable.count)
         for view in clickables {

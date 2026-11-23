@@ -39,6 +39,7 @@ import Theme
         let frames = layout(reminder: nil)
         #expect(frames.reminder == nil)
         #expect(frames.title.minX == metrics.paddingLeading)
+        #expect(frames.agent.maxX + metrics.buttonGap == frames.clock.minX)
         #expect(frames.clock.maxX + metrics.buttonGap == frames.pin.minX)
     }
 
@@ -49,7 +50,7 @@ import Theme
                                                 showsControls: false, isPinned: pinned, showsProblem: false),
                                           metrics: metrics)
                 let right = 340 - metrics.paddingTrailing
-                #expect(frames.more == .zero && frames.close == .zero && frames.divider == .zero && frames.clock == .zero)
+                #expect(frames.agent == .zero && frames.more == .zero && frames.close == .zero && frames.divider == .zero && frames.clock == .zero)
                 if pinned {
                     #expect(frames.pin.maxX == right && frames.pin.width == metrics.iconButton)
                 } else {
@@ -68,7 +69,7 @@ import Theme
 
     @Test func longTitleIsCutBeforeTheHoverIconSlots() {
         let frames = layout(title: 1000)
-        #expect(frames.title.maxX == (frames.reminder?.minX ?? 0) - metrics.gap)
+        #expect(frames.title.maxX == frames.agent.minX - metrics.gap)
     }
 
     @Test func narrowNoteShrinksTheTitleFirst() {
@@ -92,7 +93,7 @@ import Theme
         let without = layout(title: 1000)
         let with = layout(title: 1000, problem: true)
         #expect(without.problem == nil)
-        #expect((with.problem?.maxX ?? 0) + metrics.buttonGap == with.reminder?.minX)
+        #expect((with.problem?.maxX ?? 0) + metrics.buttonGap == with.agent.minX)
         #expect(with.problem?.width == metrics.iconButton)
         #expect(with.more == without.more)
         #expect(with.pin == without.pin)

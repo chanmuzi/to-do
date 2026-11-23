@@ -6,6 +6,7 @@ import DateTime
 /// 이 줄을 끌면 창이 움직이고(spec 4.1), 제목을 누르면 그 자리에서 고친다.
 final class TopRowView: NSView {
     struct Actions {
+        var agent: () -> Void = {}
         var more: (NSView) -> Void = { _ in }
         var reminder: () -> Void = {}
         var pin: () -> Void = {}
@@ -18,6 +19,7 @@ final class TopRowView: NSView {
     var actions = Actions()
 
     private let style: PanelStyle
+    private let agentButton: IconButton
     let closeButton: IconButton
     private let clockButton: IconButton
     private let divider = NSView()
@@ -41,6 +43,8 @@ final class TopRowView: NSView {
 
     init(style: PanelStyle) {
         self.style = style
+        agentButton = IconButton(style: style, symbolName: "", iconSize: .iconLarge, label: "에이전트 열기")
+        agentButton.showFace()
         closeButton = IconButton(style: style, symbolName: "xmark", iconSize: .iconMedium, label: "창 닫기")
         clockButton = IconButton(style: style, symbolName: "clock", iconSize: .iconMedium, label: "이 노트의 일정")
         title = TitleField(style: style)
@@ -54,7 +58,7 @@ final class TopRowView: NSView {
         )
         super.init(frame: .zero)
         divider.wantsLayer = true
-        [closeButton, clockButton, divider, title, moreButton, problemButton, reminderBadge, pinButton]
+        [agentButton, closeButton, clockButton, divider, title, moreButton, problemButton, reminderBadge, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
         problemButton.alphaValue = 0
@@ -67,6 +71,7 @@ final class TopRowView: NSView {
     }
 
     private func connect() {
+        agentButton.onPress = { [unowned self] in actions.agent() }
         clockButton.onPress = { [unowned self] in actions.reminder() }
         moreButton.onPress = { [unowned self] in actions.more(moreButton) }
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
@@ -127,7 +132,7 @@ final class TopRowView: NSView {
 
         clockButton.isHidden = !state.hasSchedules || state.reminder != nil
         let alphas: [(NSView, Double)] = [
-            (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
+            (agentButton, state.hoverControlsAlpha), (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
             (clockButton, state.hasSchedules && state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
             (pinButton, state.pin.alpha),
         ]
@@ -196,6 +201,8 @@ final class TopRowView: NSView {
                 buttonGap: theme.component(.iconButtonGap)
             )
         )
+        agentButton.frame = frames.agent
+        agentButton.setAccessibilityElement(frames.agent != .zero)
         closeButton.frame = frames.close
         clockButton.frame = frames.clock
         let dividerHeight = theme.component(.iconMedium)

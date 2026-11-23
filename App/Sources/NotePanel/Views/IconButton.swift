@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Theme
 
 /// 테두리 없는 아이콘 버튼(규칙 9, 10). 평소에는 아이콘만 보이고, 마우스를 올리면 `hover` 색 상자가 깔린다.
@@ -19,6 +20,17 @@ final class IconButton: ClickableView {
         }
     }
     private var isPointerInside = false
+
+    private var customGlyph: NSView?
+
+    func showFace() {
+        let face = NSHostingView(rootView: AgentFace(theme: style.theme))
+        face.sizingOptions = []
+        face.setAccessibilityElement(false)
+        imageView.isHidden = true
+        customGlyph = face
+        addSubview(face)
+    }
 
     init(style: PanelStyle, symbolName: String, iconSize: ComponentToken, label: String, tint: ColorToken = .text2) {
         self.style = style
@@ -52,7 +64,9 @@ final class IconButton: ClickableView {
 
     /// 테마나 접근성 설정이 바뀌었을 때.
     func refresh() {
-        imageView.image = NoteButtonGlyph.image(symbolName, theme: style.theme) ?? style.symbol(symbolName, size: iconSize)
+        if !symbolName.isEmpty {
+            imageView.image = NoteButtonGlyph.image(symbolName, theme: style.theme) ?? style.symbol(symbolName, size: iconSize)
+        }
         imageView.contentTintColor = style.color(isPointerInside || isSelected ? .text : tint)
         needsLayout = true
         needsDisplay = true
@@ -71,6 +85,7 @@ final class IconButton: ClickableView {
     override func layout() {
         super.layout()
         let side = style.theme.component(iconSize)
+        customGlyph?.frame = bounds
         imageView.frame = NSRect(
             x: (bounds.width - side) / 2, y: (bounds.height - side) / 2,
             width: side, height: side

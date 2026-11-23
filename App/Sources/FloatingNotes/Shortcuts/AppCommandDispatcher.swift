@@ -63,6 +63,10 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         }
     }
 
+    func openAgentWindow(keyNote: NoteID?) {
+        if let keyNote { router.route(.openAgentWindow(keyNote)) }
+    }
+
     private func zoom(_ change: BodyZoom) {
         do { try changeBodySize(change) }
         catch { presentFailure("본문 글꼴 크기를 저장하지 못했습니다", error) }
