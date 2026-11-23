@@ -7,7 +7,7 @@ public enum TextInputPolicy {
         view.selectedTextAttributes = [.backgroundColor: theme.nsColor(.selected)]
         view.markedTextAttributes = underline
             ? [.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: theme.nsColor(.text3)]
-            : [.underlineStyle: 0]
+            : [:]
     }
 
     public static func apply(to view: NSTextView) {
@@ -23,8 +23,8 @@ public enum TextInputPolicy {
         view.inlinePredictionType = .no
         view.mathExpressionCompletionType = .no
         view.smartInsertDeleteEnabled = false
-        // 밑줄을 그리지 않는다. marked range와 입력기의 조합, 후보 선택 자체는 건드리지 않는다.
-        view.markedTextAttributes = [.underlineStyle: 0]
+        // TextKit 1은 underlineStyle 키가 있으면 값이 0이어도 조합에 선을 그린다.
+        view.markedTextAttributes = [:]
     }
 }
 

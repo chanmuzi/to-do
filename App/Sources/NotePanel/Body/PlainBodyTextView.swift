@@ -3,7 +3,7 @@ import Theme
 
 /// 기본 편집기의 텍스트 뷰. 위아래 여백이 다른 `doc-pad`를 맞춘다.
 /// 입력 커서는 시스템의 것을 그대로 쓴다(옛 그리기 경로를 덮어쓰면 자국이 남는다, D-025).
-final class PlainBodyTextView: NSTextView {
+final class PlainBodyTextView: PlainTextInputView {
     var padding: ThemeInsets? {
         didSet {
             guard let padding else { return }

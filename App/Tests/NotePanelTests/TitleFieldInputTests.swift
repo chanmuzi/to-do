@@ -122,7 +122,7 @@ extension TitleFieldInputTests {
                 .foregroundColor: NSColor.red, .backgroundColor: NSColor.green])
             view.setMarkedText(marked, selectedRange: NSRange(location: 1, length: 0), replacementRange: position)
             #expect(view.hasMarkedText())
-            #expect(view.markedTextAttributes?[.underlineStyle] as? Int == 0)
+            #expect(view.markedTextAttributes?[.underlineStyle] == nil)
             #expect(view.markedTextAttributes?[.foregroundColor] == nil)
             #expect(view.markedTextAttributes?[.backgroundColor] == nil)
             let stored = try #require(view.textStorage?.attributes(at: view.markedRange().location, effectiveRange: nil))

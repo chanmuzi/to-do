@@ -24,6 +24,20 @@ import Theme
         theme.lineHeight(.body) + theme.docPadding.top + theme.docPadding.bottom
     }
 
+    @Test func fallbackBodyCommitsCompositionWhenTheWindowLosesKey() throws {
+        let (body, _) = editor()
+        let view = try #require(body.view as? NSTextView)
+        let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: true)
+        window.contentView = view
+        window.makeFirstResponder(view)
+        let input = NSAttributedString(string: "리", attributes: [.underlineStyle: 1, .underlineColor: NSColor.systemBlue])
+        view.setMarkedText(input, selectedRange: NSRange(location: 1, length: 0), replacementRange: view.selectedRange())
+        #expect(view.hasMarkedText())
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        #expect(!view.hasMarkedText())
+        #expect(body.text == "리")
+    }
+
     @Test func emptyNoteReportsOneLinePlusPadding() {
         let (_, heights) = editor()
         #expect(heights() == [emptyHeight])

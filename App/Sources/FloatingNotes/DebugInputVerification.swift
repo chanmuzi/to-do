@@ -3,6 +3,14 @@ import AppKit
 
 /// 시스템 이벤트나 클립보드를 쓰지 않고, 이 프로세스의 입력 칸만 조사한다.
 enum DebugInputVerification {
+    static func descendant(in view: NSView, matching predicate: (NSView) -> Bool) -> NSView? {
+        if predicate(view) { return view }
+        for child in view.subviews {
+            if let result = descendant(in: child, matching: predicate) { return result }
+        }
+        return nil
+    }
+
     static func state(of view: NSTextView) -> [String: Any] {
         var selectionColor = ""
         view.effectiveAppearance.performAsCurrentDrawingAppearance {
@@ -13,7 +21,20 @@ enum DebugInputVerification {
                                         Int(round(srgb.blueComponent * 255)))
             }
         }
+        var drawn: [String] = []
+        let range = view.markedRange()
+        if view.hasMarkedText(), let layout = view.textLayoutManager, let storage = layout.textContentManager,
+           let start = storage.location(storage.documentRange.location, offsetBy: range.location) {
+            layout.enumerateRenderingAttributes(from: start, reverse: false) { _, attributes, _ in
+                drawn.append(String(describing: attributes))
+                return false
+            }
+        } else if view.hasMarkedText(), let layout = view.layoutManager {
+            drawn.append(String(describing: layout.temporaryAttributes(atCharacterIndex: range.location, effectiveRange: nil)))
+        }
         return [
+            "rendered": drawn,
+            "stored": view.hasMarkedText() ? String(describing: view.textStorage?.attributes(at: range.location, effectiveRange: nil)) : "",
             "text": view.string,
             "selection": NSStringFromRange(view.selectedRange()),
             "markedRange": NSStringFromRange(view.markedRange()),
