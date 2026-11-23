@@ -22,6 +22,7 @@ enum SettingsApplication {
     static func follow(_ store: AppSettingsStore, theme: Theme, appearanceOverride: ThemeAppearance?,
                        setAppearance: @escaping (NSAppearance?) -> Void,
                        applyDisplay: @escaping (NoteDisplayOptions, Bool) -> Void,
+                       showCornerAgent: @escaping (Bool) -> Void = { _ in },
                        showMenuIcon: @escaping (Bool) -> Void) {
         var previous: AppSettings?
         func apply(_ values: AppSettings) {
@@ -40,6 +41,8 @@ enum SettingsApplication {
                 reminder: .init(rawValue: values.reminderDisplay) ?? .time,
                 clock: .init(rawValue: values.clockFormat) ?? .koreanMeridiem)
             display.underlineMarkedText = values.markedTextStyle == .underline
+            display.showsNoteAgent = values.showsNoteAgent
+            if previous?.showsCornerAgent != values.showsCornerAgent { showCornerAgent(values.showsCornerAgent) }
             display.formatBar = .init(rawValue: values.formatBar) ?? .editing
             applyDisplay(display, values.recognizesDates)
             if previous?.showsMenuBarIcon != values.showsMenuBarIcon { showMenuIcon(values.showsMenuBarIcon) }

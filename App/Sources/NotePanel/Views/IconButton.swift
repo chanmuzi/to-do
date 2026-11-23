@@ -23,8 +23,10 @@ final class IconButton: ClickableView {
 
     private var customGlyph: NSView?
 
-    func showFace() {
-        let face = NSHostingView(rootView: AgentFace(theme: style.theme))
+    func showFace(_ state: AgentFaceState = .idle) {
+        let glyph = AgentFace(theme: style.theme, state: state)
+        if let host = customGlyph as? NSHostingView<AgentFace> { host.rootView = glyph; return }
+        let face = NSHostingView(rootView: glyph)
         face.sizingOptions = []
         face.setAccessibilityElement(false)
         imageView.isHidden = true
@@ -128,6 +130,10 @@ final class IconButton: ClickableView {
         style.crossfade(imageView)
         imageView.contentTintColor = style.color(inside || isSelected ? .text : tint)
         style.animate { updateLayer() }
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) == nil ? nil : self
     }
 
     override func mouseDown(with event: NSEvent) {}

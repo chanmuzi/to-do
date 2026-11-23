@@ -26,6 +26,7 @@ public struct NoteDisplayOptions: Hashable, Sendable {
     public enum DateFormat: String, Codable, Hashable, Sendable { case relative, absolute }
 
     public enum FormatBar: String, Codable, Sendable { case always, editing, hidden }
+    public var showsNoteAgent = true
     public var formatBar: FormatBar = .editing
     public var underlineMarkedText = false
     public var dateFormat: DateFormat

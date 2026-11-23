@@ -1,4 +1,5 @@
 import Foundation
+import Models
 import Routing
 import Store
 import Theme
@@ -11,6 +12,7 @@ struct NotePanelEnvironment {
     let router: any Routing
     let recorder: WindowStateRecorder
     let makeBodyEditor: NoteBodyEditorFactory
+    var agentFace: (NoteID) -> AgentFaceState = { _ in .idle }
     let options: () -> NotePanelDisplayOptions
     /// 지금 시각(마지막으로 연 때를 적을 때 쓴다).
     let now: () -> Date

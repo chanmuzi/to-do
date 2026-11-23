@@ -19,6 +19,10 @@ final class TopRowView: NSView {
     var actions = Actions()
 
     private let style: PanelStyle
+    var allowsAgent = true
+    var agentState: AgentFaceState = .idle {
+        didSet { if oldValue != agentState { agentButton.showFace(agentState) } }
+    }
     private let agentButton: IconButton
     let closeButton: IconButton
     private let clockButton: IconButton
@@ -132,7 +136,7 @@ final class TopRowView: NSView {
 
         clockButton.isHidden = !state.hasSchedules || state.reminder != nil
         let alphas: [(NSView, Double)] = [
-            (agentButton, state.hoverControlsAlpha), (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
+            (agentButton, allowsAgent ? (agentState == .idle ? state.hoverControlsAlpha : 1) : 0), (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
             (clockButton, state.hasSchedules && state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
             (pinButton, state.pin.alpha),
         ]
@@ -187,6 +191,8 @@ final class TopRowView: NSView {
                 reminderWidth: reminderBadge.fittingWidth,
                 hasSchedules: state?.hasSchedules == true,
                 showsControls: state?.hoverControlsAlpha == 1,
+                allowsAgent: allowsAgent,
+                hasAgentActivity: agentState != .idle,
                 isPinned: state?.pin.isOn == true,
                 showsProblem: holdsProblemSlot
             ),

@@ -35,6 +35,20 @@ import Theme
         #expect(frames.pin.maxX + metrics.buttonGap == frames.more.minX)
     }
 
+    @Test func restingFaceAndPinHaveDistinctSlots() {
+        for allows in [true, false] {
+            for pinned in [true, false] {
+                let frames = TopRowLayout(.init(width: 260, titleWidth: 300, reminderWidth: 80,
+                    showsControls: false, allowsAgent: allows, hasAgentActivity: true,
+                    isPinned: pinned, showsProblem: false), metrics: metrics)
+                #expect((frames.agent != .zero) == allows)
+                #expect((frames.pin != .zero) == pinned)
+                if allows && pinned { #expect(frames.agent.maxX <= frames.pin.minX) }
+                #expect(!frames.title.intersects(frames.agent))
+            }
+        }
+    }
+
     @Test func clockReplacesAbsentChip() {
         let frames = layout(reminder: nil)
         #expect(frames.reminder == nil)
