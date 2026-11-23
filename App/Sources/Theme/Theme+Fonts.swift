@@ -17,6 +17,11 @@ extension Theme {
         Font(nsFont(style, size: size, weight: weight) as CTFont)
     }
 
+    /// 라이브러리의 시각은 본문 글꼴을 쓰고 숫자 폭만 맞춘다.
+    package var libraryNumberFont: Font {
+        font(.body, size: tokens.textStyle(.micro).size).monospacedDigit()
+    }
+
     /// 줄 높이(pt).
     public func lineHeight(_ style: TextStyle) -> CGFloat {
         tokens.textStyle(style).lineHeight

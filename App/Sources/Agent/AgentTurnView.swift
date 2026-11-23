@@ -84,7 +84,7 @@ struct AgentTurnView: View {
                                 Text(proposal.title)
                                 if let id = proposal.targetID { Text(noteTitle(id) ?? id.rawValue).lineLimit(1) }
                                 Spacer(minLength: 0)
-                                Text(proposal.status.label).font(smallFont).foregroundStyle(theme.color(.text3))
+                                Text(proposal.createdNoteID != nil && proposal.status == .pending ? "제안" : proposal.status.label).font(smallFont).foregroundStyle(theme.color(.text3))
                             }.padding(.horizontal, theme.component(.agentInputInset))
                                 .frame(minHeight: theme.component(.proposalLinkHeight))
                                 .proposalBackground(theme, pending: proposal.status == .pending, radius: theme.space(.sp2))
