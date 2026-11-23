@@ -11,7 +11,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case hover
     case text
     case text2 = "text-2"
-    case valueMenuSurface = "value-menu-surface"
+    case formatActive = "format-active"
     case valueMenuRule = "value-menu-rule"
     case valueMenuDisabled = "value-menu-disabled"
     case menuSurface = "menu-surface"
@@ -198,6 +198,10 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case settingsAlertW = "settings-alert-w"
     case settingsPreviewHead = "settings-preview-head"
     case settingsPreviewFoot = "settings-preview-foot"
+    case settingsNavSingleLineHoverHeight = "settings-nav-single-line-hover-h"
+    case settingsNavTwoLineHoverInsetY = "settings-nav-two-line-hover-inset-y"
+    case settingsNavHoverRadius = "settings-nav-hover-radius"
+    case settingsNavHoverOutset = "settings-nav-hover-outset"
     case settingsRow = "settings-row"
     case segmentHeight = "segment-h"
     case segmentItem = "segment-item-h"

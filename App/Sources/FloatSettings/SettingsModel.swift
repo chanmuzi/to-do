@@ -33,8 +33,10 @@ package final class SettingsModel {
     @ObservationIgnored package var layoutFrames: [String: CGRect] = [:]
     package func setInstallTipForVerification(_ shown: Bool) { showsInstallTip = shown }
     #endif
+    private(set) var hoveredAgent: String?
     private(set) var sidebarHover: SettingsPane?
     #if DEBUG
+    package func setAgentHoverForVerification(_ provider: String?) { hoveredAgent = provider }
     package func setSidebarHoverForVerification(_ pane: SettingsPane?) { sidebarHover = pane }
     #endif
     var confirmingReset = false
