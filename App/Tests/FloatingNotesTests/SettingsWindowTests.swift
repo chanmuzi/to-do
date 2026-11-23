@@ -71,6 +71,24 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
+    @discardableResult
+    private func checkMenu(_ settings: SettingsCoordinator, _ titles: [String], selected: String) throws -> NSMenu {
+        func modelButton(in view: NSView) -> NSButton? {
+            if let button = view as? NSButton, button.accessibilityLabel() == "모델" { return button }
+            return view.subviews.lazy.compactMap(modelButton).first
+        }
+        let root = try #require(settings.window?.contentView)
+        root.layoutSubtreeIfNeeded()
+        let button = try #require(modelButton(in: root))
+        let menu = try #require(button.menu)
+        let items = menu.items
+        #expect(items.enumerated().compactMap { $1.isSeparatorItem ? $0 : nil } == (titles.count > 1 ? [1] : []))
+        #expect(items.filter { !$0.isSeparatorItem }.map(\.title) == titles)
+        #expect(items.filter { $0.state == .on }.map(\.title) == [selected])
+        #expect(button.title == selected)
+        return menu
+    }
+
     @Test func codexMenuKeepsFiveChoicesAndTheSavedSelection() async throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
@@ -102,35 +120,20 @@ import Theme
         settings.allowsKeyWindows = false
         defer { settings.window?.close() }
 
-        func modelButton(in view: NSView) -> NSButton? {
-            if let button = view as? NSButton, button.accessibilityLabel() == "모델" { return button }
-            return view.subviews.lazy.compactMap(modelButton).first
-        }
-        func check(_ titles: [String], selected: String) throws {
-            let root = try #require(settings.window?.contentView)
-            root.layoutSubtreeIfNeeded()
-            let button = try #require(modelButton(in: root))
-            let items = try #require(button.menu).items
-            #expect(items.enumerated().compactMap { $1.isSeparatorItem ? $0 : nil } == (titles.count > 1 ? [1] : []))
-            #expect(items.filter { !$0.isSeparatorItem }.map(\.title) == titles)
-            #expect(items.filter { $0.state == .on }.map(\.title) == [selected])
-            #expect(button.title == selected)
-        }
-
         settings.show(.assistant)
         await agents.wait()
         let first = ["CLI 기본", "Model 1", "Model 2", "Model 3", "Model 4", "Model 5"]
-        try check(first, selected: "CLI 기본")
+        try checkMenu(settings, first, selected: "CLI 기본")
         try store.update { $0.codexModel = "m5" }
-        try check(first, selected: "Model 5")
+        try checkMenu(settings, first, selected: "Model 5")
         try store.update { $0.codexModel = "m11" }
-        try check(first + ["Model 11"], selected: "Model 11")
+        try checkMenu(settings, first + ["Model 11"], selected: "Model 11")
 
         settings.window?.close()
         try FileManager.default.removeItem(at: catalog)
         settings.show(.assistant)
         await agents.wait()
-        try check(["CLI 기본"], selected: "CLI 기본")
+        try checkMenu(settings, ["CLI 기본"], selected: "CLI 기본")
         func storedModel() throws -> String? {
             try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.codexModel
         }
@@ -140,14 +143,76 @@ import Theme
         try JSONSerialization.data(withJSONObject: ["models": Array(entries.dropFirst())]).write(to: catalog)
         settings.show(.assistant)
         await agents.wait()
-        try check(first, selected: "CLI 기본")
+        try checkMenu(settings, first, selected: "CLI 기본")
         #expect(try storedModel() == nil)
 
         settings.window?.close()
         try JSONSerialization.data(withJSONObject: ["models": entries]).write(to: catalog)
         settings.show(.assistant)
         await agents.wait()
-        try check(first, selected: "CLI 기본")
+        try checkMenu(settings, first, selected: "CLI 기본")
+    }
+
+    @Test func claudeMenuUsesAllCLIValuesAndPreservesTheSelectionOnFailure() async throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let cli = fixture.root.appending(path: "claude")
+        try #"""
+        #!/bin/sh
+        set -eu
+        case "$1" in
+          --version) echo fake ;;
+          auth) echo '{"loggedIn":true}' ;;
+          -p)
+            IFS= read -r request
+            id=$(printf '%s' "$request" | plutil -extract request_id raw -o - -)
+            models=$(cat "$(dirname "$0")/models.json")
+            printf '{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":%s}}}\n' "$id" "$models"
+            ;;
+          *) exit 1 ;;
+        esac
+        """#.write(to: cli, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: cli.path)
+        let catalog = fixture.root.appending(path: "models.json")
+        let longTitle = "모델 7 Research Preview 5.5"
+        var entries = (1...7).map { ["value": "v\($0)", "displayName": "모델 \($0)"] }
+        entries[6]["description"] = longTitle + " \u{00B7} Extended context"
+        let all = ["자동"] + entries.prefix(6).compactMap { $0["displayName"] } + [longTitle]
+        try JSONEncoder().encode(entries).write(to: catalog)
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let agents = AgentSettings(location: fixture.location, searchDirectory: fixture.root)
+        let schedules = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+                                  shortcuts: [], agents: agents, openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        defer { settings.window?.close() }
+        func openSettings() async {
+            settings.show(.assistant)
+            await agents.wait()
+        }
+
+        await openSettings()
+        let menu = try checkMenu(settings, all, selected: "자동")
+        let row = try #require(menu.items.last?.view)
+        #expect(row.frame.width > fixture.theme.component(.claudeMenuWidth))
+        menu.performActionForItem(at: menu.indexOfItem(withTitle: longTitle))
+        #expect(store.settings.selectedEngine(codexModels: []).model == "v7")
+        try FileManager.default.removeItem(at: catalog)
+        await openSettings()
+        try checkMenu(settings, all, selected: longTitle)
+
+        settings.window?.close()
+        await openSettings()
+        try checkMenu(settings, ["자동", "Fable", "Opus", "Sonnet", "Haiku"], selected: "자동")
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.agentModel == "v7")
+
+        settings.window?.close()
+        try JSONEncoder().encode([entries[0]]).write(to: catalog)
+        await openSettings()
+        try checkMenu(settings, ["자동", "모델 1"], selected: "자동")
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.agentModel == "auto")
+        #expect(store.settings.selectedEngine(codexModels: []).model == nil)
     }
 
     @Test func previewHasNoInteractiveAccessibilityChildren() throws {

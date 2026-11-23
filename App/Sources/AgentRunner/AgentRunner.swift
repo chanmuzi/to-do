@@ -41,8 +41,9 @@ public struct AgentRunner: Sendable {
         case .apiKey: throw AgentError.unsupportedEngine
         }
         if let requested {
-            guard !requested.isEmpty, requested.utf8.count <= 128,
-              requested.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-._:/".contains($0)) })
+            let base = provider == .claude && requested.hasSuffix("[1m]") ? requested.dropLast(4) : requested[...]
+            guard !base.isEmpty, requested.utf8.count <= 128,
+              base.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-._:/".contains($0)) })
             else { throw AgentError.invalidOutput }
         }
         let connection = try AgentConnection(provider: provider, location: location)

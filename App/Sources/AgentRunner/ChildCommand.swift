@@ -42,8 +42,8 @@ private func withStrings<T>(_ strings: [String], _ body: (UnsafeMutablePointer<U
 }
 
 extension AgentCommand {
-    /// 자식 전용 프로세스 그룹과 닫힌 stdin을 만든다. 호출자의 환경, 열려 있는 파일은 물려주지 않는다.
-    func execute(timeout: Duration, mergeDiagnostics: Bool = false, line: (Data) throws -> Void) throws -> Int32 {
+    /// 자식 전용 프로세스 그룹을 만든다. 기본 stdin은 닫혀 있다. 호출자의 환경, 열려 있는 파일은 물려주지 않는다.
+    func execute(timeout: Duration, mergeDiagnostics: Bool = false, standardInput: FileHandle? = nil, line: (Data) throws -> Void) throws -> Int32 {
         func check(_ code: Int32) throws {
             guard code == 0 else { throw AgentError.process(code) }
         }
@@ -60,7 +60,11 @@ extension AgentCommand {
         try check(posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT)))
         try check(posix_spawnattr_setpgroup(&attributes, 0))
         try check(posix_spawn_file_actions_addchdir(&actions, directory.path))
-        try check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0))
+        if let standardInput {
+            try check(posix_spawn_file_actions_adddup2(&actions, standardInput.fileDescriptor, STDIN_FILENO))
+        } else {
+            try check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0))
+        }
         try check(posix_spawn_file_actions_adddup2(&actions, writer.fileDescriptor, STDOUT_FILENO))
         if mergeDiagnostics {
             try check(posix_spawn_file_actions_adddup2(&actions, writer.fileDescriptor, STDERR_FILENO))

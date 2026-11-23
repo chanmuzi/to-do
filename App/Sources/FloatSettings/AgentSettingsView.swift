@@ -86,22 +86,27 @@ extension SettingsView {
     private var modelPicker: some View {
         let isCodex = model.values.agentProvider == "codex"
         let available = model.agents?.engines.first { $0.provider == .codex }?.models ?? []
+        let claudeModels = model.agents?.engines.first { $0.provider == .claude }?.claudeModels
+        let claudeOptions: [(id: String?, title: String)] = claudeModels?.map { ($0.value, $0.displayName) }
+            ?? [("fable", "Fable"), ("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku")]
         let options: [(id: String?, title: String)] = isCodex
             ? codexMenuOptions(available, saved: model.values.codexModel)
-            : [(nil, "자동"), ("fable", "Fable"), ("opus", "Opus"), ("sonnet", "Sonnet"), ("haiku", "Haiku")]
+            : [(nil, "자동")] + claudeOptions
         let saved = model.values.selectedEngine(codexModels: available).model
         let selected = options.first { $0.id == saved } ?? options[0]
         return row("모델") {
             ValuePopup(label: "모델", value: selected.title, theme: theme, inSettings: true) {
                 let menu = NSMenu()
                 menu.autoenablesItems = false
+                let width = isCodex ? theme.component(.codexMenuWidth)
+                    : PickerMenuRow.widthToFitTitles(options.map(\.title), minimum: theme.component(.claudeMenuWidth), theme: theme)
                 for (index, option) in options.enumerated() {
                     if index == 1 { menu.addItem(.separator()) }
                     let item = menu.addItem(withTitle: option.title, action: nil, keyEquivalent: "")
                     item.representedObject = option.id
                     item.state = option.id == selected.id ? .on : .off
                     item.view = PickerMenuRow(theme: theme, text: option.title, dot: nil, selected: item.state == .on,
-                                              width: theme.component(isCodex ? .codexMenuWidth : .claudeMenuWidth))
+                                              width: width)
                 }
                 return menu
             } choose: { item in

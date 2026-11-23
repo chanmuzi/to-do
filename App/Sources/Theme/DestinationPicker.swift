@@ -104,6 +104,13 @@ package final class PickerMenuRow: NSView {
         return theme.nsFont(.body, size: theme.tokens.textStyle(header ? .micro : .ui).size)
     }
 
+    package static func widthToFitTitles(_ titles: [String], minimum: CGFloat, theme: Theme) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: theme.tokens.textStyle(.rowSub).size)
+        let widest = titles.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        let margins = 2 * theme.component(.settingsPopupGap) + 3 * theme.space(.sp2)
+        return max(minimum, margins + theme.component(.valueMenuCheck) + ceil(widest))
+    }
+
     func popupRow(for item: NSMenuItem) -> PickerMenuRow {
         let row = PickerMenuRow(theme: theme, text: text, dot: dot, header: header, selected: selected,
                                 subtitle: subtitle, width: preferredWidth)

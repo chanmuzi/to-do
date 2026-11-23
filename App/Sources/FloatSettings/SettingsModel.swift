@@ -60,9 +60,14 @@ package final class SettingsModel {
         self.schedules = schedules
         self.shortcuts = shortcuts
         self.openPrivacy = openPrivacy
+        agents?.engines.first { $0.provider == .claude }?.didLoadModels = { [weak self] ids in
+            guard let self else { return }
+            let saved = self.values.agentModel
+            if saved != "auto" && !ids.contains(saved) { self.change { $0.agentModel = "auto" } }
+        }
         agents?.engines.first { $0.provider == .codex }?.didLoadModels = { [weak self] catalog in
             guard let self, let saved = self.values.codexModel,
-                  !catalog.contains(where: { $0.slug == saved }) else { return }
+                  !catalog.contains(saved) else { return }
             self.change { $0.codexModel = nil }
         }
     }

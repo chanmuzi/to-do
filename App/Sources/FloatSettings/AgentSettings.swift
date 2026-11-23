@@ -13,7 +13,8 @@ package final class EngineAccount {
     package private(set) var account: AgentAccount?
     package private(set) var message: String?
     package private(set) var models: [CodexModel] = []
-    @ObservationIgnored var didLoadModels: (([CodexModel]) -> Void)?
+    package private(set) var claudeModels: [ClaudeModel]?
+    @ObservationIgnored var didLoadModels: (([String]) -> Void)?
     private var requestedModels = false
     private let location: StoreLocation
     private let directory: URL?
@@ -47,13 +48,23 @@ package final class EngineAccount {
             let found = try await connection.discover(in: self.directory)
             try Task.checkCancellation()
             self.installation = found
-            if self.provider == .codex && !self.requestedModels {
+            if !self.requestedModels {
                 self.requestedModels = true
-                let catalog = await connection.models(found)
-                try Task.checkCancellation()
-                if let catalog {
-                    self.models = catalog
-                    self.didLoadModels?(catalog)
+                switch self.provider {
+                case .claude:
+                    let catalog = await connection.claudeModels(found)
+                    try Task.checkCancellation()
+                    if let catalog {
+                        self.claudeModels = catalog
+                        self.didLoadModels?(catalog.map(\.value))
+                    }
+                case .codex:
+                    let catalog = await connection.models(found)
+                    try Task.checkCancellation()
+                    if let catalog {
+                        self.models = catalog
+                        self.didLoadModels?(catalog.map(\.slug))
+                    }
                 }
             }
             try await self.readAccount(connection, found)
@@ -123,6 +134,7 @@ package final class EngineAccount {
         message = nil
         installation = nil
         models = []
+        claudeModels = nil
         requestedModels = false
     }
 
