@@ -3,6 +3,8 @@
 
 public enum ColorToken: String, CaseIterable, Sendable {
     case surface
+    case agentEdgeA = "agent-edge-a"
+    case agentEdgeB = "agent-edge-b"
     case surface2 = "surface-2"
     case surface3 = "surface-3"
     case connectFill = "connect-fill"
@@ -147,6 +149,19 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case scheduleRowHeight = "schedule-row-h"
     case scheduleListMaxHeight = "schedule-list-max-h"
     case reminderEditorWidth = "reminder-editor-w"
+    case agentFaceMedium = "agent-face-medium"
+    case agentFaceLarge = "agent-face-large"
+    case agentHeaderInset = "agent-header-inset"
+    case agentFaceTitleGap = "agent-face-title-gap"
+    case agentChipInset = "agent-chip-inset"
+    case agentChipGap = "agent-chip-gap"
+    case agentPlusSize = "agent-plus-size"
+    case agentArrowStroke = "agent-arrow-stroke"
+    case agentInputFont = "agent-input-font"
+    case agentInputInset = "agent-input-inset"
+    case agentEdgeIdle = "agent-edge-idle"
+    case agentEdgeWorking = "agent-edge-working"
+    case agentEdgeGlow = "agent-edge-glow"
     case gutter
     case indent
     case checkSize = "check-size"
@@ -338,4 +353,20 @@ public enum MotionToken: String, CaseIterable, Sendable {
     case caretBlink = "caret-blink"
     /// 짧은 알림(토스트)이 떠 있는 시간(D-041, 임시 값). 지나면 `dur` 동안 사라진다.
     case toastHold = "toast-hold"
+}
+
+public enum AgentFaceTiming: String, CaseIterable, Sendable {
+    case blink = "agent-blink"
+    case nod = "agent-nod"
+    case wave = "agent-wave"
+    case scan = "agent-scan"
+    case dots = "agent-dots"
+    case pencil = "agent-pencil"
+    case lens = "agent-lens"
+    case dream = "agent-dream"
+    case ask = "agent-ask"
+    case write = "agent-write"
+    case look = "agent-look"
+    case waveDelay = "agent-wave-delay"
+    case dotDelay = "agent-dot-delay"
 }
