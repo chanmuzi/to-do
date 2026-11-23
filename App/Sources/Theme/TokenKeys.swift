@@ -3,6 +3,8 @@
 
 public enum ColorToken: String, CaseIterable, Sendable {
     case surface
+    case agentDash = "agent-dash"
+    case diffAdd = "diff-add"
     case agentShimmer = "agent-shimmer"
     case agentBgA = "agent-bg-a"
     case agentBgM = "agent-bg-m"
@@ -156,6 +158,11 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case scheduleRowHeight = "schedule-row-h"
     case scheduleListMaxHeight = "schedule-list-max-h"
     case reminderEditorWidth = "reminder-editor-w"
+    case proposalGutter = "proposal-gutter"
+    case proposalLineHeight = "proposal-line-height"
+    case proposalFont = "proposal-font"
+    case proposalListWidth = "proposal-list-width"
+    case proposalLinkHeight = "proposal-link-height"
     case noticeDot = "notice-dot"
     case cornerButton = "corner-button"
     case agentFaceMedium = "agent-face-medium"

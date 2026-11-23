@@ -14,7 +14,7 @@ package extension View {
             if pending {
                 shape.fill(LinearGradient(colors: [theme.color(.agentBgA), theme.color(.agentBgM), theme.color(.agentBgB)],
                                           startPoint: .topLeading, endPoint: .bottomTrailing))
-                shape.strokeBorder(theme.color(.agentEdgeA), style: StrokeStyle(lineWidth: theme.shape(.borderWidth),
+                shape.strokeBorder(theme.color(.agentDash), style: StrokeStyle(lineWidth: theme.shape(.borderWidth),
                                                                                dash: [theme.space(.sp1)]))
             } else { shape.fill(theme.color(.surface2)) }
         }
@@ -58,7 +58,10 @@ package struct TodoProposalView: View {
                 Text(proposal.title).fontWeight(.semibold)
             }
             if note == nil { Text("대상 노트를 찾을 수 없어요").foregroundStyle(theme.color(.text3)) }
-            else if full { rows }
+            else if full {
+                rows.padding(theme.component(.agentInputInset))
+                    .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
+            }
             else { Button(action: review) { rows }.buttonStyle(.plain).accessibilityLabel("미리보기") }
             if proposal.requiresReview == true { Text("노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.").foregroundStyle(theme.color(.text2)) }
             HStack(spacing: theme.component(.agentRowInset)) {
@@ -71,29 +74,36 @@ package struct TodoProposalView: View {
                     else { Button("받기", action: accept).disabled(note == nil) }
                 } else { Text(proposal.status.label).foregroundStyle(theme.color(.text3)) }
             }.buttonStyle(WhiteControl(theme: theme))
-        }.font(theme.font(.body, size: theme.component(.agentInputFont))).foregroundStyle(theme.color(.text))
+        }.font(theme.font(.body, size: theme.component(.proposalFont))).foregroundStyle(theme.color(.text))
             .padding(.leading, theme.component(.agentHeaderInset)).padding(.trailing, theme.space(.sp3))
             .padding(.vertical, theme.component(.agentInputInset))
-            .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
+            .background { if !full { Color.clear.proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius)) } }
     }
 
     private var rows: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(note?.title.isEmpty == false ? note!.title : "제목 없음")
-                .font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3))
+            Text(note.flatMap { $0.title.isEmpty ? nil : $0.title } ?? "제목 없음")
+                .font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3)).padding(.horizontal, theme.space(.sp3))
             let values = preview
             ForEach(Array((full ? values[...] : values.prefix(3)).enumerated()), id: \.offset) { _, row in
                 HStack(spacing: theme.space(.sp1)) {
-                    Text(row.1 ? "+" : "").frame(width: theme.component(.rowHeight))
-                    if row.0.hasPrefix("[ ] ") || row.0.hasPrefix("[x] ") {
-                        Image(systemName: row.0.hasPrefix("[x] ") ? "checkmark.square" : "square")
-                        Text(String(row.0.dropFirst(4)))
+                    Text(row.1 ? "+" : "").frame(width: theme.component(.proposalGutter))
+                    if let match = row.0.firstMatch(of: /^\s*(?:[-*+]\s+)?\[([ xX])\]\s+(.*)$/) {
+                        let done = match.1 != " "
+                        let shape = RoundedRectangle(cornerRadius: theme.shape(.checkRadius))
+                        ZStack {
+                            if done {
+                                shape.fill(theme.color(.text3))
+                                Image(systemName: "checkmark").foregroundStyle(theme.color(.surface))
+                            } else { shape.strokeBorder(theme.color(.text2), lineWidth: theme.component(.editorGlyphStroke)) }
+                        }.frame(width: theme.component(.checkSize), height: theme.component(.checkSize))
+                        Text(String(match.2)).strikethrough(done)
                     } else { Text(row.0) }
                     Spacer(minLength: 0)
-                }.frame(minHeight: theme.component(.agentStepHeight))
-                    .background(row.1 ? theme.color(.highlight3Background) : .clear)
+                }.padding(.trailing, theme.space(.sp3)).frame(minHeight: theme.component(.proposalLineHeight))
+                    .background(row.1 ? theme.color(.diffAdd) : .clear)
             }
-        }.padding(.horizontal, theme.component(.agentInputInset)).padding(.vertical, theme.space(.sp2))
-            .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.space(.sp2)))
+        }.padding(.vertical, theme.space(.sp2))
+            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.space(.sp2)))
     }
 }

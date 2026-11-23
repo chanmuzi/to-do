@@ -35,8 +35,9 @@ struct LibraryProposalPage: View {
                                 if narrow, model.selectedProposal == proposal.id { detail(proposal) }
                             }
                         }
-                    }.padding(.horizontal, theme.space(.sp2))
-                }.frame(maxWidth: narrow ? .infinity : theme.component(.noteWidth))
+                    }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp4))
+                        .padding(.top, theme.component(.libraryRowTrailing))
+                }.frame(maxWidth: narrow ? .infinity : theme.component(.proposalListWidth))
                 if !narrow {
                     theme.color(.line).frame(width: theme.shape(.borderWidth))
                     ScrollView {
@@ -72,9 +73,10 @@ struct LibraryProposalPage: View {
                 Text(ReminderPresentation.clock(date, format: .koreanMeridiem, calendar: model.index.calendar))
                     .font(theme.font(.micro)).foregroundStyle(theme.color(.text3))
             }
-        }.font(theme.font(.libraryListHeading)).padding(.horizontal, theme.space(.sp2))
+        }.font(theme.font(.libraryListHeading))
             .frame(minHeight: theme.component(.rowHeight))
             .background(hovering(request.id) ? theme.color(.hover) : .clear, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+            .overlay(alignment: .bottom) { theme.color(.line).frame(height: theme.shape(.borderWidth)) }
             .onHover { track($0, request.id) }
             .accessibilityAction(named: "모두 받기") { model.acceptProposals(pending) }
     }
@@ -90,7 +92,8 @@ struct LibraryProposalPage: View {
             Spacer()
             if p.status != .pending { Text(p.status.label).font(theme.font(.micro)).foregroundStyle(theme.color(.text3)) }
             else if p.seenAt == nil, !hovering(p.id) { ProposalDot(theme: theme).padding(.trailing, theme.space(.sp1)) }
-        }.padding(.vertical, theme.component(.agentRowInset)).padding(.horizontal, theme.space(.sp2))
+        }.padding(.top, theme.component(.libraryRowPaddingY)).padding(.bottom, theme.space(.sp2))
+            .padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp1))
             .background(selected ? theme.color(.selected) : hovering(p.id) ? theme.color(.hover) : .clear,
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             .overlay {
@@ -120,6 +123,6 @@ struct LibraryProposalPage: View {
                          review: { model.reviewProposal(p.id) }, conversation: {
             if let c = model.conversations().first(where: { $0.requests.contains { $0.id == p.requestID } }) { model.openConversation(c.id) }
         }, accept: { model.acceptProposals([p.id]) }, discard: { model.discardProposal(p.id) })
-            .padding(theme.space(.sp3))
+            .padding(.vertical, theme.space(.sp4)).padding(.horizontal, theme.space(.sp1))
     }
 }

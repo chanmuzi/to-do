@@ -86,7 +86,7 @@ struct AgentTurnView: View {
                                 Spacer(minLength: 0)
                                 Text(proposal.status.label).font(smallFont).foregroundStyle(theme.color(.text3))
                             }.padding(.horizontal, theme.component(.agentInputInset))
-                                .frame(minHeight: theme.component(.browseFindHeight))
+                                .frame(minHeight: theme.component(.proposalLinkHeight))
                                 .proposalBackground(theme, pending: proposal.status == .pending, radius: theme.space(.sp2))
                         }.buttonStyle(.plain)
                     }
