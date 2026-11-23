@@ -47,7 +47,7 @@ macOS 네이티브 플로팅 메모, 투두 앱. SwiftUI + AppKit, 개인용, ma
 | 본문 편집기 | `docs/spec/06-editor.md`, `13-shortcuts.md`, `19-native-notes.md` |
 | 빠른 캡처, 노트 찾기 | `docs/spec/07-capture.md`, `08-browse.md`. 날짜와 시간 읽기를 고칠 때는 `07a-datetime.md` |
 | 라이브러리, 스페이스 아이콘 | `docs/spec/09-library.md`, `10-icon-picker.md` |
-| AI 패널, 에이전트 연결 | `docs/spec/11-ai-panel.md`, `docs/decisions.md`의 에이전트 항목 |
+| 에이전트(연결, 막대와 창, 제안, 루틴과 메모리) | `docs/spec/11-ai-panel.md`(연결과 안내), 화면은 `11a-agent-surfaces.md`, 제안은 `11b-agent-suggestions.md`, 루틴과 메모리는 `11c-agent-routines-memory.md`, `docs/decisions.md`의 에이전트 항목 |
 | 테마 설정, 단축키 표 | `docs/spec/12-settings.md`, `13-shortcuts.md` |
 | 호버, 포커스, 움직임 판단 | `docs/spec/02-rules.md`, `14-states.md`, `15-motion.md` |
 | 가장자리 경우, 접근성 | `docs/spec/16-edge-cases.md`, `17-accessibility.md` |
