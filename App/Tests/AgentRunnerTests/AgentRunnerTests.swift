@@ -39,7 +39,7 @@ private struct Fixture {
 }
 
 @Suite struct AgentRunnerTests {
-    @Test(arguments: ["fable", "opus", "sonnet", "haiku", "auto"])
+    @Test(arguments: ["fable", "opus", "sonnet", "haiku", "sonnet[1m]", "auto"])
     func claudeIsolationStreamAndUsage(_ model: String) async throws {
         let start = String(decoding: try JSONSerialization.data(withJSONObject: initEvent), as: UTF8.self)
         let fx = try Fixture(.claude, #"""
@@ -220,6 +220,63 @@ private struct Fixture {
             #expect(list?.isEmpty == true)
         default:
             #expect(list == nil)
+        }
+    }
+}
+
+@Suite struct ClaudeModelListTests {
+    @Test(arguments: [
+        (#"{}"#, "Opus"),
+        (#"{"description":null}"#, "Opus"),
+        (#"{"description":42}"#, "Opus"),
+        (#"{"description":"Best for everyday tasks"}"#, "Opus"),
+        (#"{"description":"Sonnet 5.5 \u00b7 For routine tasks"}"#, "Opus"),
+        (#"{"description":" \u00b7 Opus 5.5"}"#, "Opus"),
+        (#"{"description":"Opus 5.5 \u00b7 Best for everyday tasks \u00b7 Price"}"#, "Opus 5.5")
+    ])
+    func modelTitleUsesTheFirstMatchingDescriptionPart(_ extra: String, expected: String) throws {
+        var fields = try #require(JSONSerialization.jsonObject(with: Data(extra.utf8)) as? [String: Any])
+        fields["displayName"] = "Opus"
+        fields["value"] = "opus"
+        let model = try JSONDecoder().decode(ClaudeModel.self, from: JSONSerialization.data(withJSONObject: fields))
+        #expect(model.displayName == expected)
+        #expect(model.value == "opus")
+    }
+
+    @Test(arguments: ["list", "defaultOnly", "wrongID", "wrongShape", "error", "nonzero", "missing"])
+    func readsOnlyTheMatchingInitializationReply(_ scenario: String) async throws {
+        let fx = try Fixture(.claude, #"""
+        test "$1" = "-p"
+        test "$CLAUDE_CONFIG_DIR" = "$(dirname "$(dirname "$0")")/.state/agents/claude"
+        IFS= read -r request
+        field() { printf '%s' "$request" | plutil -extract "$1" raw -o - -; }
+        test "$(field type)" = control_request
+        test "$(field request.subtype)" = initialize
+        id=$(field request_id)
+        models='[{"value":"default","displayName":"Default"},{"value":"sonnet[1m]","displayName":"First"},{"value":"opus","displayName":"Second"}]'
+        status=success
+        case "\#(scenario)" in
+          defaultOnly) models='[{"value":"default","displayName":"Default"}]' ;;
+          wrongID) id=wrong ;;
+          wrongShape) models='[{"value":"x"}]' ;;
+          error) status=error ;;
+          missing) exit 0 ;;
+        esac
+        printf '{"type":"control_response","response":{"request_id":"%s","subtype":"%s","response":{"models":%s}}}\n' "$id" "$status" "$models"
+        if read -r extra; then exit 2; fi
+        test "\#(scenario)" != nonzero
+        """#)
+        defer { try! fx.cleanup() }
+        let connection = try AgentConnection(provider: .claude, location: fx.location)
+        let models = await connection.claudeModels(fx.installation)
+        switch scenario {
+        case "list":
+            #expect(models?.map(\.value) == ["sonnet[1m]", "opus"])
+            #expect(models?.map(\.displayName) == ["First", "Second"])
+        case "defaultOnly":
+            #expect(models?.isEmpty == true)
+        default:
+            #expect(models == nil)
         }
     }
 }

@@ -15,7 +15,7 @@ final class SettingsValueMenu: NSPanel {
         choices = menu
         let theme = first.theme
         let padding = theme.component(.settingsPopupGap)
-        let width = first.preferredWidth
+        let width = min(first.preferredWidth, screen.visibleFrame.width)
         let rows = FlippedMenuDocument()
         let innerWidth = width - 2 * padding
         rows.frame.size.width = innerWidth
