@@ -45,6 +45,16 @@ final class AppRouter: Routing {
     var activateApp: () -> Void = {}
     var traceActivation: (String) -> Void = { _ in }
 
+    func connectHistory(_ model: LibraryModel, agent: AgentWindowCoordinator) {
+        model.conversations = { [weak agent] in agent?.history ?? [] }
+        model.openConversation = { [weak self, weak agent] id in
+            if let draft = agent?.record(id: id) { self?.showAgent(draft, source: "library") }
+        }
+        model.newConversation = { [weak self, weak agent] in
+            if let draft = agent?.newRecord() { self?.showAgent(draft, source: "library-new") }
+        }
+    }
+
     func showAgent(_ draft: AgentDraft, source: String) {
         guard let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first)
             ?? notePanels?.agentWindowAnchor(for: nil) else { return }

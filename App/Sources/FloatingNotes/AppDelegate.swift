@@ -135,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            router.connectHistory(library.model, agent: agent)
             library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
             library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
             library.model.openCalendarEvent = { [weak library, fakeCalendar] event in
