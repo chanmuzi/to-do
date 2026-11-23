@@ -2,7 +2,7 @@
 nonisolated enum ShortcutGroup: String, Hashable, Sendable, CaseIterable {
     case global = "어디서나 (다른 앱을 쓰는 중에도. 모두 바꿀 수 있음)"
     case capture = "빠른 캡처 바"
-    case aiPanel = "AI 패널"
+    case agent = "에이전트"
     case noteWindow = "노트 창"
     case browse = "노트 찾기"
     case library = "라이브러리"
@@ -23,7 +23,7 @@ nonisolated struct ShortcutEntry: Hashable, Sendable {
     /// 표에 적는 동작 이름. `tokens.json`의 `action`과 같다.
     let action: String
     var keys: Keys
-    /// App이 받아서 하는 동작. `nil`이면 그 화면(편집기, 캡처 바, AI 패널, 노트 찾기)이 스스로 받는다.
+    /// App이 받아서 하는 동작. `nil`이면 그 화면(편집기, 캡처 바, 노트 찾기)이 스스로 받는다.
     let command: AppCommand?
 
     var chords: [KeyChord] {
@@ -72,7 +72,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
     }
 
     static let standard = ShortcutTable(
-        entries: global + capture + aiPanel + noteWindow + browse + library + editing + markdownInput
+        entries: global + capture + agent + noteWindow + browse + library + editing + markdownInput
     )
 
     private static func row(
@@ -88,7 +88,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         row(.global, "빠른 캡처", [.n], [.control, .option], command: .quickCapture),
         row(.global, "떠 있는 노트 모두 숨기기, 다시 보이기", [.h], [.control, .option], command: .toggleNotesHidden),
         row(.global, "라이브러리", [.l], [.control, .option], command: .library),
-        row(.global, "AI 패널", [.a], [.control, .option], command: .aiPanel),
+        row(.global, "에이전트에게 요청", [.a], [.control, .option], command: .requestAgent),
     ]
 
     private static let capture: [ShortcutEntry] = [
@@ -99,13 +99,8 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
         row(.capture, "닫기", [.escape]),
     ]
 
-    private static let aiPanel: [ShortcutEntry] = [
-        row(.aiPanel, "항목 이동", [.up, .down]),
-        row(.aiPanel, "체크, 체크 해제", [.space]),
-        row(.aiPanel, "제목 고치기", [.returnKey]),
-        row(.aiPanel, "모두 체크", [.a], [.command]),
-        row(.aiPanel, "체크한 항목 추가", [.returnKey], [.command]),
-        row(.aiPanel, "닫기", [.escape]),
+    private static let agent: [ShortcutEntry] = [
+        row(.agent, "노트에서 에이전트 창 열기", [.j], .command, command: .openAgentWindow),
     ]
 
     private static let noteWindow: [ShortcutEntry] = [

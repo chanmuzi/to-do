@@ -19,7 +19,7 @@ public enum Route: Hashable, Sendable {
     /// 노트에서 연 대상 대화.
     case openAgentWindow(NoteID)
     /// 전역 요청 막대.
-    case openAIPanel(context: NoteID?)
+    case requestAgent
     case openSettings
     case openShortcuts
     /// 노트의 리마인더를 정하는 화면(Reminders 단계).

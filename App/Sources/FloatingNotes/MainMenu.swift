@@ -23,7 +23,7 @@ enum MainMenu {
             return [visible] + hiddenItems(for: [command], in: table, dispatcher: dispatcher)
         }
         let listed: Set<AppCommand> = [.newNote, .findNote, .closeWindow, .settings, .shortcuts, .nextNote, .enlargeBody, .reduceBody, .resetBodySize]
-        let unlisted = table.entries(in: .noteWindow).compactMap(\.command).filter { !listed.contains($0) }
+        let unlisted = (table.entries(in: .noteWindow) + table.entries(in: .agent)).compactMap(\.command).filter { !listed.contains($0) }
         let undo = #selector(AppCommandDispatcher.undoOrRestoreTrash(_:))
 
         // 노트를 누르면 앱이 앞으로 오고 메뉴 막대에 이 메뉴가 보인다(D-025). 차례는 시안 화면 1의 메뉴 막대다.
@@ -38,7 +38,7 @@ enum MainMenu {
         menu.addItem(submenu(
             title: "파일",
             items: command("새 노트", .newNote) + command("빠른 캡처", .quickCapture) + [.separator()]
-                + command("노트 찾기", .findNote) + command("라이브러리", .library) + command("AI 패널", .aiPanel)
+                + command("노트 찾기", .findNote) + command("라이브러리", .library) + command("에이전트에게 요청", .requestAgent)
                 + [.separator()] + command("창 닫기", .closeWindow)
                 + hiddenItems(for: unlisted, in: table, dispatcher: dispatcher)
         ))
@@ -67,7 +67,7 @@ enum MainMenu {
     ) -> [NSMenuItem] {
         commands.flatMap { command -> [NSMenuItem] in
             // "어디서나" 줄의 키는 전역 단축키가 받는다. 메뉴에는 노트 창의 키만 넣는다.
-            guard let entry = table.entry(for: command), entry.group == .noteWindow else { return [] }
+            guard let entry = table.entry(for: command), entry.group == .noteWindow || entry.group == .agent else { return [] }
             return entry.chords.map { chord in
                 let item = keyOnlyItem(
                     entry.action, #selector(AppCommandDispatcher.performMenuCommand(_:)), chord, target: dispatcher

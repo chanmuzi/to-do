@@ -16,7 +16,7 @@ extension Route {
     var isConnected: Bool {
         switch self {
         case .openAgentWindow, .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
-        case .openAIPanel: false
+        case .requestAgent: false
         }
     }
 }
@@ -95,7 +95,7 @@ final class AppRouter: Routing {
                 guard let agent, let anchor = notePanels.agentWindowAnchor(for: id) else { return logUnhandled(route) }
                 try agent.open(note: id, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
                 activateApp()
-            case .openAIPanel:
+            case .requestAgent:
                 return logUnhandled(route)
             }
             return .handled

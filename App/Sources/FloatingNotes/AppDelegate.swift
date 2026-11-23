@@ -410,9 +410,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
         let store = environment.settings
         let table = ShortcutTable.standard
-        let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .aiPanel, .markdownInput]
+        let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .agent, .markdownInput]
         let sections = groups.map { group in
-            let title = group == .aiPanel ? "AI 패널 (예정)" : group == .global ? "어디서나" : group.rawValue
+            let title = group == .global ? "어디서나" : group.rawValue
             return ShortcutSection(title, rows: table.entries(in: group).map { entry in
                 let action = entry.command?.isConnected == false ? entry.action + " (예정)" : entry.action
                 switch entry.keys {

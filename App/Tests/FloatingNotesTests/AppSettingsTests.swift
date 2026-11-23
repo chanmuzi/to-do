@@ -110,7 +110,7 @@ import Testing
         let menu = DockMenu.make(areNotesHidden: false) { chosen.append($0) }
 
         #expect(menu.items.map { $0.isSeparatorItem ? "-" : $0.title } == [
-            "새 노트", "빠른 캡처", "-", "노트 찾기", "라이브러리", "AI 패널", "-", "노트 모두 숨기기", "-",
+            "새 노트", "빠른 캡처", "-", "노트 찾기", "라이브러리", "에이전트에게 요청", "-", "노트 모두 숨기기", "-",
             "설정", "단축키",
         ])
         #expect(menu.items.allSatisfy { $0.keyEquivalent.isEmpty })
@@ -118,10 +118,10 @@ import Testing
         for index in menu.items.indices where !menu.items[index].isSeparatorItem {
             menu.performActionForItem(at: index)
         }
-        // 여는 화면이 아직 이어지지 않은 항목(AI 패널, 설정, 단축키)은 자리에 그대로 있되 고를 수 없다.
+        // 전역 요청 막대의 항목은 메뉴에 남고 비활성이다.
         #expect(chosen == [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .settings, .shortcuts])
         #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
-            "AI 패널",
+            "에이전트에게 요청",
         ])
     }
 
@@ -143,13 +143,13 @@ import Testing
         }
         #expect(titles.contains("Float 종료"))
 
-        for title in ["빠른 캡처", "노트 찾기", "라이브러리", "AI 패널", "설정...", "단축키", "새 노트", "노트 모두 숨기기"] {
+        for title in ["빠른 캡처", "노트 찾기", "라이브러리", "에이전트에게 요청", "설정...", "단축키", "새 노트", "노트 모두 숨기기"] {
             let item = try #require(items.first { $0.title == title })
             item.menu.performActionForItem(at: item.index)
         }
 
         #expect(fixture.receivedRoutes == [
-            .openCapture, .openBrowse(anchor: nil), .openLibrary, .openAIPanel(context: nil), .openSettings,
+            .openCapture, .openBrowse(anchor: nil), .openLibrary, .requestAgent, .openSettings,
             .openShortcuts, .newNote(NewNoteRequest()), .toggleAllNotesHidden,
         ])
         #expect(fixture.notePanels.openNoteIDs.count == 1)
