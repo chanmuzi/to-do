@@ -196,7 +196,7 @@ private struct Fixture {
 }
 
 @Suite struct CodexModelListTests {
-    @Test(arguments: ["list", "failed", "wrongShape", "absent"])
+    @Test(arguments: ["list", "empty", "failed", "wrongShape", "absent"])
     func readsOnlyVisibleModelsInPriorityOrder(_ scenario: String) async throws {
         let fx = try Fixture(.codex, #"""
         test "$*" = "debug models"
@@ -204,6 +204,7 @@ private struct Fixture {
         case "\#(scenario)" in
           failed) exit 7 ;;
           wrongShape) echo '{"models":{}}' ;;
+          empty) echo '{"models":[]}' ;;
           *) echo '{"models":[{"slug":"b","display_name":"Second","visibility":"list","priority":2},{"slug":"x","display_name":"Hidden","visibility":"hide","priority":0},{"slug":"a","display_name":"First","visibility":"list","priority":1}]}' ;;
         esac
         """#)
@@ -211,7 +212,14 @@ private struct Fixture {
         if scenario == "absent" { try FileManager.default.removeItem(at: fx.installation.executable) }
         let connection = try AgentConnection(provider: .codex, location: fx.location)
         let list = await connection.models(fx.installation)
-        #expect(list.map(\.slug) == (scenario == "list" ? ["a", "b"] : []))
-        #expect(list.map(\.displayName) == (scenario == "list" ? ["First", "Second"] : []))
+        switch scenario {
+        case "list":
+            #expect(list?.map(\.slug) == ["a", "b"])
+            #expect(list?.map(\.displayName) == ["First", "Second"])
+        case "empty":
+            #expect(list?.isEmpty == true)
+        default:
+            #expect(list == nil)
+        }
     }
 }

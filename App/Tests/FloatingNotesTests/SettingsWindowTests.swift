@@ -71,6 +71,85 @@ import Theme
         #expect(service.destination(for: ScheduleItem(start: .now)) == fake.reminderDestination)
     }
 
+    @Test func codexMenuKeepsFiveChoicesAndTheSavedSelection() async throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let catalog = fixture.root.appending(path: "models.json")
+        let entries = (1...11).reversed().map { rank -> [String: Any] in
+            ["slug": "m\(rank)", "display_name": "Model \(rank)", "visibility": "list", "priority": rank]
+        }
+        try JSONSerialization.data(withJSONObject: ["models": entries]).write(to: catalog)
+        let cli = fixture.root.appending(path: "codex")
+        try #"""
+        #!/bin/sh
+        case "$*" in
+          --version) echo fake ;;
+          "debug models") cat "$(dirname "$0")/models.json" ;;
+          "login status") echo "Logged in using ChatGPT" ;;
+          *) exit 1 ;;
+        esac
+        """#.write(to: cli, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: cli.path)
+        try FileManager.default.createSymbolicLink(at: fixture.root.appending(path: "node"),
+                                                   withDestinationURL: URL(filePath: "/usr/bin/false"))
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        try store.update { $0.agentProvider = "codex" }
+        let agents = AgentSettings(location: fixture.location, searchDirectory: fixture.root)
+        let schedules = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(read: { store.settings }, save: store.update, schedules: schedules,
+                                  shortcuts: [], agents: agents, openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        defer { settings.window?.close() }
+
+        func modelButton(in view: NSView) -> NSButton? {
+            if let button = view as? NSButton, button.accessibilityLabel() == "모델" { return button }
+            return view.subviews.lazy.compactMap(modelButton).first
+        }
+        func check(_ titles: [String], selected: String) throws {
+            let root = try #require(settings.window?.contentView)
+            root.layoutSubtreeIfNeeded()
+            let button = try #require(modelButton(in: root))
+            let items = try #require(button.menu).items
+            #expect(items.enumerated().compactMap { $1.isSeparatorItem ? $0 : nil } == (titles.count > 1 ? [1] : []))
+            #expect(items.filter { !$0.isSeparatorItem }.map(\.title) == titles)
+            #expect(items.filter { $0.state == .on }.map(\.title) == [selected])
+            #expect(button.title == selected)
+        }
+
+        settings.show(.assistant)
+        await agents.wait()
+        let first = ["CLI 기본", "Model 1", "Model 2", "Model 3", "Model 4", "Model 5"]
+        try check(first, selected: "CLI 기본")
+        try store.update { $0.codexModel = "m5" }
+        try check(first, selected: "Model 5")
+        try store.update { $0.codexModel = "m11" }
+        try check(first + ["Model 11"], selected: "Model 11")
+
+        settings.window?.close()
+        try FileManager.default.removeItem(at: catalog)
+        settings.show(.assistant)
+        await agents.wait()
+        try check(["CLI 기본"], selected: "CLI 기본")
+        func storedModel() throws -> String? {
+            try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.codexModel
+        }
+        #expect(try storedModel() == "m11")
+
+        settings.window?.close()
+        try JSONSerialization.data(withJSONObject: ["models": Array(entries.dropFirst())]).write(to: catalog)
+        settings.show(.assistant)
+        await agents.wait()
+        try check(first, selected: "CLI 기본")
+        #expect(try storedModel() == nil)
+
+        settings.window?.close()
+        try JSONSerialization.data(withJSONObject: ["models": entries]).write(to: catalog)
+        settings.show(.assistant)
+        await agents.wait()
+        try check(first, selected: "CLI 기본")
+    }
+
     @Test func previewHasNoInteractiveAccessibilityChildren() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
