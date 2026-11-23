@@ -31,7 +31,7 @@ public struct AgentRunner: Sendable {
     }
 
     public func run(_ prompt: String, engine: AgentEngine, installation: AgentInstallation,
-                    taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
+                    runID: UUID = UUID(), taskName: String = "에이전트 작업", timeout: Duration = .seconds(120),
                     onEvent: @escaping @Sendable (AgentEvent) -> Void = { _ in }) async throws -> AgentResult {
         let provider: AgentProvider
         let requested = engine.model
@@ -48,7 +48,7 @@ public struct AgentRunner: Sendable {
         }
         let connection = try AgentConnection(provider: provider, location: location)
         do {
-            return try await executeRun(prompt, provider: provider, requested: requested, connection: connection,
+            return try await executeRun(prompt, runID: runID, provider: provider, requested: requested, connection: connection,
                                         installation: installation, timeout: timeout, onEvent: onEvent)
         } catch let error as AgentError {
             switch error {
@@ -62,11 +62,11 @@ public struct AgentRunner: Sendable {
         }
     }
 
-    private func executeRun(_ prompt: String, provider: AgentProvider, requested: String?, connection: AgentConnection,
+    private func executeRun(_ prompt: String, runID: UUID, provider: AgentProvider, requested: String?, connection: AgentConnection,
                             installation: AgentInstallation, timeout: Duration,
                             onEvent: @escaping @Sendable (AgentEvent) -> Void) async throws -> AgentResult {
         try await onWorker {
-            let id = UUID().uuidString
+            let id = runID.uuidString
             let folder = connection.state.appending(path: "agents/runs/\(id)", directoryHint: .isDirectory)
             let cwd = folder.appending(path: "work", directoryHint: .isDirectory)
             let log = location.stateDirectory.appending(path: "agent-usage", directoryHint: .isDirectory)

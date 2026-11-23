@@ -14,6 +14,7 @@ final class ToastPresenter {
         var kind: String
         var message: String
         var actionTitle: String
+        var face: AgentFaceState?
     }
 
     private let theme: Theme
@@ -53,7 +54,7 @@ final class ToastPresenter {
         self.action = action
         let panel = panel ?? ToastPanel()
         self.panel = panel
-        let view = ToastView(theme: theme, message: content.message, actionTitle: content.actionTitle)
+        let view = ToastView(theme: theme, message: content.message, actionTitle: content.actionTitle, face: content.face, working: content.kind == "agent-working")
         view.actionButton.onPress = { [unowned self] in performAction() }
         panel.contentView = view
         self.view = view

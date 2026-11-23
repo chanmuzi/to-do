@@ -227,6 +227,7 @@ public final class BrowseCoordinator {
     private func close(returningFocus: Bool) {
         guard let panel, panel.isVisible, !isClosing else { return }
         isClosing = true
+        pickTarget = nil
         storeObservation = nil
         stateObservations = []
         anchorWindow = nil
@@ -414,10 +415,19 @@ public final class BrowseCoordinator {
 
     /// 줄을 연다: 요청을 보내고 닫는다. 요청이 이루어졌으면 포커스는 받은 쪽이 정했고(고른 노트가 키 창이 된다),
     /// 이루어지지 못했으면(받은 쪽이 사용자에게 알렸다) 열기 전의 자리로 포커스를 돌려줄 때라고 알린다.
+    package var pickTarget: ((NoteID) -> Void)?
+
     private func activate(_ index: Int) {
         guard !isClosing, let listView = rootView?.listView, listView.entries.indices.contains(index),
               let route = BrowseSelection.route(for: listView.entries[index], current: current)
         else { return }
+        if let pickTarget {
+            if case .openNote(let id) = route {
+                close(returningFocus: false)
+                pickTarget(id)
+            }
+            return
+        }
         staysOpenWithoutKey = true
         let result = router.route(route)
         staysOpenWithoutKey = false

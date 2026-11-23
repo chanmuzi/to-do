@@ -84,28 +84,20 @@ import Theme
         #expect(chosen == [.newNote, .quit])
     }
 
-    /// 여는 화면이 아직 이어지지 않은 항목은 메뉴에 자리와 이름 그대로 있되(spec 4.3) 고를 수 없다:
-    /// 눌러도 아무 일이 없는 항목을 내놓지 않는다(D-034). 메뉴 막대 메뉴, 앱 메뉴 모두 같다.
-    @Test func entriesForUnconnectedScreensAreDisabledNotRemoved() throws {
+    @Test func requestMenuIsEnabledAndDispatchesOnce() throws {
         defer { fixture.cleanUp() }
-        let unconnected: Set<StatusMenuAction> = [.requestAgent]
-        let connected: [StatusMenuAction] = [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .quit]
-        #expect(connected.filter(\.isConnected) == connected)
-        #expect(unconnected.filter(\.isConnected).isEmpty)
-
         let menu = NSMenu()
         var chosen: [StatusMenuAction] = []
         StatusMenuBuilder(theme: fixture.theme).fill(
             menu, with: StatusMenuModel.entries(areNotesHidden: false)
         ) { chosen.append($0) }
         let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
-        #expect(disabled == ["에이전트에게 요청"])
-        // 고를 수 없는 항목은 눌러도 동작이 가지 않는다(고를 수 있는 항목은 위의 시험이 본다).
+        #expect(disabled.isEmpty)
         let library = try #require(menu.items.firstIndex { $0.title == "에이전트에게 요청" })
         menu.performActionForItem(at: library)
-        #expect(chosen.isEmpty)
+        #expect(chosen == [.requestAgent])
         #expect(menu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title) == [
-            "새 노트", "빠른 캡처", "노트 찾기", "라이브러리", "노트 모두 숨기기", "설정", "단축키", "종료",
+            "새 노트", "빠른 캡처", "노트 찾기", "라이브러리", "에이전트에게 요청", "노트 모두 숨기기", "설정", "단축키", "종료",
         ])
 
         // 앱 메뉴: 보이는 항목은 열릴 때 고를 수 없게 되고, 키만 듣는 숨은 짝은 그대로 듣는다.
@@ -116,7 +108,7 @@ import Theme
         }
         for title in ["에이전트에게 요청"] {
             let isValid = try validity(title)
-            #expect(!isValid, "\(title)")
+            #expect(isValid, "\(title)")
         }
         for title in ["새 노트", "빠른 캡처", "노트 찾기", "노트 모두 숨기기", "창 닫기", "설정...", "단축키"] {
             let isValid = try validity(title)
@@ -210,7 +202,7 @@ import Theme
         #expect(keyOnly.allSatisfy { $0.allowsKeyEquivalentWhenHidden && !$0.keyEquivalent.isEmpty })
         let commands = Set(keyOnly.compactMap { $0.representedObject as? String }.compactMap(AppCommand.init(rawValue:)))
         #expect(commands == Set((ShortcutTable.standard.entries(in: .noteWindow) + ShortcutTable.standard.entries(in: .agent)).compactMap(\.command)))
-        for entry in ShortcutTable.standard.entries(in: .noteWindow) + ShortcutTable.standard.entries(in: .agent) {
+        for entry in ShortcutTable.standard.entries(in: .noteWindow) + ShortcutTable.standard.entries(in: .agent) where entry.command != nil {
             let chord = entry.chords[0]
             let item = keyOnly.first { $0.representedObject as? String == entry.command?.rawValue }
             #expect(item?.keyEquivalent == chord.key.menuKeyEquivalent, "\(entry.action)")

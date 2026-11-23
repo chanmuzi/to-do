@@ -1,11 +1,18 @@
 import AppKit
+import SwiftUI
 import Theme
 
 /// 캡처 바의 한 줄(spec 7, 화면 3): `>` / 입력 칸 / 스페이스 / 리마인더. 닫는 버튼은 없다.
 final class CaptureBarView: NSView {
     private let style: CaptureStyle
     private let background: CaptureBackgroundView
-    private let promptLabel = NSTextField(labelWithString: ">")
+    private let switchHost = NSHostingView(rootView: AnyView(EmptyView()))
+    var onSwitch: () -> Void = {}
+    private var mode: CaptureCoordinator.Mode = .memo
+    func setMode(_ value: CaptureCoordinator.Mode) {
+        mode = value
+        refreshTheme()
+    }
     let input: CommandInputField
     let textView: CaptureTextView
     private let spaceBadge: CaptureBadgeView
@@ -26,8 +33,7 @@ final class CaptureBarView: NSView {
         background.autoresizingMask = [.width, .height]
         addSubview(background)
 
-        promptLabel.setAccessibilityElement(false)
-        [promptLabel, input, spaceBadge, reminderBadge].forEach(addSubview)
+        [switchHost, input, spaceBadge, reminderBadge].forEach(addSubview)
         input.setAccessibilityLabel("빠른 캡처")
         textView.setAccessibilityPlaceholderValue(Self.placeholder)
         refreshTheme()
@@ -76,9 +82,18 @@ final class CaptureBarView: NSView {
 
     func refreshTheme() {
         background.refreshTheme()
-        promptLabel.font = style.promptFont
-        promptLabel.textColor = style.color(.text3)
-        input.apply(font: style.inputFont, ink: style.color(.text), placeholder: Self.placeholder,
+        let theme = style.theme
+        let label = mode == .memo ? "요청으로 전환" : "메모로 전환"
+        switchHost.rootView = AnyView(Button { [weak self] in self?.onSwitch() } label: {
+            Group {
+                if mode == .request { AgentFace(theme: theme) }
+                else { Text(">").font(Font(style.promptFont)) }
+            }.frame(width: theme.component(.iconButton), height: theme.component(.iconButton))
+        }.buttonStyle(SettingsButton(theme: theme, selected: false)).accessibilityLabel(label))
+        let placeholder = mode == .request ? "에이전트에게 요청하기" : Self.placeholder
+        input.setAccessibilityLabel(mode == .request ? "에이전트에게 요청" : "빠른 캡처")
+        textView.setAccessibilityPlaceholderValue(placeholder)
+        input.apply(font: style.inputFont, ink: style.color(.text), placeholder: placeholder,
                     placeholderInk: style.color(.text3))
         spaceBadge.refresh()
         reminderBadge.refresh()
@@ -102,10 +117,10 @@ final class CaptureBarView: NSView {
             NSRect(x: x, y: ((bounds.height - size.height) / 2).rounded(), width: size.width, height: size.height)
         }
 
-        let promptWidth = style.textWidth(of: promptLabel)
-        promptLabel.frame = style.labelFrame(
-            promptLabel, textX: padding, textWidth: promptWidth, centeredIn: bounds.height
-        )
+        let buttonSize = theme.component(.iconButton)
+        let inset = theme.component(.agentChipGap)
+        switchHost.frame = centered(NSSize(width: buttonSize, height: buttonSize), x: padding - inset)
+        let promptWidth = buttonSize - inset * 2
 
         // 오른쪽 끝에서부터: 리마인더, 그 왼쪽에 스페이스. 없는 것은 자리가 없다.
         var trailing = bounds.width - padding

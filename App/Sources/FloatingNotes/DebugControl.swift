@@ -476,6 +476,9 @@ final class DebugControl {
             guard let url = output(named: name), let library else { return }
             do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), to: url) }
             catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
+        case ("request-bar", _, _) where isPassive: router.route(.requestAgent)
+        case ("agent-action", let id?, let action?) where isPassive:
+            agent?.performForVerification(action, for: id)
         case ("agent-open", let id?, "face") where isPassive:
             notePanels.openAgentFromFaceForVerification(id)
         case ("agent-open", let id?, "shortcut") where isPassive:

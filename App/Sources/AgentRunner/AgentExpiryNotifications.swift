@@ -32,7 +32,7 @@ public actor AgentExpiryNotifications {
     private let notifier: any AgentExpiryNotifying
     public init(notifier: any AgentExpiryNotifying) { self.notifier = notifier }
 
-    func blocked(_ connection: AgentConnection, taskName: String) async throws {
+    package func blocked(_ connection: AgentConnection, taskName: String) async throws {
         let marker = connection.config.appending(path: "float-expiry-notified")
         do { try Data().write(to: marker, options: .withoutOverwriting) }
         catch CocoaError.fileWriteFileExists { return }

@@ -534,17 +534,21 @@ public final class NotePanelCoordinator {
     }
 
     /// 같은 화면에서 노트의 높이 규칙과 이웃 창 배치를 재사용한다.
-    package func agentWindowAnchor(for id: NoteID) -> (title: String, frame: CGRect, visible: CGRect)? {
-        guard let controller = controllers[id], let visible = (controller.panel.screen ?? NSScreen.main)?.visibleFrame else { return nil }
+    package func agentWindowAnchor(for id: NoteID?) -> (title: String, frame: CGRect, visible: CGRect)? {
+        let controller = id.flatMap { controllers[$0] }
+        if id != nil && controller == nil { return nil }
+        let pointerScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
+        guard let visible = (controller?.panel.screen ?? pointerScreen ?? NSScreen.main)?.visibleFrame else { return nil }
         let theme = environment.theme
         let policy = environment.sizePolicy
         let content = policy.minBodyHeight + theme.shape(.chromeHeight) + theme.space(.sp3)
             + theme.space(.sp2) + theme.component(.agentFaceLarge) + 2 * theme.component(.agentEdgeIdle)
         let height = policy.windowHeight(contentHeight: content, screenHeight: visible.height)
         let size = CGSize(width: policy.defaultWidth, height: min(visible.height, height))
-        let frame = environment.placement.frame(nextTo: controller.panel.frame, size: size, visibleFrame: visible,
-                                                occupied: controllers.values.filter { $0.panel.isVisible }.map { $0.panel.frame })
-        let title = controller.latestNote.title
+        let occupied = controllers.values.filter { $0.panel.isVisible }.map { $0.panel.frame }
+        let frame = controller.map { environment.placement.frame(nextTo: $0.panel.frame, size: size, visibleFrame: visible, occupied: occupied) }
+            ?? environment.placement.initialFrame(size: size, visibleFrame: visible, occupied: occupied)
+        let title = controller?.latestNote.title ?? ""
         return (title.isEmpty ? TopRowState.untitled : title, frame, visible)
     }
 

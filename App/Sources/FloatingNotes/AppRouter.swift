@@ -16,7 +16,7 @@ extension Route {
     var isConnected: Bool {
         switch self {
         case .openAgentWindow, .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
-        case .requestAgent: false
+        case .requestAgent: true
         }
     }
 }
@@ -43,6 +43,15 @@ final class AppRouter: Routing {
     /// 메뉴 막대 메뉴, 캡처 바의 ⌘↵, 노트 찾기, 알림의 "열기"로 연 노트에 곧바로 글을 쓸 수 있게 한다.
     /// 기본은 아무것도 하지 않는다(시험이 사용자의 앱을 뒤로 보내지 않게). `AppDelegate`가 넣는다.
     var activateApp: () -> Void = {}
+    var traceActivation: (String) -> Void = { _ in }
+
+    func showAgent(_ draft: AgentDraft, source: String) {
+        guard let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first)
+            ?? notePanels?.agentWindowAnchor(for: nil) else { return }
+        traceActivation("agent-open " + source)
+        agent.open(record: draft, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
+        activateApp()
+    }
     var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?
     /// 아직 연결되지 않아 기록만 한 요청.
     private(set) var isRouting = false
@@ -93,10 +102,12 @@ final class AppRouter: Routing {
                 activateApp()
             case .openAgentWindow(let id):
                 guard let agent, let anchor = notePanels.agentWindowAnchor(for: id) else { return logUnhandled(route) }
+                traceActivation("agent-open note")
                 try agent.open(note: id, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
                 activateApp()
             case .requestAgent:
-                return logUnhandled(route)
+                guard let quickPanels else { return logUnhandled(route) }
+                quickPanels.toggleCapture(mode: .request)
             }
             return .handled
         } catch {

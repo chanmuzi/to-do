@@ -3,6 +3,11 @@
 
 public enum ColorToken: String, CaseIterable, Sendable {
     case surface
+    case agentShimmer = "agent-shimmer"
+    case agentBgA = "agent-bg-a"
+    case agentBgM = "agent-bg-m"
+    case agentBgB = "agent-bg-b"
+    case agentMessage = "agent-message"
     case agentEdgeA = "agent-edge-a"
     case agentEdgeB = "agent-edge-b"
     case surface2 = "surface-2"
@@ -159,6 +164,15 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case agentArrowStroke = "agent-arrow-stroke"
     case agentInputFont = "agent-input-font"
     case agentInputInset = "agent-input-inset"
+    case agentQueueRemoveSize = "agent-queue-remove-size"
+    case agentQueueActionGap = "agent-queue-action-gap"
+    case agentQueueActionSize = "agent-queue-action-size"
+    case agentQueueLabel = "agent-queue-label"
+    case agentRowInset = "agent-row-inset"
+    case agentBubbleInset = "agent-bubble-inset"
+    case agentProgressHeight = "agent-progress-height"
+    case agentStepHeight = "agent-step-height"
+    case agentAnswerFaceSlot = "agent-answer-face-slot"
     case agentEdgeIdle = "agent-edge-idle"
     case agentEdgeWorking = "agent-edge-working"
     case agentEdgeGlow = "agent-edge-glow"
@@ -356,6 +370,8 @@ public enum MotionToken: String, CaseIterable, Sendable {
 }
 
 public enum AgentFaceTiming: String, CaseIterable, Sendable {
+    case agentEdgePeriod = "agent-edge-period"
+    case agentShimmerPeriod = "agent-shimmer-period"
     case blink = "agent-blink"
     case nod = "agent-nod"
     case wave = "agent-wave"

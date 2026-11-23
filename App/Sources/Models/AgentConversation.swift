@@ -9,18 +9,25 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     public var updatedAt: Date
     public var targets: [NoteID]
     public var draft: String
+    public struct Queued: Identifiable, Codable, Equatable, Sendable {
+        public let id: UUID
+        public let text: String
+        package init(text: String) { self.id = UUID(); self.text = text }
+    }
+    public var queued: [Queued] = []
     public var messages: [Message]
     public var requests: [AgentRequest]
 
     public struct Message: Codable, Equatable, Sendable {
         public enum Role: String, Codable, Sendable { case user, assistant }
+        package init(role: Role, requestID: UUID, text: String) { self.role = role; self.requestID = requestID; self.text = text }
         public var role: Role
         public var requestID: UUID
         public var text: String
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests
+        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -31,6 +38,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encode(targets, forKey: .targets)
+        try c.encode(queued, forKey: .queued)
         try c.encode(draft, forKey: .draft)
         try c.encode(messages, forKey: .messages)
         try c.encode(requests, forKey: .requests)
@@ -64,6 +72,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
         targets = try c.decodeIfPresent([NoteID].self, forKey: .targets) ?? []
         draft = try c.decodeIfPresent(String.self, forKey: .draft) ?? ""
+        queued = try c.decodeIfPresent([Queued].self, forKey: .queued) ?? []
         messages = try c.decodeIfPresent([Message].self, forKey: .messages) ?? []
         requests = try c.decodeIfPresent([AgentRequest].self, forKey: .requests) ?? []
     }
@@ -73,6 +82,7 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
     public enum Status: String, Codable, Sendable { case running, completed, interrupted, failed, awaitingAnswer }
     public struct Step: Codable, Equatable, Sendable {
         public enum Kind: String, Codable, Sendable { case think, search, read, write }
+        public var callID: String?
         public var id: UUID
         public var kind: Kind
         public var startedAt: Date
@@ -81,6 +91,12 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
         public var result: String?
         public var noteID: NoteID?
         public var noteTitle: String?
+        package init(_ kind: Kind, callID: String? = nil, now: Date = Date()) {
+            self.id = UUID()
+            self.kind = kind
+            self.startedAt = now
+            self.callID = callID
+        }
     }
     public var id: UUID
     public var runID: UUID
@@ -90,5 +106,17 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
     public var userText: String
     public var answer: String?
     public var steps: [Step]
+    public var failure: String?
+    public var resumeAt: Date?
+    package var resumeTime: String? {
+        resumeAt?.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: "ko_KR")))
+    }
     public var proposals: [AgentProposal]
+}
+
+extension AgentRequest {
+    package init(id: UUID, text: String, engine: String, model: String?) {
+        self.init(id: id, runID: UUID(), engine: engine, model: model, status: .running,
+                  userText: text, steps: [], proposals: [])
+    }
 }

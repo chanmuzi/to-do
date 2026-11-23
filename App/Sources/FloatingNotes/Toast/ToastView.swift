@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Theme
 
 /// 짧은 알림의 모습(D-041): 한 줄의 글과 동작 하나. 흑백이고, 바탕은 캡처 바와 같다(뒤 배경 흐림 위에
@@ -11,7 +12,13 @@ final class ToastView: NSView {
     private let surfaceView = NSView()
     private let label = NSTextField(labelWithString: "")
 
-    init(theme: Theme, message: String, actionTitle: String) {
+    private let faceView: NSView?
+    private let tint: CAGradientLayer?
+    private var faceWidth: CGFloat { faceView == nil ? 0 : theme.component(.agentFaceMedium) + theme.space(.sp2) }
+
+    init(theme: Theme, message: String, actionTitle: String, face: AgentFaceState? = nil, working: Bool = false) {
+        faceView = face.map { NSHostingView(rootView: AgentFace(theme: theme, state: $0, size: .medium)) }
+        tint = working ? CAGradientLayer() : nil
         self.theme = theme
         actionButton = ToastActionButton(theme: theme, title: actionTitle)
         super.init(frame: .zero)
@@ -21,12 +28,14 @@ final class ToastView: NSView {
         effectView.state = .active
         effectView.maskImage = Self.roundedMask(radius: theme.shape(.windowRadius))
         surfaceView.wantsLayer = true
+        if let tint { surfaceView.layer?.addSublayer(tint) }
         label.stringValue = message
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
         label.cell?.usesSingleLineMode = true
         [effectView, surfaceView, label, actionButton].forEach(addSubview)
+        if let faceView { addSubview(faceView) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(message)
@@ -42,7 +51,7 @@ final class ToastView: NSView {
     /// 글과 동작이 다 보이는 크기. 너비는 `maxWidth`를 넘지 않고, 넘치면 글이 말줄임표로 줄어든다.
     func fittingSize(maxWidth: CGFloat) -> NSSize {
         let padding = theme.component(.toastPadding)
-        let natural = padding * 2 + messageSize.width
+        let natural = padding * 2 + faceWidth + messageSize.width
             + theme.component(.toastGap) + actionButton.preferredSize.width
         return NSSize(width: min(natural, maxWidth), height: theme.component(.toastHeight))
     }
@@ -66,6 +75,10 @@ final class ToastView: NSView {
         layer.cornerRadius = theme.shape(.windowRadius)
         layer.borderWidth = theme.shape(.borderWidth)
         effectiveAppearance.performAsCurrentDrawingAppearance {
+            tint?.colors = [ColorToken.agentBgA, .agentBgM, .agentBgB].map { theme.nsColor($0).cgColor }
+            tint?.startPoint = .zero
+            tint?.endPoint = CGPoint(x: 1, y: 1)
+            tint?.cornerRadius = theme.shape(.windowRadius)
             layer.borderColor = theme.nsColor(.outline).cgColor
             layer.backgroundColor = theme.nsColor(.surface).withAlphaComponent(theme.material.opacity).cgColor
         }
@@ -82,6 +95,9 @@ final class ToastView: NSView {
         effectView.frame = bounds
         surfaceView.frame = bounds
         let padding = theme.component(.toastPadding)
+        tint?.frame = surfaceView.bounds
+        let size = theme.component(.agentFaceMedium)
+        faceView?.frame = NSRect(x: padding, y: (bounds.height - size) / 2, width: size, height: size)
         let button = actionButton.preferredSize
         actionButton.frame = NSRect(
             x: bounds.width - padding + theme.space(.sp2) - button.width,
@@ -95,8 +111,8 @@ final class ToastView: NSView {
         let baselineShift = actionButton.frame.minY + actionButton.labelBaselineFromTop
             - (centered + label.firstBaselineOffsetFromTop)
         label.frame = NSRect(
-            x: padding, y: (centered + baselineShift).rounded(),
-            width: max(0, labelEnd - padding), height: labelHeight
+            x: padding + faceWidth, y: (centered + baselineShift).rounded(),
+            width: max(0, labelEnd - padding - faceWidth), height: labelHeight
         )
     }
 

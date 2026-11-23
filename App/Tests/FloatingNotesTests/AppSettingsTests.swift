@@ -118,11 +118,8 @@ import Testing
         for index in menu.items.indices where !menu.items[index].isSeparatorItem {
             menu.performActionForItem(at: index)
         }
-        // 전역 요청 막대의 항목은 메뉴에 남고 비활성이다.
-        #expect(chosen == [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .settings, .shortcuts])
-        #expect(menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title) == [
-            "에이전트에게 요청",
-        ])
+        #expect(chosen == [.newNote, .quickCapture, .findNote, .library, .requestAgent, .toggleNotesHidden, .settings, .shortcuts])
+        #expect(menu.items.allSatisfy { $0.isSeparatorItem || $0.isEnabled })
     }
 
     /// 메뉴 막대 메뉴의 모든 항목이 앱 메뉴에도 보이는 항목으로 있고, 골랐을 때 같은 일을 한다.
