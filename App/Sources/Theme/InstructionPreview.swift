@@ -51,7 +51,7 @@ struct InstructionPreview: View {
                     Spacer(minLength: 0)
                 }.padding(.trailing, theme.space(.sp3))
                     .frame(minHeight: theme.component(.proposalLineHeight))
-                    .background(row.sign == "+" ? theme.color(.diffAdd) : row.sign == "-" ? theme.color(.surface2) : .clear)
+                    .background(row.sign == "+" ? theme.color(.diffAdd) : row.sign == "-" ? theme.color(.diffDel) : .clear)
             }
         }.font(theme.font(.body, size: theme.component(.proposalFont)))
     }

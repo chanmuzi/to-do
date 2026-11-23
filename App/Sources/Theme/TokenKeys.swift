@@ -4,6 +4,7 @@
 public enum ColorToken: String, CaseIterable, Sendable {
     case surface
     case agentDash = "agent-dash"
+    case diffDel = "diff-del"
     case diffAdd = "diff-add"
     case agentShimmer = "agent-shimmer"
     case agentBgA = "agent-bg-a"
