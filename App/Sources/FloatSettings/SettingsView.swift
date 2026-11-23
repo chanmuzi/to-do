@@ -141,7 +141,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                }
+                }.settingsMeasure("shortcut-" + section.title)
             }
         case .assistant: assistant
         case .accounts: if let engine = model.detailEngine { accountDetail(engine) }

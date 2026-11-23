@@ -27,7 +27,7 @@ import SpaceIcons
             notes = try FileNoteStore(location: location)
             let recorder = recorder
             let router = RouteDispatcher(isConnected: { route in
-                switch route { case .openSettings, .openAIPanel: false; default: true }
+                switch route { case .openSettings, .requestAgent: false; default: true }
             }, answering: { recorder.values.append($0); return .handled })
             coordinator = LibraryCoordinator(theme: try Theme.bundled(), notes: notes,
                 spaces: try SpaceStore(location: location), windows: try WindowStateStore(location: location),

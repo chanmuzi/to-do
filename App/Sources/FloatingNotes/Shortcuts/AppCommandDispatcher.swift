@@ -31,7 +31,8 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         case .quickCapture: router.route(.openCapture)
         case .toggleNotesHidden: router.route(.toggleAllNotesHidden)
         case .library: router.route(.openLibrary)
-        case .aiPanel: router.route(.openAIPanel(context: note))
+        case .requestAgent: router.route(.requestAgent)
+        case .openAgentWindow: openAgentWindow(keyNote: note)
         case .newNote: router.route(.newNote(NewNoteRequest(nextTo: note)))
         case .findNote: router.route(.openBrowse(anchor: note))
         case .settings: router.route(.openSettings)
@@ -63,6 +64,10 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         }
     }
 
+    func openAgentWindow(keyNote: NoteID?) {
+        if let keyNote { router.route(.openAgentWindow(keyNote)) }
+    }
+
     private func zoom(_ change: BodyZoom) {
         do { try changeBodySize(change) }
         catch { presentFailure("본문 글꼴 크기를 저장하지 못했습니다", error) }
@@ -76,7 +81,7 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         // 메뉴 막대에서 연 노트 찾기는 노트에 붙지 않고 화면 가운데 위쪽에 뜬다(spec 4.1, D-030).
         case .findNote: router.route(.openBrowse(anchor: nil))
         case .library: perform(.library)
-        case .aiPanel: perform(.aiPanel)
+        case .requestAgent: perform(.requestAgent)
         case .toggleNotesHidden: perform(.toggleNotesHidden)
         case .settings: perform(.settings)
         case .shortcuts: perform(.shortcuts)
@@ -102,6 +107,7 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         }
         // 키만 듣는 숨은 짝 항목은 그대로 둔다(그 키가 다른 곳으로 흘러가지 않게 받아서 기록한다).
         guard !menuItem.isHidden else { return true }
+        if name == AppCommand.openAgentWindow.rawValue { return notePanels.keyNoteID != nil }
         return name.flatMap(AppCommand.init(rawValue:))?.isConnected ?? true
     }
 

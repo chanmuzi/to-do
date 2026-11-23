@@ -26,6 +26,8 @@ nonisolated final class KeyCodeMenu: NSMenu {
         guard event.type == .keyDown else { return false }
         let wanted = (Int(event.keyCode) + 1) << 8 | Self.modifiers(of: event).rawValue
         guard let (menu, index) = Self.find(tag: wanted, in: self) else { return false }
+        menu.update()
+        guard menu.items[index].isEnabled else { return false }
         menu.performActionForItem(at: index)
         return true
     }

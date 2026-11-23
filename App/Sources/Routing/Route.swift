@@ -16,8 +16,10 @@ public enum Route: Hashable, Sendable {
     case toggleAllNotesHidden
     /// 닫은 노트를 다시 여는 라이브러리.
     case openLibrary
-    // 아래의 AI, 설정, 리마인더 화면은 뒤 단계에서 연결한다.
-    case openAIPanel(context: NoteID?)
+    /// 노트에서 연 대상 대화.
+    case openAgentWindow(NoteID)
+    /// 전역 요청 막대.
+    case requestAgent
     case openSettings
     case openShortcuts
     /// 노트의 리마인더를 정하는 화면(Reminders 단계).

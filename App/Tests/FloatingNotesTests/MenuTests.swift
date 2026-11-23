@@ -38,7 +38,7 @@ import Theme
         let entries = StatusMenuModel.entries(areNotesHidden: false)
         let layout = entries.map { $0.title ?? "-" }
         #expect(layout == [
-            "새 노트", "빠른 캡처", "-", "노트 찾기", "라이브러리", "AI 패널", "-", "노트 모두 숨기기", "-",
+            "새 노트", "빠른 캡처", "-", "노트 찾기", "라이브러리", "에이전트에게 요청", "-", "노트 모두 숨기기", "-",
             "설정", "단축키", "-", "종료",
         ])
         // 종료를 뺀 항목에는 아이콘이 있다.
@@ -88,7 +88,7 @@ import Theme
     /// 눌러도 아무 일이 없는 항목을 내놓지 않는다(D-034). 메뉴 막대 메뉴, 앱 메뉴 모두 같다.
     @Test func entriesForUnconnectedScreensAreDisabledNotRemoved() throws {
         defer { fixture.cleanUp() }
-        let unconnected: Set<StatusMenuAction> = [.aiPanel]
+        let unconnected: Set<StatusMenuAction> = [.requestAgent]
         let connected: [StatusMenuAction] = [.newNote, .quickCapture, .findNote, .library, .toggleNotesHidden, .quit]
         #expect(connected.filter(\.isConnected) == connected)
         #expect(unconnected.filter(\.isConnected).isEmpty)
@@ -99,9 +99,9 @@ import Theme
             menu, with: StatusMenuModel.entries(areNotesHidden: false)
         ) { chosen.append($0) }
         let disabled = menu.items.filter { !$0.isSeparatorItem && !$0.isEnabled }.map(\.title)
-        #expect(disabled == ["AI 패널"])
+        #expect(disabled == ["에이전트에게 요청"])
         // 고를 수 없는 항목은 눌러도 동작이 가지 않는다(고를 수 있는 항목은 위의 시험이 본다).
-        let library = try #require(menu.items.firstIndex { $0.title == "AI 패널" })
+        let library = try #require(menu.items.firstIndex { $0.title == "에이전트에게 요청" })
         menu.performActionForItem(at: library)
         #expect(chosen.isEmpty)
         #expect(menu.items.filter { !$0.isSeparatorItem && $0.isEnabled }.map(\.title) == [
@@ -114,7 +114,7 @@ import Theme
         func validity(_ title: String) throws -> Bool {
             fixture.commands.validateMenuItem(try #require(items.first { $0.title == title && !$0.isHidden }))
         }
-        for title in ["AI 패널"] {
+        for title in ["에이전트에게 요청"] {
             let isValid = try validity(title)
             #expect(!isValid, "\(title)")
         }
@@ -139,14 +139,14 @@ import Theme
         var didQuit = false
         fixture.commands.quit = { didQuit = true }
 
-        for action: StatusMenuAction in [.quickCapture, .findNote, .library, .aiPanel, .settings, .shortcuts] {
+        for action: StatusMenuAction in [.quickCapture, .findNote, .library, .requestAgent, .settings, .shortcuts] {
             fixture.commands.performStatusMenu(action)
         }
         fixture.commands.performStatusMenu(.quit)
 
         // 메뉴 막대에서 연 노트 찾기는 노트에 붙지 않는다(spec 4.1).
         #expect(fixture.receivedRoutes == [
-            .openCapture, .openBrowse(anchor: nil), .openLibrary, .openAIPanel(context: nil), .openSettings,
+            .openCapture, .openBrowse(anchor: nil), .openLibrary, .requestAgent, .openSettings,
             .openShortcuts,
         ])
         #expect(didQuit)
@@ -209,8 +209,8 @@ import Theme
 
         #expect(keyOnly.allSatisfy { $0.allowsKeyEquivalentWhenHidden && !$0.keyEquivalent.isEmpty })
         let commands = Set(keyOnly.compactMap { $0.representedObject as? String }.compactMap(AppCommand.init(rawValue:)))
-        #expect(commands == Set(ShortcutTable.standard.entries(in: .noteWindow).compactMap(\.command)))
-        for entry in ShortcutTable.standard.entries(in: .noteWindow) {
+        #expect(commands == Set((ShortcutTable.standard.entries(in: .noteWindow) + ShortcutTable.standard.entries(in: .agent)).compactMap(\.command)))
+        for entry in ShortcutTable.standard.entries(in: .noteWindow) + ShortcutTable.standard.entries(in: .agent) {
             let chord = entry.chords[0]
             let item = keyOnly.first { $0.representedObject as? String == entry.command?.rawValue }
             #expect(item?.keyEquivalent == chord.key.menuKeyEquivalent, "\(entry.action)")

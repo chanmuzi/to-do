@@ -52,8 +52,12 @@ import Theme
         defer { fixture.cleanUp(coordinator) }
         let all = buttons(in: controller.root).filter { !$0.isHidden }
         #expect(Set(all.compactMap { $0.accessibilityLabel() }) == [
-            "더 보기", "항상 위에 고정", "창 닫기",
+            "에이전트 열기", "더 보기", "항상 위에 고정", "창 닫기",
         ])
+        let face = try #require(all.first { $0.accessibilityLabel() == "에이전트 열기" })
+        RealClick.click(face)
+        #expect(fixture.routes == [.openAgentWindow(controller.noteID)])
+
         for button in all {
             var pressed = 0
             button.onPress = { pressed += 1 }

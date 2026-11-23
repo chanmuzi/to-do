@@ -48,13 +48,13 @@ import Testing
         let failures = hotKeys.register(.standard)
 
         #expect(failures.isEmpty)
-        // 지금 이어진 것은 "빠른 캡처"(⌃⌥N)와 "노트 모두 숨기기"(⌃⌥H)다. 라이브러리, AI 패널은 화면이 없다.
+        // 빠른 캡처, 노트 모두 숨기기, 라이브러리만 전역 키를 등록한다.
         #expect(hotKeys.registered == [
             .quickCapture: KeyChord(.n, [.control, .option]),
             .toggleNotesHidden: KeyChord(.h, [.control, .option]),
             .library: KeyChord(.l, [.control, .option]),
         ])
-        #expect(hotKeys.skipped == [.aiPanel])
+        #expect(hotKeys.skipped == [.requestAgent])
         #expect(Set(registrar.chords.values) == [KeyChord(.n, [.control, .option]), KeyChord(.h, [.control, .option]), KeyChord(.l, [.control, .option])])
         registrar.press(KeyChord(.n, [.control, .option]))
         registrar.press(KeyChord(.l, [.control, .option]))
@@ -67,18 +67,18 @@ import Testing
         #expect(Route.toggleAllNotesHidden.isConnected && AppCommand.toggleNotesHidden.isConnected)
         #expect(AppCommand.quickCapture.isConnected == Route.openCapture.isConnected)
         #expect(AppCommand.library.isConnected == Route.openLibrary.isConnected)
-        #expect(AppCommand.aiPanel.isConnected == Route.openAIPanel(context: nil).isConnected)
+        #expect(AppCommand.requestAgent.isConnected == Route.requestAgent.isConnected)
         #expect(AppCommand.findNote.isConnected == Route.openBrowse(anchor: nil).isConnected)
-        // 빠른 캡처와 노트 찾기는 이어졌다(4단계). 라이브러리와 AI 패널은 아직이다.
+        // 라이브러리를 열 수 있으며 전역 요청 막대는 아직 연결 전이다.
         #expect(AppCommand.quickCapture.isConnected && AppCommand.findNote.isConnected)
-        #expect(AppCommand.library.isConnected && !AppCommand.aiPanel.isConnected)
+        #expect(AppCommand.library.isConnected && !AppCommand.requestAgent.isConnected)
 
         // 화면이 이어진 뒤처럼 넘기면 그 키도 등록된다.
         let registrar = FakeRegistrar()
-        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { $0 != .aiPanel }) { _ in }
+        let hotKeys = GlobalHotKeys(registrar: registrar, isAvailable: { $0 != .requestAgent }) { _ in }
         hotKeys.register(.standard)
         #expect(Set(hotKeys.registered.keys) == [.quickCapture, .toggleNotesHidden, .library])
-        #expect(hotKeys.skipped == [.aiPanel])
+        #expect(hotKeys.skipped == [.requestAgent])
     }
 
     @Test func registersTheFourGlobalRowsAndDispatchesTheirCommands() {
@@ -93,7 +93,7 @@ import Testing
             .quickCapture: KeyChord(.n, [.control, .option]),
             .toggleNotesHidden: KeyChord(.h, [.control, .option]),
             .library: KeyChord(.l, [.control, .option]),
-            .aiPanel: KeyChord(.a, [.control, .option]),
+            .requestAgent: KeyChord(.a, [.control, .option]),
         ])
         registrar.press(KeyChord(.h, [.control, .option]))
         registrar.press(KeyChord(.n, [.control, .option]))
@@ -109,7 +109,7 @@ import Testing
 
         let failures = hotKeys.register(.standard)
 
-        #expect(failures.map(\.command) == [.quickCapture, .aiPanel])
+        #expect(failures.map(\.command) == [.quickCapture, .requestAgent])
         #expect(failures[0].error.isTakenByAnotherApp)
         #expect(failures[0].warning == "전역 단축키 ⌃⌥N (빠른 캡처)를 등록하지 못했습니다: 다른 앱이 이미 쓰는 키입니다")
         #expect(!failures[1].error.isTakenByAnotherApp)

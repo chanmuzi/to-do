@@ -88,7 +88,7 @@ public final class NotePanelCoordinator {
     var isAppActive: () -> Bool = { NSApplication.shared.isActive }
 
     /// - Parameters:
-    ///   - router: 노트 창이 다른 기능을 부를 때(노트 찾기, 새 노트, AI 패널 등) 보내는 곳.
+    ///   - router: 노트 창이 다른 기능을 부를 때(노트 찾기, 새 노트, 에이전트 창 등) 보내는 곳.
     ///   - makeBodyEditor: 본문 편집기를 만드는 곳. 주지 않으면 서식 없는 기본 편집기를 쓴다.
     ///   - log: 사용자에게 창으로 알릴 일이 아닌 문제를 남기는 곳.
     public init(
@@ -348,6 +348,12 @@ public final class NotePanelCoordinator {
         controller.beginTitleEditing()
     }
 
+    #if DEBUG
+    package func openAgentFromFaceForVerification(_ id: NoteID) {
+        controllers[id]?.root.topRow.actions.agent()
+    }
+    #endif
+
     public func snapshot(of id: NoteID) -> NoteWindowSnapshot? {
         controllers[id]?.snapshot
     }
@@ -525,6 +531,21 @@ public final class NotePanelCoordinator {
                 queue: .main, using: refresh
             ),
         ]
+    }
+
+    /// 같은 화면에서 노트의 높이 규칙과 이웃 창 배치를 재사용한다.
+    package func agentWindowAnchor(for id: NoteID) -> (title: String, frame: CGRect, visible: CGRect)? {
+        guard let controller = controllers[id], let visible = (controller.panel.screen ?? NSScreen.main)?.visibleFrame else { return nil }
+        let theme = environment.theme
+        let policy = environment.sizePolicy
+        let content = policy.minBodyHeight + theme.shape(.chromeHeight) + theme.space(.sp3)
+            + theme.space(.sp2) + theme.component(.agentFaceLarge) + 2 * theme.component(.agentEdgeIdle)
+        let height = policy.windowHeight(contentHeight: content, screenHeight: visible.height)
+        let size = CGSize(width: policy.defaultWidth, height: min(visible.height, height))
+        let frame = environment.placement.frame(nextTo: controller.panel.frame, size: size, visibleFrame: visible,
+                                                occupied: controllers.values.filter { $0.panel.isVisible }.map { $0.panel.frame })
+        let title = controller.latestNote.title
+        return (title.isEmpty ? TopRowState.untitled : title, frame, visible)
     }
 
     private func frame(for state: NoteWindowState, nextTo: NoteID?) -> CGRect {

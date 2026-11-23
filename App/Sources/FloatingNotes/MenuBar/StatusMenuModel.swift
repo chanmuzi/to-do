@@ -4,7 +4,7 @@ nonisolated enum StatusMenuAction: Hashable, Sendable {
     case quickCapture
     case findNote
     case library
-    case aiPanel
+    case requestAgent
     case toggleNotesHidden
     case settings
     case shortcuts
@@ -20,7 +20,7 @@ extension StatusMenuAction {
         case .quickCapture: AppCommand.quickCapture.isConnected
         case .findNote: AppCommand.findNote.isConnected
         case .library: AppCommand.library.isConnected
-        case .aiPanel: AppCommand.aiPanel.isConnected
+        case .requestAgent: AppCommand.requestAgent.isConnected
         case .toggleNotesHidden: AppCommand.toggleNotesHidden.isConnected
         case .settings: AppCommand.settings.isConnected
         case .shortcuts: AppCommand.shortcuts.isConnected
@@ -54,7 +54,7 @@ nonisolated enum StatusMenuModel {
             .separator,
             .item(title: "노트 찾기", symbol: "magnifyingglass", action: .findNote),
             .item(title: "라이브러리", symbol: "sidebar.left", action: .library),
-            .item(title: "AI 패널", symbol: "sparkle", action: .aiPanel),
+            .item(title: "에이전트에게 요청", symbol: "sparkle", action: .requestAgent),
             .separator,
             areNotesHidden
                 ? .item(title: showAllTitle, symbol: "eye", action: .toggleNotesHidden)

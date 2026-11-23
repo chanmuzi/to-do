@@ -1,3 +1,4 @@
+import Agent
 import Models
 import Foundation
 import FloatSettings
@@ -14,8 +15,8 @@ extension Route {
     /// 하는 일이 없는 키를 시스템 전체에서 차지하지 않기 위해서다(D-024).
     var isConnected: Bool {
         switch self {
-        case .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
-        case .openAIPanel: false
+        case .openAgentWindow, .openNote, .newNote, .closeNoteWindow, .toggleAllNotesHidden, .openCapture, .openBrowse, .openLibrary, .openSpacePicker, .openReminderEditor, .openSettings, .openShortcuts: true
+        case .requestAgent: false
         }
     }
 }
@@ -33,6 +34,7 @@ final class AppRouter: Routing {
     /// 조립할 때 넣는다. 캡처 바와 노트 찾기가 이 라우터를 들고 있으므로 약하게 든다.
     weak var settingsWindow: SettingsCoordinator?
     weak var reminders: ReminderEditorCoordinator?
+    var agent: AgentWindowCoordinator?
     weak var library: LibraryCoordinator?
     weak var quickPanels: QuickPanels?
     /// 사용자가 시킨 일을 하지 못했을 때 알리는 곳(제목, 까닭). 기본은 알림 창이다.
@@ -89,7 +91,11 @@ final class AppRouter: Routing {
                 guard let settingsWindow else { return logUnhandled(route) }
                 settingsWindow.show(route == .openShortcuts ? .shortcuts : nil)
                 activateApp()
-            case .openAIPanel:
+            case .openAgentWindow(let id):
+                guard let agent, let anchor = notePanels.agentWindowAnchor(for: id) else { return logUnhandled(route) }
+                try agent.open(note: id, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
+                activateApp()
+            case .requestAgent:
                 return logUnhandled(route)
             }
             return .handled
@@ -103,6 +109,7 @@ final class AppRouter: Routing {
 
     private static func failureTitle(for route: Route) -> String? {
         switch route {
+        case .openAgentWindow: "에이전트 창을 열지 못했습니다"
         case .newNote: "새 노트를 만들지 못했습니다"
         case .openNote: "노트를 열지 못했습니다"
         default: nil

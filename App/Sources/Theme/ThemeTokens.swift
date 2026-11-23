@@ -19,6 +19,8 @@ public struct ThemeTokens: Hashable, Sendable {
     /// 노트 본문 안쪽 여백(`doc-pad`).
     public let docPadding: ThemeInsets
     public let material: MaterialTokens
+    private let facePeriods: [AgentFaceTiming: TimeInterval]
+    public func period(_ timing: AgentFaceTiming) -> TimeInterval { facePeriods[timing]! }
     public let motion: MotionTokens
     /// 팔레트(순서는 `tokens.json`과 같다).
     public let palette: [PaletteColor]
@@ -203,6 +205,7 @@ public struct ThemeTokens: Hashable, Sendable {
         func motion<T>(_ token: MotionToken, _ parser: (String) -> T?) throws -> T {
             try parse("motion.\(token.rawValue)", parser)
         }
+        facePeriods = try table("motion", TokenValueParser.seconds)
         self.motion = MotionTokens(
             duration: try motion(.duration, TokenValueParser.seconds),
             curve: try motion(.ease, TokenValueParser.bezier),

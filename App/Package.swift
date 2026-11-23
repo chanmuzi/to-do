@@ -57,6 +57,8 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
+        .target(name: "Agent", dependencies: ["Theme", "Models", "Store", "Routing"], swiftSettings: uiSettings),
+
         .target(name: "Library", dependencies: ["MarkdownSyntax", "Theme", "Models", "Store", "Routing", "SpaceIcons"],
                 swiftSettings: uiSettings),
 
@@ -70,7 +72,7 @@ let package = Package(
         .executableTarget(
             name: "FloatingNotes",
             dependencies: [
-                "Theme", "Models", "Store", "Routing", "AgentRunner",
+                "Theme", "Models", "Store", "Routing", "AgentRunner", "Agent",
                 "NotePanel", "Editor", "Capture", "Browse", "Library", "Scheduling", "Reminders", "DateTime", "FloatSettings",
             ],
             // Resources/ 안의 항목은 App/Resources/ 를 가리키는 심볼릭 링크다(정본은 App/Resources/).
@@ -93,6 +95,7 @@ let package = Package(
         ),
 
         // MARK: Tests
+        .testTarget(name: "AgentTests", dependencies: ["Agent", "Theme", "Models", "Store"], swiftSettings: uiSettings),
         .testTarget(name: "AgentRunnerTests", dependencies: ["AgentRunner"]),
         .testTarget(name: "FloatMCPTests", dependencies: ["FloatMCP"]),
         .testTarget(name: "SchedulingTests", dependencies: ["FieldTestSupport", "Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),

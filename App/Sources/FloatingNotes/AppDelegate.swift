@@ -1,4 +1,5 @@
 import AppKit
+import Agent
 import Carbon
 import OSLog
 import Scheduling
@@ -74,6 +75,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
             router.notePanels = notePanels
+            let agent = AgentWindowCoordinator(store: AgentStore(location: environment.location),
+                                               theme: environment.theme, warning: AppLog.warning)
+            #if DEBUG
+            agent.allowsKeyWindows = !options.debugIsPassive
+            #endif
+            router.agent = agent
             let reminderEditor = ReminderEditorCoordinator(notes: environment.notes, theme: environment.theme)
             #if DEBUG
             reminderEditor.allowsKeyWindows = !options.debugIsPassive
@@ -254,6 +261,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flushWindowStates()
         do {
             try notes.flushPendingSaves()
+            try router?.agent?.flushFailedDrafts()
             // 아무것도 적지 않은 노트는 남기지 않는다(D-040). 다 쓴 뒤에만 본다.
             if notePanels?.deleteBlankNotes().isEmpty == false { flushWindowStates() }
         } catch {
@@ -377,6 +385,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             dockMenu: { [unowned self] in applicationDockMenu(NSApplication.shared) },
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
+        control.agent = router.agent
+        control.theme = environment?.theme
         control.settingsWindow = settingsWindow
         control.reminderEditor = reminderEditor
         control.fakeCalendar = fakeCalendar
@@ -400,9 +410,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeSettingsWindow(environment: AppEnvironment, schedules: ScheduleService) -> SettingsCoordinator {
         let store = environment.settings
         let table = ShortcutTable.standard
-        let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .aiPanel, .markdownInput]
+        let groups: [ShortcutGroup] = [.global, .noteWindow, .capture, .browse, .library, .editing, .agent, .markdownInput]
         let sections = groups.map { group in
-            let title = group == .aiPanel ? "AI 패널 (예정)" : group == .global ? "어디서나" : group.rawValue
+            let title = group == .global ? "어디서나" : group.rawValue
             return ShortcutSection(title, rows: table.entries(in: group).map { entry in
                 let action = entry.command?.isConnected == false ? entry.action + " (예정)" : entry.action
                 switch entry.keys {

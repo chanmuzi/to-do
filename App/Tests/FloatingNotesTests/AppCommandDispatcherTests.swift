@@ -1,5 +1,6 @@
 import AppKit
 @_spi(Verification) import Editor
+@testable import NotePanel
 import Models
 import Routing
 import Testing
@@ -16,14 +17,14 @@ import Testing
     @Test func screenCommandsBecomeRoutes() {
         defer { fixture.cleanUp() }
         for command: AppCommand in [
-            .quickCapture, .toggleNotesHidden, .library, .aiPanel, .newNote, .findNote, .settings, .shortcuts,
+            .quickCapture, .toggleNotesHidden, .library, .requestAgent, .newNote, .findNote, .settings, .shortcuts,
         ] {
             fixture.commands.perform(command)
         }
 
         // 키 창인 노트가 없으면 노트에 붙는 요청은 붙을 곳 없이 간다.
         #expect(fixture.receivedRoutes == [
-            .openCapture, .toggleAllNotesHidden, .openLibrary, .openAIPanel(context: nil),
+            .openCapture, .toggleAllNotesHidden, .openLibrary, .requestAgent,
             .newNote(NewNoteRequest()), .openBrowse(anchor: nil), .openSettings, .openShortcuts,
         ])
     }
@@ -34,13 +35,27 @@ import Testing
         let (id, _) = try fixture.open(NoteDraft(title: "키 창이 아닌 노트"))
         #expect(fixture.notePanels.keyNoteID == nil)
 
-        for command: AppCommand in [.moreMenu, .editTitle, .togglePin, .setReminder, .moveToSpace, .closeWindow] {
+        for command: AppCommand in [.openAgentWindow, .moreMenu, .editTitle, .togglePin, .setReminder, .moveToSpace, .closeWindow] {
             fixture.commands.perform(command)
         }
 
         #expect(fixture.receivedRoutes.isEmpty)
         #expect(fixture.notePanels.snapshot(of: id)?.isPinned == true)
         #expect(fixture.notePanels.openNoteIDs == [id])
+    }
+
+    @Test func agentShortcutUsesPhysicalJAndOnlyTheKeyNote() throws {
+        defer { fixture.cleanUp() }
+        let (a, _) = try fixture.open(NoteDraft(title: "첫째"))
+        _ = try fixture.open(NoteDraft(title: "둘째"))
+        let chord = try #require(ShortcutTable.standard.chord(for: .openAgentWindow))
+        // 두벌식 ㅓ도 ANSI J 자리(38)로 찾는다.
+        #expect(chord.key.keyCode == 38 && chord.key.menuKeyEquivalent == "j" && chord.modifiers == .command)
+        let window = fixture.notePanels.window(for: a)
+        fixture.notePanels.isKeyPanel = { $0 === window }
+        fixture.commands.perform(.openAgentWindow)
+        #expect(fixture.receivedRoutes == [.openAgentWindow(a)])
+        fixture.notePanels.isKeyPanel = { _ in false }
     }
 
     @Test func nextNoteMovesThroughOpenNotes() throws {
