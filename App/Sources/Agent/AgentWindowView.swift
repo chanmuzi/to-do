@@ -6,6 +6,10 @@ struct AgentWindowView: View {
     let theme: Theme
     let title: String
     let draft: AgentDraft
+    let history: () -> [AgentConversation]
+    let openHistory: (UUID) -> Void
+    let newChat: () -> Void
+    @State private var selection: UUID?
     let send: () -> Void
     let retry: (UUID) -> Void
     let sendNow: (UUID) -> Void
@@ -27,55 +31,59 @@ struct AgentWindowView: View {
         let outline = RoundedRectangle(cornerRadius: theme.shape(.windowRadius))
         VStack(alignment: .leading, spacing: 0) {
             header
-            if !draft.conversation.targets.isEmpty {
-                HStack(spacing: theme.space(.sp1)) {
-                    ForEach(draft.conversation.targets, id: \.self) { id in
-                        HStack(spacing: theme.component(.agentChipGap)) {
-                            Image(nsImage: AgentWindowGlyph.note.image(theme: theme))
-                            Text(titleForNote(id) ?? title).lineLimit(1)
+            if draft.showsHistory {
+                ConversationHistoryList(theme: theme, conversations: history(), selection: $selection, open: openHistory)
+            } else {
+                if !draft.conversation.targets.isEmpty {
+                    HStack(spacing: theme.space(.sp1)) {
+                        ForEach(draft.conversation.targets, id: \.self) { id in
+                            HStack(spacing: theme.component(.agentChipGap)) {
+                                Image(nsImage: AgentWindowGlyph.note.image(theme: theme))
+                                Text(titleForNote(id) ?? title).lineLimit(1)
+                            }
+                            .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
+                            .padding(.horizontal, theme.component(.agentChipInset))
+                            .frame(height: theme.component(.agentFaceLarge))
+                            .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.chipRadius)))
                         }
-                        .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
-                        .padding(.horizontal, theme.component(.agentChipInset))
-                        .frame(height: theme.component(.agentFaceLarge))
-                        .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.chipRadius)))
-                    }
-                    control("대상 추가", .plus, action: chooseTarget)
-                }.padding(.leading, theme.component(.agentHeaderInset)).padding(.top, theme.space(.sp2))
-            }
-            ScrollView {
-                VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
-                    ForEach(draft.conversation.requests) { request in
-                        AgentTurnView(theme: theme, draft: draft, request: request, still: still,
-                                      openNote: openNote, retry: { retry(request.id) })
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
-            }.defaultScrollAnchor(.bottom)
-            if !draft.conversation.queued.isEmpty {
+                        control("대상 추가", .plus, action: chooseTarget)
+                    }.padding(.leading, theme.component(.agentHeaderInset)).padding(.top, theme.space(.sp2))
+                }
                 ScrollView {
-                    VStack(spacing: theme.component(.iconButtonGap)) {
-                        ForEach(draft.conversation.queued) { item in
-                            AgentQueueRow(theme: theme, draft: draft, item: item, sendNow: { sendNow(item.id) })
+                    VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
+                        ForEach(draft.conversation.requests) { request in
+                            AgentTurnView(theme: theme, draft: draft, request: request, still: still,
+                                          openNote: openNote, retry: { retry(request.id) })
                         }
-                    }
-                }.frame(height: min(queueHeight, queueLimit))
-                .padding(.horizontal, theme.space(.sp3)).padding(.bottom, theme.component(.agentRowInset))
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
+                }.defaultScrollAnchor(.bottom)
+                if !draft.conversation.queued.isEmpty {
+                    ScrollView {
+                        VStack(spacing: theme.component(.iconButtonGap)) {
+                            ForEach(draft.conversation.queued) { item in
+                                AgentQueueRow(theme: theme, draft: draft, item: item, sendNow: { sendNow(item.id) })
+                            }
+                        }
+                    }.frame(height: min(queueHeight, queueLimit))
+                    .padding(.horizontal, theme.space(.sp3)).padding(.bottom, theme.component(.agentRowInset))
+                }
+                if let error = draft.errorMessage {
+                    Text(error).font(theme.font(.ui)).foregroundStyle(theme.color(.warn)).padding(.horizontal, theme.space(.sp3))
+                }
+                HStack(spacing: theme.space(.sp1)) {
+                    CommandTextField(text: Binding(get: { draft.conversation.draft }, set: draft.update), theme: theme,
+                                     placeholder: "에이전트에게 요청하기", font: theme.nsFont(.body, size: theme.component(.agentInputFont)),
+                                     submit: send, cancel: close)
+                    control("보내기", .send, action: draft.conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : send)
+                }
+                .padding(.leading, theme.component(.agentInputInset))
+                .padding(.trailing, theme.space(.sp1))
+                .frame(height: theme.shape(.chromeHeight))
+                .overlay(RoundedRectangle(cornerRadius: theme.space(.sp2)).strokeBorder(theme.color(.outline), lineWidth: theme.shape(.borderWidth)))
+                .padding([.horizontal, .bottom], theme.space(.sp3))
             }
-            if let error = draft.errorMessage {
-                Text(error).font(theme.font(.ui)).foregroundStyle(theme.color(.warn)).padding(.horizontal, theme.space(.sp3))
-            }
-            HStack(spacing: theme.space(.sp1)) {
-                CommandTextField(text: Binding(get: { draft.conversation.draft }, set: draft.update), theme: theme,
-                                 placeholder: "에이전트에게 요청하기", font: theme.nsFont(.body, size: theme.component(.agentInputFont)),
-                                 submit: send, cancel: close)
-                control("보내기", .send, action: draft.conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : send)
-            }
-            .padding(.leading, theme.component(.agentInputInset))
-            .padding(.trailing, theme.space(.sp1))
-            .frame(height: theme.shape(.chromeHeight))
-            .overlay(RoundedRectangle(cornerRadius: theme.space(.sp2)).strokeBorder(theme.color(.outline), lineWidth: theme.shape(.borderWidth)))
-            .padding([.horizontal, .bottom], theme.space(.sp3))
         }
         .padding(theme.component(.agentEdgeIdle))
         .background(theme.color(.surface), in: outline)
@@ -115,10 +123,10 @@ struct AgentWindowView: View {
     private var header: some View {
         HStack(spacing: theme.component(.iconButtonGap)) {
             AgentFace(theme: theme, state: draft.conversation.requests.last?.face ?? .idle, forceStill: still).padding(.trailing, theme.component(.agentFaceTitleGap) - theme.component(.iconButtonGap))
-            Text(draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+            Text(draft.showsHistory ? "지난 대화" : draft.conversation.requests.isEmpty ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
             Spacer(minLength: 0)
-            control("지난 대화", .clock)
-            control("새 대화", .plus)
+            control("지난 대화", .clock) { draft.showsHistory.toggle() }
+            control("새 대화", .plus, action: newChat)
             control("더 보기", .more)
             Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth), height: theme.component(.iconMedium))
                 .padding(.horizontal, theme.space(.sp1))

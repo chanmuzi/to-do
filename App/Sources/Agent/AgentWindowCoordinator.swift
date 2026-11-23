@@ -18,7 +18,13 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         let draft: AgentDraft
     }
     private var sessions: [UUID: Session] = [:]
-    private var records: [UUID: AgentDraft] = [:]
+    @Observable fileprivate final class Catalog {
+        var records: [UUID: AgentDraft] = [:]
+    }
+    private let catalog = Catalog()
+    package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter { !$0.requests.isEmpty } }
+    package func record(id: UUID) -> AgentDraft? { catalog.records[id] }
+    package var present: (AgentDraft, String) -> Void = { _, _ in }
     private var loaded = false
     package var send: (AgentDraft) -> Void = { _ in }
     package var sendNow: (AgentDraft, UUID) -> Void = { _, _ in }
@@ -37,18 +43,30 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                 }
                 try store.save(value)
             }
-            records[value.id] = AgentDraft(value, store: store)
+            catalog.records[value.id] = AgentDraft(value, store: store)
         }
         loaded = true
+    }
+
+    package func preferred(for note: NoteID) -> AgentDraft? {
+        let candidates = catalog.records.values.filter { $0.conversation.targets.contains(note) }.sorted {
+            ($0.conversation.updatedAt, $0.conversation.id.uuidString) > ($1.conversation.updatedAt, $1.conversation.id.uuidString)
+        }
+        return candidates.first { $0.conversation.requests.last?.status == .running }
+            ?? candidates.first { $0.conversation.needsAnswer }
     }
 
     package func record(for note: NoteID?) throws -> AgentDraft {
         try restore()
         let targets = note.map { [$0] } ?? []
-        if let existing = records.values.filter({ $0.conversation.targets.first == targets.first })
+        if let existing = catalog.records.values.filter({ $0.conversation.targets.first == targets.first })
             .max(by: { $0.conversation.updatedAt < $1.conversation.updatedAt }) { return existing }
+        return newRecord(targets: targets)
+    }
+
+    package func newRecord(targets: [NoteID] = []) -> AgentDraft {
         let record = AgentDraft(AgentConversation(targets: targets), store: store)
-        records[record.conversation.id] = record
+        catalog.records[record.conversation.id] = record
         return record
     }
     private let store: AgentStore
@@ -63,10 +81,13 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     public func open(note: NoteID, title: String, frame: CGRect, visible: CGRect) throws {
-        try open(record: record(for: note), title: title, frame: frame, visible: visible)
+        try restore()
+        try open(record: preferred(for: note) ?? record(for: note), title: title, frame: frame, visible: visible)
     }
 
     package func open(record draft: AgentDraft, title: String, frame: CGRect, visible: CGRect) {
+        draft.showsHistory = false
+        draft.markSeen()
         let id = draft.conversation.id
         let panel: AgentPanel
         if let existing = sessions[id] {
@@ -89,6 +110,17 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                 return draft?.writeError == nil
             }
             let view = AgentWindowView(theme: theme, title: title, draft: draft,
+                                       history: { [weak self] in self?.history ?? [] },
+                                       openHistory: { [weak self, weak panel] id in
+                                           guard let self, let next = record(id: id) else { return }
+                                           present(next, "clock")
+                                           if id != draft.conversation.id { panel?.close() }
+                                       },
+                                       newChat: { [weak self, weak panel] in
+                                           guard let self else { return }
+                                           present(newRecord(targets: draft.conversation.targets), "new")
+                                           panel?.close()
+                                       },
                                        send: { [weak self] in self?.send(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
@@ -123,11 +155,16 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         guard let panel = notification.object as? AgentPanel,
               let id = sessions.first(where: { $0.value.panel === panel })?.key else { return }
         sessions.removeValue(forKey: id)
+        if let record = catalog.records[id], record.conversation.requests.isEmpty,
+           record.conversation.draft.isEmpty, record.conversation.queued.isEmpty,
+           record.conversation.createdAt == record.conversation.updatedAt {
+            catalog.records.removeValue(forKey: id)
+        }
         onClose()
     }
 
     public func flushFailedDrafts() throws {
-        for draft in records.values where draft.writeError != nil {
+        for draft in catalog.records.values where draft.writeError != nil {
             draft.save()
             if let error = draft.writeError { throw error }
         }
@@ -137,6 +174,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package func performForVerification(_ action: String, for note: NoteID) {
         guard let draft = sessions.values.first(where: { $0.draft.conversation.targets.first == note })?.draft else { return }
         switch action {
+        case "history": draft.showsHistory.toggle()
         case "send": send(draft)
         case "retry": if let id = draft.conversation.requests.last?.id { retry(draft, id) }
         case "expand": if let id = draft.conversation.requests.last?.id { draft.expanded.insert(id) }
@@ -149,6 +187,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         default: break
         }
     }
+    package func window(id: UUID) -> NSWindow? { sessions[id]?.panel }
     public func window(for note: NoteID) -> NSWindow? { sessions.values.first { $0.draft.conversation.targets.first == note }?.panel }
     public func setDraft(_ text: String, for note: NoteID) { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.update(text) }
     public func draft(for note: NoteID) -> String? { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.conversation.draft }
