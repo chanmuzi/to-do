@@ -345,6 +345,38 @@ import SpaceIcons
         #expect(queries == [.event, .reminder])
     }
 
+    @Test func noteListKeepsShortRowsAtTopAndLeavesEightPointsAtEnd() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        let first = try f.notes.create(NoteDraft(title: "짧은 목록"))
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        f.model.select(.today)
+        settle()
+        let root = try #require(f.coordinator.window?.contentView)
+        func row(_ id: NoteID) throws -> LibraryRowInputView {
+            try #require(descendants(root).compactMap { $0 as? LibraryRowInputView }.first { $0.note?.id == id })
+        }
+        let shortRow = try row(first.id)
+        let scroll = try #require(shortRow.enclosingScrollView)
+        let clip = scroll.contentView
+        let firstFrame = shortRow.convert(shortRow.bounds, to: clip)
+        #expect(firstFrame.minY == clip.bounds.minY)
+        #expect(clip.documentRect.height <= clip.bounds.height)
+
+        for index in 1...24 { _ = try f.notes.create(NoteDraft(title: "노트 \(index)")) }
+        f.model.refresh()
+        settle()
+        let document = try #require(scroll.documentView)
+        #expect(document.isFlipped && clip.documentRect.height > clip.bounds.height)
+        clip.scroll(to: NSPoint(x: 0, y: clip.documentRect.maxY - clip.bounds.height))
+        scroll.reflectScrolledClipView(clip)
+        settle()
+        let last = try row(try #require(f.model.rows.last).id)
+        let lastFrame = last.convert(last.bounds, to: clip)
+        #expect(clip.bounds.maxY - lastFrame.maxY == 8)
+    }
+
     @Test func listRulesStartAtTextAndSkipTheLastNote() throws {
         let f = try Fixture()
         defer { try? f.close() }
