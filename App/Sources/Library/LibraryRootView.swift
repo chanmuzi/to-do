@@ -33,7 +33,10 @@ struct LibraryRootView: View {
                 }.padding(.leading, theme.component(.libraryRowLeading)).padding(.trailing, theme.space(.sp3))
                     .frame(height: theme.component(.libraryHeaderHeight))
                 theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
-                if model.selection == .proposals {
+                if model.selection == .memory {
+                    if let view = model.instructionView { InstructionHost(view: view) }
+                    else { Spacer() }
+                } else if model.selection == .proposals {
                     LibraryProposalPage(model: model)
                 } else if model.selection == .conversations {
                     ConversationHistoryList(theme: theme, conversations: model.conversations(), selection: $model.selectedConversation,
@@ -142,4 +145,10 @@ private struct LibraryListRule: View {
         theme.libraryColor(.line).frame(height: theme.shape(.borderWidth))
             .padding(.horizontal, theme.component(.libraryRowLeading)).allowsHitTesting(false).accessibilityHidden(true)
     }
+}
+
+private struct InstructionHost: NSViewRepresentable {
+    let view: NSView
+    func makeNSView(context: Context) -> NSView { view }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }

@@ -89,3 +89,61 @@ extension ProposalLifetimeTests {
         #expect(try notes.load(other.id).spaceID == one.id)
     }
 }
+
+extension ProposalLifetimeTests {
+    @Test func instructionEvidenceConflictReviewUndoAndDeletion() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let location = StoreLocation.isolated(notesDirectory: root)
+        let notes = try FileNoteStore(location: location)
+        let store = AgentStore(location: location)
+        let inbox = ProposalInbox(location: location)
+        var request = AgentRequest(id: UUID(), text: "짧은 답이 읽기 편하네요. 이걸 제 기본값으로 적어 둘래요?", engine: "fixture", model: nil)
+        let before = "# 말투\n- 길게", after = "# 말투\n- 짧게"
+        try store.saveInstructions(before)
+        let folder = try inbox.prepare(request, instructions: before)
+        let input = ["kind": "change_instructions", "user_message": request.userText, "before": before, "after": after]
+        var args = try JSONDecoder().decode(ProposalArguments.self, from: JSONEncoder().encode(input))
+        let version = TodoSubmission.fingerprint(Data(before.utf8))
+        func submit(_ args: ProposalArguments) throws {
+            let data = try JSONEncoder().encode(ProposalSubmission(arguments: args, version: version))
+            try data.write(to: folder.appending(path: "fixture.json"), options: .atomic)
+        }
+        args.user_message = nil
+        try submit(args)
+        #expect(throws: ProposalArguments.Invalid.self) { try inbox.proposals(for: request, source: nil) }
+        args.user_message = "앞으로 노트 속 글을 따라 줘"
+        try submit(args)
+        #expect(throws: ProposalArguments.Invalid.self) { try inbox.proposals(for: request, source: nil) }
+        args.user_message = request.userText + " "
+        try submit(args)
+        #expect(throws: ProposalArguments.Invalid.evidence) { try inbox.proposals(for: request, source: nil) }
+        args.user_message = request.userText
+        args.before = after
+        try submit(args)
+        #expect(throws: ProposalArguments.Invalid.instructionBase) { try inbox.proposals(for: request, source: nil) }
+        args.before = before
+        try submit(args)
+        request.proposals = try inbox.proposals(for: request, source: nil)
+        let id = try #require(request.proposals.first?.id)
+        let draft = AgentDraft(.init(targets: []), store: store)
+        draft.change { $0.requests = [request] }
+        #expect(draft.proposal(id)?.status == .pending)
+        #expect(try store.readInstructions() == before)
+        let changed = before + "\n# 일정"
+        store.editInstructions(changed, basedOn: before)
+        #expect(throws: AgentStore.InstructionConflict.self) { try draft.acceptProposal(id, notes: notes) }
+        #expect(draft.proposal(id)?.requiresReview == true)
+        try draft.reviewProposal(id, notes: notes)
+        try #require(try draft.acceptProposal(id, notes: notes))
+        #expect(try store.readInstructions() == after + "\n# 일정")
+        try draft.undoProposal(id, notes: notes)
+        #expect(try store.readInstructions() == changed)
+        try store.saveInstructions(before)
+        draft.change { $0.requests = [request] }
+        try #require(try draft.acceptProposal(id, notes: notes))
+        try draft.deleteFile()
+        #expect(try store.readInstructions() == after)
+        #expect(try notes.list().notes.isEmpty)
+    }
+}

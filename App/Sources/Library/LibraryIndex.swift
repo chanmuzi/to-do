@@ -146,7 +146,7 @@ public struct LibraryIndex: Sendable {
             case .today:
                 included = calendar.isDate(note.created, inSameDayAs: now)
                     || note.schedules.contains { !$0.isDeleted && !$0.isCompleted && calendar.isDate($0.start, inSameDayAs: now) }
-            case .proposals, .conversations: included = false
+            case .proposals, .conversations, .memory: included = false
             case .floating: included = windows[note.id]?.isPinned == true
             case .archived: included = note.isArchived
             case .all, .trash: included = true

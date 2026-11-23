@@ -121,6 +121,7 @@ struct LibraryProposalPage: View {
     }
 
     private func subtitle(_ p: AgentProposal, note: Note?) -> String {
+        if p.target == .instructions { return "메모리" }
         if case .newNote(let title, let body) = p.content {
             return LibraryPreview(title: title, markdown: body).subtitle
         }
@@ -136,6 +137,7 @@ struct LibraryProposalPage: View {
     private func detail(_ p: AgentProposal) -> some View {
         TodoProposalView(theme: theme, proposal: p, note: model.index.notes.first { $0.id == p.targetID }, full: true, spaceName: spaceName(p),
                          review: { model.reviewProposal(p.id) }, conversation: {
+            if p.target == .instructions { model.openEvidence(p.id); return }
             if let c = model.conversations().first(where: { $0.requests.contains { $0.id == p.requestID } }) { model.openConversation(c.id) }
         }, accept: { model.acceptProposals([p.id]) }, discard: { model.discardProposal(p.id) })
             .padding(.vertical, theme.space(.sp4)).padding(.horizontal, theme.space(.sp1))

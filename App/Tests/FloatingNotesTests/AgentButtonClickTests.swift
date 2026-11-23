@@ -426,3 +426,37 @@ extension AgentButtonClickTests {
         #expect(draft.conversation.name == "첫 이름" && !win.isKeyWindow)
     }
 }
+
+extension AgentButtonClickTests {
+    @Test func memoryButtonOpensStandaloneEditorAndCloseFlushes() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let store = AgentStore(location: fx.location)
+        let host = InstructionEditor(theme: fx.theme, store: store)
+        let library = LibraryCoordinator(theme: fx.theme, notes: fx.notes, spaces: fx.spaces, windows: fx.windowStates,
+                                         preferences: try .init(location: fx.location), router: fx.router)
+        library.model.instructionView = host.editor.view
+        library.model.openInstructions = host.open
+        library.model.flushInstructions = store.flushInstructions
+        library.allowsKeyWindows = false
+        library.show()
+        defer { library.close() }
+        let window = try #require(library.window)
+        for _ in 0..<40 where buttons(in: window)["메모리"] == nil { try await Task.sleep(for: .milliseconds(25)) }
+        let button = try #require(buttons(in: window)["메모리"])
+        #expect(button.accessibilityPerformPress?() == true)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(library.model.selection == .memory && !library.model.showsNewNote)
+        let editor = host.editor
+        #expect(editor.view.window === window && !editor.configuration.recognizesDates && editor.onAcceptDate == nil)
+        let body = try #require(editor.documentView as? NSTextView)
+        body.setMarkedText("하", selectedRange: .init(location: 1, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+        body.insertText("한글", replacementRange: body.markedRange())
+        library.close()
+        #expect(try store.readInstructions() == "한글")
+        library.show()
+        #expect(editor.text == "한글" && library.model.rows.isEmpty)
+    }
+}

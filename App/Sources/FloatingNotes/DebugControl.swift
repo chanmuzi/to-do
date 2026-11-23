@@ -77,6 +77,7 @@ final class DebugControl {
     private let dockMenu: () -> NSMenu?
     private let setMenuBarIconShown: (Bool) -> Void
     /// 떠 있는 짧은 알림의 창과 그 동작(D-041).
+    weak var instructionEditor: InstructionEditor?
     weak var proposals: TodoProposalController?
     weak var agentCorner: AgentCorner?
     weak var agent: AgentWindowCoordinator?
@@ -331,9 +332,21 @@ final class DebugControl {
             write(json: ["windowNumber": sample.windowNumber, "kind": sample.window.rawValue,
                          "mouseAge": String(sample.mouseAge), "keyAge": String(sample.keyAge)], to: url)
         case ("simulate-activation", _, _) where isPassive: simulateActivation()
+        case ("memory-document", let name?, _) where isPassive:
+            guard let editor = instructionEditor?.editor, let url = output(named: name.rawValue),
+                  let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+            editor.text = text
+            editor.onTextChange?(editor.text)
+        case ("memory-editing", let mode?, _) where isPassive:
+            if let editor = instructionEditor?.editor {
+                editor.selectedRange = NSRange(location: (editor.text as NSString).length, length: 0)
+                if mode.rawValue == "on" { editor.focus() }
+                editor.forcesActiveAppearance = mode.rawValue == "on"
+            }
         case ("library-select", let target?, _):
             let value = target.rawValue
             switch value {
+            case "memory": library?.model.select(.memory)
             case "proposals": library?.model.select(.proposals)
             case "conversations": library?.model.select(.conversations)
             case "today": library?.model.select(.today)

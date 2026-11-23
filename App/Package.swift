@@ -97,7 +97,7 @@ let package = Package(
         // MARK: Tests
         .testTarget(name: "AgentTests", dependencies: ["Agent", "Theme", "Models", "Store"], swiftSettings: uiSettings),
         .testTarget(name: "AgentRunnerTests", dependencies: ["AgentRunner"]),
-        .testTarget(name: "FloatMCPTests", dependencies: ["FloatMCP"]),
+        .testTarget(name: "FloatMCPTests", dependencies: ["FloatMCP", "Models"]),
         .testTarget(name: "SchedulingTests", dependencies: ["FieldTestSupport", "Scheduling", "Models", "Store", "Reminders", "Theme"], swiftSettings: uiSettings),
         .testTarget(name: "LibraryTests", dependencies: ["FieldTestSupport", "Library", "SpaceIcons", "Store", "Models", "Theme", "Routing"], swiftSettings: uiSettings),
         .target(name: "FieldTestSupport", dependencies: ["Theme"], path: "Tests/ThemeTests/Support"),

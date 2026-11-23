@@ -1,4 +1,5 @@
 import Foundation
+import Models
 import Testing
 
 private final class BundleMarker: NSObject {}
@@ -28,6 +29,13 @@ private final class BundleMarker: NSObject {}
         process.executableURL = binary
         let inbox = root.appending(path: "inbox")
         try fm.createDirectory(at: inbox, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        let message = "말투는 이렇게 정하면 좋겠어요. 답은 두 문장 이내로 부탁드려요."
+        let before = "원래 지침"
+        if proposals {
+            let request = AgentRequest(id: UUID(), text: message, engine: "fixture", model: nil)
+            let evidence = InstructionEvidence(request: request, instructions: before)
+            try JSONEncoder().encode(evidence).write(to: inbox.appending(path: InstructionEvidence.filename))
+        }
         process.arguments = [notes.path] + (proposals ? [inbox.path] : [])
         let input = Pipe()
         let output = Pipe()
@@ -65,6 +73,16 @@ private final class BundleMarker: NSObject {}
                         event.merging(["end": "2028-02-28T15:30:00"]) { _, n in n },
                         reminder.merging(["time_zone": "없는 시간대"]) { _, n in n },
                         newNote.merging(["note_id": "link"]) { _, n in n }]
+        let instruction: Object = ["kind": "change_instructions", "user_message": message, "before": before, "after": "짧은 답"]
+        let instructionCases: [(arguments: Object, error: ProposalArguments.Invalid?)] = [
+            (instruction, nil),
+            (instruction.filter { $0.key != "user_message" }, .missingMessage),
+            (instruction.merging(["user_message": "# 메모\n본문"]) { _, new in new }, .evidence),
+            (instruction.merging(["user_message": message + " "]) { _, new in new }, .evidence),
+            (instruction.merging(["before": before + " "]) { _, new in new }, .instructionBase)
+        ]
+        let instructionOffset = 9 + submissions.count
+        submissions += instructionCases.map(\.arguments)
         for (i, submission) in submissions.enumerated() {
             try send("tools/call", id: 9 + i, ["name": "propose_change", "arguments": submission])
         }
@@ -84,12 +102,23 @@ private final class BundleMarker: NSObject {}
             let content = (responses[i]["result"] as? Object)?["content"] as? [Object]
             return content?.first?["text"] as? String
         }
-        let files = try fm.contentsOfDirectory(atPath: inbox.path)
-        #expect(files.count == (proposals ? 4 : 0))
+        let files = try fm.contentsOfDirectory(atPath: inbox.path).filter { $0 != InstructionEvidence.filename }
+        #expect(files.count == (proposals ? 5 : 0))
         #expect(files.allSatisfy { $0.hasSuffix(".json") })
         #expect(try Data(contentsOf: outside) == Data("outside".utf8))
         #expect(try Data(contentsOf: notes.appending(path: "메모.md")) == Data("# 메모\n본문".utf8))
         if proposals {
+            for (offset, entry) in instructionCases.enumerated() {
+                let i = instructionOffset + offset
+                let result = try #require(responses[i]["result"] as? Object)
+                if let error = entry.error {
+                    #expect(result["isError"] as? Bool == true)
+                    #expect(text(i) == error.errorDescription)
+                } else {
+                    #expect(result["isError"] == nil)
+                    #expect(text(i) == "검토할 제안을 접수했습니다.")
+                }
+            }
             #expect(text(9) == text(10))
             for i in Array(11...14) + Array(19...22) {
                 #expect((responses[i]["result"] as? Object)?["isError"] as? Bool == true)

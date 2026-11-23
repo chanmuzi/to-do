@@ -17,6 +17,9 @@ public final class LibraryModel {
     private let windows: WindowStateStore
     public private(set) var index = LibraryIndex(notes: [])
     public private(set) var spaceList: [Space] = []
+    package var instructionView: NSView?
+    package var openInstructions: () throws -> Void = {}
+    package var flushInstructions: () throws -> Void = {}
     public var selection: LibrarySelection = .today
     public private(set) var selectedNoteID: NoteID?
     public var displayOptions = NoteDisplayOptions()
@@ -29,6 +32,7 @@ public final class LibraryModel {
     package var newConversation: () -> Void = {}
     package var selectedProposal: UUID?
     package var openProposal: (UUID) -> Void = { _ in }
+    package var openEvidence: (UUID) -> Void = { _ in }
     package var seenProposal: (UUID) -> Void = { _ in }
     package var reviewProposal: (UUID) -> Void = { _ in }
     package var acceptProposals: ([UUID]) -> Void = { _ in }
@@ -163,6 +167,10 @@ public final class LibraryModel {
         return value
     }
     public func select(_ value: LibrarySelection) {
+        do {
+            if selection == .memory { try flushInstructions() }
+            if value == .memory { try openInstructions() }
+        } catch { self.error = error.localizedDescription; return }
         selectedNoteID = nil
         selectedConversation = nil
         selectedProposal = nil
@@ -201,7 +209,7 @@ public final class LibraryModel {
 
     var showAllUpcoming = false
     var sections: [LibraryIndex.Section] { index.sections(for: selection) }
-    public var showsNewNote: Bool { selection != .proposals && selection != .conversations && selection != .trash && selection != .archived }
+    public var showsNewNote: Bool { selection != .memory && selection != .proposals && selection != .conversations && selection != .trash && selection != .archived }
     func toggleArchive(_ note: Note) {
         perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
     }
@@ -324,6 +332,7 @@ public final class LibraryModel {
         case .archived: "보관함"
         case .all: "전체 노트"
         case .reminders: "리마인더 있는 노트"
+        case .memory: "메모리"
         case .proposals: "제안"
         case .conversations: "대화"
         case .trash: "휴지통"

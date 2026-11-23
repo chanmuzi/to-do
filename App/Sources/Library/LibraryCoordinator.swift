@@ -96,11 +96,16 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
         try data.write(to: url)
     }
     #endif
-    public func close() { model.cancelSpaceEditing(); spacePopover?.close(); window?.close(); timer?.invalidate(); timer = nil }
+    public func close() { guard window.map(windowShouldClose) != false else { return }; model.cancelSpaceEditing(); spacePopover?.close(); window?.close(); timer?.invalidate(); timer = nil }
     public func windowDidResignKey(_ notification: Notification) {
         model.dismissUpcoming()
         if !model.choosingDraftIcon { model.cancelSpaceEditing() }
     }
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        do { try model.flushInstructions(); return true }
+        catch { model.error = error.localizedDescription; return false }
+    }
+
     public func windowWillClose(_ notification: Notification) { model.reorder.cancel(); model.dismissUpcoming(); timer?.invalidate(); timer = nil }
     public func showSpacePicker(for id: NoteID, anchor: NSView?) {
         beforeMove()

@@ -20,7 +20,7 @@ struct ProposalNoteBody: View {
                 let line = document.lines[index], added = index >= firstAdded
                 HStack(spacing: 0) {
                     Text(added ? "+" : "").frame(width: theme.component(.proposalGutter))
-                    content(line, in: document)
+                    ProposalLineContent(theme: theme, line: line, document: document)
                         .padding(.leading, CGFloat(line.level) * theme.component(.indent))
                     Spacer(minLength: 0)
                 }.padding(.trailing, theme.space(.sp3))
@@ -30,7 +30,23 @@ struct ProposalNoteBody: View {
         }.font(theme.font(.body, size: theme.component(.proposalFont)))
     }
 
-    @ViewBuilder private func content(_ line: MarkdownLine, in document: MarkdownDocument) -> some View {
+}
+
+struct ProposalLineContent: View {
+    let theme: Theme
+    let line: MarkdownLine
+    let document: MarkdownDocument
+
+    private var text: String {
+        var start = line.contentStart, value = ""
+        for marker in line.markers {
+            value += document.string(in: NSRange(location: start, length: marker.range.location - start))
+            start = NSMaxRange(marker.range)
+        }
+        return value + document.string(in: NSRange(location: start, length: line.end - start))
+    }
+
+    @ViewBuilder var body: some View {
         if case .todo(let done) = line.kind {
             HStack(spacing: 0) {
                 let shape = RoundedRectangle(cornerRadius: theme.shape(.checkRadius))
@@ -41,11 +57,16 @@ struct ProposalNoteBody: View {
                     } else { shape.strokeBorder(theme.color(.text2), lineWidth: theme.component(.editorGlyphStroke)) }
                 }.frame(width: theme.component(.checkSize), height: theme.component(.checkSize))
                     .frame(width: theme.component(.indent), alignment: .leading)
-                Text(document.string(in: line.contentRange)).strikethrough(done)
+                Text(text).strikethrough(done)
             }
-        } else {
-            let start = line.start + line.indentLength
-            Text(document.string(in: NSRange(location: start, length: line.end - start)))
-        }
+        } else if line.kind == .bullet {
+            HStack(spacing: 0) {
+                Circle().frame(width: theme.component(.editorBulletDot), height: theme.component(.editorBulletDot))
+                    .frame(width: theme.component(.indent), alignment: .leading)
+                Text(text)
+            }
+        } else if case .heading = line.kind {
+            Text(text).fontWeight(.semibold)
+        } else if line.kind != .fenceOpen && line.kind != .fenceClose { Text(text) }
     }
 }

@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var library: LibraryCoordinator?
     private var agentCorner: AgentCorner?
     private var proposalController: TodoProposalController?
+    private var instructionEditor: InstructionEditor?
+    private var instructionStore: AgentStore?
     private var requests: AgentRequestCoordinator?
     private var quickPanels: QuickPanels?
     private var editors: NoteEditorFactory?
@@ -80,7 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             #endif
             router.notePanels = notePanels
-            let agent = AgentWindowCoordinator(store: AgentStore(location: environment.location),
+            let store = AgentStore(location: environment.location)
+            instructionStore = store
+            let agent = AgentWindowCoordinator(store: store,
                                                theme: environment.theme, warning: AppLog.warning)
             #if DEBUG
             agent.allowsKeyWindows = !options.debugIsPassive
@@ -137,6 +141,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            let instructionEditor = InstructionEditor(theme: environment.theme, store: store)
+            self.instructionEditor = instructionEditor
+            library.model.instructionView = instructionEditor.editor.view
+            library.model.openInstructions = instructionEditor.open
+            library.model.flushInstructions = store.flushInstructions
+            store.instructionSaveFailed = { [weak library] in library?.model.error = $0.localizedDescription }
             router.connectHistory(library.model, agent: agent)
             library.model.readEvents = { [weak schedules] in schedules?.events(in: $0) ?? [] }
             library.model.linkedDestination = { [weak schedules] in schedules?.destination(for: $0) }
@@ -269,6 +279,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notePanels?.flushPendingEdits()
         flushWindowStates()
         do {
+            try instructionStore?.flushInstructions()
             try notes.flushPendingSaves()
             try router?.agent?.flushFailedDrafts()
             // 아무것도 적지 않은 노트는 남기지 않는다(D-040). 다 쓴 뒤에만 본다.
@@ -405,6 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setMenuBarIconShown: { [unowned self] in setMenuBarIconShown($0) }
         )
         control.agent = router.agent
+        control.instructionEditor = instructionEditor
         control.proposals = proposalController
         control.agentCorner = agentCorner
         control.theme = environment?.theme
@@ -439,7 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func connectRequests(_ environment: AppEnvironment, router: AppRouter, agent: AgentWindowCoordinator,
                                  panels: QuickPanels, notes: NotePanelCoordinator) throws {
         try agent.restore()
-        var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment))
+        var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment), instructionStore: instructionStore)
         #if DEBUG
         if options.debugIsPassive { execution.notifications = AgentExpiryNotifications(notifier: VerificationExpiryNotifier()) }
         #endif

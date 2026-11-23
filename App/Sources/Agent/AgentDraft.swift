@@ -24,13 +24,15 @@ import Store
     }
 
     package var queueHeld = false
+    package var evidenceRequest: UUID?
+    package func revealRequest(_ id: UUID) { showsHistory = false; evidenceRequest = id }
     var showsHistory = false
     var expanded: Set<UUID> = []
     var hovered: UUID?
     #if DEBUG
     var still = false
     #endif
-    private let store: AgentStore
+    let store: AgentStore
 
     package init(_ conversation: AgentConversation, store: AgentStore) {
         self.conversation = conversation

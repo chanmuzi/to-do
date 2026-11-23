@@ -100,7 +100,11 @@ public struct AgentProposal: Identifiable, Codable, Equatable, Sendable {
         case .newNote(let name, _):
             target = .newNote(reservedID, args.space_id.map(SpaceID.init(rawValue:)))
             title = "새 노트: " + name
-        case .instructions: throw CocoaError(.fileReadCorruptFile)
+        case .instructions(let before, let after):
+            guard args.user_message?.utf8.elementsEqual(request.userText.utf8) == true else { throw ProposalArguments.Invalid.evidence }
+            guard entry.version == TodoSubmission.fingerprint(Data(before.utf8)) else { throw ProposalArguments.Invalid.instructionBase }
+            target = .instructions
+            title = after.hasPrefix(before) && after.dropFirst(before.count).split(separator: "\n").count == 1 ? "지침에 한 줄 추가" : "지침 고치기"
         default:
             guard let note, entry.version != nil else { throw CocoaError(.fileReadCorruptFile) }
             target = .note(note)

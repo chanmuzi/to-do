@@ -2,7 +2,7 @@ import Foundation
 
 /// MCP 인자와 실행별 접수 파일에서 같은 검사를 사용한다.
 package struct ProposalArguments: Codable, Sendable {
-    package enum Kind: String, Codable, CaseIterable { case todos = "add_todos", reminder = "add_reminder", event = "add_event", newNote = "create_note" }
+    package enum Kind: String, Codable, CaseIterable { case todos = "add_todos", reminder = "add_reminder", event = "add_event", newNote = "create_note", instructions = "change_instructions" }
     package var kind: Kind
     package var note_id: String?
     package var lines: [String]?
@@ -14,8 +14,13 @@ package struct ProposalArguments: Codable, Sendable {
     package var date_only: Bool?
     package var time_zone: String?
 
+    package var user_message: String?
+    package var before: String?
+    package var after: String?
+
     package var fields: Set<String> {
         switch kind {
+        case .instructions: ["kind", "user_message", "before", "after"]
         case .todos: ["kind", "note_id", "lines"]
         case .reminder: ["kind", "note_id", "title", "start", "date_only", "time_zone"]
         case .event: ["kind", "note_id", "title", "start", "end", "date_only", "time_zone"]
@@ -28,6 +33,14 @@ package struct ProposalArguments: Codable, Sendable {
     }
 
     package func content() throws -> AgentProposal.Content {
+        if kind == .instructions {
+            guard let user_message, !user_message.isEmpty else { throw Invalid.missingMessage }
+            guard note_id == nil, let before, let after else { throw Invalid.instructionFields }
+            guard [before, after, user_message].allSatisfy({ $0.utf8.count <= 96 * 1024 && !$0.utf8.contains(0) })
+            else { throw Invalid.instructionText }
+            guard !before.utf8.elementsEqual(after.utf8) else { throw Invalid.unchangedInstructions }
+            return .instructions(before: before, after: after)
+        }
         guard note_id.map(identifier) != false, kind == .newNote || note_id != nil else { throw Invalid.target }
         if kind == .todos {
             guard let lines, TodoSubmission.valid(lines: lines) else { throw Invalid.lines }
@@ -59,6 +72,12 @@ package struct ProposalArguments: Codable, Sendable {
     }
 
     package enum Invalid: String, LocalizedError {
+        case missingMessage = "user_message에 이번 실행의 사용자 메시지 원문 전체를 넣어 주세요."
+        case evidence = "user_message가 이번 실행의 사용자 메시지 원문과 일치하지 않습니다."
+        case instructionBase = "before가 이번 실행을 시작할 때의 지침 원문과 일치하지 않습니다."
+        case instructionFields = "지침 변경에는 대상 노트 없이 before와 after에 문서 전체를 넣어 주세요."
+        case instructionText = "user_message, before, after는 각각 UTF-8 96KiB 이하이고 널 문자를 포함할 수 없습니다."
+        case unchangedInstructions = "before와 after의 지침 내용이 같습니다."
         case target = "대상 노트 ID를 확인해 주세요."
         case title = "제목은 비어 있지 않은 한 줄로 1024바이트까지 쓸 수 있습니다."
         case lines = "할 일은 한 줄에 1024바이트까지, 1개에서 32개까지 제안할 수 있습니다."

@@ -144,3 +144,33 @@ extension AppActivationTests {
         #expect(try fixture.notes.load(reserved).title == "정리")
     }
 }
+
+extension AppActivationTests {
+    @Test func instructionResultOpensPreviewAndAcceptedDocument() throws {
+        defer { fixture.cleanUp() }
+        let store = AgentStore(location: fixture.location)
+        let agent = AgentWindowCoordinator(store: store, theme: fixture.theme) { Issue.record("\($0)") }
+        let library = LibraryCoordinator(theme: fixture.theme, notes: fixture.notes, spaces: fixture.spaces, windows: fixture.windowStates,
+                                         preferences: try .init(location: fixture.location), router: fixture.router)
+        library.allowsKeyWindows = false
+        defer { library.close() }
+        fixture.router.library = library
+        fixture.router.connectHistory(library.model, agent: agent)
+        let controller = TodoProposalController(agent: agent, notes: fixture.notes, panels: fixture.notePanels, theme: fixture.theme, router: fixture.router)
+        controller.connect(library.model)
+        let draft = try agent.record(for: nil)
+        var request = AgentRequest(id: UUID(), text: "앞으로 짧게 답해 줘", engine: "fixture", model: nil)
+        let fields = ["kind": "change_instructions", "before": "", "after": "짧게", "user_message": request.userText]
+        let args = try JSONDecoder().decode(ProposalArguments.self, from: JSONEncoder().encode(fields))
+        let p = try AgentProposal.submitted(.init(arguments: args, version: TodoSubmission.fingerprint(Data())), key: "rule",
+                                            request: request, source: nil, reservedID: .make())
+        request.proposals = [p]
+        draft.change { $0.requests = [request] }
+        controller.open(p.id, source: "conversation")
+        #expect(activations == 1 && library.model.selectedProposal == p.id)
+        controller.accept([p.id], source: "library")
+        controller.open(p.id, source: "conversation")
+        #expect(activations == 2 && library.model.selection == .memory && fixture.notePanels.openNoteIDs.isEmpty)
+        #expect(try store.readInstructions() == "짧게")
+    }
+}
