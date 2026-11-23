@@ -15,6 +15,7 @@ public enum AgentError: Error, Equatable, Sendable {
     case invalidOutput
     case isolation(String)
     case failed(Int32)
+    case rateLimited(Double?)
     case loginExpired
     case providerFailure
     case unsupportedEngine
@@ -77,13 +78,34 @@ extension AgentCommand {
                 try check(posix_spawn(&pid, executable.path, &actions, &attributes, argv, env))
             }
         }
-        var reaped = false
-        defer {
-            if !reaped {
-                kill(-pid, SIGKILL)
-                while waitpid(pid, nil, 0) == -1 && errno == EINTR {}
-            }
+        do {
+            return try readOutput(pid: pid, reader: reader, writer: writer, timeout: timeout, line: line)
+        } catch {
+            kill(-pid, SIGKILL)
+            while waitpid(pid, nil, 0) == -1 && errno == EINTR {}
+            try Self.waitForGroupExit(pid)
+            throw error
         }
+    }
+
+    /// 리더를 회수한 직후에는 그룹 신호 권한 판정과 마지막 자손의 종료가 경합할 수 있다.
+    /// Darwin의 그룹별 프로세스 목록이 실제로 비었을 때만 다음 실행에 제어를 돌려준다.
+    private static func waitForGroupExit(_ group: pid_t) throws {
+        var query = [CTL_KERN, KERN_PROC, KERN_PROC_PGRP, group]
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        repeat {
+            var member = kinfo_proc()
+            var size = MemoryLayout.size(ofValue: member)
+            let result = sysctl(&query, UInt32(query.count), &member, &size, nil, 0)
+            if result == 0 && size == 0 { return }
+            if result != 0 && errno != ENOMEM && errno != EINTR { throw AgentError.isolation("process_group") }
+            usleep(10_000)
+        } while ContinuousClock.now < deadline
+        throw AgentError.isolation("process_group")
+    }
+
+    private func readOutput(pid: pid_t, reader: FileHandle, writer: FileHandle, timeout: Duration,
+                            line: (Data) throws -> Void) throws -> Int32 {
         try writer.close()
         let deadline = ContinuousClock.now.advanced(by: timeout)
         var pending = Data()
@@ -96,7 +118,6 @@ extension AgentCommand {
                 var status: Int32 = 0
                 let result = waitpid(pid, &status, WNOHANG)
                 if result == pid {
-                    reaped = true
                     let signal = status & 0x7f
                     return signal == 0 ? (status >> 8) & 0xff : 128 + signal
                 }

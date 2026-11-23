@@ -280,3 +280,81 @@ private struct Fixture {
         }
     }
 }
+
+extension AgentRunnerTests {
+    @Test func subscriptionSurvivesBinaryReplacementAndDetectsIncompatibleVersion() async throws {
+        let initLine = String(decoding: try JSONSerialization.data(withJSONObject: initEvent), as: UTF8.self)
+        let fx = try Fixture(.claude, "exit 70")
+        defer { try! fx.cleanup() }
+        let connection = try AgentConnection(provider: .claude, location: fx.location)
+        let marker = connection.config.appending(path: "fixture-account")
+        let original = Data("subscription-a".utf8)
+        try original.write(to: marker)
+        let bin = fx.installation.executable.deletingLastPathComponent()
+        for version in 1...3 {
+            let body = """
+            #!/bin/sh
+            set -eu
+            test -z "${ANTHROPIC_API_KEY-}${CLAUDE_CODE_OAUTH_TOKEN-}${CLAUDE_CODE_SIMPLE-}"
+            if test "$1" = --version; then echo \(version).0; exit 0; fi
+            if test "$1" = auth; then
+              if test "$(cat "$CLAUDE_CONFIG_DIR/fixture-account" 2>/dev/null)" = subscription-a; then
+                echo '{"loggedIn":true}'; exit 0
+              fi
+              echo '{"loggedIn":false}'; exit 1
+            fi
+            for arg in "$@"; do if test "$arg" = --bare; then exit 7; fi; done
+            test "$1" = -p && test "$(cat "$CLAUDE_CONFIG_DIR/fixture-account")" = subscription-a || exit 6
+            test \(version) -lt 3 || exit 8
+            echo '\(initLine)'
+            echo '{"type":"result","subtype":"success","is_error":false,"result":"답"}'
+            """
+            try body.write(to: fx.installation.executable, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: fx.installation.executable.path)
+            let found = try await connection.discover(in: bin)
+            #expect(found.version == "\(version).0")
+            #expect(try await connection.account(found).loggedIn)
+            let bare = try connection.command(found, ["-p", "--bare"], directory: bin)
+            #expect(try bare.capture().0 == 7)
+            if version == 3 {
+                await #expect(throws: AgentError.failed(8)) { try await fx.runner.run("질문", engine: .claude(), installation: found) }
+                #expect(!FileManager.default.fileExists(atPath: connection.config.appending(path: "float-expiry-notified").path))
+            } else {
+                #expect(try await fx.runner.run("질문", engine: .claude(), installation: found).text == "답")
+            }
+            #expect(try Data(contentsOf: marker) == original)
+        }
+        let empty = try AgentConnection(provider: .claude, location: .isolated(notesDirectory: fx.root.appending(path: "empty")))
+        #expect(try await !empty.account(fx.installation).loggedIn)
+        try Data("subscription-b".utf8).write(to: empty.config.appending(path: "fixture-account"))
+        #expect(try await !empty.account(fx.installation).loggedIn)
+        await #expect(throws: AgentError.missingExecutable("claude")) { try await connection.discover(in: empty.config) }
+    }
+}
+
+extension AgentRunnerTests {
+    @Test func toolResultsRequireMatchingCallsAndCodexMessageIDsAreUnique() throws {
+        var events: [AgentEvent] = []
+        func accept(_ rows: [Object], _ stream: inout AgentStream) throws {
+            for row in rows { try stream.accept(JSONSerialization.data(withJSONObject: row)) { events.append($0) } }
+        }
+        var claude = AgentStream(provider: .claude)
+        let call: Object = ["type":"assistant","message":["content":[["type":"tool_use","name":"mcp__float__read_note",
+                                                                        "id":"one","input":["name":"note.md"]]]]]
+        func result(_ id: String, failed: Bool) -> Object {
+            ["type":"user","message":["content":[["type":"tool_result","tool_use_id":id,"is_error":failed]]]]
+        }
+        try accept([initEvent, call, call, result("unknown", failed: false), result("one", failed: true), result("one", failed: false)], &claude)
+        #expect(events.dropFirst() == [.toolStarted(id: "one", name: "read_note", file: "note.md"), .toolEnded(id: "one", succeeded: false)])
+        var codex = AgentStream(provider: .codex)
+        var item: Object = ["type":"mcp_tool_call","id":"two","server":"float","tool":"read_note","arguments":["name":"n.md"]]
+        events = []
+        try accept([["type":"thread.started"],["type":"item.started","item":item]], &codex)
+        item["status"] = "completed"
+        item["result"] = ["content":[]]
+        let message: Object = ["type":"item.completed","item":["type":"agent_message","id":"m","text":"답"]]
+        try accept([["type":"item.completed","item":item],message,message,["type":"turn.completed"]], &codex)
+        #expect(events.contains(.toolEnded(id: "two", succeeded: true)))
+        #expect(codex.response == "답" && events.filter { $0 == .text("답") }.count == 1)
+    }
+}

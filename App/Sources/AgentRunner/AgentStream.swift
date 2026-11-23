@@ -11,6 +11,8 @@ public enum AgentEvent: Equatable, Sendable {
     case started(model: String?)
     case text(String)
     case tool(String)
+    case toolStarted(id: String, name: String, file: String?)
+    case toolEnded(id: String, succeeded: Bool)
     case rateLimit(status: String, resetsAt: Double?)
     case usage(AgentUsage)
 }
@@ -21,6 +23,8 @@ struct AgentStream {
     static let claudeTools = tools.map { "mcp__float__" + $0 }
 
     let provider: AgentProvider
+    var messageIDs: Set<String> = []
+    var calls: Set<String> = []
     var started = false
     var completed = false
     var model: String?
@@ -66,11 +70,25 @@ struct AgentStream {
             for block in message?["content"] as? [Object] ?? [] where block["type"] as? String == "tool_use" {
                 guard let name = block["name"] as? String, Self.claudeTools.contains(name)
                 else { throw AgentError.isolation("tool_use") }
-                emit(.tool(name))
+                if let id = block["id"] as? String {
+                    if calls.insert(id).inserted {
+                        emit(.toolStarted(id: id, name: String(name.dropFirst("mcp__float__".count)),
+                                          file: (block["input"] as? Object)?["name"] as? String))
+                    }
+                } else { emit(.tool(name)) }
+            }
+        case "user":
+            for block in (row["message"] as? Object)?["content"] as? [Object] ?? []
+                where block["type"] as? String == "tool_result" {
+                if let id = block["tool_use_id"] as? String, calls.remove(id) != nil {
+                    emit(.toolEnded(id: id, succeeded: block["is_error"] as? Bool != true))
+                }
             }
         case "rate_limit_event":
             if let info = row["rate_limit_info"] as? Object, let status = info["status"] as? String {
-                emit(.rateLimit(status: status, resetsAt: info["resetsAt"] as? Double))
+                let reset = info["resetsAt"] as? Double
+                emit(.rateLimit(status: status, resetsAt: reset))
+                if status == "rejected" { throw AgentError.rateLimited(reset) }
             }
         case "result":
             let counts = row["usage"] as? Object
@@ -89,7 +107,12 @@ struct AgentStream {
     }
 
     private mutating func codex(_ type: String, _ row: Object, _ emit: (AgentEvent) -> Void) throws {
-        if type == "error" || type == "turn.failed" { throw AgentError.providerFailure }
+        if type == "error" || type == "turn.failed" {
+            if let error = row["error"] as? Object, error["code"] as? String == "usage_limit_reached" {
+                throw AgentError.rateLimited(error["resets_at"] as? Double)
+            }
+            throw AgentError.providerFailure
+        }
         if type == "thread.started" {
             guard !started else { throw AgentError.invalidOutput }
             started = true
@@ -107,11 +130,21 @@ struct AgentStream {
             case "mcp_tool_call":
                 guard item["server"] as? String == "float", let name = item["tool"] as? String, Self.tools.contains(name)
                 else { throw AgentError.isolation("mcp_tool_call") }
-                if type == "item.started" { emit(.tool(name)) }
+                if let id = item["id"] as? String {
+                    if type == "item.started", calls.insert(id).inserted {
+                        emit(.toolStarted(id: id, name: name, file: (item["arguments"] as? Object)?["name"] as? String))
+                    } else if type == "item.completed", calls.remove(id) != nil {
+                        let result = item["result"] as? Object
+                        emit(.toolEnded(id: id, succeeded: item["status"] as? String == "completed"
+                                        && result != nil && result?["isError"] as? Bool != true))
+                    }
+                } else if type == "item.started" { emit(.tool(name)) }
             case "agent_message":
                 if type == "item.completed", let text = item["text"] as? String {
-                    response = text
-                    emit(.text(text))
+                    if let id = item["id"] as? String, !messageIDs.insert(id).inserted { break }
+                    let fragment = response.isEmpty ? text : "\n" + text
+                    response += fragment
+                    emit(.text(fragment))
                 }
             case "reasoning", "todo_list": break
             default: throw AgentError.isolation("item.type")
