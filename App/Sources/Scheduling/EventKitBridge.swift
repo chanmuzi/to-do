@@ -72,13 +72,42 @@ public final class EventKitBridge: CalendarBridge {
     public func events(in interval: DateInterval) -> [CalendarEvent] {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return [] }
         let store = store()
-        let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: nil)
+        return events(in: interval, calendars: nil, store: store)
+    }
+
+    private func events(in interval: DateInterval, calendars: [EKCalendar]?, store: EKEventStore) -> [CalendarEvent] {
+        let predicate = store.predicateForEvents(withStart: interval.start, end: interval.end, calendars: calendars)
         return store.events(matching: predicate).compactMap { event in
             guard event.status != .canceled, let start = event.startDate,
-                  let item = decoded(event, retaining: ScheduleItem(id: event.calendarItemIdentifier, start: start)) else { return nil }
+                  let item = Self.decoded(event, retaining: ScheduleItem(id: event.calendarItemIdentifier, start: start)) else { return nil }
             return CalendarEvent(item: item, destination: destination(for: event.calendar), recurring: event.hasRecurrenceRules || event.isDetached)
         }
     }
+    public func contextItems(_ kind: ScheduleItem.Kind, day: DateInterval) async -> (calendarID: String, items: [CalendarEvent])? {
+        guard access(for: kind) == .available else { return nil }
+        let store = store()
+        let selected: EKCalendar?
+        if let id = preferredID(kind) { selected = store.calendar(withIdentifier: id) }
+        else { selected = defaultCalendar(kind, in: store) }
+        guard let selected, selected.allowedEntityTypes.contains(kind == .event ? .event : .reminder) else { return nil }
+        let id = selected.calendarIdentifier
+        if kind == .event { return (id, events(in: day, calendars: [selected], store: store)) }
+        let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: day.end, calendars: [selected])
+        let items: [CalendarEvent]? = await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { @Sendable reminders in
+                let rows = reminders?.compactMap { reminder -> CalendarEvent? in
+                    guard !reminder.isCompleted,
+                          let item = Self.decoded(reminder, retaining: ScheduleItem(id: reminder.calendarItemIdentifier, start: day.start)),
+                          item.start < day.end else { return nil }
+                    return CalendarEvent(item: item, destination: nil)
+                }
+                continuation.resume(returning: rows)
+            }
+        }
+        guard let items, access(for: kind) == .available else { return nil }
+        return (id, items)
+    }
+
     public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
         let type: EKEntityType = kind == .event ? .event : .reminder
         let status = EKEventStore.authorizationStatus(for: type)
@@ -112,9 +141,9 @@ public final class EventKitBridge: CalendarBridge {
     public func fetch(_ item: ScheduleItem) throws -> ScheduleItem? {
         let store = try authorizedStore(item.kind)
         guard let value = try find(item, in: store) else { return nil }
-        return decoded(value, retaining: item)
+        return Self.decoded(value, retaining: item)
     }
-    private func decoded(_ value: EKCalendarItem, retaining item: ScheduleItem) -> ScheduleItem? {
+    private nonisolated static func decoded(_ value: EKCalendarItem, retaining item: ScheduleItem) -> ScheduleItem? {
         var result = item
         result.title = value.title ?? ""
         result.link = .init(localID: value.calendarItemIdentifier, externalID: value.calendarItemExternalIdentifier, kind: value is EKEvent ? .event : .reminder)
@@ -177,7 +206,7 @@ public final class EventKitBridge: CalendarBridge {
                 throw original
             }
         }
-        return decoded(value, retaining: item) ?? item
+        return Self.decoded(value, retaining: item) ?? item
     }
     private func removeValue(_ value: EKCalendarItem, in store: EKEventStore) throws {
         guard value.calendar.allowsContentModifications else { throw CalendarBridgeError.readOnly }

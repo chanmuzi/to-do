@@ -508,6 +508,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  panels: QuickPanels, notes: NotePanelCoordinator) throws {
         try agent.restore()
         var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment), instructionStore: instructionStore)
+        execution.scheduleContext = { [weak schedules] now, calendar in
+            await schedules?.todayContext(now: now, calendar: calendar) ?? TodayScheduleContext()
+        }
         execution.supportedEfforts = settingsWindow?.model.supportedEfforts
         execution.noteContext = {
             AgentNoteContext(windows: Dictionary(uniqueKeysWithValues: environment.windowStates.all.map {
