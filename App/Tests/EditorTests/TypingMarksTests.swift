@@ -119,7 +119,7 @@ import Testing
         #expect(target("|가\n나|") == nil)
         #expect(target("```\n|code|\n```") == nil)
         #expect(target("`co|d|e`") == nil)
-        #expect(target("|a [b] c|") == nil)
+        #expect(link("|a [b] c|", "https://example.com") == "[a [b\\] c|](https://example.com)")
         #expect(target("|가 [나](https://a.example)| 다") == nil)
     }
 
@@ -130,8 +130,10 @@ import Testing
         let doc = MarkdownDocument("[문서](https://a.example/%28x%29) 뒤")
         #expect(doc.lines[0].spans.first?.kind == .link("https://a.example/%28x%29"))
         // 고른 글자가 주소처럼 생겼으면 주소 칸에 미리 넣는다.
-        let s = Scenario("|https://a.example|")
-        #expect(EditorCommands.linkAddress(s.doc, for: .new(s.selection)) == "https://a.example")
+        for address in ["https://a.example", "http://[::1]/notes"] {
+            let s = Scenario("|\(address)|")
+            #expect(EditorCommands.linkAddress(s.doc, for: .new(s.selection)) == address)
+        }
     }
 
     @Test func aLinkWithoutTextIsNotALink() {

@@ -310,11 +310,13 @@ final class NoteWindowController: NSObject {
         let router = environment.router
         let id = noteID
         let menu = NoteMenuBuilder(style: environment.style).moreMenu(
-            isPinned: isPinned, isArchived: note.isArchived, selectedPaletteID: note.colorID?.rawValue,
+            isPinned: isPinned, isArchived: note.isArchived, showsFormatBar: environment.options().formatBar != .hidden,
+            selectedPaletteID: note.colorID?.rawValue,
             isAvailable: { action in
                 switch action {
                 case .setReminder: note.schedules.contains { !$0.isDeleted && !$0.isCompleted } && router.isConnected(.openReminderEditor(id))
                 case .moveToSpace: router.isConnected(.openSpacePicker(id))
+                case .toggleFormatBar: coordinator?.toggleFormatBar != nil
                 case .newNote: true
                 case .openLibrary: router.isConnected(.openLibrary)
                 case .findNote: router.isConnected(.openBrowse(anchor: id))
@@ -326,6 +328,7 @@ final class NoteWindowController: NSObject {
             case .setReminder: router.route(.openReminderEditor(id))
             case .moveToSpace: router.route(.openSpacePicker(id))
             case .togglePin: self?.setPinned(self?.isPinned == false)
+            case .toggleFormatBar: self?.coordinator?.toggleFormatBar?()
             case .setColor(let paletteID): self?.setColor(paletteID)
             case .openLibrary: router.route(.openLibrary)
             case .findNote: router.route(.openBrowse(anchor: id))

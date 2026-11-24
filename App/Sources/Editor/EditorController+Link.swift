@@ -5,25 +5,59 @@ import Theme
 // 고른 글자 아래에 뜨는 작은 칸에서 한다.
 
 extension EditorController {
+    var currentLinkTarget: LinkTarget? {
+        EditorCommands.linkTarget(document, selection: clamped(textView.selectedRange()))
+    }
+
+    var linkSelectionHelp: String {
+        let selection = textView.selectedRange()
+        if selection.length == 0 { return "링크로 만들 본문 글자를 먼저 선택하세요." }
+        if document.lineIndex(at: selection.location) != document.lineIndex(at: NSMaxRange(selection)) {
+            return "한 줄 안에서 링크로 만들 글자를 선택하세요."
+        }
+        return "코드나 기존 링크의 경계를 걸치지 않게 글자를 선택하세요."
+    }
+
+    func explainRejectedLink(_ reason: String) {
+        onRejectedEdit()
+        NSAccessibility.post(element: NSApplication.shared, notification: .announcementRequested,
+                             userInfo: [.announcement: reason, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+
     /// 링크 단축키. 글자를 골랐으면 주소를 물어 링크로 만들고, 커서가 링크 안이면 그 주소를 고친다
     /// (주소를 비우면 링크를 벗긴다).
     func beginLinkEditing() {
-        guard linkSession == nil, !textView.hasMarkedText(), textView.isEditable,
-              let target = EditorCommands.linkTarget(document, selection: clamped(textView.selectedRange())) else { return }
+        guard linkSession == nil, !textView.hasMarkedText(), textView.isEditable else { return }
+        guard let target = currentLinkTarget else { explainRejectedLink(linkSelectionHelp); return }
         linkSession = (target, documentVersion)
+        linkField.input.toolTip = nil
+        linkField.input.setAccessibilityHelp(nil)
         linkField.address = EditorCommands.linkAddress(document, for: target)
         linkField.isHidden = false
         layoutLinkField()
         textView.window?.makeFirstResponder(linkField.input)
         reportContentHeight()
+        textView.scrollToVisible(linkField.frame)
     }
 
     /// 주소 칸에서 Return. 그사이에 원문이 바뀌었으면(다른 프로그램이 고침) 넣지 않는다.
     func commitLink(_ address: String) {
         guard let session = linkSession else { return }
+        guard session.version == documentVersion else { cancelLinkEditing(); return }
+        let value = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !value.isEmpty, LinkPolicy.openableURL(value) == nil {
+            let help = "http, https 또는 mailto 주소를 입력하세요."
+            linkField.input.toolTip = help
+            linkField.input.setAccessibilityHelp(help)
+            explainRejectedLink(help)
+            return
+        }
+        guard let edit = EditorCommands.setLink(document, target: session.target, address: value) else {
+            if value.isEmpty { cancelLinkEditing() } else { explainRejectedLink(linkSelectionHelp) }
+            return
+        }
         endLinkEditing()
-        guard session.version == documentVersion else { return }
-        apply(EditorCommands.setLink(document, target: session.target, address: address))
+        apply(edit)
     }
 
     func cancelLinkEditing() {
@@ -33,6 +67,8 @@ extension EditorController {
 
     private func endLinkEditing() {
         linkSession = nil
+        textView.minSize.height = 0
+        textView.sizeToFit()
         linkField.isHidden = true
         if let window = textView.window, window.firstResponder !== textView {
             window.makeFirstResponder(textView)
@@ -59,6 +95,10 @@ extension EditorController {
             width: width,
             height: theme.component(.controlHeight)
         )
+        // 주소 칸도 스크롤 문서의 일부다. 고정 높이 창에서도 마지막 줄 아래까지 이동할 수 있다.
+        let height = ceil(linkField.frame.maxY + style.metrics.linkFieldGap)
+        textView.minSize.height = height
+        if textView.frame.height < height { textView.setFrameSize(NSSize(width: textView.frame.width, height: height)) }
     }
 
     /// 그 범위의 글자가 차지하는 사각형들(화면 줄마다 하나). 텍스트 뷰 좌표.

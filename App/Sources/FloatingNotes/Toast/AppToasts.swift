@@ -37,9 +37,9 @@ final class AppToasts {
         self.notePanels = notePanels
         self.notes = notes
         self.router = router
-        notePanels.onMovedToTrash = { [unowned self] _, screen in
+        notePanels.onMovedToTrash = { [unowned self] _, screen, frame in
             presenter.show(
-                .init(kind: Self.trashKind, message: Self.trashMessage, actionTitle: Self.undoTitle), on: screen
+                .init(kind: Self.trashKind, message: Self.trashMessage, actionTitle: Self.undoTitle), on: screen, noteFrame: frame
             ) { [unowned self] in
                 // 그사이 되돌릴 수 없게 됐으면 아무것도 하지 않는다(알림도 이미 거둬졌어야 한다).
                 if self.notePanels.canUndoTrash { undoTrash() }

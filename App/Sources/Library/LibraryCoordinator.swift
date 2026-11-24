@@ -77,6 +77,15 @@ public final class LibraryCoordinator: NSObject, NSWindowDelegate {
         }
     }
     #if DEBUG
+    package func noteRowForVerification(_ id: NoteID, action: String) {
+        guard let row = window?.contentView?.libraryNoteRow(id), let note = row.note else { return }
+        switch action {
+        case "select": model.activate(note)
+        case "menu": row.showMenu()
+        case "pin": row.togglePin()
+        default: break
+        }
+    }
     package func spaceMenuForVerification() -> NSMenu? {
         func freshMenu(_ view: NSView) -> NSMenu? {
             if let button = view as? SpaceMenuButton, !button.contextOnly { return button.spaceMenu() }

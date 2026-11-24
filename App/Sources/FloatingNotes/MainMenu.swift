@@ -53,6 +53,7 @@ enum MainMenu {
                 + standard("굵게", MarkdownEditor.toggleBoldAction, KeyChord(.b, .command))
                 + standard("모두 선택", #selector(NSText.selectAll(_:)), KeyChord(.a, .command))
         ))
+        menu.addItem(submenu(title: "서식", items: standard("링크 추가", MarkdownEditor.editLinkAction, KeyChord(.l, .command))))
         menu.addItem(submenu(title: "보기", items: command(StatusMenuModel.hideAllTitle, .toggleNotesHidden)
             + [.separator()] + command("본문 확대", .enlargeBody) + command("본문 축소", .reduceBody)
             + command("본문 기본 크기", .resetBodySize)))

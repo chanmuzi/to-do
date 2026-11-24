@@ -73,6 +73,33 @@ import Theme
         #expect(restored.editor.view.enclosingScrollView?.documentVisibleRect.minY == 0)
     }
 
+    @Test func fixedHeightShowsEntireLinkFieldAtLastLine() throws {
+        defer { fixture.cleanUp() }
+        let body = (1...18).map { "본문 줄 \($0)" }.joined(separator: "\n")
+        let (id, adapter) = try fixture.open(NoteDraft(title: "링크", body: body))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        let original = window.frame
+        adapter.editor.forcesActiveAppearance = true
+        adapter.editor.focus()
+        let range = (body as NSString).range(of: "본문 줄 18")
+        adapter.editor.selectedRange = range
+        adapter.editor.textView.scrollRangeToVisible(range)
+        let field = try #require(adapter.view.subviews.first { $0.subviews.contains { $0.accessibilityLabel() == "링크 주소" } })
+        let key = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
+            timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "l",
+            charactersIgnoringModifiers: "l", isARepeat: false, keyCode: 37))
+        #expect(adapter.view.performKeyEquivalent(with: key))
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(!field.isHidden && window.frame == original)
+        #expect(scroll.documentVisibleRect.contains(field.frame))
+        adapter.editor.commitLink("https://example.com")
+        fixture.notePanels.beginTitleEditing(for: id)
+        #expect(window.firstResponder !== adapter.view)
+        #expect(!adapter.view.performKeyEquivalent(with: key))
+        #expect(field.isHidden)
+    }
+
     @Test func typingGrowsTheWindowFromTheSameTopEdge() async throws {
         defer { fixture.cleanUp() }
         fixture.notePanels.displayOptions.heightMode = .fitContent

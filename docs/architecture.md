@@ -205,7 +205,7 @@ Float 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routi
   - 그림자: 투명한 창의 그림자는 내용 모양에서 만들어 두고 다시 쓰이므로 창 크기가 바뀔 때마다(`windowDidResize`) `invalidateShadow()`를 부른다.
   - 휴지통 되돌리기(spec 5.3): `moveToTrash(_:)` 바로 뒤에 `canUndoTrash`가 참이 되고 `undoTrash() throws -> NoteID?`가 노트를 되살려 창 상태(틀, 핀, 접힘)째 다시 띄운다. 다른 노트가 키 창이 되거나 사용자가 노트 창을 누르면(보낸 직후 다음 노트가 키 창을 이어받는 것은 빼고), 글을 고치면(본문, 제목, 색), 새 노트를 만들면 거짓이 된다(D-024). 되살릴 수 없는 실패(`noteNotFound`, `noteAlreadyExists`)를 던질 때도 거짓이 되고, 그 밖의 실패에서는 다시 시도할 수 있게 남는다.
   - 빈 노트(D-040): `closeWindow(_:)`는 아무것도 적지 않은 노트(`Note.isBlank`, 쓰지 못한 글과 풀지 않은 문제 없음)를 창과 함께 `delete`로 지운다. `deleteBlankNotes() -> [NoteID]`는 떠 있는 빈 노트를 지운다(App이 끝낼 때 미뤄 둔 저장을 다 쓴 뒤 부른다).
-  - 알림 고리(D-041): `onMovedToTrash: ((NoteID, NSScreen?) -> Void)?`(보낸 노트와 그 창이 있던 화면), `onTrashUndoEnded: (() -> Void)?`(되돌리기가 끝남. 되살렸거나 "바로 뒤"가 지남).
+  - 알림 고리(D-041): `onMovedToTrash: ((NoteID, NSScreen?, CGRect?) -> Void)?`(보낸 노트와 그 창이 있던 화면, 닫기 직전 보이던 창의 틀), `onTrashUndoEnded: (() -> Void)?`(되돌리기가 끝남. 되살렸거나 "바로 뒤"가 지남).
   - `flushPendingEdits()`: 떠 있는 모든 창에서 고치던 제목을 마무리하고 편집기가 아직 알리지 않은 본문을 받는다. App이 끝내기 전에 `flushPendingSaves()`보다 먼저 부른다. 창 하나를 닫거나 휴지통으로 보낼 때는 노트 창이 스스로 한다.
   - `displayOptions: NotePanelDisplayOptions`: 스페이스 표시(아이콘, 아이콘+이름, 이름), 리마인더 표시(시간, 남은 시간, 아이콘), 시간 형식, 임박 기준. 설정 화면이 생기면 여기에 넣는다.
 - 노트 창이 하는 일과 하지 않는 일:

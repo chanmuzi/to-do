@@ -34,7 +34,14 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
-        switch item.action {
+        if item.action == #selector(editMarkdownLink(_:)) {
+            let target = editor?.currentLinkTarget
+            let menuItem = item as? NSMenuItem
+            if case .existing = target { menuItem?.title = "링크 고치기" } else { menuItem?.title = "링크 추가" }
+            menuItem?.toolTip = target == nil ? editor?.linkSelectionHelp : nil
+            return isEditable && !hasMarkedText() && editor?.isActive == true && target != nil
+        }
+        return switch item.action {
         case #selector(undo(_:)): editor?.editorUndoManager.canUndo ?? false
         case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
         case #selector(toggleMarkdownBold(_:)): isEditable && editor?.isActive == true
@@ -97,6 +104,25 @@ final class EditorTextView: PlainTextInputView {
     @objc func toggleMarkdownBold(_ sender: Any?) {
         guard editor?.isActive == true else { return }
         editor?.perform(.bold)
+    }
+
+    @objc func editMarkdownLink(_ sender: Any?) {
+        guard editor?.isActive == true else { return }
+        editor?.beginLinkEditing()
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        window?.makeFirstResponder(self)
+        let menu = super.menu(for: event)?.copy() as? NSMenu ?? NSMenu()
+        if let editor, case .link(let line, let offset, _) = editor.hit(at: convert(event.locationInWindow, from: nil)),
+           let span = editor.document.lines[line].markedSpans.first(where: { $0.range.location == editor.document.lines[line].start + offset }) {
+            setSelectedRange(span.contentRange)
+        }
+        if !menu.items.isEmpty { menu.addItem(.separator()) }
+        let item = menu.addItem(withTitle: "링크 추가", action: #selector(editMarkdownLink(_:)), keyEquivalent: "")
+        item.target = self
+        item.isEnabled = validateUserInterfaceItem(item)
+        return menu
     }
 
     private static func modifiers(of event: NSEvent) -> EditorShortcuts.Modifiers {

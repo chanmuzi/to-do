@@ -32,7 +32,7 @@ extension SettingsView {
                     model.change { $0.noteHeightMode = mode }
                 }
             }.frame(height: theme.component(.settingsRow))
-            toggle("서식 막대 항상 보이기", \.showsFormatBar)
+            toggle("서식 막대 보이기", \.showsFormatBar)
         }
     }
 

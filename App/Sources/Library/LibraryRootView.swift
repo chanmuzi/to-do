@@ -130,7 +130,7 @@ struct LibraryNoteRow: View {
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, theme.component(.libraryRowLeading) + indent)
-                .padding(.trailing, theme.component(.libraryRowLeading))
+                .padding(.trailing, LibraryRowActionLayout(theme: theme, allowsPin: model.allowsRowPin).textTrailing)
                 .padding(.vertical, theme.component(.libraryRowPaddingY))
         }.background(theme.tokens.rowTint(paletteID: note.colorID?.rawValue)?.color ?? .clear)
             .overlay(alignment: .bottom) {

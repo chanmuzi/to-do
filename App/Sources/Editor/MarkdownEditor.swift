@@ -154,6 +154,7 @@ public final class MarkdownEditor {
 
     public var formattingState: EditorFormattingState { controller.formattingState }
 
+    package static var editLinkAction: Selector { #selector(EditorTextView.editMarkdownLink(_:)) }
     package static var toggleBoldAction: Selector { #selector(EditorTextView.toggleMarkdownBold(_:)) }
 
     /// 선택 범위(원문의 UTF-16 위치).

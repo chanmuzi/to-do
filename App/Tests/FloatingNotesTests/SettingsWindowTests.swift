@@ -2,6 +2,7 @@ import AppKit
 @_spi(Verification) import Editor
 @testable import FloatSettings
 import Library
+@_spi(Verification) import NotePanel
 import Models
 import Scheduling
 import Store
@@ -289,7 +290,12 @@ import Theme
         let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
         SettingsApplication.follow(store, theme: fixture.theme, appearanceOverride: nil, setAppearance: { _ in },
             applyDisplay: { options, _ in fixture.notePanels.displayOptions = options }, showMenuIcon: { _ in })
-        let (id, adapter) = try fixture.open(NoteDraft(title: "서식"))
+        fixture.notePanels.toggleFormatBar = {
+            do { try store.update { $0.showsFormatBar.toggle() } }
+            catch { Issue.record(error) }
+        }
+        let (otherID, _) = try fixture.open(NoteDraft(title: "다른 노트"))
+        let (id, adapter) = try fixture.open(NoteDraft(title: "서식", body: "고를 글자"))
         adapter.editor.forcesActiveAppearance = true
         let window = try #require(fixture.notePanels.window(for: id))
         #expect(window.makeFirstResponder(adapter.view))
@@ -309,14 +315,23 @@ import Theme
         let root = try #require(settings.window?.contentView)
         root.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-        let control = try #require(elements(in: root).first { $0.accessibilityLabel?() == "서식 막대 항상 보이기"
+        let control = try #require(elements(in: root).first { $0.accessibilityLabel?() == "서식 막대 보이기"
             && $0.accessibilityRole?() == .checkBox })
         #expect(control.accessibilityPerformPress?() == true)
         window.contentView?.layoutSubtreeIfNeeded()
         #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.showsFormatBar)
         #expect(window.frame == initial)
         #expect(scroll.frame.height == bodyHeight - fixture.theme.shape(.chromeHeight))
-        try store.update { $0.showsFormatBar = false }
+        let otherMenu = try #require(fixture.notePanels.moreMenuForVerification(for: otherID))
+        let hide = try #require(otherMenu.items.firstIndex { $0.title == "서식 막대 숨기기" })
+        otherMenu.performActionForItem(at: hide)
+        adapter.editor.selectedRange = NSRange(location: 0, length: 2)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        #expect(!model.values.showsFormatBar)
+        let switchedOff = try #require(elements(in: root).first { $0.accessibilityRole?() == .checkBox && $0.accessibilityLabel?() == "서식 막대 보이기" })
+        let switchValue = (switchedOff as? NSObject)?.value(forKey: "accessibilityValue")
+        #expect((switchValue as? NSNumber)?.boolValue == false, "스위치 값 \(String(describing: switchValue))")
+        #expect(fixture.notePanels.moreMenuForVerification(for: id)?.item(withTitle: "서식 막대 보이기") != nil)
         window.contentView?.layoutSubtreeIfNeeded()
         #expect(scroll.frame.height == bodyHeight && window.frame == initial)
     }
