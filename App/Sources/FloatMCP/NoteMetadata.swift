@@ -20,10 +20,8 @@ struct NoteCatalog {
         let note = NoteFileCodec.note(file.text, id: id, creation: file.created, modified: file.modified,
                                       archiveCutoff: context?.archiveCutoff ?? .distantPast)
         let iso = Date.ISO8601FormatStyle(timeZoneSeparator: .colon, includingFractionalSeconds: true, timeZone: timeZone)
-        let tasks = MarkdownDocument(note.body).lines.compactMap { line -> Bool? in
-            if case .todo(let done) = line.kind { return done }
-            return nil
-        }
+        let document = MarkdownDocument(note.body)
+        let tasks = document.lines.compactMap(document.todoCompletion)
         func nearest(_ kind: ScheduleItem.Kind) -> Any {
             let active = note.schedules.filter { $0.kind == kind && !$0.isDeleted && !$0.isCompleted }
             guard let item = active.min(by: { abs($0.start.timeIntervalSince(now)) < abs($1.start.timeIntervalSince(now)) })

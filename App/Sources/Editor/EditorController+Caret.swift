@@ -24,6 +24,30 @@ extension EditorController {
         return NSRect(x: origin.x + spot.x + caret.shift, y: origin.y + top, width: 0, height: height)
     }
 
+    /// 커서의 화면 줄과 위아래 여백만 드러낸다. 감긴 마지막 문단도 실제 마지막 화면 줄에서만 끝을 보인다.
+    func caretScrollTarget(for range: NSRange) -> CGRect? {
+        guard !isSettingText, !isApplyingOutsideChange, linkSession == nil, range.length == 0,
+              range == textView.selectedRange(), range.location <= document.length,
+              textView.textStorage?.length == document.length else { return nil }
+        let index = document.lineIndex(at: range.location)
+        guard let spot = caretSpot(range.location, lineIndex: index) else { return nil }
+        let origin = textView.textContainerOrigin
+        let line = spot.line.offsetBy(dx: origin.x, dy: origin.y)
+        let room = max(theme.component(.editorCaretScrollRoom), ceil(line.height / 2))
+        var bottom = line.maxY + room
+        if index == document.lines.count - 1,
+           let last = caretSpot(document.length, lineIndex: index), last.line.midY == spot.line.midY {
+            // 조합과 붙여넣기 직후에는 TextKit의 새 줄이 문서 뷰의 자동 크기 조정보다 앞설 수 있다.
+            let height = ceil(line.maxY + theme.docPadding.bottom)
+            if textView.bounds.height < height {
+                textView.setFrameSize(NSSize(width: textView.frame.width, height: height))
+            }
+            bottom = textView.bounds.maxY
+        }
+        let top = max(textView.bounds.minY, line.minY - room)
+        return CGRect(x: origin.x + spot.x, y: top, width: theme.component(.caretWidth), height: max(0, bottom - top))
+    }
+
     /// 그 줄의 기본 글꼴.
     private func lineFont(for line: MarkdownLine, at index: Int) -> EditorStyle.TextFont {
         switch line.kind {

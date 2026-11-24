@@ -62,6 +62,16 @@ public final class ScheduleService {
     }
     public var calendarChanged: (() -> Void)?
     public func events(in interval: DateInterval) -> [CalendarEvent] { bridge.events(in: interval) }
+    package func todayContext(now: Date, calendar: Calendar) async -> TodayScheduleContext {
+        var result = TodayScheduleContext()
+        guard let day = calendar.dateInterval(of: .day, for: now),
+              let snapshot = try? notes.list().notes else { return result }
+        result.events = TodayScheduleContext.section(kind: .event, selection: await bridge.contextItems(.event, day: day),
+                                                    notes: snapshot, day: day, now: now, calendar: calendar)
+        result.reminders = TodayScheduleContext.section(kind: .reminder, selection: await bridge.contextItems(.reminder, day: day),
+                                                       notes: snapshot, day: day, now: now, calendar: calendar)
+        return result
+    }
     public func destination(for item: ScheduleItem) -> ScheduleDestination? { bridge.destination(for: item) }
     public func refreshLinked() {
         do {

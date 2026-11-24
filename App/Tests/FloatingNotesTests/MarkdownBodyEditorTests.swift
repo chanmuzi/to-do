@@ -141,6 +141,29 @@ import Theme
         #expect(reopened.view.enclosingScrollView?.documentVisibleRect.minY == 0)
     }
 
+    @Test func cappedFitWindowReservesWritingRoomAboveFormatBarAndLink() throws {
+        defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
+        fixture.notePanels.displayOptions.formatBar = .always
+        let body = (1...120).map { "본문 줄 " + String($0) }.joined(separator: "\n")
+        let (id, adapter) = try fixture.open(NoteDraft(body: body))
+        let window = try #require(fixture.notePanels.window(for: id))
+        window.orderOut(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let editor = adapter.editor
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        let chrome = fixture.theme.shape(.chromeHeight)
+        #expect(scroll.frame.height == window.frame.height - chrome * 2 - fixture.theme.shape(.borderWidth))
+        #expect(editor.contentHeight > scroll.frame.height)
+        editor.selectedRange = NSRange(location: body.utf16.count, length: 0)
+        editor.textView.scrollRangeToVisible(editor.selectedRange)
+        #expect(scroll.documentVisibleRect.maxY == adapter.view.bounds.maxY)
+        editor.selectedRange = (body as NSString).range(of: "본문 줄 120")
+        editor.perform(.link)
+        let field = try #require(adapter.view.subviews.first { $0.subviews.contains { $0.accessibilityLabel() == "링크 주소" } })
+        #expect(!field.isHidden && scroll.documentVisibleRect.contains(field.frame))
+    }
+
     @Test func fixedHeightShowsEntireLinkFieldAtLastLine() throws {
         defer { fixture.cleanUp() }
         let body = (1...18).map { "본문 줄 \($0)" }.joined(separator: "\n")

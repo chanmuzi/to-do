@@ -46,7 +46,9 @@ import Theme
         one.body = ""; #expect(LibraryPreview(one).title == "제목 없음" && LibraryPreview(one).isEmpty)
         #expect(LibraryPreview(one).upcomingTitle(for: ScheduleItem(start: Date())) == "리마인더")
         one.title = "제목"; one.body = "[ ] "
-        #expect(LibraryPreview(one).subtitle == "투두 1개 남음")
+        #expect(LibraryPreview(one).subtitle.isEmpty)
+        one.body = "[ ] 남음\n- [x] 끝\n  [x]  \t\n[ ] "
+        #expect(LibraryPreview(one).total == 2 && LibraryPreview(one).completed == 1)
     }
     @Test func previewUsesEditorMarkersAndPreservesCodeAndLiteralSymbols() {
         let body = "# **제목** `글자`\n- [x] [링크](https://example.org) ==강조==\n```swift\n**그대로**\n```"

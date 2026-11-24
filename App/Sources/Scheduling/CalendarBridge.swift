@@ -19,6 +19,7 @@ public protocol CalendarBridge: AnyObject {
     func remove(_ item: ScheduleItem) throws
     func destination(for item: ScheduleItem) -> ScheduleDestination?
     func events(in interval: DateInterval) -> [CalendarEvent]
+    func contextItems(_ kind: ScheduleItem.Kind, day: DateInterval) async -> (calendarID: String, items: [CalendarEvent])?
     func stop()
 }
 
@@ -100,6 +101,20 @@ public final class FakeCalendarBridge: CalendarBridge {
                   item.start < interval.end, end > interval.start else { return nil }
             return CalendarEvent(item: item, destination: destination(for: item))
         }
+    }
+    public func contextItems(_ kind: ScheduleItem.Kind, day: DateInterval) async -> (calendarID: String, items: [CalendarEvent])? {
+        guard access(for: kind) == .available, failure == nil else { return nil }
+        let selected = preferredID(kind) ?? kind.rawValue
+        guard writableChoices(for: kind).contains(where: { $0.id == selected }) else { return nil }
+        let rows = items.values.compactMap { item -> CalendarEvent? in
+            guard item.kind == kind, !item.isCompleted, !item.isDeleted, item.start < day.end,
+                  item.end.map({ $0 > day.start }) ?? true else { return nil }
+            let target = item.link.flatMap { linkedDestinations[$0.localID] } ?? systemDefault(for: kind)
+            let id = target?.calendarID ?? writableChoices(for: kind).first { $0.destination == target }?.id
+            guard id == selected else { return nil }
+            return CalendarEvent(item: item, destination: target)
+        }
+        return (selected, rows)
     }
     public func authorize(_ kind: ScheduleItem.Kind, request: Bool) async throws -> Bool {
         if request { authorizationPromptAttempts.append(kind) }
