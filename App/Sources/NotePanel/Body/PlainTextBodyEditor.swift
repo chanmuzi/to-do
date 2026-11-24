@@ -88,7 +88,7 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         in textContainer: NSTextContainer,
         forGlyphRange glyphRange: NSRange
     ) -> Bool {
-        let extra = theme.lineHeight(.body) - layoutManager.defaultLineHeight(for: theme.nsFont(.body))
+        let extra = theme.noteBodyLineHeight - layoutManager.defaultLineHeight(for: theme.nsFont(.body, size: theme.noteBodySize))
         guard extra > 0 else { return false }
         baselineOffset.pointee -= (extra / 2).rounded(.down)
         return true
@@ -135,8 +135,8 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
     }
 
     private var textAttributes: [NSAttributedString.Key: Any] {
-        let font = theme.nsFont(.body)
-        let lineHeight = theme.lineHeight(.body)
+        let font = theme.nsFont(.body, size: theme.noteBodySize)
+        let lineHeight = theme.noteBodyLineHeight
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = lineHeight
         paragraph.maximumLineHeight = lineHeight
@@ -161,7 +161,7 @@ public final class PlainTextBodyEditor: NSObject, NoteBodyEditing, NSTextViewDel
         layoutManager.ensureLayout(for: container)
         let used = layoutManager.usedRect(for: container).height
         let padding = theme.docPadding
-        let height = (max(used, theme.lineHeight(.body)) + padding.top + padding.bottom).rounded(.up)
+        let height = (max(used, theme.noteBodyLineHeight) + padding.top + padding.bottom).rounded(.up)
         guard height != reportedHeight else { return }
         reportedHeight = height
         onContentHeightChange?(height)

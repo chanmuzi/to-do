@@ -30,6 +30,7 @@ import Theme
 
     @Test func documentViewSitsInThePanelsScrollViewAndTheWindowFollowsItsHeight() throws {
         defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
         let (id, adapter) = try fixture.open(NoteDraft(title: "높이", body: "한 줄\n두 줄\n세 줄\n네 줄\n다섯 줄"))
         let window = try #require(fixture.notePanels.window(for: id))
         let theme = fixture.theme
@@ -52,8 +53,29 @@ import Theme
         #expect(adapter.view.frame.height <= scrollView.contentSize.height + 0.5)
     }
 
+    @Test func fixedWindowKeepsTheCaretVisibleWhenTypingPastSixLines() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "고정"))
+        let window = try #require(fixture.notePanels.window(for: id))
+        let original = window.frame
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        adapter.editor.forcesActiveAppearance = true
+        #expect(window.makeFirstResponder(adapter.view))
+        type((1...12).map(String.init).joined(separator: "\n"), into: adapter)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let caret = try #require(adapter.editor.caretFrame)
+        #expect(window.frame == original)
+        #expect(scroll.documentVisibleRect.minY > 0)
+        #expect(scroll.documentVisibleRect.contains(caret))
+        fixture.notePanels.closeWindow(id)
+        try fixture.notePanels.open(id, focus: false)
+        let restored = try #require(fixture.notePanels.controllers[id])
+        #expect(restored.editor.view.enclosingScrollView?.documentVisibleRect.minY == 0)
+    }
+
     @Test func typingGrowsTheWindowFromTheSameTopEdge() async throws {
         defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
         let (id, adapter) = try fixture.open(NoteDraft(title: "늘어남", body: "하나\n둘\n셋\n넷"))
         let window = try #require(fixture.notePanels.window(for: id))
         let top = window.frame.maxY
@@ -72,6 +94,7 @@ import Theme
     /// 그 줄에 글자를 쳐 줄이 넘어가면 창 높이가 내용을 끝까지 따라간다. 본문이 스크롤되지 않는다.
     @Test func windowKeepsItsHeightUnderTheCaretAndFollowsTypingOnALinkLine() async throws {
         defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
         // 본문 영역의 가장 낮은 높이(네 줄)보다 길어야 창 높이가 내용을 그대로 따른다.
         let body = "## 아이디어\n하나\n둘\n셋\n+ 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         let (id, adapter) = try fixture.open(NoteDraft(title: "링크", body: body))
@@ -394,6 +417,7 @@ import Theme
     /// 끼운 창이 열두 줄 노트를 처음부터 내용 높이로 띄우고, 스크롤할 것이 없는지 본다.
     @Test func aTwelveLineNoteOpensAtItsFullHeightWithNothingToScroll() throws {
         defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
         let body = (1...12).map { "\($0)번째 줄" }.joined(separator: "\n")
         let (id, adapter) = try fixture.open(NoteDraft(title: "열두 줄", body: body))
         let window = try #require(fixture.notePanels.window(for: id))
@@ -417,6 +441,7 @@ import Theme
     @Test(arguments: ["", "한 줄", "한 줄\n두 줄"])
     func shortNotesOpenFourBodyLinesTall(body: String) throws {
         defer { fixture.cleanUp() }
+        fixture.notePanels.displayOptions.heightMode = .fitContent
         let (id, adapter) = try fixture.open(NoteDraft(title: "짧은 노트", body: body))
         let window = try #require(fixture.notePanels.window(for: id))
         let theme = fixture.theme

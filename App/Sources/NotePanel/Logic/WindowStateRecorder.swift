@@ -41,6 +41,10 @@ struct WindowStateRecorder {
         write(id) { $0.frame = WindowFrame(frame) }
     }
 
+    func recordHeight(_ id: NoteID, height: CGFloat) {
+        write(id) { $0.heightPreference = .fixed(height) }
+    }
+
     func recordPinned(_ id: NoteID, isPinned: Bool) {
         write(id) { $0.isPinned = isPinned }
     }

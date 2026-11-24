@@ -31,7 +31,9 @@ final class NoteWindowController: NSObject {
     // 창 크기(`+Sizing`)
     var contentHeight: CGFloat = 0
     var liveResizeTop: CGFloat?
-    /// 사용자가 직접 정한 높이(D-158). 있으면 내용이 바뀌어도 창 높이를 바꾸지 않고 본문이 스크롤된다. 창을 닫으면 잊는다.
+    /// 이 창을 열 때의 여섯 줄 높이. 다음에 열 때 새 글자 설정으로 다시 계산한다.
+    let defaultHeightAtOpen: CGFloat
+    /// 노트별로 기억하는 높이. 화면에 맞춰 줄인 표시 높이와 별도로 보관한다.
     var manualHeight: CGFloat?
     /// 가장자리를 끄는 중에 높이가 바뀌었다.
     var isDraggingHeight = false
@@ -46,11 +48,13 @@ final class NoteWindowController: NSObject {
 
     private var reminderRefresh: Task<Void, Never>?
 
-    init(note: Note, frame: CGRect, isPinned: Bool, environment: NotePanelEnvironment) {
+    init(note: Note, frame: CGRect, state: NoteWindowState, environment: NotePanelEnvironment) {
         self.noteID = note.id
         self.note = note
         self.exchangedBody = note.body
-        self.isPinned = isPinned
+        self.isPinned = state.isPinned
+        manualHeight = state.heightPreference.points
+        defaultHeightAtOpen = environment.sizePolicy.defaultHeight
         self.environment = environment
         editor = environment.makeBodyEditor(NoteBodyEditorContext(theme: environment.theme, noteID: note.id))
         editor.text = note.body

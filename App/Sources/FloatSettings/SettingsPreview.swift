@@ -4,7 +4,7 @@ import Theme
 struct SettingsPreview: View {
     let theme: Theme
     let values: SettingsValues
-    private var lineHeight: CGFloat { theme.lineHeight(.body) }
+    private var lineHeight: CGFloat { theme.noteBodyLineHeight }
     private var fontSize: CGFloat { theme.noteBodySize }
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

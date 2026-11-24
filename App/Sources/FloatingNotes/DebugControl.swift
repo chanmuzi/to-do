@@ -383,6 +383,11 @@ final class DebugControl {
                 libraryModel.moveSidebar(.floating, to: .all)
             default: break
             }
+        case ("settings-height-tip", let flag?, _) where isPassive:
+            settingsWindow?.model.showsHeightTip = flag.rawValue == "on"
+        case ("settings-height-mode", let value?, _) where isPassive:
+            guard let mode = NoteDisplayOptions.HeightMode(rawValue: value.rawValue) else { return }
+            settingsWindow?.model.change { $0.noteHeightMode = mode }
         case ("settings-opening-tip", let flag?, _) where isPassive:
             settingsWindow?.model.showsOpeningTip = flag.rawValue == "on"
         case ("sidebar-menu-snapshot", let name?, _) where isPassive:
@@ -723,6 +728,11 @@ final class DebugControl {
         case ("type", let id?, let text?): insert(text, into: id)
         case ("fold", let id?, let line?): setFolded(true, line: Int(line), in: id)
         case ("unfold", let id?, let line?): setFolded(false, line: Int(line), in: id)
+        case ("note-scroll-end", let id?, _) where isPassive:
+            if let scroll = editor(of: id)?.textView.enclosingScrollView {
+                DebugLibraryInput.scrollToEnd(scroll)
+                scroll.flashScrollers()
+            }
         case ("editor", let id?, let name?):
             guard let url = output(named: name) else { return }
             dumpEditor(of: id, to: url)

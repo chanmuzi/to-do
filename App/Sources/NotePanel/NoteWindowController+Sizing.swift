@@ -1,24 +1,39 @@
 import AppKit
 
-/// 창 크기와 자리(spec 5.6, 19). 너비는 사용자가 끌어 바꾸고, 높이는 내용을 따라
-/// 위쪽 가장자리를 고정한 채 아래로 늘거나 준다(한도: 화면의 `note-h-max-screen`).
-/// 사용자가 높이를 직접 바꾸면(가장자리 끌기, 창 크기 조절 명령) 그 높이를 지키고, 화면 표시 영역 전체까지 된다(D-158).
+/// 고정 높이는 본문에서 스크롤하고 글에 맞춤은 위쪽 끝에서 아래로 자란다.
+/// 직접 정한 높이는 두 모드 모두 화면 표시 영역까지 쓸 수 있다.
 extension NoteWindowController: NSWindowDelegate {
     func applySizeLimits() {
         let policy = environment.sizePolicy
+        isSettingHeight = true
+        defer { isSettingHeight = false }
         panel.contentMinSize = NSSize(width: policy.minWidth, height: policy.minHeight)
         panel.contentMaxSize = NSSize(width: policy.maxWidth, height: .greatestFiniteMagnitude)
     }
 
+    func heightModeDidChange() {
+        if environment.options().heightMode == .fixed, manualHeight == nil {
+            rememberHeight(panel.frame.height)
+        }
+        applyContentHeight(animated: false)
+    }
+
+    private func rememberHeight(_ height: CGFloat) {
+        manualHeight = height
+        environment.recorder.recordHeight(noteID, height: height)
+    }
+
     /// 내용 높이에 창 높이를 맞춘다. 한도(화면 높이의 몫, 화면 아래 끝)에 닿으면 거기서 멈추고 본문이 스크롤된다.
     func applyContentHeight(animated: Bool) {
-        guard contentHeight > 0, !isDraggingHeight else { return }
+        guard !isDraggingHeight else { return }
         let top = liveResizeTop ?? panel.frame.maxY
         let visible = (panel.screen ?? NSScreen.main)?.visibleFrame
-        if let manualHeight {
-            applyManualHeight(manualHeight, top: top, screenHeight: visible?.height ?? .greatestFiniteMagnitude)
+        let fixedHeight = manualHeight ?? (environment.options().heightMode == .fixed ? defaultHeightAtOpen : nil)
+        if let fixedHeight {
+            applyManualHeight(fixedHeight, top: top, screenHeight: visible?.height ?? .greatestFiniteMagnitude)
             return
         }
+        guard contentHeight > 0 else { return }
         let target = environment.sizePolicy.frame(
             current: panel.frame, top: top, contentHeight: contentHeight,
             screenHeight: visible?.height ?? .greatestFiniteMagnitude,
@@ -123,7 +138,7 @@ extension NoteWindowController: NSWindowDelegate {
         liveResizeTop = nil
         if isDraggingHeight {
             isDraggingHeight = false
-            manualHeight = panel.frame.height
+            rememberHeight(panel.frame.height)
             knownHeight = panel.frame.height
         }
         applyContentHeight(animated: false)
@@ -153,7 +168,7 @@ extension NoteWindowController: NSWindowDelegate {
         heightAnimation = nil
         heightTarget = nil
         let clamped = environment.sizePolicy.manualHeight(height, screenHeight: visibleScreenHeight)
-        manualHeight = clamped
+        rememberHeight(clamped)
         self.knownHeight = height
         if clamped != height { setHeight(clamped, top: panel.frame.maxY) }
         recordFrameIfSettled()

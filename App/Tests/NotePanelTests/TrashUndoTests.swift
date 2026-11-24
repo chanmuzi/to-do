@@ -214,6 +214,7 @@ import Testing
     /// 창을 띄우는 배치 도중에 알게 된 내용 높이로 창이 커져도 본문 영역이 창을 따라간다.
     @Test func bodyAreaFillsTheWindowAfterTheHeightIsLearnedDuringLayout() throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft(body: "하나\n둘\n셋\n넷\n다섯"))
         try coordinator.open(note.id, focus: false)

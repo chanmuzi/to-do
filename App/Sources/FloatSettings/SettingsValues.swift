@@ -1,5 +1,6 @@
 import AgentRunner
 import Foundation
+import Theme
 
 /// 설정 창과 앱이 공유하는 저장 형식.
 package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
@@ -19,6 +20,7 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var agentProvider = "claude"
     package var codexModel: String?
     package var agentModel = "auto"
+    package var noteHeightMode: NoteDisplayOptions.HeightMode = .fixed
     package var appearance = "system"
     package var bodySize: Int?
     package var bodyLineHeight: Int?
@@ -55,6 +57,8 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
         spaceDisplay = try container.decodeIfPresent(String.self, forKey: .spaceDisplay) ?? "icon"
         reminderDisplay = try container.decodeIfPresent(String.self, forKey: .reminderDisplay) ?? "time"
         clockFormat = try container.decodeIfPresent(String.self, forKey: .clockFormat) ?? "koreanMeridiem"
+        let height = try container.decodeIfPresent(String.self, forKey: .noteHeightMode)
+        noteHeightMode = height.flatMap(NoteDisplayOptions.HeightMode.init(rawValue:)) ?? .fixed
         appearance = try container.decodeIfPresent(String.self, forKey: .appearance) ?? "system"
         bodySize = try container.decodeIfPresent(Int.self, forKey: .bodySize)
         bodyLineHeight = try container.decodeIfPresent(Int.self, forKey: .bodyLineHeight)

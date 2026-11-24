@@ -31,7 +31,14 @@ public final class NotePanelCoordinator {
         }
     }
     public var displayOptions = NotePanelDisplayOptions() {
-        didSet { controllers.values.forEach { $0.refreshChrome(animated: false) } }
+        didSet {
+            for controller in controllers.values {
+                if displayOptions.heightMode != oldValue.heightMode {
+                    controller.heightModeDidChange()
+                }
+                controller.refreshChrome(animated: false)
+            }
+        }
     }
 
     /// 확인용: 끄면 노트 창이 키 창이 되지 않는다. 노트 창은 앱을 앞으로 가져오지 않고도 키 창이 되므로,
@@ -164,7 +171,7 @@ public final class NotePanelCoordinator {
         let note = try notes.load(id)
         let state = recorder.state(for: id)
         let controller = NoteWindowController(
-            note: note, frame: frame(for: state, nextTo: nextTo), isPinned: state.isPinned,
+            note: note, frame: frame(for: state, nextTo: nextTo), state: state,
             environment: environment
         )
         controller.coordinator = self
@@ -569,8 +576,10 @@ public final class NotePanelCoordinator {
         let policy = environment.sizePolicy
         let placement = environment.placement
         let screens = NSScreen.screens
+        let openingHeight = state.heightPreference.points
+            ?? (displayOptions.heightMode == .fixed ? policy.defaultHeight : policy.minHeight)
         guard let main = (NSScreen.main ?? screens.first)?.visibleFrame else {
-            return CGRect(x: 0, y: 0, width: policy.defaultWidth, height: policy.minHeight)
+            return CGRect(x: 0, y: 0, width: policy.defaultWidth, height: openingHeight)
         }
         if let saved = state.frame?.cgRect {
             // 적어 둔 틀이 가장 낮은 높이보다 낮으면(그 값이 커지기 전에 적힌 틀) 위쪽 가장자리를 지킨 채 아래로 늘린다.
@@ -583,7 +592,7 @@ public final class NotePanelCoordinator {
                 handleHeight: environment.theme.shape(.chromeHeight)
             )
         }
-        let size = CGSize(width: policy.defaultWidth, height: policy.minHeight)
+        let size = CGSize(width: policy.defaultWidth, height: openingHeight)
         let occupied = order.compactMap { controllers[$0]?.panel.frame }
         let anchorID = nextTo.flatMap { controllers[$0] != nil ? $0 : nil } ?? keyNoteID ?? order.last
         guard let anchor = anchorID.flatMap({ controllers[$0]?.panel.frame }) else {

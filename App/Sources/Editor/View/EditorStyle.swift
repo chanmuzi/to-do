@@ -83,7 +83,7 @@ nonisolated struct EditorStyle {
         func noteFont(_ role: TextStyle) -> NSFont {
             theme.nsFont(role, size: theme.tokens.textStyle(role).size * scale)
         }
-        body = TextFont(noteFont(.body), lineHeight: theme.lineHeight(.body))
+        body = TextFont(noteFont(.body), lineHeight: theme.noteBodyLineHeight)
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = body.lineHeight
         paragraph.maximumLineHeight = body.lineHeight

@@ -109,10 +109,15 @@ final class NoteRootView: NSView {
         background.frame = bounds
         topRow.frame = NSRect(x: 0, y: 0, width: bounds.width, height: rowHeight)
         separator.frame = NSRect(x: 0, y: rowHeight, width: bounds.width, height: theme.shape(.borderWidth))
+        let previousHeight = scrollView.frame.height
         scrollView.frame = NSRect(
             x: 0, y: chromeHeight, width: bounds.width, height: max(0, bounds.height - chromeHeight - (cornerButtons.showsFormats ? rowHeight : 0))
         )
         placeBody()
+        if scrollView.frame.height < previousHeight, let text = scrollView.documentView as? NSTextView,
+           window?.firstResponder === text, text.selectedRange().length == 0 {
+            text.scrollRangeToVisible(text.selectedRange())
+        }
         cornerButtons.frame = NSRect(x: 0, y: bounds.height - rowHeight, width: bounds.width, height: rowHeight)
     }
 

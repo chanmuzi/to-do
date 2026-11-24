@@ -111,8 +111,75 @@ import Theme
         })
     }
 
+    @Test func fixedHeightScrollsAndModeChangesPreservePerNoteChoices() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let note = try fixture.notes.create(NoteDraft(title: "높이"))
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        let initial = controller.panel.frame
+        #expect(initial.height == controller.environment.sizePolicy.defaultHeight)
+        #expect(fixture.theme.count(.noteBodyLinesDefault) == 6)
+        let lines = (1...12).map(String.init).joined(separator: "\n")
+        try typeText(lines, into: controller)
+        controller.root.layoutSubtreeIfNeeded()
+        let scroll = try #require(controller.editor.view.enclosingScrollView)
+        #expect(initial == controller.panel.frame)
+        #expect(controller.contentHeight > scroll.contentSize.height)
+        #expect(scroll.scrollerStyle == .overlay)
+        #expect(try fixture.windowState(for: note.id)?.heightPreference == .followSetting)
+        coordinator.displayOptions.heightMode = .fitContent
+        let fitted = controller.panel.frame
+        #expect(fitted.height > initial.height && fitted.maxY == initial.maxY)
+        coordinator.displayOptions.heightMode = .fixed
+        coordinator.displayOptions.heightMode = .fitContent
+        #expect(try fixture.windowState(for: note.id)?.heightPreference == .fixed(fitted.height))
+        coordinator.closeWindow(note.id)
+        try coordinator.open(note.id, focus: false)
+        #expect(coordinator.snapshot(of: note.id)?.frame == fitted)
+    }
+
+    @Test func oversizedRestoredHeightIsLimitedOnlyOnScreen() throws {
+        defer { fixture.cleanUp() }
+        let screen = try #require(NSScreen.main).visibleFrame
+        let note = try fixture.notes.create(NoteDraft(title: "큰 화면에서 쓴 노트"))
+        let wanted = screen.height + 400
+        var state = NoteWindowState(frame: WindowFrame(x: screen.midX, y: screen.maxY - screen.height,
+                                                       width: 340, height: screen.height), isOpen: true)
+        state.heightPreference = .fixed(wanted)
+        try WindowStateStore(location: fixture.location).set(state, for: note.id)
+        let coordinator = try fixture.makeCoordinator()
+        defer { coordinator.controllers.values.forEach { $0.discardWindow() } }
+        coordinator.restoreOpenNotes()
+        #expect(coordinator.snapshot(of: note.id)?.frame.height == screen.height.rounded(.down))
+        coordinator.displayOptions.heightMode = .fitContent
+        coordinator.displayOptions.heightMode = .fixed
+        #expect(try fixture.windowState(for: note.id)?.heightPreference == .fixed(wanted))
+    }
+
+    @Test func newFixedWindowsUseCurrentTypographyAndKeepSavedHeightsAcrossLaunches() throws {
+        let coordinator = try fixture.makeCoordinator()
+        defer { fixture.cleanUp(coordinator) }
+        let id = try coordinator.createNote(.init(draft: NoteDraft(title: "크기 기억")))
+        let window = try #require(coordinator.window(for: id))
+        let initial = window.frame
+        let height = initial.height + fixture.theme.lineHeight(.body)
+        window.setContentSize(NSSize(width: initial.width, height: height))
+        coordinator.closeWindow(id)
+        try fixture.theme.applyBodyTypography(size: 17, lineHeight: 28)
+        let reopened = try fixture.makeCoordinator()
+        defer { reopened.controllers.values.forEach { $0.discardWindow() } }
+        try reopened.open(id, focus: false)
+        #expect(reopened.snapshot(of: id)?.frame.height == height)
+        let next = try reopened.createNote()
+        let theme = fixture.theme
+        #expect(reopened.snapshot(of: next)?.frame.height == theme.shape(.chromeHeight) + theme.shape(.borderWidth)
+            + theme.docPadding.top + theme.docPadding.bottom + 6 * (28 + 17 - theme.defaultBodySize))
+    }
+
     @Test func heightFollowsTheContentWithTheTopEdgeFixed() async throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft())
         try coordinator.open(note.id, focus: false)
@@ -148,6 +215,7 @@ import Theme
 
     @Test func animatedHeightChangeReachesItsTarget() async throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft())
         try coordinator.open(note.id, focus: false)
@@ -173,6 +241,7 @@ import Theme
     /// 그 뒤로는 글이 늘어도 창 높이를 지킨다(D-158).
     @Test func manualHeightIsKeptAndMayExceedTheAutomaticLimit() async throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft())
         try coordinator.open(note.id, focus: false)
@@ -267,6 +336,7 @@ import Theme
         )
 
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { coordinator.controllers.values.forEach { $0.discardWindow() } }
         coordinator.restoreOpenNotes()
         let controller = try #require(coordinator.controllers[note.id])

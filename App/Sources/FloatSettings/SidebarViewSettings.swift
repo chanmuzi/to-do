@@ -11,9 +11,22 @@ extension SettingsView {
             Text(tip).font(valueFont).foregroundStyle(tooltipInk).fixedSize()
                 .padding(.horizontal, theme.space(.sp2)).padding(.vertical, theme.component(.settingsPopupGap))
                 .background(tooltipFill, in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+                .settingsMeasure("info-tooltip-bubble")
+                .visualEffect { bubble, geometry in
+                    let leadingEdge = geometry.bounds(of: .scrollView)?.minX ?? 0
+                    return bubble.offset(x: max(0, leadingEdge))
+                }
             Rectangle().fill(tooltipFill).frame(width: theme.component(.settingsTipTail), height: theme.component(.settingsTipTail))
                 .rotationEffect(.degrees(45)).padding(.top, -theme.component(.settingsTipTail) / 2)
         }.fixedSize().offset(y: -tipOffset).allowsHitTesting(false)
+    }
+
+    func infoIcon(_ tip: String, shown: Bool, setShown: @escaping (Bool) -> Void) -> some View {
+        Image(systemName: "info.circle").resizable().scaledToFit()
+            .frame(width: theme.component(.iconSmall), height: theme.component(.iconSmall))
+            .foregroundStyle(theme.color(.text2))
+            .onHover(perform: setShown).accessibilityLabel(tip)
+            .overlay(alignment: .bottom) { if shown { infoTooltip(tip) } }
     }
 
     @ViewBuilder var sidebarViewSettings: some View {
@@ -55,11 +68,8 @@ extension SettingsView {
                 let title = "마지막으로 본 곳에서 열기"
                 let tip = "끄면 맨 위의 보기에서 열어요"
                 Text(title).settingsMeasure("opening-label")
-                Image(systemName: "info.circle").resizable().scaledToFit()
-                    .frame(width: theme.component(.iconSmall), height: theme.component(.iconSmall))
-                    .foregroundStyle(theme.color(.text2)).settingsMeasure("opening-info")
-                    .onHover { model.showsOpeningTip = $0 }.accessibilityLabel(tip)
-                    .overlay(alignment: .bottom) { if model.showsOpeningTip { infoTooltip(tip) } }
+                infoIcon(tip, shown: model.showsOpeningTip) { model.showsOpeningTip = $0 }
+                    .settingsMeasure("opening-info")
                 Spacer()
                 Toggle(title, isOn: Binding(get: { model.preferences.value.opensLastSelection },
                     set: { value in model.changeSidebar { $0.opensLastSelection = value } }))

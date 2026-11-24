@@ -4,7 +4,7 @@ import Testing
 
 @Suite @MainActor struct NoteSizePolicyTests {
     private let policy = NoteSizePolicy(
-        defaultWidth: 340, minWidth: 260, maxWidth: 560, chromeHeight: 29, minBodyHeight: 48,
+        defaultWidth: 340, minWidth: 260, maxWidth: 560, chromeHeight: 29, minBodyHeight: 48, defaultBodyHeight: 72,
         maxScreenFraction: 0.7
     )
 

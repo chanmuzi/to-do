@@ -368,6 +368,7 @@ public enum RatioToken: String, CaseIterable, Sendable {
 public enum CountToken: String, CaseIterable, Sendable {
     /// 노트 창의 본문 영역이 적어도 보이는 본문 줄 수(D-031, 임시 값). 글이 그보다 적어도 창은 이만큼 높다.
     case iconPickerColumns = "icon-picker-columns"
+    case noteBodyLinesDefault = "note-body-lines-default"
     case noteBodyLinesMin = "note-body-lines-min"
 }
 

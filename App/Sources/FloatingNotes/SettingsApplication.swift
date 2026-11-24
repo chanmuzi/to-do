@@ -43,6 +43,7 @@ enum SettingsApplication {
             display.underlineMarkedText = values.markedTextStyle == .underline
             display.showsNoteAgent = values.showsNoteAgent
             if previous?.showsCornerAgent != values.showsCornerAgent { showCornerAgent(values.showsCornerAgent) }
+            display.heightMode = values.noteHeightMode
             display.formatBar = .init(rawValue: values.formatBar) ?? .editing
             applyDisplay(display, values.recognizesDates)
             if previous?.showsMenuBarIcon != values.showsMenuBarIcon { showMenuIcon(values.showsMenuBarIcon) }
