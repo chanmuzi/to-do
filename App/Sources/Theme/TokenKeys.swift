@@ -123,6 +123,7 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case editorCountGap = "editor-count-gap"
     case editorHighlightPadX = "editor-highlight-pad-x"
     case editorHighlightPadY = "editor-highlight-pad-y"
+    case editorCaretScrollRoom = "editor-caret-scroll-room"
     case editorLinkFieldGap = "editor-link-field-gap"
     case editorLinkFieldPadX = "editor-link-field-pad-x"
     case editorCopyButtonInset = "editor-copy-button-inset"

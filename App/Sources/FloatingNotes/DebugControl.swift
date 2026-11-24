@@ -734,6 +734,12 @@ final class DebugControl {
             guard let editor = editor(of: id) else { return }
             editor.focus()
             editor.forcesActiveAppearance = true
+        case ("note-caret-end", let id?, _) where isPassive:
+            guard let editor = editor(of: id) else { return }
+            editor.focus()
+            editor.forcesActiveAppearance = true
+            editor.selectedRange = NSRange(location: editor.text.utf16.count, length: 0)
+            editor.textView.scrollRangeToVisible(editor.selectedRange)
         case ("date-suggestion", let id?, let offset):
             guard let editor = editor(of: id) else { return }
             editor.forcesActiveAppearance = true

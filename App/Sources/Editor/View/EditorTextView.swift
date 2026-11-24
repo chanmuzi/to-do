@@ -20,6 +20,14 @@ final class EditorTextView: PlainTextInputView {
         caret?.reposition()
     }
 
+    override func scrollRangeToVisible(_ range: NSRange) {
+        if let target = editor?.caretScrollTarget(for: range) {
+            scrollToVisible(target)
+        } else {
+            super.scrollRangeToVisible(range)
+        }
+    }
+
     // MARK: 되돌리기
 
     /// 되돌리기 기록은 편집기가 직접 든다. 편집 메뉴와 ⌘Z가 창의 기록이 아니라 이것을 쓰게 한다.
@@ -151,6 +159,7 @@ final class EditorTextView: PlainTextInputView {
         super.setMarkedText(string, selectedRange: selectedRange, replacementRange: replacement)
         editor?.flushPendingChange()
         editor?.compositionDidChange()
+        scrollRangeToVisible(self.selectedRange())
         caret?.refresh()
     }
 
@@ -172,6 +181,7 @@ final class EditorTextView: PlainTextInputView {
             super.insertText(string, replacementRange: replacementRange)
         }
         editor?.compositionDidChange()
+        scrollRangeToVisible(selectedRange())
     }
 
     // MARK: 마우스
