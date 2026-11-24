@@ -1,5 +1,6 @@
 import AgentRunner
 import Foundation
+import Theme
 
 /// 설정 창과 앱이 공유하는 저장 형식.
 package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
@@ -19,12 +20,14 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var agentProvider = "claude"
     package var codexModel: String?
     package var agentModel = "auto"
+    package var noteHeightMode: NoteDisplayOptions.HeightMode = .fixed
     package var appearance = "system"
     package var bodySize: Int?
     package var bodyLineHeight: Int?
     package enum MarkedTextStyle: String, Codable, Sendable { case none, underline }
     package var markedTextStyle: MarkedTextStyle = .none
-    package var formatBar = "editing"
+    package var showsFormatBar = false
+    private enum LegacyKeys: String, CodingKey { case formatBar }
     package var recognizesDates = true
     package var calendarID: String?
     package var reminderListID: String?
@@ -55,12 +58,19 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
         spaceDisplay = try container.decodeIfPresent(String.self, forKey: .spaceDisplay) ?? "icon"
         reminderDisplay = try container.decodeIfPresent(String.self, forKey: .reminderDisplay) ?? "time"
         clockFormat = try container.decodeIfPresent(String.self, forKey: .clockFormat) ?? "koreanMeridiem"
+        let height = try container.decodeIfPresent(String.self, forKey: .noteHeightMode)
+        noteHeightMode = height.flatMap(NoteDisplayOptions.HeightMode.init(rawValue:)) ?? .fixed
         appearance = try container.decodeIfPresent(String.self, forKey: .appearance) ?? "system"
         bodySize = try container.decodeIfPresent(Int.self, forKey: .bodySize)
         bodyLineHeight = try container.decodeIfPresent(Int.self, forKey: .bodyLineHeight)
         let markedStyle = try container.decodeIfPresent(String.self, forKey: .markedTextStyle)
         markedTextStyle = markedStyle.flatMap(MarkedTextStyle.init(rawValue:)) ?? .none
-        formatBar = try container.decodeIfPresent(String.self, forKey: .formatBar) ?? "editing"
+        if let enabled = try container.decodeIfPresent(Bool.self, forKey: .showsFormatBar) {
+            showsFormatBar = enabled
+        } else {
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            showsFormatBar = try legacy.decodeIfPresent(String.self, forKey: .formatBar) == "always"
+        }
         recognizesDates = try container.decodeIfPresent(Bool.self, forKey: .recognizesDates) ?? true
         calendarID = try container.decodeIfPresent(String.self, forKey: .calendarID)
         reminderListID = try container.decodeIfPresent(String.self, forKey: .reminderListID)

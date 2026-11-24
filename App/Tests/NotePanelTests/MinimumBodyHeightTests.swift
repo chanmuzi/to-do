@@ -34,6 +34,7 @@ import Testing
 
     @Test func policyKeepsFourBodyLinesFromTheToken() throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let (controller, _) = try open("", in: coordinator)
         let policy = controller.environment.sizePolicy
@@ -48,6 +49,7 @@ import Testing
     @Test(arguments: ["", "한 줄", "한 줄\n두 줄", "하나\n둘\n셋\n넷"])
     func shortNotesOpenAtTheMinimumHeight(body: String) throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let (controller, scrollView) = try open(body, in: coordinator)
 
@@ -62,6 +64,7 @@ import Testing
     /// 배치 도중에 알게 된 내용 높이가 창과 본문 영역에 끝까지 반영되는지 본다.
     @Test func aTwelveLineNoteOpensAtItsFullHeightWithNothingToScroll() throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let body = (1...12).map { "\($0)번째 줄" }.joined(separator: "\n")
         let (controller, scrollView) = try open(body, in: coordinator)
@@ -91,6 +94,7 @@ import Testing
         try states.set(NoteWindowState(frame: WindowFrame(old), isOpen: true, stackOrder: 2), for: long.id)
 
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { coordinator.controllers.values.forEach { $0.discardWindow() } }
         coordinator.restoreOpenNotes()
         let shortPanel = try #require(coordinator.controllers[short.id]).panel
@@ -108,6 +112,7 @@ import Testing
     /// 글을 지워 줄어드는 노트는 가장 낮은 높이에서 멈춘다.
     @Test func shrinkingStopsAtTheMinimumHeight() async throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let (controller, _) = try open("하나\n둘\n셋\n넷\n다섯\n여섯", in: coordinator)
         let top = controller.panel.frame.maxY
@@ -125,6 +130,7 @@ import Testing
     /// 글이 가장 낮은 높이보다 짧아도 본문 뷰가 본문 영역을 채운다. 글 아래의 빈 자리를 눌러도 본문이 받는다.
     @Test func aShortBodyStillFillsTheBodyAreaSoPressesBelowTheTextReachIt() throws {
         let coordinator = try fixture.makeCoordinator()
+        coordinator.displayOptions.heightMode = .fitContent
         defer { fixture.cleanUp(coordinator) }
         let (controller, scrollView) = try open("한 줄", in: coordinator)
         let body = controller.editor.view

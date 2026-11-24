@@ -28,6 +28,26 @@ import Store
         #expect(try WindowStateStore(location: temporary.location).state(for: id) == nil)
     }
 
+    @Test func oldWindowFramesBecomePreferredHeightsAndNewAutomaticFramesStayAutomatic() throws {
+        defer { temporary.cleanUp() }
+        let folder = temporary.location.stateDirectory
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let frame = WindowFrame(x: 20, y: 30, width: 340, height: 420)
+        let file = folder.appendingPathComponent("windows.json")
+        try Data(#"{"old":{"isPinned":false,"isOpen":false,"frame":{"x":20,"y":30,"width":340,"height":420}}}"#.utf8).write(to: file)
+        let id = NoteID(rawValue: "old")
+        let store = try WindowStateStore(location: temporary.location)
+        var old = try #require(store.state(for: id))
+        #expect(old.heightPreference == .fixed(420))
+        old.frame?.height = 300
+        try store.set(old, for: id)
+        let new = NoteID(rawValue: "automatic")
+        try store.set(NoteWindowState(frame: frame), for: new)
+        let reloaded = try WindowStateStore(location: temporary.location)
+        #expect(reloaded.state(for: id)?.heightPreference == .fixed(420))
+        #expect(reloaded.state(for: new)?.heightPreference == .followSetting)
+    }
+
     @Test func spacesPersistInOrder() throws {
         defer { temporary.cleanUp() }
         let spaces = [

@@ -26,6 +26,17 @@ public struct WindowFrame: Hashable, Codable, Sendable {
 
 /// 노트 창의 로컬 상태. 노트 파일이 아니라 앱 로컬 상태에 저장한다(D-003).
 public struct NoteWindowState: Hashable, Codable, Sendable {
+    public enum HeightPreference: Hashable, Codable, Sendable {
+        case followSetting
+        case fixed(Double)
+
+        public var points: CGFloat? {
+            if case let .fixed(height) = self { return CGFloat(height) }
+            return nil
+        }
+    }
+
+    public var heightPreference: HeightPreference = .followSetting
     /// 창 틀. 한 번도 띄운 적이 없으면 `nil`.
     public var frame: WindowFrame?
     /// 항상 위에 고정. 새 노트는 켜진 채 만들어진다(spec 4.1).
@@ -44,6 +55,20 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     /// 이 노트가 마지막으로 키 창이 된 때. 기존에 기록된 시각은 이어 쓴다(D-130).
     /// 기록이 없으면 최근에서 제외하고 검색으로 찾는다.
     public var lastOpened: Date?
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        frame = try values.decodeIfPresent(WindowFrame.self, forKey: .frame)
+        // 옛 파일에는 마지막 프레임만 있다. 새 파일은 자동 높이도 명시한다.
+        heightPreference = try values.decodeIfPresent(HeightPreference.self, forKey: .heightPreference)
+            ?? frame.map { .fixed($0.height) } ?? .followSetting
+        isPinned = try values.decode(Bool.self, forKey: .isPinned)
+        isOpen = try values.decode(Bool.self, forKey: .isOpen)
+        stackOrder = try values.decodeIfPresent(Int.self, forKey: .stackOrder)
+        foldedLines = try values.decodeIfPresent([Int].self, forKey: .foldedLines)
+        foldedLineTexts = try values.decodeIfPresent([String].self, forKey: .foldedLineTexts)
+        lastOpened = try values.decodeIfPresent(Date.self, forKey: .lastOpened)
+    }
 
     public init(
         frame: WindowFrame? = nil, isPinned: Bool = true, isOpen: Bool = false, stackOrder: Int? = nil,

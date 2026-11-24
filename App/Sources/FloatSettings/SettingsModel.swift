@@ -31,6 +31,7 @@ package final class SettingsModel {
     package let preferences: LibraryPreferencesStore
     package let reorder = SidebarReorder()
     package var showsOpeningTip = false
+    package var showsHeightTip = false
     package func changeSidebar(_ change: (inout LibraryPreferences) -> Void) {
         do { try preferences.update(change); error = nil }
         catch { self.error = error.localizedDescription }

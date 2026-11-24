@@ -239,6 +239,88 @@ import Theme
     }
 
     #if DEBUG
+    private func elements(in root: NSView) -> [AnyObject] {
+        var seen = Set<ObjectIdentifier>()
+        func visit(_ node: AnyObject) -> [AnyObject] {
+            guard seen.insert(ObjectIdentifier(node)).inserted else { return [] }
+            let children = node.accessibilityChildren?() ?? []
+            return [node] + children.flatMap { visit($0 as AnyObject) } + ((node as? NSView)?.subviews.flatMap { visit($0) } ?? [])
+        }
+        return visit(root)
+    }
+
+    @Test func appearanceHeightSegmentSavesItsChoice() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location),
+                                  read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.appearance)
+        defer { settings.window?.close() }
+        let root = try #require(settings.window?.contentView)
+        root.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        model.showsHeightTip = true
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let bubble = try #require(model.layoutFrames["info-tooltip-bubble"])
+        let cardLeft = fixture.theme.component(.settingsSidebarWidth) + fixture.theme.component(.settingsBodyInset)
+        #expect(bubble.minX >= cardLeft)
+        #expect(bubble.maxX <= root.bounds.width - fixture.theme.component(.settingsBodyInset))
+        model.showsHeightTip = false
+        let choices = elements(in: root)
+        #expect(choices.contains { $0.accessibilityLabel?() == "노트 창 높이" })
+        #expect(choices.contains { $0.accessibilityLabel?() == "고정" })
+        #expect(model.values.noteHeightMode == .fixed)
+        let fit = try #require(choices.first { $0.accessibilityLabel?() == "글에 맞춤" })
+        #expect(fit.accessibilityPerformPress?() == true)
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.noteHeightMode == .fitContent)
+    }
+
+    @Test func appearanceFormatSwitchUpdatesAFocusedNoteWithoutResizing() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        SettingsApplication.follow(store, theme: fixture.theme, appearanceOverride: nil, setAppearance: { _ in },
+            applyDisplay: { options, _ in fixture.notePanels.displayOptions = options }, showMenuIcon: { _ in })
+        let (id, adapter) = try fixture.open(NoteDraft(title: "서식"))
+        adapter.editor.forcesActiveAppearance = true
+        let window = try #require(fixture.notePanels.window(for: id))
+        #expect(window.makeFirstResponder(adapter.view))
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let initial = window.frame
+        let bodyHeight = scroll.frame.height
+        #expect(!store.settings.showsFormatBar && adapter.isEditingBody)
+
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location),
+                                  read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.appearance)
+        defer { settings.window?.close() }
+        let root = try #require(settings.window?.contentView)
+        root.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let control = try #require(elements(in: root).first { $0.accessibilityLabel?() == "서식 막대 항상 보이기"
+            && $0.accessibilityRole?() == .checkBox })
+        #expect(control.accessibilityPerformPress?() == true)
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.showsFormatBar)
+        #expect(window.frame == initial)
+        #expect(scroll.frame.height == bodyHeight - fixture.theme.shape(.chromeHeight))
+        try store.update { $0.showsFormatBar = false }
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(scroll.frame.height == bodyHeight && window.frame == initial)
+    }
+
     @Test func generalSidebarGripActionsAndOpeningTooltip() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }
@@ -257,17 +339,8 @@ import Theme
             root.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(0.1))
         }
-        func elements() -> [AnyObject] {
-            var seen = Set<ObjectIdentifier>()
-            func visit(_ node: AnyObject) -> [AnyObject] {
-                guard seen.insert(ObjectIdentifier(node)).inserted else { return [] }
-                let children = node.accessibilityChildren?() ?? []
-                return [node] + children.flatMap { visit($0 as AnyObject) } + ((node as? NSView)?.subviews.flatMap { visit($0) } ?? [])
-            }
-            return visit(root)
-        }
         settle()
-        let grip = try #require(elements().first {
+        let grip = try #require(elements(in: root).first {
             $0.accessibilityLabel?() == "순서 바꾸기" && $0.accessibilityCustomActions?()?.map(\.name) == ["아래로"]
         })
         let actions: [NSAccessibilityCustomAction] = grip.accessibilityCustomActions?() ?? []
@@ -292,7 +365,7 @@ import Theme
         #expect(prefs.value.viewOrder == [.floating, .all, .today, .reminders])
         model.showsOpeningTip = true
         settle()
-        #expect(elements().contains { $0.accessibilityLabel?() == "끄면 맨 위의 보기에서 열어요" })
+        #expect(elements(in: root).contains { $0.accessibilityLabel?() == "끄면 맨 위의 보기에서 열어요" })
     }
 
     @Test func sidebarAndAccountDetailSpacing() throws {

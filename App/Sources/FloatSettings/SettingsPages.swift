@@ -21,6 +21,18 @@ extension SettingsView {
                     choices: [(Int(theme.component(.settingsLineMin)), "좁게"), (Int(theme.defaultBodyLineHeight), "보통"),
                               (Int(theme.component(.settingsLineMax)), "넓게")]) { value in model.change { $0.bodyLineHeight = value } }
             setting("스페이스 표시", \.spaceDisplay, [("icon", "아이콘"), ("iconAndName", "아이콘과 이름"), ("name", "이름")])
+            HStack(spacing: theme.component(.chromeGap)) {
+                let title = "노트 창 높이"
+                Text(title)
+                infoIcon("글에 맞춤은 글이 늘면 창이 화면의 70%까지 커져요", shown: model.showsHeightTip) {
+                    model.showsHeightTip = $0
+                }
+                Spacer()
+                segmentControl(title, value: model.values.noteHeightMode, choices: [(.fixed, "고정"), (.fitContent, "글에 맞춤")]) { mode in
+                    model.change { $0.noteHeightMode = mode }
+                }
+            }.frame(height: theme.component(.settingsRow))
+            toggle("서식 막대 항상 보이기", \.showsFormatBar)
         }
     }
 
@@ -30,7 +42,6 @@ extension SettingsView {
             setting("체크박스", \.checkbox, [("box", "상자"), ("bracket", "[ ]")])
             segment("입력 중 글자", value: model.values.markedTextStyle,
                     choices: [(.none, "표시 없음"), (.underline, "옅은 밑줄")]) { value in model.change { $0.markedTextStyle = value } }
-            setting("서식 표시줄", \.formatBar, [("always", "항상"), ("editing", "편집할 때"), ("hidden", "숨김")])
             toggle("날짜 알아보기", \.recognizesDates)
         }
     }

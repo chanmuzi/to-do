@@ -24,6 +24,10 @@ public final class Theme {
 
     private var configuredBodySize: Int?
     public var noteBodySize: CGFloat { configuredBodySize.map { CGFloat($0) } ?? tokens.textStyle(.body).size }
+    /// 설정에서 고른 줄의 여유 공간을 유지하며 본문 글자 크기를 반영한다.
+    public var noteBodyLineHeight: CGFloat {
+        lineHeight(.body) + noteBodySize - tokens.textStyle(.body).size
+    }
     public var defaultBodyLineHeight: CGFloat { baseTokens.textStyle(.body).lineHeight }
     public var defaultBodySize: CGFloat { baseTokens.textStyle(.body).size }
 

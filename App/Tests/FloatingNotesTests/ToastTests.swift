@@ -58,6 +58,45 @@ import Testing
         #expect(!window.isVisible)
     }
 
+    @Test(arguments: [false, true])
+    func menuTrashKeepsUndoAfterDeferredKeyHandoff(hasOtherNote: Bool) async throws {
+        defer { presenter.dismiss(); fixture.cleanUp() }
+        let other = hasOtherNote ? try fixture.open("남은 노트") : nil
+        let id = try fixture.open("메뉴에서 버릴 노트")
+        let menu = try #require(fixture.notePanels.moreMenuForVerification(for: id))
+        let index = try #require(menu.items.firstIndex { $0.title == "휴지통으로 보내기" })
+        menu.performActionForItem(at: index)
+        #expect(presenter.isVisible)
+
+        if let other {
+            let window = try #require(fixture.notePanels.window(for: other))
+            await Task { @MainActor in
+                NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+            }.value
+        }
+        #expect(presenter.window?.isVisible == true)
+        #expect(fixture.notePanels.canUndoTrash)
+        presenter.performAction()
+        #expect(fixture.notePanels.openNoteIDs.contains(id))
+    }
+
+    @Test func toastExpiresAfterFourSecondsAndShortcutStillRestores() async throws {
+        defer { presenter.dismiss(); fixture.cleanUp() }
+        presenter.holdDuration = fixture.theme.motion.toastHold
+        #expect(presenter.holdDuration == 4)
+        let id = try fixture.open("알림 시간")
+        let start = ContinuousClock.now
+        fixture.notePanels.moveToTrash(id)
+        while presenter.isVisible && start.duration(to: .now) < .seconds(8) {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(start.duration(to: .now) >= .seconds(4))
+        #expect(!presenter.isVisible)
+        #expect(fixture.notePanels.canUndoTrash)
+        fixture.commands.undoOrRestoreTrash(nil)
+        #expect(fixture.notePanels.openNoteIDs == [id])
+    }
+
     /// ⌘Z로 되살리면 알림을 거둔다. 어느 쪽으로든 되돌리기는 한 번만 된다.
     @Test func undoByShortcutDismissesTheToast() throws {
         defer { presenter.dismiss(); fixture.cleanUp() }

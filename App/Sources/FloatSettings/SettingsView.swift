@@ -180,25 +180,28 @@ struct SettingsView: View {
     }
 
     func segment<Value: Equatable>(_ title: String, value: Value, choices: [(Value, String)], select: @escaping (Value) -> Void) -> some View {
-        row(title) {
-            HStack(spacing: 0) {
-                ForEach(choices.indices, id: \.self) { index in
-                    let choice = choices[index]
-                    Button { select(choice.0) } label: {
-                        Group {
-                            if title == "체크박스", index == 0 { Image(systemName: "square") }
-                            else { Text(choice.1) }
-                        }.font(valueFont).padding(.horizontal, theme.component(.settingsSegmentPad))
-                            .frame(maxHeight: .infinity)
-                            .background(choice.0 == value ? theme.color(.surface) : .clear,
-                                        in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
-                    }.buttonStyle(RowHoverStyle(theme: theme, role: .segment(selected: choice.0 == value))).accessibilityLabel(choice.1)
-                        .accessibilityAddTraits(choice.0 == value ? .isSelected : [])
-                }
-            }.padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
-                .background(theme.color(.connectFill), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
-                .accessibilityElement(children: .contain).accessibilityLabel(title)
-        }
+        row(title) { segmentControl(title, value: value, choices: choices, select: select) }
+    }
+
+    func segmentControl<Value: Equatable>(_ title: String, value: Value, choices: [(Value, String)],
+                                          select: @escaping (Value) -> Void) -> some View {
+        HStack(spacing: 0) {
+            ForEach(choices.indices, id: \.self) { index in
+                let choice = choices[index]
+                Button { select(choice.0) } label: {
+                    Group {
+                        if title == "체크박스", index == 0 { Image(systemName: "square") }
+                        else { Text(choice.1) }
+                    }.font(valueFont).padding(.horizontal, theme.component(.settingsSegmentPad))
+                        .frame(maxHeight: .infinity)
+                        .background(choice.0 == value ? theme.color(.surface) : .clear,
+                                    in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
+                }.buttonStyle(RowHoverStyle(theme: theme, role: .segment(selected: choice.0 == value))).accessibilityLabel(choice.1)
+                    .accessibilityAddTraits(choice.0 == value ? .isSelected : [])
+            }
+        }.padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
+            .background(theme.color(.connectFill), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
+            .accessibilityElement(children: .contain).accessibilityLabel(title)
     }
 
     func setting(_ title: String, _ key: WritableKeyPath<SettingsValues, String>, _ choices: [(String, String)]) -> some View {

@@ -71,6 +71,16 @@ import Testing
         #expect(!older.settings.showsMenuBarIcon)
     }
 
+    @Test func formatSwitchReadsLegacyPreferencesAndPersistsNewChoices() throws {
+        let decoder = JSONDecoder()
+        for (old, enabled) in [("always", true), ("editing", false), ("hidden", false)] {
+            let data = try JSONEncoder().encode(["formatBar": old])
+            #expect(try decoder.decode(AppSettings.self, from: data).showsFormatBar == enabled)
+        }
+        #expect(try !decoder.decode(AppSettings.self, from: Data("{}".utf8)).showsFormatBar)
+        #expect(try !decoder.decode(AppSettings.self, from: Data(#"{"showsFormatBar":false,"formatBar":"always"}"#.utf8)).showsFormatBar)
+    }
+
     @Test func olderOrBrokenSettingsFilesFallBackToDefaultsWithoutLosingTheFile() throws {
         defer { cleanUp() }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
