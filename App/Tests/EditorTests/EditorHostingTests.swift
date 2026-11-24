@@ -39,6 +39,42 @@ import Theme
         }
     }
 
+    @Test func firstBodyPressAndCursorTrackingUseTheEditor() throws {
+        let host = try Host("[ ] 할 일\n[링크](https://example.com)\n보통 글")
+        let editor = host.editor.controller
+        let view = editor.textView
+        view.updateTrackingAreas()
+        #expect(view.acceptsFirstMouse(for: nil))
+        #expect(view.trackingAreas.contains { $0.owner === view && $0.options.contains(.cursorUpdate)
+            && $0.options.contains(.activeInActiveApp) })
+        #expect(editor.isInteractive(at: try #require(editor.gutterPoint(forLine: 0))))
+        #expect(editor.isInteractive(at: try #require(editor.textPoint(forLine: 1))))
+        #expect(!editor.isInteractive(at: try #require(editor.textPoint(forLine: 2))))
+    }
+
+    @Test func scrolledBodyUsesVisibleLineAndKeepsViewportOnRefocus() throws {
+        let host = try Host((0..<60).map { "본문 줄 \($0)" }.joined(separator: "\n"))
+        let editor = host.editor.controller
+        let view = editor.textView, clip = host.scrollView.contentView
+        view.setFrameSize(NSSize(width: 340, height: editor.contentHeight))
+        let point = try #require(editor.textPoint(forLine: 30))
+        clip.scroll(to: CGPoint(x: 0, y: point.y - 35))
+        host.scrollView.reflectScrolledClipView(clip)
+        let origin = clip.bounds.origin
+        #expect(origin.y > 0)
+        let local = view.convert(view.convert(point, to: nil), from: nil)
+        let index = view.characterIndexForInsertion(at: local)
+        #expect(editor.document.lineIndex(at: index) == 30)
+        let below = NSPoint(x: point.x, y: editor.contentHeight - 1)
+        #expect(view.characterIndexForInsertion(at: below) == editor.document.length)
+        editor.selectedRange = NSRange(location: index, length: 0)
+        editor.focus()
+        _ = host.window.makeFirstResponder(nil)
+        editor.focus()
+        #expect(editor.selectedRange == NSRange(location: index, length: 0))
+        #expect(clip.bounds.origin == origin)
+    }
+
     @Test func documentViewIsAFlippedBodyThatCarriesThePaddingAndReportsItsHeight() throws {
         let host = try Host("한 줄\n너비가 줄면 다음 줄로 넘어가는 긴 줄")
         let theme = try Theme.bundled()

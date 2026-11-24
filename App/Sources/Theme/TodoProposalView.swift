@@ -7,17 +7,35 @@ package extension AgentProposal.Status {
     }
 }
 
+package extension Theme {
+    func stationaryAgentBorder(radius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: radius)
+            .strokeBorder(LinearGradient(colors: [color(.agentEdgeA), color(.agentEdgeB)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing),
+                          lineWidth: component(.agentEdgeIdle))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
 package extension View {
     func proposalBackground(_ theme: Theme, pending: Bool, radius: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius)
-        return self.background {
-            if pending {
-                shape.fill(LinearGradient(colors: [theme.color(.agentBgA), theme.color(.agentBgM), theme.color(.agentBgB)],
-                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-                shape.strokeBorder(theme.color(.agentDash), style: StrokeStyle(lineWidth: theme.shape(.borderWidth),
-                                                                               dash: [theme.space(.sp1)]))
-            } else { shape.fill(theme.color(.surface2)) }
+        background {
+            if pending { theme.stationaryAgentBorder(radius: radius) }
+            else { RoundedRectangle(cornerRadius: radius).fill(theme.color(.surface2)) }
         }
+    }
+}
+
+extension View {
+    func proposalPreviewSurface(_ theme: Theme, pending: Bool, radius: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius)
+        let width = theme.shape(.borderWidth)
+        return padding(.horizontal, pending ? width : 0)
+            .background(theme.color(.surface), in: shape)
+            .overlay {
+                if pending { shape.strokeBorder(theme.color(.outline), lineWidth: width).allowsHitTesting(false) }
+            }
     }
 }
 
@@ -65,7 +83,7 @@ package struct TodoProposalView: View {
                 rows.padding(theme.component(.agentInputInset))
                     .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
             }
-            else { Button(action: review) { rows }.buttonStyle(.plain).accessibilityLabel("미리보기") }
+            else { Button(action: review) { rows.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityLabel("미리보기") }
             if proposal.requiresReview == true { Text(proposal.target == .instructions ? "지침이 바뀌었어요. 미리보기를 다시 확인해 주세요." : "노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.").foregroundStyle(theme.color(.text2)) }
             HStack(spacing: theme.component(.agentRowInset)) {
                 if !full { TextActionLink(theme: theme, title: "노트로 보기", symbol: "chevron.right", action: review) }
@@ -102,6 +120,6 @@ package struct TodoProposalView: View {
             if let spaceName { Text(spaceName).font(theme.font(.micro)).padding(.horizontal, theme.space(.sp3)) }
             noteBody
         }.padding(.vertical, theme.space(.sp2))
-            .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.space(.sp2)))
+            .proposalPreviewSurface(theme, pending: pending, radius: theme.space(.sp2))
     }
 }

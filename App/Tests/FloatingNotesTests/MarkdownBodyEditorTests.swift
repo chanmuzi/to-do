@@ -28,6 +28,54 @@ import Theme
 
     // MARK: - 화면
 
+    @Test func fixedHeightBlankAreaBelongsToTheTextView() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "빈 영역", body: "첫 줄"))
+        let root = try #require(fixture.notePanels.window(for: id)?.contentView)
+        root.layoutSubtreeIfNeeded()
+        let view = adapter.editor.textView
+        let clip = try #require(view.enclosingScrollView?.contentView)
+        let point = NSPoint(x: clip.bounds.midX, y: clip.bounds.maxY - 10)
+        let hit = root.hitTest(clip.convert(point, to: root.superview))
+        #expect(hit === view)
+        #expect(view.characterIndexForInsertion(at: view.convert(point, from: clip)) == view.string.utf16.count)
+    }
+
+    @Test(arguments: [NoteDisplayOptions.FormatBar.hidden, .editing])
+    func returningToAnOpenNoteKeepsItsOwnCaretAndScroll(formatBar: NoteDisplayOptions.FormatBar) throws {
+        defer { fixture.cleanUp() }
+        let panels = fixture.notePanels
+        panels.displayOptions.formatBar = formatBar
+        let body = (0..<50).map { "본문 줄 \($0)" }.joined(separator: "\n")
+        let (id, adapter) = try fixture.open(NoteDraft(title: "이어 쓰기", body: body))
+        let (other, _) = try fixture.open(NoteDraft(title: "다른 노트"))
+        let window = try #require(panels.window(for: id))
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        adapter.editor.forcesActiveAppearance = true
+        _ = window.makeFirstResponder(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let caret = NSRange(location: 3, length: 0)
+        adapter.editor.selectedRange = caret
+        let clip = scroll.contentView
+        clip.scroll(to: NSPoint(x: 0, y: 200))
+        scroll.reflectScrolledClipView(clip)
+        let origin = clip.bounds.origin
+        #expect(origin.y > 0)
+        func check() {
+            window.contentView?.layoutSubtreeIfNeeded()
+            #expect(adapter.editor.selectedRange == caret)
+            #expect(clip.bounds.origin == origin)
+        }
+        #expect(panels.returnKey(to: id))
+        check()
+        let otherWindow = panels.window(for: other)
+        panels.isKeyPanel = { $0 === otherWindow }
+        #expect(panels.focusNextNote() == id)
+        check()
+        panels.closeWindow(other)
+        check()
+    }
+
     @Test func documentViewSitsInThePanelsScrollViewAndTheWindowFollowsItsHeight() throws {
         defer { fixture.cleanUp() }
         fixture.notePanels.displayOptions.heightMode = .fitContent

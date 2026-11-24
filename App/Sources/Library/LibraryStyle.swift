@@ -61,20 +61,60 @@ struct LibrarySymbol: View {
 
 /// SwiftUI 포커스 효과와 별개인 AppKit 버튼/팝업의 기본 포커스 링도 없앤다.
 /// 키 뷰 순서와 acceptsFirstResponder는 바꾸지 않는다.
-final class LibraryHostingView<Content: View>: NSHostingView<Content> {
+class LibraryHostingView<Content: View>: NSHostingView<Content> {
+    private let styledViews = NSHashTable<NSView>.weakObjects()
+    private var hierarchyChanged = true
+
+    override func didAddSubview(_ subview: NSView) {
+        super.didAddSubview(subview)
+        markHierarchyChanged()
+    }
+
     override func layout() {
         super.layout()
-        let pointer = window?.mouseLocationOutsideOfEventStream
-        func suppressRing(_ view: NSView) {
-            if let row = view as? LibraryRowInputView { row.synchronizeHover(at: pointer) }
-            view.focusRingType = .none
-            if let scroll = view as? NSScrollView, scroll.scrollerStyle != .overlay {
-                scroll.scrollerStyle = .overlay
-                scroll.autohidesScrollers = true
-            }
-            view.subviews.forEach(suppressRing)
+        guard hierarchyChanged else { return }
+        hierarchyChanged = false
+        configureBranch(self)
+    }
+
+    private func markHierarchyChanged() {
+        guard !hierarchyChanged else { return }
+        hierarchyChanged = true
+        needsLayout = true
+    }
+
+    private func configureBranch(_ view: NSView) {
+        if !styledViews.contains(view) {
+            styledViews.add(view)
+            configure(view)
         }
-        suppressRing(self)
+        view.subviews.forEach(configureBranch)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let center = NotificationCenter.default
+        center.removeObserver(self, name: NSView.didUpdateTrackingAreasNotification, object: nil)
+        if window != nil {
+            markHierarchyChanged()
+            center.addObserver(self, selector: #selector(trackingAreasChanged(_:)),
+                               name: NSView.didUpdateTrackingAreasNotification, object: nil)
+        }
+    }
+
+    // 추적 영역이 달린 새 하위 뷰는 호스트의 직접 자식이 아니어도 다음 배치에서 함께 설정한다.
+    @objc private func trackingAreasChanged(_ note: Notification) {
+        guard !hierarchyChanged, let view = note.object as? NSView, view.window === window,
+              !styledViews.contains(view), view.isDescendant(of: self) else { return }
+        markHierarchyChanged()
+    }
+
+    private func configure(_ view: NSView) {
+        if view.focusRingType != .none { view.focusRingType = .none }
+        if let scroll = view as? NSScrollView, scroll.scrollerStyle != .overlay {
+            scroll.scrollerStyle = .overlay
+            scroll.autohidesScrollers = true
+        }
     }
 }
 

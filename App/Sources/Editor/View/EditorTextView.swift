@@ -176,25 +176,31 @@ final class EditorTextView: PlainTextInputView {
 
     // MARK: 마우스
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        updatePointer(for: event)
+    }
+
     override func mouseDown(with event: NSEvent) {
         if editor?.handleMouseDown(at: convert(event.locationInWindow, from: nil)) == true { return }
         super.mouseDown(with: event)
     }
 
     override func mouseMoved(with event: NSEvent) {
-        // 이 뷰 위에 겹쳐 뜬 다른 뷰(노트 창의 휴지통, 닫기)가 마우스를 받는 자리에서는 글자 칸이 아니다.
-        // I자 커서를 넣지 않고 화살표로 둔다(규칙 9).
+        super.mouseMoved(with: event)
+        updatePointer(for: event)
+    }
+
+    private func updatePointer(for event: NSEvent) {
         guard isHitView(for: event) else {
             editor?.handleMouseExited()
             NSCursor.arrow.set()
             return
         }
-        // 누를 수 있는 곳(체크박스, 꺾쇠, 링크) 위에서는 화살표, 글자 위에서만 I자 커서(규칙 9).
-        if editor?.handleMouseMoved(at: convert(event.locationInWindow, from: nil)) == true {
-            NSCursor.arrow.set()
-        } else {
-            super.mouseMoved(with: event)
-        }
+        let interactive = editor?.handleMouseMoved(at: convert(event.locationInWindow, from: nil)) == true
+        (interactive ? NSCursor.arrow : NSCursor.iBeam).set()
     }
 
     /// 그 자리에서 마우스를 받는 뷰가 이 뷰(또는 그 안의 뷰)인지.
@@ -225,14 +231,14 @@ final class EditorTextView: PlainTextInputView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        for area in trackingAreas where area.owner === self && area.userInfo?["editor"] != nil {
-            removeTrackingArea(area)
-        }
+        guard !trackingAreas.contains(where: { $0.owner === self && $0.userInfo?["editor"] != nil }) else { return }
         addTrackingArea(NSTrackingArea(
-            rect: .zero,
-            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: ["editor": true]
+            rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self, userInfo: ["editor": true]
+        ))
+        // AppKit은 activeAlways 영역에 cursorUpdate를 전달하지 않는다.
+        addTrackingArea(NSTrackingArea(
+            rect: .zero, options: [.cursorUpdate, .activeInActiveApp, .inVisibleRect], owner: self
         ))
     }
 

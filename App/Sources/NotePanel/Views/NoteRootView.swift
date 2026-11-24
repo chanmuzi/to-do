@@ -17,6 +17,12 @@ final class NoteRootView: NSView {
     private let style: PanelStyle
     private let separator = NSView()
     private let scrollView = NSScrollView()
+    private var preserveScrollOnLayout = false
+
+    func layoutFormatBar(preservingScroll: Bool) {
+        preserveScrollOnLayout = preservingScroll
+        needsLayout = true
+    }
 
     init(style: PanelStyle, bodyView: NSView) {
         self.style = style
@@ -114,10 +120,11 @@ final class NoteRootView: NSView {
             x: 0, y: chromeHeight, width: bounds.width, height: max(0, bounds.height - chromeHeight - (cornerButtons.showsFormats ? rowHeight : 0))
         )
         placeBody()
-        if scrollView.frame.height < previousHeight, let text = scrollView.documentView as? NSTextView,
+        if !preserveScrollOnLayout, scrollView.frame.height < previousHeight, let text = scrollView.documentView as? NSTextView,
            window?.firstResponder === text, text.selectedRange().length == 0 {
             text.scrollRangeToVisible(text.selectedRange())
         }
+        preserveScrollOnLayout = false
         cornerButtons.frame = NSRect(x: 0, y: bounds.height - rowHeight, width: bounds.width, height: rowHeight)
     }
 

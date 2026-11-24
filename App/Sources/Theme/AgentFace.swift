@@ -36,14 +36,23 @@ public struct AgentFace: View {
 
     public var body: some View {
         Group {
-            if forceStill || reduceMotion || state == .done || state == .blocked {
+            if forceStill || reduceMotion || !hasMotion {
                 glyph(at: nil)
             } else {
-                TimelineView(.animation) { glyph(at: $0.date.timeIntervalSinceReferenceDate) }
+                AnimatedAgentFace(face: self)
             }
         }
         .frame(width: theme.component(size.token), height: theme.component(size.token))
         .accessibilityLabel(state.rawValue)
+    }
+
+    private var hasMotion: Bool {
+        switch state {
+        case .done, .blocked: false
+        case .think: size.showsProps
+        case .ask, .dream: size.showsCorner
+        default: true
+        }
     }
 
     package func glyph(at time: TimeInterval?) -> some View {
