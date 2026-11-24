@@ -88,7 +88,7 @@ final class DebugControl {
     weak var library: LibraryCoordinator?
     var setScheduleDateFormat: (String) -> Void = { _ in }
     var reopen: () -> Void = {}
-    var simulateActivation: () -> Void = {}
+    var simulateActivation: (_ repeatLocalPress: Bool) -> Void = { _ in }
     var toastWindow: () -> NSWindow? = { nil }
     var toastAction: () -> Void = {}
     private var statusItem: StatusItemController? { currentStatusItem() }
@@ -331,7 +331,8 @@ final class DebugControl {
             let sample = ActivationPointer(library: library?.window, at: point)
             write(json: ["windowNumber": sample.windowNumber, "kind": sample.window.rawValue,
                          "mouseAge": String(sample.mouseAge), "keyAge": String(sample.keyAge)], to: url)
-        case ("simulate-activation", _, _) where isPassive: simulateActivation()
+        case ("simulate-activation", let mode, _) where isPassive:
+            simulateActivation(mode?.rawValue == "local-repeat")
         case ("memory-document", let name?, _) where isPassive:
             guard let editor = instructionEditor?.editor, let url = output(named: name.rawValue),
                   let text = try? String(contentsOf: url, encoding: .utf8) else { return }

@@ -1,21 +1,28 @@
 import Carbon
 import Foundation
 
-/// 첫 실행과 비활성 노트의 로컬 누름 기록. 한 활성화가 소비한 기록은 다음 활성화로 넘기지 않는다.
+/// 비활성으로 돌아갈 때까지 창을 유지한 이유를 기억한다. 누름의 유효 시간은 첫 누름부터 센다.
 struct ActivationFocusPolicy {
     static let launchGrace: TimeInterval = 1
     static let pressLifetime: TimeInterval = 0.5
 
     private var launchFinishedAt: TimeInterval?
     private var hasSeenActivation = false
-    private var notePressAt: TimeInterval?
+    private var pressAt: TimeInterval?
+    private var pressAlreadyUsed = false
+    private var activeReason: ActivationDecision.Reason?
 
     mutating func launchFinished(at time: TimeInterval) {
         launchFinishedAt = time
     }
 
-    mutating func notePressedWhileInactive(at time: TimeInterval) {
-        notePressAt = time
+    mutating func windowPressedWhileInactive(at time: TimeInterval) {
+        pressAt = time
+        pressAlreadyUsed = false
+    }
+
+    mutating func didResignActive() {
+        activeReason = nil
     }
 
     enum CarbonTarget: String { case noEvent, otherEvent, unspecified, clickedWindow }
@@ -31,12 +38,26 @@ struct ActivationFocusPolicy {
         return status == noErr && window != nil ? .clickedWindow : .unspecified
     }
 
-    mutating func consumeActivation(at time: TimeInterval) -> ActivationDecision {
+    mutating func decide(at time: TimeInterval, explicitTarget: Bool = false,
+                         carbon: CarbonTarget = .noEvent, appKit: CarbonTarget = .noEvent,
+                         window: ActivationDecision.WindowKind = .none, mouseAge: TimeInterval = .infinity,
+                         keyAge: TimeInterval = .infinity) -> (reason: ActivationDecision.Reason, pendingAge: TimeInterval?, reused: Bool) {
         let launching = launchFinishedAt.map { !hasSeenActivation && time - $0 < Self.launchGrace } ?? true
-        let pendingAge = notePressAt.map { time - $0 }
         hasSeenActivation = true
-        notePressAt = nil
-        return ActivationDecision(launching: launching, pendingAge: pendingAge)
+        let age = pressAt.map { time - $0 }
+        let recentPress = age.map { (0...Self.pressLifetime).contains($0) && $0 <= keyAge } == true
+        if !recentPress { pressAt = nil }
+        if let activeReason { return (activeReason, age, true) }
+
+        let evidence = ActivationDecision(launching: launching, pendingAge: recentPress ? age : nil)
+        let reason = evidence.reason(explicitTarget: explicitTarget, carbonWindow: carbon == .clickedWindow || appKit == .clickedWindow,
+                                     window: window, mouseAge: mouseAge, keyAge: keyAge)
+        let reused = reason == .localPress && pressAlreadyUsed
+        if reason != .showLibrary {
+            activeReason = reason
+            if recentPress { pressAlreadyUsed = true }
+        }
+        return (reason, age, reused)
     }
 }
 
