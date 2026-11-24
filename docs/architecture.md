@@ -201,7 +201,7 @@ Float 창(spec 04, 05, 19). Core 모듈만 import하고, 다른 기능은 `Routi
   - 마지막으로 연 때(D-033): 사용자가 노트 창을 띄울 때(`open`, 새 노트, 노트 찾기에서 고름)와 그 창이 키 창이 될 때 `NoteWindowState.lastOpened`에 지금 시각을 적는다(겹친 차례와 한 번에 쓴다, `WindowStateRecorder.recordFronted(_:openedAt:)`). 켤 때 되살린 창과 "모두 보이기"로 돌아온 창은 적지 않는다.
   - 확인용으로만 쓰는 것은 `@_spi(Verification)` 뒤에 있다(편집기와 같다): `allowsKeyWindows`(끄면 노트 창이 키 창이 되지 않는다), `releaseKeyWindow()`(키 창인 노트 창을 물린다), `now`(지금 시각을 바꿔 끼운다). `@_spi(Verification) import NotePanel`로 들여와야 보이고, 앱에서는 디버그 빌드의 `DebugControl.swift`만 그렇게 한다.
   - 키 창과 앱 활성화(D-025의 4번, 사용자 결정): 노트 창은 보통 앱 창처럼 누르면 앱이 앞으로 온다(`.nonactivatingPanel`이 아니다). 앱이 뒤로 가도 숨지 않고(`hidesOnDeactivate` 끔) 모든 Spaces와 전체 화면 앱 위에 보인다. 키 창은 앱이 앞에 있을 때만 키 입력을 받으므로 `NotePanelWindow.canBecomeKey`는 확인용 스위치(`allowsKey`)만 본다. 다른 앱의 입력을 가져오지 않는 일은 앱을 앞으로 가져오는 쪽이 지킨다: 켤 때 되살린 창, `focus: false`로 띄운 창, 모두 보이기, 호버는 앱을 앞으로 가져오지 않고 키 창도 시키지 않는다. 사용자가 노트를 누를 때(버튼 누름은 `noteButtonPressed()`가 `activateApp`을 부른다)와 App이 사용자의 요청으로 노트를 열거나 만들 때(`AppRouter.activateApp`)만 앞으로 온다. 앱이 시켜서 키 창이 되는 때: `focusBody`, `beginTitleEditing`, `focusNextNote`, 새 노트, `open(_:focus: true)`, 휴지통에서 되살리기, 키 창이던 노트가 내려가 보이는 노트 가운데 가장 앞의 것이 이어받음(`KeyHandoff`. 남은 노트가 없고 휴지통으로 보낸 것이면 ⌘Z를 받도록 앱을 앞으로 가져온다), 사용자가 앱을 앞으로 가져왔는데 키 창이 없음(`focusFrontmostNote()`), 캡처 바나 노트 찾기가 닫히며 돌려줌(`returnKey(to:)`, D-032). 버튼으로 가는 누름은 `NotePanelWindow.sendEvent`가 창의 크기 조절이나 첫 누름 처리보다 먼저 그 버튼(`ClickableView`)에 건네고 뗄 때까지의 이벤트도 그 버튼이 받는다. `ClickableView`는 안의 아이콘이나 글자 대신 통째로 누름을 받고(`hitTest`) 첫 누름을 받는다(`acceptsFirstMouse`, D-039).
-  - 크기(D-031): 본문 영역은 적어도 본문 `note-body-lines-min`(4)줄 높이다. 창 높이는 상단 줄 + max(내용 높이, 그 높이)이고 한도(`note-h-max-screen`, 화면 아래 끝)까지 내용을 따라 는다(`NoteSizePolicy`). 적어 둔 틀이 더 낮은 노트는 위쪽 가장자리를 지킨 채 아래로 늘려 되살린다.
+  - 크기(D-031): 본문 영역은 적어도 본문 `note-body-lines-min`(4)줄 높이다. 기본은 본문 여섯 줄 높이로 고정한다. 저장 높이가 없는 글에 맞춤 창은 상단 줄 + max(내용 높이, 최소 본문 높이)이고 한도(`note-h-max-screen`, 화면 아래 끝)까지 내용을 따라 는다(`NoteSizePolicy`). 적어 둔 틀이 더 낮은 노트는 위쪽 가장자리를 지킨 채 아래로 늘려 되살린다.
   - 그림자: 투명한 창의 그림자는 내용 모양에서 만들어 두고 다시 쓰이므로 창 크기가 바뀔 때마다(`windowDidResize`) `invalidateShadow()`를 부른다.
   - 휴지통 되돌리기(spec 5.3): `moveToTrash(_:)` 바로 뒤에 `canUndoTrash`가 참이 되고 `undoTrash() throws -> NoteID?`가 노트를 되살려 창 상태(틀, 핀, 접힘)째 다시 띄운다. 다른 노트가 키 창이 되거나 사용자가 노트 창을 누르면(보낸 직후 다음 노트가 키 창을 이어받는 것은 빼고), 글을 고치면(본문, 제목, 색), 새 노트를 만들면 거짓이 된다(D-024). 되살릴 수 없는 실패(`noteNotFound`, `noteAlreadyExists`)를 던질 때도 거짓이 되고, 그 밖의 실패에서는 다시 시도할 수 있게 남는다.
   - 빈 노트(D-040): `closeWindow(_:)`는 아무것도 적지 않은 노트(`Note.isBlank`, 쓰지 못한 글과 풀지 않은 문제 없음)를 창과 함께 `delete`로 지운다. `deleteBlankNotes() -> [NoteID]`는 떠 있는 빈 노트를 지운다(App이 끝낼 때 미뤄 둔 저장을 다 쓴 뒤 부른다).
@@ -239,7 +239,7 @@ public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> a
 
 - `view`는 노트 창이 가진 스크롤 뷰의 문서 뷰가 된다. 노트 창은 너비만 맞추고, 높이는 `view`가 내용에 맞춘다. 뒤집힌 좌표(`isFlipped`)여야 한다.
 - 안쪽 여백(`Theme.docPadding`)은 편집기가 넣는다.
-- `onContentHeightChange`에는 여백을 포함한 내용 높이를 넘긴다(글이나 너비가 바뀔 때마다, 처음 배치된 뒤 한 번). 노트 창이 이 값으로 창 높이를 맞춘다(위쪽 고정, 아래로, `dur` 동안).
+- `onContentHeightChange`에는 여백을 포함한 내용 높이를 넘긴다(글이나 너비가 바뀔 때마다, 처음 배치된 뒤 한 번). 글에 맞춤이고 저장한 높이가 없는 노트 창이 이 값으로 높이를 맞춘다(위쪽 고정, 아래로, `dur` 동안).
 - 배치 도중에 알게 된 내용 높이로 창 높이를 바꾸면(창을 처음 띄울 때가 그렇다) 그 배치가 끝나며 "다시 배치" 요청이 지워진다. `NoteRootView.layout()`은 `onLayout` 뒤에 크기가 달라졌으면 한 번 더 놓는다. 이것이 없으면 본문 영역이 옛 창 높이에 머물러 아래가 잘린다.
 - `PlainTextBodyEditor(theme:)`: 서식 없는 기본 구현(TextKit 1). 제 실행 취소 기록을 따로 갖는다. `makeBodyEditor`를 주지 않았을 때의 기본값이고 노트 창 테스트가 쓴다. 앱에서는 App 타깃의 어댑터 `MarkdownBodyEditor`가 Editor 모듈을 끼운다.
 
