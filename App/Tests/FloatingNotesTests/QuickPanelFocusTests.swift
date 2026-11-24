@@ -199,7 +199,9 @@ extension QuickPanelFocusTests {
         #expect(fixture.capture.inputView?.string == "메모 초안")
         fixture.router.route(.requestAgent)
         var sends: [String] = []
-        fixture.capture.onRequest = { text, opens in sends.append(text); return !opens }
+        fixture.capture.onRequest = { text in sends.append(text); return true }
+        fixture.capture.performSubmitAsNewNote()
+        #expect(sends.isEmpty && fixture.capture.isVisible)
         fixture.capture.performSubmit()
         fixture.capture.performSubmit()
         #expect(sends == ["내일 세 시 회의 요약"] && !fixture.capture.isVisible)

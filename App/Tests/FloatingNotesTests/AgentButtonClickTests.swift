@@ -190,7 +190,7 @@ extension AgentButtonClickTests {
         agent.allowsKeyWindows = false
         let note = try fx.open("대상")
         fx.router.agent = agent
-        agent.present = fx.router.showAgent
+        agent.present = { fx.router.showAgent($0, source: $1) }
         var trace: [String] = []
         fx.router.traceActivation = { trace.append($0) }
         var sends = 0
@@ -458,5 +458,31 @@ extension AgentButtonClickTests {
         #expect(try store.readInstructions() == "한글")
         library.show()
         #expect(editor.text == "한글" && library.model.rows.isEmpty)
+    }
+}
+
+extension AgentButtonClickTests {
+    @Test func recentRowAndNotificationOpenTheOriginalConversation() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: .init(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        fx.router.agent = agent
+        let draft = agent.newRecord()
+        let id = draft.conversation.id
+        fx.capture.recentRequest = { .init(id: id, question: "물음", detail: "답", date: Date(), face: .done) }
+        fx.capture.openRecent = { fx.router.openBarConversation($0, source: "bar-recent") }
+        fx.router.route(.requestAgent)
+        let bar = try #require(fx.capture.window)
+        try await Task.sleep(for: .milliseconds(200))
+        let button = try #require(buttons(in: bar)["직전 대화 열기, 물음, 답"])
+        #expect(button.accessibilityPerformPress?() == true)
+        let window = try #require(agent.window(id: id))
+        defer { window.close() }
+        #expect(!fx.capture.isVisible)
+        fx.router.openBarConversation(id, source: "notification")
+        #expect(agent.window(id: id) === window)
     }
 }
