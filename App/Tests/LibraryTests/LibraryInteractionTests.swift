@@ -460,6 +460,8 @@ import SpaceIcons
         _ = try f.notes.create(NoteDraft(title: "첫째"))
         f.model.opened()
         let theme = f.model.theme
+        // 노트 개수 전후의 같은 프레임을 비교하도록 얼굴의 눈 깜빡임만 고정한다.
+        try theme.setOverrides(theme.overrides.setting("motion.agent-blink", to: "0s"))
         let rect = NSRect(x: 0, y: 0, width: theme.component(.librarySidebarWidth), height: theme.component(.libraryHeight))
         let window = NSWindow(contentRect: rect, styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
