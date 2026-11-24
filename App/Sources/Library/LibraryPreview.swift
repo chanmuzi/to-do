@@ -19,7 +19,7 @@ struct LibraryPreview {
         var visible: [String] = []
         var checked = 0, todos = 0
         for line in document.lines where line.kind != .fenceOpen && line.kind != .fenceClose {
-            if case .todo(let done) = line.kind {
+            if let done = document.todoCompletion(on: line) {
                 todos += 1
                 if done { checked += 1 }
             }

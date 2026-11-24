@@ -13,7 +13,8 @@ private final class BundleMarker: NSObject {}
         let notes = root.appending(path: "notes")
         try fm.createDirectory(at: notes, withIntermediateDirectories: true)
         defer { try! fm.removeItem(at: root) }
-        try "# 메모\n본문".write(to: notes.appending(path: "메모.md"), atomically: true, encoding: .utf8)
+        let markdown = "# 메모\n본문\n[ ] 할 일\n[ ] "
+        try markdown.write(to: notes.appending(path: "메모.md"), atomically: true, encoding: .utf8)
         let outside = root.appending(path: "outside.md")
         try "outside".write(to: outside, atomically: true, encoding: .utf8)
         try fm.createSymbolicLink(at: notes.appending(path: "link.md"), withDestinationURL: outside)
@@ -22,7 +23,7 @@ private final class BundleMarker: NSObject {}
 
         try "숨김".write(to: notes.appending(path: ".trash/삭제.md"), atomically: true, encoding: .utf8)
         let old = notes.appending(path: "older.md")
-        try "---\ntitle: 계획\nspace: work\narchived: true\nreminder: 2026-11-24T10:00:00Z\n---\n[ ] 남음\n[x] 끝".write(to: old, atomically: true, encoding: .utf8)
+        try "---\ntitle: 계획\nspace: work\narchived: true\nreminder: 2026-11-24T10:00:00Z\n---\n[ ] 남음\n[x] 끝\n  - [x]  \t\n[ ] ".write(to: old, atomically: true, encoding: .utf8)
         try fm.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: old.path)
         let bundle = Bundle(for: BundleMarker.self).bundleURL
         let candidates = [bundle.deletingLastPathComponent(), Bundle.main.bundleURL.deletingLastPathComponent(),
@@ -118,7 +119,7 @@ private final class BundleMarker: NSObject {}
         #expect(files.count == (proposals ? 5 : 0))
         #expect(files.allSatisfy { $0.hasSuffix(".json") })
         #expect(try Data(contentsOf: outside) == Data("outside".utf8))
-        #expect(try Data(contentsOf: notes.appending(path: "메모.md")) == Data("# 메모\n본문".utf8))
+        #expect(try Data(contentsOf: notes.appending(path: "메모.md")) == Data(markdown.utf8))
         if proposals {
             for (offset, entry) in instructionCases.enumerated() {
                 let i = instructionOffset + offset
@@ -158,7 +159,10 @@ private final class BundleMarker: NSObject {}
         #expect(try page(responses.count - 3).first?["name"] as? String == "older.md")
         #expect(try page(responses.count - 2).count == 1)
         #expect((responses.last?["result"] as? Object)?["isError"] as? Bool == true)
-        #expect(text(3)?.hasSuffix("\n\n[원문]\n# 메모\n본문") == true)
+        let read = try #require(text(3)?.components(separatedBy: "\n\n[원문]\n").first)
+        let metadata = try #require(JSONSerialization.jsonObject(with: Data(read.utf8)) as? Object)
+        #expect(metadata["todo_total"] as? Int == 1 && metadata["todo_remaining"] as? Int == 1)
+        #expect(text(3)?.hasSuffix("\n\n[원문]\n# 메모\n본문\n[ ] 할 일\n[ ] ") == true)
         for i in 4...7 { #expect((responses[i]["result"] as? Object)?["isError"] as? Bool == true) }
         #expect((responses[8]["error"] as? Object)?["code"] as? Int == -32602)
         #expect(try fm.contentsOfDirectory(atPath: notes.path).sorted() == [".trash", "directory.md", "link.md", "older.md", "메모.md"])

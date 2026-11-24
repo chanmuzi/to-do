@@ -28,6 +28,12 @@ nonisolated package struct MarkdownDocument: Sendable {
         return String(utf16CodeUnits: Array(units[lower..<upper]), count: upper - lower)
     }
 
+    package func todoCompletion(on line: MarkdownLine) -> Bool? {
+        guard case .todo(let done) = line.kind,
+              !string(in: line.contentRange).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return done
+    }
+
     /// 그 위치가 속한 줄 번호. 문서 끝은 마지막 줄이다.
     package func lineIndex(at location: Int) -> Int {
         var low = 0
