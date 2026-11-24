@@ -528,7 +528,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         coordinator.finished = { [weak self, weak router] draft, request in
             let success = request.status == .completed
-            var message = success ? (draft.conversation.customName ?? request.answer?.split(whereSeparator: \.isNewline).first.map(String.init) ?? "끝났어요")
+            var message = success ? draft.conversation.completionMessage(for: request)
                 : request.failure ?? "막혔어요"
             if let reset = request.resumeTime { message += ". " + reset + "부터 다시 돼요" }
             self?.toasts?.presenter.show(.init(kind: "agent", message: message, actionTitle: success ? "보기" : "다시 시도",

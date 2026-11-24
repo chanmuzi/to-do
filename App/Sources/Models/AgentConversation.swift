@@ -69,8 +69,11 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     public var name: String {
-        customName ?? (requests.first?.userText ?? queued.first?.text)?.split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? "새 대화"
+        customName ?? (requests.first?.userText ?? queued.first?.text).flatMap(NotePreviewText.firstLine) ?? "새 대화"
+    }
+
+    package func completionMessage(for request: AgentRequest) -> String {
+        customName ?? request.answer.flatMap(NotePreviewText.firstLine) ?? "끝났어요"
     }
 
     public init(targets: [NoteID], now: Date = Date()) {

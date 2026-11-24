@@ -25,7 +25,7 @@ let package = Package(
             resources: [.copy("Resources/tokens.json"), .copy("Resources/Fonts"), .copy("Resources/AgentLogos")]
         ),
         .target(name: "AgentRunner", dependencies: ["Store"]),
-        .target(name: "Models"),
+        .target(name: "Models", dependencies: ["MarkdownSyntax"]),
         .target(name: "MarkdownSyntax"),
         .target(name: "DateTime", dependencies: ["Models"]),
         .target(name: "SpaceIcons", dependencies: ["Models", "Theme"],
