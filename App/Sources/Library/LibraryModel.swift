@@ -51,6 +51,7 @@ public final class LibraryModel {
     #endif
     package var selectedConversation: UUID?
     #if DEBUG
+    package var previewNoteHover: NoteID?
     package var previewHistoryHover: UUID?
     package var previewSectionHover = false
     #endif
@@ -210,6 +211,28 @@ public final class LibraryModel {
     var showAllUpcoming = false
     var sections: [LibraryIndex.Section] { index.sections(for: selection) }
     public var showsNewNote: Bool { selection != .memory && selection != .proposals && selection != .conversations && selection != .trash && selection != .archived }
+    package var updateOpenWindowPin: (NoteID, Bool) -> Void = { _, _ in }
+
+    var allowsRowPin: Bool {
+        switch selection {
+        case .archived, .archive, .trash: false
+        default: true
+        }
+    }
+
+    func togglePin(_ note: Note) {
+        guard allowsRowPin else { return }
+        perform {
+            let saved = windows.state(for: note.id)
+            var state = saved ?? NoteWindowState()
+            state.isPinned = saved?.isPinned != true
+            try windows.set(state, for: note.id)
+            updateOpenWindowPin(note.id, state.isPinned)
+            selectedNoteID = selection == .floating && !state.isPinned ? nil : note.id
+            refresh()
+        }
+    }
+
     func toggleArchive(_ note: Note) {
         perform { try notes.update(note.id) { $0.isArchived = !note.isArchived }; refresh() }
     }

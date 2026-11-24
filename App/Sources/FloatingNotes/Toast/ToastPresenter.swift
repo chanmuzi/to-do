@@ -13,7 +13,7 @@ final class ToastPresenter {
     struct Content: Equatable {
         var kind: String
         var message: String
-        var actionTitle: String
+        var actionTitle: String?
         var face: AgentFaceState?
     }
 
@@ -48,10 +48,10 @@ final class ToastPresenter {
     /// - Parameters:
     ///   - screen: 띄울 화면. 없으면 주 화면.
     ///   - action: 동작을 눌렀을 때. 알림은 그 뒤 사라진다.
-    func show(_ content: Content, on screen: NSScreen?, action: @escaping () -> Void) {
+    func show(_ content: Content, on screen: NSScreen?, noteFrame: CGRect? = nil, action: (() -> Void)? = nil) {
         cancelTimers()
         self.content = content
-        self.action = action
+        self.action = content.actionTitle?.isEmpty == false ? action : nil
         let panel = panel ?? ToastPanel()
         self.panel = panel
         let view = ToastView(theme: theme, message: content.message, actionTitle: content.actionTitle, face: content.face, working: content.kind == "agent-working")
@@ -66,7 +66,8 @@ final class ToastPresenter {
             panel.setFrame(
                 ToastPlacement.frame(
                     size: view.fittingSize(maxWidth: maxWidth), visibleFrame: visible,
-                    bottomFraction: theme.tokens.ratio(.toastBottomScreen)
+                    bottomFraction: theme.tokens.ratio(.toastBottomScreen),
+                    noteFrame: noteFrame, inset: theme.space(.sp2)
                 ),
                 display: false
             )

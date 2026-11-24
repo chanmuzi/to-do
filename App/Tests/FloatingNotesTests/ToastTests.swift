@@ -42,10 +42,15 @@ import Testing
     @Test func trashShowsAnUndoToastThatRestoresTheNoteOnARealPress() throws {
         defer { presenter.dismiss(); fixture.cleanUp() }
         let id = try fixture.open("버릴 노트", body: "글")
+        let noteWindow = try #require(fixture.notePanels.window(for: id))
+        let noteFrame = noteWindow.frame
+        let visible = try #require(noteWindow.screen?.visibleFrame)
         fixture.notePanels.moveToTrash(id)
         #expect(presenter.content?.message == AppToasts.trashMessage)
         #expect(presenter.content?.actionTitle == "되돌리기")
         let window = try #require(presenter.window)
+        #expect(window.frame == ToastPlacement.frame(size: window.frame.size, visibleFrame: visible,
+                                                     bottomFraction: 0, noteFrame: noteFrame, inset: 8))
         #expect(window.isVisible)
         #expect(!window.canBecomeKey)
         #expect(!window.styleMask.contains(.titled))
@@ -182,6 +187,28 @@ import Testing
         #expect(frame == CGRect(x: 500, y: 114, width: 200, height: 34))
     }
 
+    @Test func trashPlacementClampsAtScreenEdgesAndCentersWideToastOverANarrowNote() {
+        let screen = CGRect(x: -1200, y: 40, width: 1200, height: 800)
+        let size = CGSize(width: 300, height: 34)
+        func frame(_ x: CGFloat, _ y: CGFloat) -> CGRect {
+            ToastPlacement.frame(size: size, visibleFrame: screen, bottomFraction: 0.08,
+                                noteFrame: CGRect(x: x, y: y, width: 260, height: 120), inset: 8)
+        }
+        #expect(frame(-800, 200) == CGRect(x: -820, y: 208, width: 300, height: 34))
+        #expect(frame(-1300, 20).origin == CGPoint(x: -1192, y: 48))
+        #expect(frame(-100, 830).origin == CGPoint(x: -308, y: 798))
+    }
+
+    @Test func actionlessToastOnlyReservesPaddingAndMessage() throws {
+        let view = ToastView(theme: fixture.theme, message: "완료")
+        view.frame.size = view.fittingSize(maxWidth: 600)
+        view.layoutSubtreeIfNeeded()
+        let label = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
+        let divider = try #require(view.subviews.compactMap { $0 as? NSBox }.first)
+        #expect(view.actionButton.isHidden && divider.isHidden)
+        #expect(label.frame.minX == 12 && view.bounds.maxX - label.frame.maxX == 12)
+    }
+
     /// 동작 글자는 끝 글자까지 다 그려지고("되돌리기"의 "기"가 잘리지 않음), 안내 글과 같은 기준선에 앉는다.
     @Test(arguments: [("휴지통으로 보냈습니다", "되돌리기"), ("“장보기”에 넣었습니다", "열기")])
     func actionTitleIsNotClippedAndSharesTheBaseline(message: String, action: String) throws {
@@ -196,6 +223,11 @@ import Testing
         #expect(view.actionButton.frame.maxX <= view.bounds.maxX)
         let message = try #require(view.subviews.compactMap { $0 as? NSTextField }.first)
         #expect(message.frame.width >= (message.cell?.cellSize.width ?? .infinity))
+        let divider = try #require(view.subviews.compactMap { $0 as? NSBox }.first)
+        let actionFrame = actionLabel.convert(actionLabel.bounds, to: view)
+        #expect(divider.frame.size == CGSize(width: 1, height: 14) && divider.frame.midY == view.bounds.midY)
+        #expect(message.frame.minX == 12 && divider.frame.minX - message.frame.maxX == 12)
+        #expect(actionFrame.minX - divider.frame.maxX == 12 && view.bounds.maxX - actionFrame.maxX == 12)
         #expect(abs(view.baselines.message - view.baselines.action) < 0.5)
     }
 }

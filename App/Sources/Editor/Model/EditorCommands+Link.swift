@@ -10,12 +10,12 @@ nonisolated enum LinkTarget: Equatable, Sendable {
 
 nonisolated extension EditorCommands {
     /// 커서나 선택이 링크 안이면 그 링크, 아니면 선택한 글자. 링크를 걸 수 없으면 `nil`
-    /// (선택 없음, 여러 줄, 코드 안, 대괄호가 든 글, 다른 링크에 걸친 선택).
+    /// (선택 없음, 여러 줄, 코드 안, 다른 링크에 걸친 선택).
     static func linkTarget(_ doc: MarkdownDocument, selection: NSRange) -> LinkTarget? {
         guard let line = inlineLine(doc, selection) else { return nil }
         let isLink: (InlineSpan) -> Bool = { if case .link = $0.kind { true } else { false } }
         if let span = line.markedSpans.last(where: {
-            isLink($0) && $0.contentRange.location <= selection.location && NSMaxRange(selection) <= NSMaxRange($0.contentRange)
+            isLink($0) && ($0.range == selection || ($0.contentRange.location <= selection.location && NSMaxRange(selection) <= NSMaxRange($0.contentRange)))
         }) {
             return .existing(span)
         }
@@ -42,8 +42,10 @@ nonisolated extension EditorCommands {
         }
         let range = NSRange(location: lower, length: upper - lower)
         guard !line.markedSpans.contains(where: { isLink($0) && NSIntersectionRange($0.range, range).length > 0 }) else { return nil }
-        let text = doc.string(in: range)
-        guard !text.contains("["), !text.contains("]") else { return nil }
+        // 코드 안에서는 백슬래시도 보이는 글자여서 닫는 대괄호를 이스케이프할 수 없다.
+        guard !line.markedSpans.contains(where: { span in
+            span.kind == .code && NSIntersectionRange(span.range, range).length > 0 && doc.string(in: span.contentRange).contains("]")
+        }) else { return nil }
         return .new(range)
     }
 
@@ -79,7 +81,7 @@ nonisolated extension EditorCommands {
             )
         case .new(let range):
             guard !url.isEmpty else { return nil }
-            let text = doc.string(in: range)
+            let text = escaped(doc.string(in: range), only: ["]"])
             let line = doc.line(at: range.location)
             // 링크의 한쪽 끝만 걸친 구간은 그 끝에서 닫고 건너편에서 다시 연다(구간이 링크의 기호와 엇갈리지 않게).
             func cut(at position: Int) -> [InlineSpan] {

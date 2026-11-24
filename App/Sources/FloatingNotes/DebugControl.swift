@@ -520,6 +520,10 @@ final class DebugControl {
             guard let url = output(named: name), let library else { return }
             do { try library.snapshotIconPicker(space: SpaceID(rawValue: id.rawValue), to: url) }
             catch { AppLog.warning("아이콘 스냅숏 실패: \(error)") }
+        case ("library-note-hover", let id?, _) where isPassive:
+            library?.model.previewNoteHover = id
+        case ("library-note-action", let id?, let action?) where isPassive:
+            library?.noteRowForVerification(id, action: action)
         case ("history-hover", let item?, _) where isPassive:
             library?.model.previewHistoryHover = UUID(uuidString: item.rawValue)
             library?.model.previewSectionHover = item.rawValue == "section"
@@ -536,15 +540,14 @@ final class DebugControl {
             case "dismiss": host.childWindows?.forEach { $0.close() }
             default: break
             }
+        case ("library-note-popup", let name?, _) where isPassive:
+            if let host = library?.window, let url = output(named: name.rawValue) { writePopup(of: host, to: url) }
         case ("conversation-popup", let id?, let args?) where isPassive:
             guard let uuid = UUID(uuidString: id.rawValue) else { return }
             let parts = args.split(separator: " ", maxSplits: 1).map(String.init)
             guard parts.count == 2, let url = output(named: parts[1]) else { return }
             let host = parts[0] == "library" ? library?.window : agent?.window(id: uuid)
-            guard let host, let child = host.childWindows?.last(where: { $0.isVisible }) else { return }
-            write(child, to: url)
-            write(json: ["x": child.frame.minX - host.frame.minX, "y": host.frame.maxY - child.frame.maxY,
-                         "width": child.frame.width, "height": child.frame.height], to: url.appendingPathExtension("frame"))
+            if let host { writePopup(of: host, to: url) }
         case ("agent-width", let note?, let width?) where isPassive:
             guard let window = agent?.window(for: note), let width = Double(width),
                   (window.minSize.width...window.maxSize.width).contains(width) else { return }
@@ -695,6 +698,8 @@ final class DebugControl {
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
         case ("format-link", let id?, _) where isPassive:
             editor(of: id)?.perform(.link)
+        case ("format-link-commit", let id?, let address?) where isPassive:
+            editor(of: id)?.commitLink(address)
         case ("input-select-all", let target?, _) where isPassive:
             verificationInput(target.rawValue)?.selectAll(nil)
         case ("input-check", let target?, let name?):
@@ -850,6 +855,13 @@ final class DebugControl {
     }
 
     /// 창의 내용 뷰를 앱 안에서 그려 PNG로 쓴다.
+    private func writePopup(of host: NSWindow, to url: URL) {
+        guard let child = host.childWindows?.last(where: { $0.isVisible }) else { return }
+        write(child, to: url)
+        write(json: ["x": child.frame.minX - host.frame.minX, "y": host.frame.maxY - child.frame.maxY,
+                     "width": child.frame.width, "height": child.frame.height], to: url.appendingPathExtension("frame"))
+    }
+
     private func write(_ window: NSWindow?, to url: URL, audit: Bool = true) {
         guard let view = window?.contentView?.superview ?? window?.contentView,
               let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)
@@ -1192,6 +1204,8 @@ final class DebugControl {
             "lastKeyHandled": lastKeyHandled.map { $0 ? "yes" : "no" } ?? "",
             "unavailableCommands": commands.unavailable.map(\.rawValue),
             "quickPanels": quickPanels.dump(),
+            "visibleScreenFrames": NSScreen.screens.map { NSStringFromRect($0.visibleFrame) },
+            "toastFrame": toastWindow().map { NSStringFromRect($0.frame) } ?? "",
             "toastWindowNumber": toastWindow()?.isVisible == true ? toastWindow()?.windowNumber ?? 0 : 0,
             "statusItemLength": statusItem?.length ?? 0,
         ]
