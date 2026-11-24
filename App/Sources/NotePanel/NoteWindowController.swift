@@ -191,7 +191,7 @@ final class NoteWindowController: NSObject {
         scheduleReminderRefresh()
     }
 
-    func refreshFormatBar(animated: Bool = false) {
+    func refreshFormatBar(animated: Bool = false, focusChanged: Bool = false) {
         let formatting = editor as? any NoteBodyFormatting
         let mode = environment.options().formatBar
         root.cornerButtons.isHidden = mode == .hidden
@@ -199,7 +199,7 @@ final class NoteWindowController: NSObject {
         let changed = visible != root.cornerButtons.showsFormats
         root.cornerButtons.apply(visible: visible, active: visible ? formatting?.activeFormats ?? [] : [])
         root.setHoverControlsAlpha(visible ? 1 : 0, animated: animated)
-        if changed { root.needsLayout = true }
+        if changed { root.layoutFormatBar(preservingScroll: focusChanged) }
     }
 
     func themeDidChange() {
@@ -235,7 +235,7 @@ final class NoteWindowController: NSObject {
             formatting.onFormattingChange = { [weak self] in self?.refreshFormatBar() }
             root.cornerButtons.onFormat = { [weak formatting] in formatting?.applyFormat($0) }
         }
-        panel.onResponderChange = { [weak self] in self?.refreshFormatBar() }
+        panel.onResponderChange = { [weak self] in self?.refreshFormatBar(focusChanged: true) }
         panel.onMouseDown = { [unowned self] in coordinator?.endTrashUndo() }
         root.onHoverChange = { [unowned self] inside in
             guard isPointerInside != inside else { return }
