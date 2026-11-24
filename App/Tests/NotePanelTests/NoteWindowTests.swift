@@ -74,7 +74,7 @@ import Theme
         #expect(measured[0] != measured[1])
         // 호버로 나타나는 것은 보이지 않을 때도 자리를 차지한다.
         #expect(controller.root.topRow.subviews.filter { $0 is IconButton && !$0.isHidden }.allSatisfy {
-            $0.frame.width == fixture.theme.component(.iconButton)
+            $0.frame.width == fixture.theme.component(.noteTopButtonSize)
         })
     }
 
@@ -676,7 +676,7 @@ import Theme
         // 긴 제목이 잘리는 자리만 표시 앞으로 당겨진다.
         #expect(title.frame.minX == titleFrame.minX)
         #expect(title.frame.maxX == indicator.frame.minX - fixture.theme.component(.chromeGap))
-        #expect(indicator.frame.maxX == reserved.map(\.frame.minX).min()! - fixture.theme.component(.iconButtonGap))
+        #expect(indicator.frame.maxX == reserved.map(\.frame.minX).min()! - fixture.theme.component(.noteTopButtonGap))
 
         controller.resolveProblem(.keepMine)
         #expect(controller.problem == nil)

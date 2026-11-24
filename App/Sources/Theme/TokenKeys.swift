@@ -256,6 +256,9 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case settingsContentHeight = "settings-content-h"
     case menuDot = "menu-dot"
     case iconButton = "icon-btn"
+    case noteTopButtonSize = "note-top-button-size"
+    case noteTopButtonGap = "note-top-button-gap"
+    case noteTopPaddingEnd = "note-top-pad-end"
     case menubarIcon = "menubar-icon"
     case browseWidth = "browse-w"
     /// 노트 상단 줄: 요소 사이, 오른쪽 여백(spec 5.1).

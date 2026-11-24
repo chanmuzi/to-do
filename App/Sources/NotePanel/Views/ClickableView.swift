@@ -27,6 +27,12 @@ class ClickableView: NSView {
         return self
     }
 
+    /// 상단 줄이 칸 사이의 누름을 이 버튼에 건넨 경우 뗄 때에도 같은 경계를 쓴다.
+    func acceptsRelease(at windowPoint: NSPoint) -> Bool {
+        if bounds.contains(convert(windowPoint, from: nil)) { return true }
+        return (window as? NotePanelWindow)?.button(at: windowPoint) === self
+    }
+
     override var mouseDownCanMoveWindow: Bool { false }
 
     /// 키 창이 아니어도, 앱이 앞에 있지 않아도 첫 누름이 동작한다.

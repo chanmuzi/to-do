@@ -199,12 +199,12 @@ final class TopRowView: NSView {
             metrics: TopRowLayout.Metrics(
                 height: style.theme.shape(.chromeHeight),
                 paddingLeading: theme.space(.sp3),
-                // 핀 아이콘의 오른쪽 끝이 제목의 왼쪽 여백과 같은 거리에 오게 한다(좌우 균형).
-                paddingTrailing: theme.component(.chromePaddingEnd),
+                // 줄 끝에 보이는 닫기와 평소 핀의 중심은 이전 자리와 같다.
+                paddingTrailing: theme.component(.noteTopPaddingEnd),
                 gap: theme.component(.chromeGap),
-                iconButton: theme.component(.iconButton),
+                iconButton: theme.component(.noteTopButtonSize),
                 dividerWidth: theme.shape(.borderWidth),
-                buttonGap: theme.component(.iconButtonGap)
+                buttonGap: theme.component(.noteTopButtonGap)
             )
         )
         agentButton.frame = frames.agent
@@ -245,7 +245,16 @@ final class TopRowView: NSView {
             if current === title, title.isEditing { return hit }
             view = current.superview
         }
-        return self
+        // 칸 사이와 구분선에서도 가까운 쪽이 누름을 받는다. 제목 쪽과 줄 끝은 끌 수 있다.
+        let local = convert(point, from: superview)
+        let controls = subviews.compactMap { $0 as? ClickableView }.filter {
+            !$0.isHidden && $0.alphaValue > 0 && !$0.frame.isEmpty
+                && local.y >= $0.frame.minY && local.y < $0.frame.maxY
+        }
+        let left = controls.filter { $0.frame.maxX <= local.x }.max { $0.frame.maxX < $1.frame.maxX }
+        let right = controls.filter { $0.frame.minX > local.x }.min { $0.frame.minX < $1.frame.minX }
+        guard let left, let right else { return self }
+        return local.x < (left.frame.maxX + right.frame.minX) / 2 ? left : right
     }
 
     override func updateTrackingAreas() {

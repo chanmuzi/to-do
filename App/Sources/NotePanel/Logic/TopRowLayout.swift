@@ -8,9 +8,8 @@ struct TopRowLayout: Hashable {
         var paddingTrailing: CGFloat
         var gap: CGFloat
         var iconButton: CGFloat
-        /// 나란히 놓인 아이콘 버튼 사이(`icon-btn-gap`). 버튼은 평소 상자 없이 아이콘만 보이므로(규칙 10)
-        /// 보이는 간격은 아이콘 사이의 거리다. 이웃한 버튼의 `hover` 상자는 겹치지 않고 맞닿는다.
         var dividerWidth: CGFloat = 1
+        /// 호버 바탕 사이의 간격. 누름은 이웃한 두 조작이 절반씩 받는다.
         var buttonGap: CGFloat = 0
     }
 

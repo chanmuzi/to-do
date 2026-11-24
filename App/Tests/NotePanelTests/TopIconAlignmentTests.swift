@@ -7,7 +7,7 @@ import Theme
     @Test func clockAndPinShareTheButtonCenterAndIconSlot() throws {
         let theme = try Theme.bundled()
         let style = PanelStyle(theme: theme)
-        let side = theme.component(.iconButton)
+        let side = theme.component(.noteTopButtonSize)
         let frame = NSRect(x: 0, y: 0, width: side, height: side)
         let pin = IconButton(style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "핀")
         pin.frame = frame
