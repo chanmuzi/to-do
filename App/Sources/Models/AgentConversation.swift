@@ -8,6 +8,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     public let createdAt: Date
     public var updatedAt: Date
     public var targets: [NoteID]
+    public var barRequestID: UUID?
     public var customName: String?
     public var seenAt: Date?
     public var needsAnswer: Bool { requests.contains { $0.status == .awaitingAnswer } }
@@ -37,13 +38,14 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt, customName
+        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt, customName, barRequestID
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(formatVersion, forKey: .formatVersion)
         try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(barRequestID, forKey: .barRequestID)
         try c.encodeIfPresent(seenAt, forKey: .seenAt)
         try c.encodeIfPresent(customName, forKey: .customName)
         try c.encode(name, forKey: .name)
@@ -95,6 +97,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
                                                    debugDescription: "지원하지 않는 대화 형식입니다")
         }
         id = try c.decode(UUID.self, forKey: .id)
+        barRequestID = try c.decodeIfPresent(UUID.self, forKey: .barRequestID)
         customName = try c.decodeIfPresent(String.self, forKey: .customName)
         seenAt = try c.decodeIfPresent(Date.self, forKey: .seenAt)
         createdAt = try c.decode(Date.self, forKey: .createdAt)

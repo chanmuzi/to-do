@@ -57,7 +57,7 @@ let package = Package(
             swiftSettings: uiSettings
         ),
 
-        .target(name: "Agent", dependencies: ["Theme", "Models", "Store", "Routing"], swiftSettings: uiSettings),
+        .target(name: "Agent", dependencies: ["MarkdownSyntax", "Theme", "Models", "Store", "Routing"], swiftSettings: uiSettings),
 
         .target(name: "Library", dependencies: ["MarkdownSyntax", "Theme", "Models", "Store", "Routing", "SpaceIcons"],
                 swiftSettings: uiSettings),
