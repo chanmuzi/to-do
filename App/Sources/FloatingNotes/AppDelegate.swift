@@ -325,6 +325,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let notes = environment?.notes else { return .terminateNow }
         // 편집기가 아직 알리지 않은 글과 고치던 제목을 먼저 받는다.
         notePanels?.flushPendingEdits()
+        notePanels?.saveReadingPositions()
         flushWindowStates()
         do {
             try instructionStore?.flushInstructions()

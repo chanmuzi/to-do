@@ -119,6 +119,28 @@ final class NoteWindowController: NSObject {
         if focus { focusBody() }
     }
 
+    func saveReadingPosition() {
+        guard let text = editor.view as? NSTextView, let scroll = text.enclosingScrollView else { return }
+        let selection = text.selectedRange()
+        guard selection.location != NSNotFound else { return }
+        environment.recorder.recordReadingPosition(.init(selection: selection, scrollY: scroll.documentVisibleRect.minY), for: noteID)
+    }
+
+    func restoreReadingPosition(_ position: NoteWindowState.ReadingPosition?) {
+        guard let position, let text = editor.view as? NSTextView, let scroll = text.enclosingScrollView else { return }
+        root.layoutSubtreeIfNeeded()
+        let source = text.string as NSString
+        let start = min(max(0, position.selection.location), source.length)
+        var end = start + min(max(0, position.selection.length), source.length - start)
+        if end < source.length { end = source.rangeOfComposedCharacterSequence(at: end).location }
+        text.setSelectedRange(NSRange(location: end, length: 0))
+        let clip = scroll.contentView
+        var bounds = clip.bounds
+        bounds.origin.y = position.scrollY.isFinite ? position.scrollY : 0
+        clip.scroll(to: clip.constrainBoundsRect(bounds).origin)
+        scroll.reflectScrolledClipView(clip)
+    }
+
     func focusBody() {
         panel.becomeKeyByRequest()
         editor.focus()

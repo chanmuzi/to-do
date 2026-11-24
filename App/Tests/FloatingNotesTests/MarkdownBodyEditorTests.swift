@@ -115,10 +115,30 @@ import Theme
         #expect(window.frame == original)
         #expect(scroll.documentVisibleRect.minY > 0)
         #expect(scroll.documentVisibleRect.contains(caret))
+        let end = adapter.editor.selectedRange.location
+        let savedY = scroll.documentVisibleRect.minY
+        adapter.editor.selectedRange = NSRange(location: end - 1, length: 1)
         fixture.notePanels.closeWindow(id)
         try fixture.notePanels.open(id, focus: false)
         let restored = try #require(fixture.notePanels.controllers[id])
-        #expect(restored.editor.view.enclosingScrollView?.documentVisibleRect.minY == 0)
+        let clip = try #require(restored.editor.view.enclosingScrollView?.contentView)
+        var expected = clip.bounds
+        expected.origin.y = savedY
+        #expect(clip.bounds.minY == clip.constrainBoundsRect(expected).minY)
+        #expect((restored.editor.view as? NSTextView)?.selectedRange() == NSRange(location: end, length: 0))
+    }
+
+    @Test func reopenedPositionClampsAfterExternalShortening() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "일정", body: (1...30).map(String.init).joined(separator: "\n")))
+        adapter.editor.selectedRange = NSRange(location: adapter.text.utf16.count - 3, length: 3)
+        adapter.editor.textView.scrollRangeToVisible(adapter.editor.selectedRange)
+        fixture.notePanels.closeWindow(id)
+        try fixture.notes.update(id) { $0.body = "짧음" }
+        try fixture.notePanels.open(id, focus: false)
+        let reopened = try #require(fixture.editors.editor(for: id))
+        #expect(reopened.editor.selectedRange == NSRange(location: 2, length: 0))
+        #expect(reopened.view.enclosingScrollView?.documentVisibleRect.minY == 0)
     }
 
     @Test func fixedHeightShowsEntireLinkFieldAtLastLine() throws {

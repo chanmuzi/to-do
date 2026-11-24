@@ -63,6 +63,10 @@ struct WindowStateRecorder {
     }
 
     /// 창만 닫았다. 틀과 핀은 다시 띄울 때를 위해 남긴다.
+    func recordReadingPosition(_ position: NoteWindowState.ReadingPosition, for id: NoteID) {
+        write(id) { $0.readingPosition = position }
+    }
+
     func recordClosed(_ id: NoteID) {
         write(id) { $0.isOpen = false }
     }
