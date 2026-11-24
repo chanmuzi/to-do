@@ -98,10 +98,14 @@ class ValueButton: NSButton {
         }
         let value = text
         value.draw(at: NSPoint(x: textX, y: (bounds.height - value.size().height) / 2))
-        let width = chevronWidth, height = inSettings ? theme.component(.settingsChevronHeight) : theme.space(.sp3)
-        let x = textX + ceil(value.size().width) + valueGap, y = bounds.midY - (inSettings ? (isFlipped ? 1 : -1) * height / 3 : 0)
+        drawChevron(at: textX + ceil(value.size().width) + valueGap, single: inSettings)
+    }
+    func drawChevron(at x: CGFloat, single: Bool) {
+        let width = theme.component(single ? .settingsChevronWidth : .menuDot)
+        let height = single ? theme.component(.settingsChevronHeight) : theme.space(.sp3)
+        let y = bounds.midY - (single ? (isFlipped ? 1 : -1) * height / 3 : 0)
         let path = NSBezierPath()
-        for sign: CGFloat in (inSettings ? [isFlipped ? 1 : -1] : [-1, 1]) {
+        for sign: CGFloat in (single ? [isFlipped ? 1 : -1] : [-1, 1]) {
             path.move(to: NSPoint(x: x, y: y + sign * height / 6))
             path.line(to: NSPoint(x: x + width / 2, y: y + sign * height / 2))
             path.line(to: NSPoint(x: x + width, y: y + sign * height / 6))
@@ -124,9 +128,15 @@ class ValueButton: NSButton {
     @objc func openChoices() {
         guard let menu else { return }
         if usesFloatingMenu {
-            if popup?.isVisible == true { popup?.close() }
+            if let popup, popup.isVisible {
+                popup.close()
+                return
+            }
             popup = SettingsValueMenu(menu: menu, anchor: self, offset: menuOffset)
-            popup?.onDismiss = { [weak self] in self?.popupVisibilityChanged() }
+            popup?.onDismiss = { [weak self] in
+                self?.popup = nil
+                self?.popupVisibilityChanged()
+            }
             popupVisibilityChanged()
             needsDisplay = true
         }

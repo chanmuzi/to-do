@@ -49,7 +49,7 @@ private final class InlineValueButton: ValueButton {
     var lineSpace: CommandLineSpace?
     var visible = true
     var makeChoices: (() -> NSMenu)?
-    private var shown: Bool { fits && (visible || window?.firstResponder === self || popup?.isVisible == true) }
+    private var shown: Bool { popup?.isVisible == true || (fits && (visible || window?.firstResponder === self)) }
     private var gap: CGFloat { theme.component(.captureValueGap) }
     private var labelFont: NSFont { theme.nsFont(.body, size: theme.component(.agentModelFont)) }
     private func text(_ string: String, _ color: ColorToken) -> NSAttributedString {
@@ -58,7 +58,7 @@ private final class InlineValueButton: ValueButton {
         return NSAttributedString(string: string, attributes: [.font: labelFont, .foregroundColor: theme.nsColor(color), .paragraphStyle: paragraph])
     }
     private var detailWidth: CGFloat { detail.map { ceil(text($0, .text3).size().width) + gap } ?? 0 }
-    private var fixedWidth: CGFloat { detailWidth + gap * 3 + theme.component(.agentModelChevron) }
+    private var fixedWidth: CGFloat { detailWidth + gap * 3 + theme.component(.settingsChevronWidth) }
     private var buttonWidth: CGFloat {
         let natural = min(theme.component(.agentModelNameMax), ceil(text(title, .text2).size().width)) + fixedWidth
         guard let space = lineSpace else { return natural }
@@ -71,7 +71,7 @@ private final class InlineValueButton: ValueButton {
     }
     override var intrinsicContentSize: NSSize {
         let height = ceil(text(title, .text2).size().height) + theme.component(.agentModelInsetY) * 2
-        guard fits else { return .zero }
+        guard fits || popup?.isVisible == true else { return .zero }
         let availableHeight = lineSpace.flatMap { $0.multiline ? $0.lineHeight : nil } ?? height
         return NSSize(width: shown ? buttonWidth : theme.shape(.borderWidth), height: min(height, availableHeight))
     }
@@ -97,14 +97,11 @@ private final class InlineValueButton: ValueButton {
         let name = text(title, .text2)
         let height = ceil(name.size().height)
         let y = (bounds.height - height) / 2
-        let side = theme.component(.agentModelChevron)
+        let side = theme.component(.settingsChevronWidth)
         let nameWidth = max(0, bounds.width - gap * 3 - side - detailWidth)
         name.draw(in: NSRect(x: gap, y: y, width: nameWidth, height: height))
         if let detail { text(detail, .text3).draw(at: .init(x: gap * 2 + nameWidth, y: y)) }
-        if let glyph = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(paletteColors: [theme.nsColor(.text3)])) {
-            glyph.draw(in: CGRect(x: bounds.maxX - gap - side, y: bounds.midY - side / 2, width: side, height: side))
-        }
+        drawChevron(at: bounds.maxX - gap - side, single: true)
     }
     override func becomeFirstResponder() -> Bool {
         let accepted = super.becomeFirstResponder()
@@ -121,15 +118,16 @@ private final class InlineValueButton: ValueButton {
         if [36, 76, 49].contains(event.keyCode) { openChoices() } else { super.keyDown(with: event) }
     }
     override func openChoices() {
-        guard fits else { return }
-        menu = makeChoices?()
-        prepareMenu()
+        if popup?.isVisible != true {
+            guard fits else { return }
+            menu = makeChoices?()
+            prepareMenu()
+        }
         super.openChoices()
     }
     override func popupVisibilityChanged() { updateAppearance() }
     func updateAppearance() {
-        if !fits, popup?.isVisible == true { popup?.close() }
-        setAccessibilityElement(fits)
+        setAccessibilityElement(fits || popup?.isVisible == true)
         wantsLayer = true
         CATransaction.begin()
         CATransaction.setAnimationDuration(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : theme.motion.duration)

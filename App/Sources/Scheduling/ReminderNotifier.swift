@@ -23,7 +23,7 @@ public final class FakeReminderNotifier: ReminderNotifier {
 @MainActor
 public final class SystemReminderNotifier: NSObject, ReminderNotifier, UNUserNotificationCenterDelegate {
     private var storage: UNUserNotificationCenter?
-    package var openConversation: (@MainActor (UUID) -> Void)?
+    package var openConversation: (@MainActor (UUID, UUID?) -> Void)?
     public var openAgent: (@MainActor (String) -> Void)?
     public func installDelegate() { _ = center() }
     public var openNote: (@MainActor (NoteID) -> Void)?
@@ -65,7 +65,8 @@ public final class SystemReminderNotifier: NSObject, ReminderNotifier, UNUserNot
     public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
         if let raw = response.notification.request.content.userInfo["floatConversation"] as? String,
            let id = UUID(uuidString: raw), response.actionIdentifier != UNNotificationDismissActionIdentifier {
-            await MainActor.run { openConversation?(id) }
+            let proposal = (response.notification.request.content.userInfo["floatProposal"] as? String).flatMap(UUID.init(uuidString:))
+            await MainActor.run { openConversation?(id, proposal) }
             return
         }
         if let provider = response.notification.request.content.userInfo["floatAgent"] as? String,

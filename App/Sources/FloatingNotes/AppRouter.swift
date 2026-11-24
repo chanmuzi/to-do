@@ -74,6 +74,15 @@ final class AppRouter: Routing {
         showAgent(draft, source: source, screen: screen, reuseForBar: true)
     }
 
+    func openReply(_ id: UUID, proposal: UUID?) {
+        guard let agent, let draft = agent.record(id: id) else { return }
+        if let proposal, draft.proposal(proposal) != nil {
+            agent.openProposal(proposal)
+        } else {
+            showAgent(draft, source: "notification", reuseForBar: draft.conversation.barRequestID != nil)
+        }
+    }
+
     func showAgent(_ draft: AgentDraft, source: String, screen: NSScreen? = nil, reuseForBar: Bool = false) {
         guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first, preferredScreen: screen)
             ?? notePanels?.agentWindowAnchor(for: nil) else { return }

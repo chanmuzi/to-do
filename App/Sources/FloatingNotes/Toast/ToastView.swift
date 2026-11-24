@@ -1,5 +1,4 @@
 import AppKit
-import SwiftUI
 import Theme
 
 /// 짧은 알림의 모습(D-041): 한 줄의 글과 동작 하나. 흑백이고, 바탕은 캡처 바와 같다(뒤 배경 흐림 위에
@@ -13,13 +12,7 @@ final class ToastView: NSView {
     private let divider = NSBox()
     private let label = NSTextField(labelWithString: "")
 
-    private let faceView: NSView?
-    private let workingBorder: NSView?
-    private var faceWidth: CGFloat { faceView == nil ? 0 : theme.component(.agentFaceMedium) + theme.space(.sp2) }
-
-    init(theme: Theme, message: String, actionTitle: String? = nil, face: AgentFaceState? = nil, working: Bool = false) {
-        faceView = face.map { NSHostingView(rootView: AgentFace(theme: theme, state: $0, size: .medium)) }
-        workingBorder = working ? NSHostingView(rootView: theme.stationaryAgentBorder(radius: theme.shape(.windowRadius))) : nil
+    init(theme: Theme, message: String, actionTitle: String? = nil) {
         self.theme = theme
         actionButton = ToastActionButton(theme: theme, title: actionTitle ?? "")
         super.init(frame: .zero)
@@ -29,7 +22,6 @@ final class ToastView: NSView {
         effectView.state = .active
         effectView.maskImage = Self.roundedMask(radius: theme.shape(.windowRadius))
         surfaceView.wantsLayer = true
-        if let workingBorder { surfaceView.addSubview(workingBorder) }
         label.stringValue = message
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
         label.lineBreakMode = .byTruncatingTail
@@ -42,7 +34,6 @@ final class ToastView: NSView {
         actionButton.isHidden = actionTitle?.isEmpty != false
         divider.isHidden = actionButton.isHidden
         [effectView, surfaceView, label, divider, actionButton].forEach(addSubview)
-        if let faceView { addSubview(faceView) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(message)
@@ -60,7 +51,7 @@ final class ToastView: NSView {
         let padding = theme.component(.toastPadding)
         let actionWidth = actionButton.isHidden ? 0 : theme.component(.toastGap) * 2
             + theme.shape(.borderWidth) + actionButton.labelSize.width
-        let natural = padding * 2 + faceWidth + messageSize.width + actionWidth
+        let natural = padding * 2 + messageSize.width + actionWidth
         return NSSize(width: min(natural, maxWidth), height: theme.component(.toastHeight))
     }
 
@@ -81,7 +72,7 @@ final class ToastView: NSView {
     override func updateLayer() {
         guard let layer = surfaceView.layer else { return }
         layer.cornerRadius = theme.shape(.windowRadius)
-        layer.borderWidth = workingBorder == nil ? theme.shape(.borderWidth) : 0
+        layer.borderWidth = theme.shape(.borderWidth)
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer.borderColor = theme.nsColor(.outline).cgColor
             layer.backgroundColor = theme.nsColor(.surface).withAlphaComponent(theme.material.opacity).cgColor
@@ -99,9 +90,6 @@ final class ToastView: NSView {
         effectView.frame = bounds
         surfaceView.frame = bounds
         let padding = theme.component(.toastPadding)
-        workingBorder?.frame = surfaceView.bounds
-        let size = theme.component(.agentFaceMedium)
-        faceView?.frame = NSRect(x: padding, y: (bounds.height - size) / 2, width: size, height: size)
         let button = actionButton.preferredSize
         actionButton.frame = NSRect(
             x: bounds.width - padding + theme.space(.sp2) - button.width,
@@ -120,8 +108,8 @@ final class ToastView: NSView {
         let baselineShift = actionButton.frame.minY + actionButton.labelBaselineFromTop
             - (centered + label.firstBaselineOffsetFromTop)
         label.frame = NSRect(
-            x: padding + faceWidth, y: actionButton.isHidden ? centered : (centered + baselineShift).rounded(),
-            width: max(0, labelEnd - padding - faceWidth), height: labelHeight
+            x: padding, y: actionButton.isHidden ? centered : (centered + baselineShift).rounded(),
+            width: max(0, labelEnd - padding), height: labelHeight
         )
     }
 

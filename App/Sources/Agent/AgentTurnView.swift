@@ -101,7 +101,7 @@ struct AgentTurnView: View {
                     }
                     if request.status == .failed {
                         stoppedLine(request.failure ?? "막혔어요")
-                        if let reset = request.resumeTime { Text(reset).font(smallFont) }
+                        if let reset = request.resumeTime { Text("\(reset)부터 다시 돼요").font(smallFont) }
                         Button("다시 시도", action: retry).buttonStyle(SettingsButton(theme: theme, selected: false))
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)

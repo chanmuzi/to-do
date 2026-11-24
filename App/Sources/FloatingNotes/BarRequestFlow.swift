@@ -1,5 +1,4 @@
 import Agent
-import AgentRunner
 import Capture
 import Foundation
 import Models
@@ -7,21 +6,17 @@ import Models
 final class BarRequestFlow {
     private let agent: AgentWindowCoordinator
     private unowned let requests: AgentRequestCoordinator
-    var showsConversation: (UUID) -> Bool
-    var deliver: (AgentReplyNotification) async throws -> Bool = { try await $0.deliver() }
-    var log: @MainActor (String) -> Void = AppLog.warning
 
     init(agent: AgentWindowCoordinator, requests: AgentRequestCoordinator) {
         self.agent = agent
         self.requests = requests
-        showsConversation = agent.showsConversation
     }
 
     func submit(_ text: String) -> AgentDraft? {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let draft = agent.newRecord()
         guard requests.submit(draft, text: text, fromInput: false, fromBar: true) else {
-            if let error = draft.writeError { log(error.localizedDescription) }
+            if let error = draft.writeError { AppLog.warning(error.localizedDescription) }
             return nil
         }
         agent.rememberBar(draft)
@@ -45,18 +40,5 @@ final class BarRequestFlow {
         }
         return .init(id: chat.id, question: NotePreviewText.firstLine(in: request.userText) ?? request.userText,
                      detail: detail, date: request.steps.last?.endedAt ?? chat.createdAt, face: request.face)
-    }
-
-    @discardableResult func finished(_ draft: AgentDraft, _ request: AgentRequest) -> Task<Void, Never>? {
-        guard !showsConversation(draft.conversation.id) else { return nil }
-        let body = request.status == .failed ? request.failure ?? "막혔어요"
-            : NotePreviewText.firstLines(in: request.answer ?? "", limit: 2).joined(separator: "\n")
-        let notice = AgentReplyNotification(conversation: draft.conversation.id, request: request.id,
-                                            title: NotePreviewText.firstLine(in: request.userText) ?? draft.conversation.name, body: body)
-        return Task {
-            do {
-                if try await !deliver(notice) { log("알림 권한이 없어 막대 요청의 결과 알림을 건너뜁니다.") }
-            } catch { log("막대 요청의 결과를 알리지 못했습니다. " + error.localizedDescription) }
-        }
     }
 }

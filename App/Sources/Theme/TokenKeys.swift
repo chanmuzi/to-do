@@ -170,7 +170,6 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case agentFaceLarge = "agent-face-large"
     case agentModelNameMax = "agent-model-name-max"
     case agentModelFont = "agent-model-font"
-    case agentModelChevron = "agent-model-chevron"
     case agentModelInsetY = "agent-model-inset-y"
     case agentHeaderInset = "agent-header-inset"
     case agentFaceTitleGap = "agent-face-title-gap"
