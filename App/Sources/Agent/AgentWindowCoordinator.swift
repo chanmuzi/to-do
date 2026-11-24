@@ -26,6 +26,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var drafts: [AgentDraft] { Array(catalog.records.values) }
     package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter(\.hasSubmitted) }
     package func record(id: UUID) -> AgentDraft? { catalog.records[id] }
+    package var modelPicker: ((Bool, CommandLineSpace) -> AnyView)?
     package var present: (AgentDraft, String) -> Void = { _, _ in }
     private weak var lastPresentedPanel: AgentPanel?
     private var lastBarFrame: CGRect?
@@ -159,7 +160,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                 if draft?.writeError != nil { draft?.save() }
                 return draft?.writeError == nil
             }
-            let view = AgentWindowView(theme: theme, title: title, draft: draft,
+            let view = AgentWindowView(theme: theme, modelPicker: modelPicker, title: title, draft: draft,
                                        history: { [weak self] in self?.history ?? [] },
                                        openHistory: { [weak self, weak panel] id in
                                            guard let self, let next = record(id: id) else { return }

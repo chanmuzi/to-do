@@ -8,6 +8,7 @@ struct AgentExecution {
     let directory: URL?
     var instructionStore: AgentStore?
     var server: URL?
+    var supportedEfforts: ((AgentProvider, String?) -> [String]?)?
     var noteContext: (() -> AgentNoteContext)?
     var notifications: AgentExpiryNotifications = .shared
 
@@ -59,7 +60,8 @@ struct AgentExecution {
                 try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: url.path)
             }
             let engine: AgentEngine = provider == .claude ? .claude(request.model) : .codex(model: request.model)
-            return try await runner.run(prompt, engine: engine, installation: installation, runID: request.runID, proposalInbox: inbox, notifyExpiry: notifyExpiry, onEvent: emit).text
+            let effort = try await resolvedEffort(request, installation: installation)
+            return try await runner.run(prompt, engine: engine, installation: installation, effort: effort, runID: request.runID, proposalInbox: inbox, notifyExpiry: notifyExpiry, onEvent: emit).text
         } catch AgentError.loginExpired {
             throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
         } catch AgentError.rateLimited(let reset) {
@@ -71,6 +73,22 @@ struct AgentExecution {
             let version = installation.version.split { !$0.isNumber && $0 != "." }.first { $0.contains(".") } ?? ""
             throw AgentRequestCoordinator.Failure(message: "\(provider == .claude ? "Claude" : "Codex") \(version) 요청을 마치지 못했어요")
         }
+    }
+
+    private func resolvedEffort(_ request: AgentRequest, installation: AgentInstallation) async throws -> String? {
+        guard let effort = request.effort else { return nil }
+        let provider = installation.provider
+        if let cached = supportedEfforts?(provider, request.model) { return cached.contains(effort) ? effort : nil }
+        let connection = try AgentConnection(provider: provider, location: location)
+        let levels: [String]?
+        if provider == .codex {
+            let models = await connection.models(installation)
+            levels = (request.model == nil ? models?.first : models?.first { $0.slug == request.model })?.efforts
+        } else if let model = request.model {
+            levels = await connection.claudeModels(installation)?.first { $0.value == model }?.efforts
+        } else { levels = nil }
+        try Task.checkCancellation()
+        return (levels ?? provider.fallbackEfforts).contains(effort) ? effort : nil
     }
 
     private struct Prompt: Encodable {

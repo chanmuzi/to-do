@@ -632,6 +632,19 @@ final class DebugControl {
             guard let agent, let panel = agent.window(for: id), let url = output(named: name) else { return }
             write(json: ["target": id.rawValue, "draft": agent.draft(for: id) ?? "", "frame": NSStringFromRect(panel.frame),
                          "key": panel.isKeyWindow, "minWidth": panel.minSize.width, "maxWidth": panel.maxSize.width], to: url)
+        case ("agent-input-hover", let id?, let value?) where isPassive:
+            (try? agent?.record(for: id))?.previewInputHover = value == "on"
+        case ("bar-model-menu", let name?, _) where isPassive:
+            func picker(in view: NSView) -> NSButton? {
+                if let button = view as? NSButton, button.accessibilityLabel()?.hasPrefix("모델: ") == true { return button }
+                return view.subviews.lazy.compactMap(picker).first
+            }
+            if let root = quickPanels.window(named: "capture")?.contentView, let button = picker(in: root),
+               let url = output(named: name.rawValue) {
+                DebugSettingsMenu.capture(at: button, to: url, image: true) {
+                    self.write($0, to: url.deletingPathExtension().appendingPathExtension("parent.png"), audit: false)
+                }
+            }
         case ("agent-snapshot", let id?, let name?) where isPassive:
             guard let url = output(named: name) else { return }
             write(agent?.window(for: id), to: url)

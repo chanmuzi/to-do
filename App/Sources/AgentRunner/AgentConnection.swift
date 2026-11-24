@@ -3,6 +3,12 @@ import Store
 
 public enum AgentProvider: String, Codable, Sendable { case claude, codex }
 public enum APIProvider: String, Sendable { case anthropic, openAI }
+extension AgentProvider {
+    package var fallbackEfforts: [String] {
+        self == .claude ? ["low", "medium", "high", "xhigh", "max"] : ["low", "medium", "high", "xhigh", "max", "ultra"]
+    }
+}
+
 public enum AgentEngine: Sendable {
     case claude(String? = nil), codex(model: String? = nil), apiKey(APIProvider)
 

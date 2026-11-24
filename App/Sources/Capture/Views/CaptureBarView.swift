@@ -7,6 +7,13 @@ final class CaptureBarView: NSView {
     private let style: CaptureStyle
     private let background: CaptureBackgroundView
     private let switchHost = NSHostingView(rootView: AnyView(EmptyView()))
+    private let modelHost = ModelPickerHost(rootView: AnyView(EmptyView()))
+    func setModelPicker(_ picker: AnyView?) {
+        modelHost.rootView = AnyView(picker.fixedSize())
+        modelHost.isHidden = picker == nil
+        needsLayout = true
+    }
+
     private let recentHost = NSHostingView(rootView: AnyView(EmptyView()))
     private var recent: CaptureRecentRequest?
     var onRecent: (UUID) -> Void = { _ in }
@@ -49,7 +56,7 @@ final class CaptureBarView: NSView {
         background.autoresizingMask = [.width, .height]
         addSubview(background)
 
-        [recentHost, switchHost, input, spaceBadge, reminderBadge].forEach(addSubview)
+        [recentHost, switchHost, input, spaceBadge, reminderBadge, modelHost].forEach(addSubview)
         input.setAccessibilityLabel("빠른 캡처")
         textView.setAccessibilityPlaceholderValue(Self.placeholder)
         refreshTheme()
@@ -142,6 +149,11 @@ final class CaptureBarView: NSView {
 
         // 오른쪽 끝에서부터: 리마인더, 그 왼쪽에 스페이스. 없는 것은 자리가 없다.
         var trailing = bounds.width - padding
+        if mode == .request && !modelHost.isHidden {
+            let size = modelHost.fittingSize
+            modelHost.frame = centered(size, x: trailing - size.width)
+            trailing = modelHost.frame.minX - gap
+        }
         for badge in [reminderBadge, spaceBadge] {
             let width = badge.fittingWidth
             guard width > 0 else {
@@ -156,5 +168,13 @@ final class CaptureBarView: NSView {
         let height = ceil(input.intrinsicContentSize.height)
         input.frame = centered(NSSize(width: max(0, trailing - inputX), height: height),
                                x: inputX - CaptureStyle.labelInset)
+    }
+}
+
+
+private final class ModelPickerHost: NSHostingView<AnyView> {
+    override func invalidateIntrinsicContentSize() {
+        super.invalidateIntrinsicContentSize()
+        superview?.needsLayout = true
     }
 }

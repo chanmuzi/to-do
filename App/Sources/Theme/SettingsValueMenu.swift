@@ -2,6 +2,7 @@ import AppKit
 
 /// 설정 값 버튼에 붙는 메뉴. 창은 포커스를 가져가지 않고 선택 결과를 원래 메뉴 액션으로 돌려준다.
 package final class SettingsValueMenu: NSPanel {
+    var onDismiss: (() -> Void)?
     private weak var anchor: NSView?
     private let choices: NSMenu
     private var rowsByItem: [NSMenuItem: PickerMenuRow] = [:]
@@ -103,6 +104,8 @@ package final class SettingsValueMenu: NSPanel {
         parent?.removeChildWindow(self)
         super.close()
         anchor?.needsDisplay = true
+        onDismiss?()
+        onDismiss = nil
     }
 
     func highlight(_ row: PickerMenuRow?) {

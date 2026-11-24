@@ -19,6 +19,15 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var showsCornerAgent = false
     package var agentProvider = "claude"
     package var codexModel: String?
+    package var claudeEffort: String?
+    package var codexEffort: String?
+    package var effort: String? {
+        get { agentProvider == "codex" ? codexEffort : claudeEffort }
+        set {
+            if agentProvider == "codex" { codexEffort = newValue }
+            else { claudeEffort = newValue }
+        }
+    }
     package var agentModel = "auto"
     package var noteHeightMode: NoteDisplayOptions.HeightMode = .fixed
     package var appearance = "system"
@@ -53,6 +62,8 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
         showsNoteAgent = try container.decodeIfPresent(Bool.self, forKey: .showsNoteAgent) ?? true
         showsCornerAgent = try container.decodeIfPresent(Bool.self, forKey: .showsCornerAgent) ?? false
         agentProvider = try container.decodeIfPresent(String.self, forKey: .agentProvider) ?? "claude"
+        claudeEffort = try container.decodeIfPresent(String.self, forKey: .claudeEffort)
+        codexEffort = try container.decodeIfPresent(String.self, forKey: .codexEffort)
         codexModel = try container.decodeIfPresent(String.self, forKey: .codexModel)
         agentModel = try container.decodeIfPresent(String.self, forKey: .agentModel) ?? "auto"
         spaceDisplay = try container.decodeIfPresent(String.self, forKey: .spaceDisplay) ?? "icon"

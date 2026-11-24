@@ -8,7 +8,11 @@ import Testing
     @Test func savedModelFallsBackWithoutOverwritingProviderChoices() throws {
         var values = try JSONDecoder().decode(SettingsValues.self, from: Data(#"{"agentModel":"sonnet"}"#.utf8))
         #expect(values.selectedEngine(codexModels: []).model == "sonnet")
+        #expect(values.effort == nil)
+        values.effort = "high"
         values.agentProvider = "codex"
+        #expect(values.effort == nil)
+        values.effort = "ultra"
         values.codexModel = "test-slug"
         #expect(values.selectedEngine(codexModels: []).model == nil)
         let list = try JSONDecoder().decode([CodexModel].self, from: Data(
@@ -16,6 +20,7 @@ import Testing
         let reopened = try JSONDecoder().decode(SettingsValues.self, from: JSONEncoder().encode(values))
         #expect(reopened.selectedEngine(codexModels: list).model == "test-slug")
         #expect(reopened.agentModel == "sonnet")
+        #expect(reopened.claudeEffort == "high" && reopened.codexEffort == "ultra")
     }
 
     @Test func isolatedLoginCancelVerifyExpiryAndLogout() async throws {

@@ -147,6 +147,7 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
     public var stoppedAttempts: [StoppedAttempt]?
     public var runID: UUID
     public var engine: String
+    public var effort: String?
     public var model: String?
     public var status: Status
     public var userText: String
@@ -161,8 +162,8 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
 }
 
 extension AgentRequest {
-    package init(id: UUID, text: String, engine: String, model: String?) {
-        self.init(id: id, runID: UUID(), engine: engine, model: model, status: .running,
+    package init(id: UUID, text: String, engine: String, model: String?, effort: String? = nil) {
+        self.init(id: id, runID: UUID(), engine: engine, effort: effort, model: model, status: .running,
                   userText: text, steps: [], proposals: [])
     }
 }
