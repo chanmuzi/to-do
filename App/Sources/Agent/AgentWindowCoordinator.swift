@@ -19,6 +19,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     }
     private var sessions: [UUID: Session] = [:]
     @Observable fileprivate final class Catalog {
+        var recentBarID: UUID?
         var records: [UUID: AgentDraft] = [:]
     }
     private let catalog = Catalog()
@@ -26,6 +27,8 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var history: [AgentConversation] { catalog.records.values.map(\.conversation).filter(\.hasSubmitted) }
     package func record(id: UUID) -> AgentDraft? { catalog.records[id] }
     package var present: (AgentDraft, String) -> Void = { _, _ in }
+    private weak var lastPresentedPanel: AgentPanel?
+    private var lastBarFrame: CGRect?
     private var loaded = false
     package var send: (AgentDraft) -> Void = { _ in }
     package var sendAll: (AgentDraft) -> Void = { _ in }
@@ -62,7 +65,24 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
             }
             catalog.records[value.id] = AgentDraft(value, store: store)
         }
+        do { catalog.recentBarID = try store.recentBarID() }
+        catch { warning("직전 막대 대화를 읽지 못했습니다. " + error.localizedDescription) }
         loaded = true
+    }
+
+    package var recentBar: AgentDraft? {
+        catalog.recentBarID.flatMap { catalog.records[$0] }
+    }
+
+    package func rememberBar(_ draft: AgentDraft) {
+        catalog.recentBarID = draft.conversation.id
+        do { try store.rememberBar(draft.conversation.id) }
+        catch { warning("직전 막대 대화를 기록하지 못했습니다. " + error.localizedDescription) }
+    }
+
+    package func showsConversation(_ id: UUID) -> Bool {
+        guard let session = sessions[id], !session.draft.showsHistory else { return false }
+        return session.panel.isVisible && !session.panel.isMiniaturized && session.panel.occlusionState.contains(.visible)
     }
 
     package func preferred(for note: NoteID) -> AgentDraft? {
@@ -102,7 +122,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         try open(record: preferred(for: note) ?? record(for: note), title: title, frame: frame, visible: visible)
     }
 
-    package func open(record draft: AgentDraft, title: String, frame: CGRect, visible: CGRect) {
+    package func open(record draft: AgentDraft, title: String, frame: CGRect, visible: CGRect, reuseForBar: Bool = false) {
         draft.showsHistory = false
         draft.markSeen()
         let id = draft.conversation.id
@@ -110,8 +130,21 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         if let existing = sessions[id] {
             panel = existing.panel
         } else {
-            panel = AgentPanel(contentRect: frame, styleMask: [.borderless, .resizable, .closable, .nonactivatingPanel],
+            var opening = frame
+            let candidate = lastPresentedPanel ?? sessions.values.first(where: { $0.panel.isVisible })?.panel
+            let reusable = reuseForBar ? candidate : nil
+            if let reusable, let old = sessions.first(where: { $0.value.panel === reusable }), old.value.draft.writeError == nil {
+                sessions.removeValue(forKey: old.key)
+                panel = reusable
+                opening = reusable.frame
+                if !visible.intersects(opening) { opening.origin = frame.origin }
+            } else {
+                if reuseForBar, let lastBarFrame, visible.contains(lastBarFrame) {
+                    opening.origin = CGPoint(x: lastBarFrame.minX, y: lastBarFrame.maxY - frame.height)
+                }
+                panel = AgentPanel(contentRect: opening, styleMask: [.borderless, .resizable, .closable, .nonactivatingPanel],
                                backing: .buffered, defer: false)
+            }
             panel.allowsKey = allowsKeyWindows
             panel.title = "에이전트"
             panel.isReleasedWhenClosed = false
@@ -149,35 +182,40 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
                                        openProposal: openProposal, openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
-                                       titleForNote: titleForNote, fit: { [weak panel, theme] height in
-                guard let panel else { return }
-                let maxHeight = visible.height * theme.ratio(.noteMaxScreenHeight)
+                                       titleForNote: titleForNote, fit: { [weak panel, weak self, theme] height in
+                guard let panel, self?.sessions[id]?.panel === panel else { return }
+                let screen = panel.screen?.visibleFrame ?? visible
+                let maxHeight = min(theme.component(.agentWindowHeightLimit), screen.height * theme.ratio(.noteMaxScreenHeight))
                 let target = min(maxHeight, max(frame.height, height.rounded(.up)))
                 guard target > panel.frame.height else { return }
                 var rect = panel.frame
-                rect.origin.y = max(visible.minY, rect.maxY - target)
+                rect.origin.y = max(screen.minY, rect.maxY - target)
                 rect.size.height = target
                 panel.setFrame(rect, display: true)
             }) { [weak panel] in panel?.close() }
             let host = NSHostingView(rootView: view)
             host.sizingOptions = []
             // NSHostingView가 창의 크기 제한을 갱신하지 않도록 AppKit 컨테이너가 크기를 소유한다.
-            let container = NSView(frame: CGRect(origin: .zero, size: frame.size))
+            let container = NSView(frame: CGRect(origin: .zero, size: opening.size))
             host.frame = container.bounds
             host.autoresizingMask = [.width, .height]
             container.addSubview(host)
             panel.contentView = container
             panel.minSize = CGSize(width: theme.component(.noteWidthMin), height: frame.height)
             panel.maxSize = CGSize(width: theme.component(.noteWidthMax), height: max(frame.height, visible.height))
-            panel.setFrame(frame, display: false)
+            panel.setFrame(opening, display: false)
             sessions[id] = Session(panel: panel, draft: draft)
         }
+        lastPresentedPanel = panel
+        if panel.isMiniaturized { panel.deminiaturize(nil) }
         if allowsKeyWindows { panel.makeKeyAndOrderFront(nil) } else { panel.orderFront(nil) }
     }
 
     public func windowWillClose(_ notification: Notification) {
         guard let panel = notification.object as? AgentPanel,
               let id = sessions.first(where: { $0.value.panel === panel })?.key else { return }
+        if sessions[id]?.draft.conversation.barRequestID != nil { lastBarFrame = panel.frame }
+        if lastPresentedPanel === panel { lastPresentedPanel = nil }
         sessions.removeValue(forKey: id)
         if let record = catalog.records[id], record.conversation.requests.isEmpty,
            record.conversation.draft.isEmpty, record.conversation.queued.isEmpty,

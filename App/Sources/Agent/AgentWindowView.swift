@@ -64,7 +64,52 @@ struct AgentWindowView: View {
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.vertical, theme.space(.sp3))
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { conversationHeight = $0 }
-                    }.defaultScrollAnchor(.bottom)
+                    }
+                    .scrollPosition($position)
+                    .defaultScrollAnchor(.bottom, for: .initialOffset)
+                    .defaultScrollAnchor(.top, for: .alignment)
+                    .defaultScrollAnchor(followsBottom ? .bottom : nil, for: .sizeChanges)
+                    .onScrollGeometryChange(for: Viewport.self) { geometry in
+                        Viewport(offset: geometry.visibleRect.minY, bottom: geometry.visibleRect.maxY,
+                                 height: geometry.contentSize.height, viewport: geometry.containerSize.height)
+                    } action: { previous, current in
+                        // 글이나 창의 크기만 변한 경우는 사용자가 위로 올린 것이 아니다.
+                        #if DEBUG
+                        draft.scrollMetrics = ["offset": current.offset, "bottom": current.bottom, "content": current.height,
+                                               "viewport": current.viewport]
+                        #endif
+                        if current.atBottom { followsBottom = true }
+                        else if previous.height == current.height && previous.viewport == current.viewport &&
+                                    previous.offset != current.offset {
+                            followsBottom = false
+                        } else if followsBottom { position.scrollTo(edge: .bottom) }
+                    }
+                    #if DEBUG
+                    .onChange(of: draft.verificationBottom) {
+                        if let bottom = draft.verificationBottom {
+                            position.scrollTo(edge: bottom ? .bottom : .top)
+                            draft.verificationBottom = nil
+                        }
+                    }
+                    #endif
+                    .overlay(alignment: .bottom) {
+                        if !followsBottom {
+                            Button {
+                                followsBottom = true
+                                position.scrollTo(edge: .bottom)
+                            } label: {
+                                let side = theme.component(.agentScrollButton)
+                                let shadow = theme.shadow(.pop).last
+                                Image(systemName: "arrow.down")
+                                    .font(.system(size: theme.component(.iconMedium)))
+                                    .foregroundStyle(theme.color(.text2))
+                                    .frame(width: side, height: side)
+                                    .background(theme.color(.surface), in: Circle())
+                                    .shadow(color: shadow?.color.color ?? .clear, radius: (shadow?.blur ?? 0) / 2, y: shadow?.y ?? 0)
+                            }.buttonStyle(.plain).accessibilityLabel("맨 아래로").help("맨 아래로")
+                                .padding(.bottom, theme.space(.sp2))
+                        }
+                    }
                         .onChange(of: draft.evidenceRequest, initial: true) {
                             if let id = draft.evidenceRequest {
                                 proxy.scrollTo(id, anchor: .top)
@@ -119,6 +164,15 @@ struct AgentWindowView: View {
         .onChange(of: requiredHeight) { _, height in fit(height) }
     }
 
+    private struct Viewport: Equatable {
+        let offset: CGFloat
+        let bottom: CGFloat
+        let height: CGFloat
+        let viewport: CGFloat
+        var atBottom: Bool { bottom.rounded(.up) >= height.rounded(.down) }
+    }
+    @State private var position = ScrollPosition(edge: .bottom)
+    @State private var followsBottom = true
     @State private var conversationHeight: CGFloat = 0
     @State private var headerHeight: CGFloat = 0
     private var queueHeight: CGFloat {
