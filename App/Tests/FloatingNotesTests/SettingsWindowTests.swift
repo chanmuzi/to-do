@@ -9,7 +9,7 @@ import Scheduling
 import Store
 import SwiftUI
 import Testing
-import Theme
+@testable import Theme
 @testable import FloatingNotes
 
 @Suite struct SettingsWindowTests {
@@ -33,8 +33,75 @@ import Theme
         let size = host.fittingSize
         let font = theme.nsFont(.body, size: theme.component(.agentModelFont))
         let detail = ceil(("High" as NSString).size(withAttributes: [.font: font]).width)
-        #expect(size.width == theme.component(.agentModelNameMax) + detail + theme.component(.captureValueGap) * 4 + theme.component(.agentModelChevron))
+        #expect(size.width == theme.component(.agentModelNameMax) + detail + theme.component(.captureValueGap) * 4 + theme.component(.settingsChevronWidth))
         #expect(!font.isFixedPitch)
+    }
+
+    @Test(arguments: [false, true])
+    func inlineMenuPressTogglesAndKeepsTheLabelWhileOpen(inConversation: Bool) async throws {
+        let theme = try Theme.bundled()
+        let field = CommandInputField(theme: theme)
+        field.frame = NSRect(x: 0, y: 0, width: 240, height: 24)
+        let lineSpace = try #require(CommandLineSpace(field))
+        var selected: String?
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let item = menu.addItem(withTitle: "Opus", action: nil, keyEquivalent: "")
+        item.view = PickerMenuRow(theme: theme, text: item.title, dot: nil, selected: true, width: theme.component(.claudeMenuWidth))
+        func control(hover: Bool) -> InlineValuePopup {
+            InlineValuePopup(theme: theme, name: "Opus", detail: "High", visible: !inConversation || hover,
+                             lineSpace: inConversation ? lineSpace : nil, label: "모델", makeMenu: { menu }, choose: { selected = $0.title })
+        }
+        let host = NSHostingView(rootView: control(hover: true))
+        let window = NSPanel(contentRect: CGRect(x: 100, y: 100, width: 240, height: 64),
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        let container = NSView(frame: window.contentRect(forFrameRect: window.frame))
+        window.contentView = container
+        container.addSubview(field)
+        host.frame = NSRect(x: 0, y: 24, width: 240, height: 40)
+        container.addSubview(host)
+        window.makeFirstResponder(field)
+        defer { window.close() }
+        func settle() async throws {
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(60))
+            host.layoutSubtreeIfNeeded()
+        }
+        func find<T: NSView>(_ type: T.Type, in view: NSView) -> T? {
+            if let match = view as? T { return match }
+            return view.subviews.lazy.compactMap { find(type, in: $0) }.first
+        }
+        try await settle()
+        let button = try #require(find(ValueButton.self, in: host))
+        func press() { _ = button.sendAction(button.action, to: button.target) }
+        press()
+        let popup = try #require(button.popup)
+        #expect(popup.isVisible)
+        host.rootView = control(hover: false)
+        try await settle()
+        #expect(button.popup === popup && button.layer?.opacity == 1)
+        let anchor = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
+        popup.pointerDown(in: window, at: anchor, primary: true)
+        #expect(popup.isVisible)
+        press()
+        try await settle()
+        #expect(button.popup?.isVisible != true)
+        #expect(button.layer?.opacity == (inConversation ? 0 : 1), "단추 초점 \(window.firstResponder === button), 표시 폭 \(button.intrinsicContentSize.width)")
+        host.rootView = control(hover: true)
+        try await settle()
+        press()
+        let outside = try #require(button.popup)
+        outside.pointerDown(in: window, at: NSPoint(x: -1, y: -1), primary: true)
+        #expect(button.popup == nil)
+        press()
+        let escape = try #require(button.popup)
+        #expect(escape.handleKey(53, modifiers: [], characters: nil))
+        #expect(button.popup == nil)
+        press()
+        let row = try #require(button.popup?.contentView.flatMap { find(PickerMenuRow.self, in: $0) })
+        #expect(row.accessibilityPerformPress())
+        #expect(selected == "Opus" && button.popup?.isVisible != true)
     }
 
     @Test func hoveringModelPreservesInputHeightAndLines() async throws {

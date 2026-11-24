@@ -634,13 +634,14 @@ final class DebugControl {
                          "key": panel.isKeyWindow, "minWidth": panel.minSize.width, "maxWidth": panel.maxSize.width], to: url)
         case ("agent-input-hover", let id?, let value?) where isPassive:
             (try? agent?.record(for: id))?.previewInputHover = value == "on"
-        case ("bar-model-menu", let name?, _) where isPassive:
+        case (let command?, let argument?, let file) where isPassive && ["bar-model-menu", "agent-model-menu"].contains(command):
             func picker(in view: NSView) -> NSButton? {
                 if let button = view as? NSButton, button.accessibilityLabel()?.hasPrefix("모델: ") == true { return button }
                 return view.subviews.lazy.compactMap(picker).first
             }
-            if let root = quickPanels.window(named: "capture")?.contentView, let button = picker(in: root),
-               let url = output(named: name.rawValue) {
+            let host = command == "agent-model-menu" ? agent?.window(for: argument) : quickPanels.window(named: "capture")
+            if let root = host?.contentView, let button = picker(in: root),
+               let url = output(named: file ?? argument.rawValue) {
                 DebugSettingsMenu.capture(at: button, to: url, image: true) {
                     self.write($0, to: url.deletingPathExtension().appendingPathExtension("parent.png"), audit: false)
                 }

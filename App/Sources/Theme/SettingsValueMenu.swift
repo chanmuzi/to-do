@@ -8,6 +8,7 @@ package final class SettingsValueMenu: NSPanel {
     private var rowsByItem: [NSMenuItem: PickerMenuRow] = [:]
     private var highlighted: PickerMenuRow?
     private var eventMonitor: Any?
+    private var outsideMonitor: Any?
 
     package init?(menu: NSMenu, anchor: NSView, offset: CGSize) {
         guard let host = anchor.window, let screen = host.screen,
@@ -85,11 +86,24 @@ package final class SettingsValueMenu: NSPanel {
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
             if event.type == .keyDown {
-                if self.handleKey(event) { return nil }
-            } else if event.window === self { return event }
-            self.close()
+                if self.handleKey(event.keyCode, modifiers: event.modifierFlags, characters: event.charactersIgnoringModifiers) { return nil }
+                self.close()
+            } else {
+                self.pointerDown(in: event.window, at: event.locationInWindow, primary: event.type == .leftMouseDown)
+            }
             return event
         }
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] _ in
+            self?.close()
+        }
+    }
+
+    func pointerDown(in window: NSWindow?, at location: NSPoint, primary: Bool) {
+        guard window !== self else { return }
+        // 값 단추 위에서 시작한 누름은 단추가 뗄 때 한 번만 처리한다.
+        if primary, let button = anchor as? ValueButton, window === button.window,
+           button.bounds.contains(button.convert(location, from: nil)) { return }
+        close()
     }
 
     package override var canBecomeKey: Bool { false }
@@ -100,6 +114,8 @@ package final class SettingsValueMenu: NSPanel {
     package override func close() {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         eventMonitor = nil
+        if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
+        outsideMonitor = nil
         NotificationCenter.default.removeObserver(self)
         parent?.removeChildWindow(self)
         super.close()
@@ -126,16 +142,16 @@ package final class SettingsValueMenu: NSPanel {
         return true
     }
 
-    private func handleKey(_ event: NSEvent) -> Bool {
-        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty else { return false }
+    func handleKey(_ code: UInt16, modifiers: NSEvent.ModifierFlags, characters: String?) -> Bool {
+        guard modifiers.intersection([.command, .control, .option]).isEmpty else { return false }
         let available = choices.items.filter { $0.isEnabled && rowsByItem[$0] != nil }
         var next: NSMenuItem?
-        switch event.keyCode {
+        switch code {
         case 53: close()
         case 36, 76, 49:
             if let highlighted { _ = select(highlighted) }
         case 125, 126:
-            let down = event.keyCode == 125
+            let down = code == 125
             if let item = highlighted?.choiceItem, let index = available.firstIndex(of: item) {
                 next = available[(index + available.count + (down ? 1 : -1)) % available.count]
             } else { next = down ? available.first : available.last }
@@ -143,7 +159,7 @@ package final class SettingsValueMenu: NSPanel {
         case 119: next = available.last
         case 48: return false
         default:
-            guard let prefix = event.charactersIgnoringModifiers, !prefix.isEmpty else { return false }
+            guard let prefix = characters, !prefix.isEmpty else { return false }
             next = available.first { $0.title.localizedLowercase.hasPrefix(prefix.localizedLowercase) }
         }
         if let next, let row = rowsByItem[next] {
