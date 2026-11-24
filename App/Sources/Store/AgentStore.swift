@@ -57,6 +57,18 @@ import Models
         catch let error as CocoaError where error.code == .fileNoSuchFile { return }
     }
 
+    private var recentBarFile: URL { directory.appending(path: "last-bar.json") }
+
+    package func recentBarID() throws -> UUID? {
+        do { return try JSONDecoder().decode(UUID.self, from: Data(contentsOf: recentBarFile)) }
+        catch CocoaError.fileReadNoSuchFile { return nil }
+    }
+
+    package func rememberBar(_ id: UUID) throws {
+        try prepare(directory)
+        try JSONEncoder().encode(id).write(to: recentBarFile, options: .atomic)
+    }
+
     public func readInstructions() throws -> String {
         do { return try String(contentsOf: instructions, encoding: .utf8) }
         catch let error as CocoaError where error.code == .fileReadNoSuchFile { return "" }

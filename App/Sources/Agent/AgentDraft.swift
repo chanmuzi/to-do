@@ -31,6 +31,8 @@ import Store
     var hovered: UUID?
     #if DEBUG
     var still = false
+    package var verificationBottom: Bool?
+    @ObservationIgnored package var scrollMetrics: [String: Double] = [:]
     #endif
     let store: AgentStore
 

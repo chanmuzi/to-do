@@ -109,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let system = SystemReminderNotifier()
                 system.openNote = { [weak router] id in router?.route(.openNote(id)) }
                 system.openAgent = { [weak self] provider in self?.settingsWindow?.showAgent(provider) }
+                system.openConversation = { [weak router] id in router?.openBarConversation(id, source: "notification") }
                 system.installDelegate()
                 notifier = system
                 makeBridge = { EventKitBridge() }
@@ -559,18 +560,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         panels.capture.providerName = { environment.settings.settings.agentProvider == "codex" ? "Codex" : "Claude" }
-        panels.capture.onRequest = { [weak agent, weak router] text, opens in
-            guard let draft = try? agent?.record(for: nil), coordinator.submit(draft, text: text, fromInput: false) else { return false }
-            if opens { router?.showAgent(draft, source: "bar") }
+        let bar = BarRequestFlow(agent: agent, requests: coordinator)
+        if options.usesFakeCalendar { bar.deliver = { _ in true } }
+        panels.capture.recentRequest = { bar.recent }
+        panels.capture.openRecent = { [weak router, weak panels] id in
+            router?.openBarConversation(id, source: "bar-recent", screen: panels?.capture.screen)
+        }
+        panels.capture.onRequest = { [weak router, weak panels] text in
+            guard let draft = bar.submit(text) else { return false }
+            router?.showAgent(draft, source: "bar", screen: panels?.capture.screen, reuseForBar: true)
             return true
         }
         coordinator.openSettings = { [weak self] in self?.settingsWindow?.showAgent($0) }
-        coordinator.progress = { [weak self, weak coordinator] request in
+        coordinator.progress = { [weak self, weak coordinator] draft, request in
+            guard draft.conversation.barRequestID != request.id else { return }
             let face = request.face
             self?.toasts?.presenter.show(.init(kind: "agent-working", message: face.rawValue, actionTitle: "취소", face: face),
                                          on: self?.toasts?.pointerScreen()) { coordinator?.task?.cancel() }
         }
         coordinator.finished = { [weak self, weak router] draft, request in
+            if draft.conversation.barRequestID == request.id {
+                bar.finished(draft, request)
+                return
+            }
             let success = request.status == .completed
             var message = success ? draft.conversation.completionMessage(for: request)
                 : request.failure ?? "막혔어요"

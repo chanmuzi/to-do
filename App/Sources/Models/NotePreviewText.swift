@@ -5,6 +5,11 @@ import MarkdownSyntax
 package enum NotePreviewText {
     /// 대화 이름과 완료 알림에는 처음으로 글이 보이는 줄만 쓴다.
     package static func firstLine(in markdown: String) -> String? {
+        firstLines(in: markdown, limit: 1).first
+    }
+
+    package static func firstLines(in markdown: String, limit: Int) -> [String] {
+        var lines: [String] = []
         let document = MarkdownDocument(markdown)
         for line in document.lines where line.kind != .fenceOpen && line.kind != .fenceClose {
             // Float의 체크박스는 목록 머리 없이도 올 수 있다.
@@ -16,14 +21,15 @@ package enum NotePreviewText {
             }
             let trimmed = source.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { continue }
-            if line.kind == .code { return trimmed }
 
-            guard let rendered = try? AttributedString(markdown: trimmed) else { return trimmed }
-            if rendered.runs.first?.presentationIntent?.components.contains(where: { $0.kind == .thematicBreak }) == true { continue }
-            let text = String(rendered.characters).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !text.isEmpty { return text }
+
+            let rendered = line.kind == .code ? nil : try? AttributedString(markdown: trimmed)
+            if rendered?.runs.first?.presentationIntent?.components.contains(where: { $0.kind == .thematicBreak }) == true { continue }
+            let text = (rendered.map { String($0.characters) } ?? trimmed).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { lines.append(text) }
+            if lines.count == limit { break }
         }
-        return nil
+        return lines
     }
 
     package static func join(_ lines: some Sequence<String>) -> String {

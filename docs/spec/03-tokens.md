@@ -202,3 +202,14 @@
 대화 명령 메뉴는 `conversation-menu-width` 170pt, 재사용하는 삭제 확인은 `confirmation-width` 236pt를 쓴다. 두 표면의 모서리는 `r-window` 10pt다.
 
 예정의 노트 미리보기와 목록 사이는 `proposal-preview-gap` 14pt다. 다가오는 일정 미리보기는 최대 폭 `proposal-upcoming-width` 240pt, 줄 높이 `proposal-upcoming-row` 24pt를 쓴다. 칩과 일정 표시는 기존 예정 토큰을 사용한다.
+
+### 막대 요청과 대화 창
+
+| 토큰 | 값 | 쓰는 곳 |
+| --- | --- | --- |
+| agent-window-height-limit | 420pt | 화면 표시 영역의 70%와 비교하는 자동 높이 상한 |
+| agent-scroll-button | 26pt | 맨 아래로 단추 지름 |
+| capture-recent-height | 34pt | 직전 물음과 답 줄 |
+| agent-list-indent | 17pt | 답의 목록 들여쓰기 |
+| agent-answer-line | 21pt | 답 한 줄의 최소 높이 |
+| agent-heading-gap | 5pt | 묶음 제목 위 여백 |

@@ -7,6 +7,22 @@ final class CaptureBarView: NSView {
     private let style: CaptureStyle
     private let background: CaptureBackgroundView
     private let switchHost = NSHostingView(rootView: AnyView(EmptyView()))
+    private let recentHost = NSHostingView(rootView: AnyView(EmptyView()))
+    private var recent: CaptureRecentRequest?
+    var onRecent: (UUID) -> Void = { _ in }
+    var recentHeight: CGFloat { recent == nil ? 0 : style.theme.component(.captureRecentHeight) }
+
+    func setRecent(_ recent: CaptureRecentRequest?) {
+        self.recent = recent
+        if let recent {
+            recentHost.rootView = AnyView(CaptureRecentRow(theme: style.theme, recent: recent) { [weak self] in
+                self?.onRecent(recent.id)
+            })
+        }
+        recentHost.isHidden = recent == nil
+        needsLayout = true
+    }
+
     var onSwitch: () -> Void = {}
     private var mode: CaptureCoordinator.Mode = .memo
     func setMode(_ value: CaptureCoordinator.Mode) {
@@ -33,7 +49,7 @@ final class CaptureBarView: NSView {
         background.autoresizingMask = [.width, .height]
         addSubview(background)
 
-        [switchHost, input, spaceBadge, reminderBadge].forEach(addSubview)
+        [recentHost, switchHost, input, spaceBadge, reminderBadge].forEach(addSubview)
         input.setAccessibilityLabel("빠른 캡처")
         textView.setAccessibilityPlaceholderValue(Self.placeholder)
         refreshTheme()
@@ -112,9 +128,11 @@ final class CaptureBarView: NSView {
         let gap = theme.component(.captureGap)
         let valueGap = theme.component(.captureValueGap)
         background.frame = bounds
+        let rowHeight = theme.component(.captureHeight)
+        recentHost.frame = NSRect(x: 0, y: rowHeight, width: bounds.width, height: recentHeight)
 
         func centered(_ size: NSSize, x: CGFloat) -> NSRect {
-            NSRect(x: x, y: ((bounds.height - size.height) / 2).rounded(), width: size.width, height: size.height)
+            NSRect(x: x, y: ((rowHeight - size.height) / 2).rounded(), width: size.width, height: size.height)
         }
 
         let buttonSize = theme.component(.iconButton)
@@ -127,10 +145,10 @@ final class CaptureBarView: NSView {
         for badge in [reminderBadge, spaceBadge] {
             let width = badge.fittingWidth
             guard width > 0 else {
-                badge.frame = NSRect(x: trailing, y: 0, width: 0, height: bounds.height)
+                badge.frame = NSRect(x: trailing, y: 0, width: 0, height: rowHeight)
                 continue
             }
-            badge.frame = NSRect(x: trailing - width, y: 0, width: width, height: bounds.height)
+            badge.frame = NSRect(x: trailing - width, y: 0, width: width, height: rowHeight)
             trailing = badge.frame.minX - gap - valueGap
         }
 

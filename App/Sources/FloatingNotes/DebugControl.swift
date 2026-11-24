@@ -595,13 +595,25 @@ final class DebugControl {
             guard let url = output(named: name.rawValue) else { return }
             write(agentCorner?.window, to: url)
         case ("request-bar", _, _) where isPassive: router.route(.requestAgent)
+        case ("bar-scroll", let edge?, _) where isPassive:
+            agent?.recentBar?.verificationBottom = edge.rawValue == "bottom"
+        case ("bar-close", _, _) where isPassive:
+            if let id = agent?.recentBar?.conversation.id { agent?.window(id: id)?.close() }
+        case ("bar-metrics", let name?, _) where isPassive:
+            guard let draft = agent?.recentBar, let window = agent?.window(id: draft.conversation.id),
+                  let url = output(named: name.rawValue) else { return }
+            var state = draft.scrollMetrics
+            state["height"] = window.frame.height
+            state["window"] = Double(window.windowNumber)
+            state["characters"] = Double(draft.conversation.requests.first?.answer?.count ?? 0)
+            write(json: state, to: url)
         case ("global-request", let first?, let rest) where isPassive:
             guard let agent, let draft = try? agent.record(for: nil) else { return }
             agent.present(draft, "bar")
             draft.update(first.rawValue + (rest.map { " " + $0 } ?? ""))
             agent.send(draft)
         case ("global-snapshot", let name?, _) where isPassive:
-            if let draft = try? agent?.record(for: nil), let url = output(named: name.rawValue) {
+            if let draft = agent?.recentBar ?? (try? agent?.record(for: nil)), let url = output(named: name.rawValue) {
                 write(agent?.window(id: draft.conversation.id), to: url)
             }
         case ("agent-action", let id?, let action?) where isPassive:

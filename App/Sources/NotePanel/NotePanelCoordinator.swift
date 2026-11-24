@@ -553,11 +553,11 @@ public final class NotePanelCoordinator {
     }
 
     /// 같은 화면에서 노트의 높이 규칙과 이웃 창 배치를 재사용한다.
-    package func agentWindowAnchor(for id: NoteID?) -> (title: String, frame: CGRect, visible: CGRect)? {
+    package func agentWindowAnchor(for id: NoteID?, preferredScreen: NSScreen? = nil) -> (title: String, frame: CGRect, visible: CGRect)? {
         let controller = id.flatMap { controllers[$0] }
         if id != nil && controller == nil { return nil }
         let pointerScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
-        guard let visible = (controller?.panel.screen ?? pointerScreen ?? NSScreen.main)?.visibleFrame else { return nil }
+        guard let visible = (preferredScreen ?? controller?.panel.screen ?? pointerScreen ?? NSScreen.main)?.visibleFrame else { return nil }
         let theme = environment.theme
         let policy = environment.sizePolicy
         let content = policy.minBodyHeight + theme.shape(.chromeHeight) + theme.space(.sp3)

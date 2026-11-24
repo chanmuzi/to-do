@@ -3,6 +3,11 @@ import SwiftUI
 import Theme
 
 extension AgentRequest {
+    package var progressTitle: String {
+        if steps.last?.kind == .read, let title = steps.last?.noteTitle { return title + " 읽는 중" }
+        return face.rawValue
+    }
+
     package var face: AgentFaceState {
         switch status {
         case .running: steps.last?.kind.face ?? .think
@@ -32,7 +37,7 @@ struct AgentTurnView: View {
 
     private var expanded: Bool { draft.expanded.contains(request.id) }
     private var summary: String {
-        if request.status == .running { return request.face.rawValue }
+        if request.status == .running { return request.progressTitle }
         let count = Set(request.steps.compactMap(\.noteID)).count
         return count > 0 ? "노트 \(count)개 읽음" : "진행 \(request.steps.count)단계"
     }
@@ -49,7 +54,7 @@ struct AgentTurnView: View {
                         .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
                     VStack(alignment: .leading, spacing: theme.component(.agentRowInset)) {
                         if !attempt.steps.isEmpty { stepList(attempt.steps) }
-                        if let answer = attempt.answer { Text(answer).textSelection(.enabled) }
+                        if let answer = attempt.answer { AgentAnswerView(theme: theme, answer: answer) }
                         stoppedLine("앱을 끄면서 멈췄어요")
                     }
                 }
@@ -58,7 +63,7 @@ struct AgentTurnView: View {
                 AgentFace(theme: theme, state: request.face, forceStill: still)
                     .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
                 VStack(alignment: .leading, spacing: theme.component(.agentRowInset)) {
-                    if !request.steps.isEmpty {
+                    if request.status == .running || !request.steps.isEmpty {
                         Button {
                             if expanded { draft.expanded.remove(request.id) } else { draft.expanded.insert(request.id) }
                         } label: {
@@ -77,7 +82,7 @@ struct AgentTurnView: View {
                         }.buttonStyle(.plain).foregroundStyle(theme.color(.text3)).font(smallFont)
                     }
                     if expanded { stepList(request.steps) }
-                    if let answer = request.answer { Text(answer).textSelection(.enabled) }
+                    if let answer = request.answer { AgentAnswerView(theme: theme, answer: answer) }
                     ForEach(request.proposals) { proposal in
                         Button { openProposal(proposal.id) } label: {
                             HStack(spacing: theme.space(.sp2)) {

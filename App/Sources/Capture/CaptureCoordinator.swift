@@ -1,4 +1,5 @@
 import AppKit
+import Observation
 import Models
 import Routing
 import Store
@@ -13,7 +14,11 @@ import Theme
 public final class CaptureCoordinator {
     public enum Mode { case memo, request }
     public private(set) var mode: Mode = .memo
-    public var onRequest: ((String, Bool) -> Bool)?
+    package var onRequest: ((String) -> Bool)?
+    package var recentRequest: () -> CaptureRecentRequest? = { nil }
+    package var openRecent: (UUID) -> Void = { _ in }
+    package var screen: NSScreen? { panel?.screen }
+    private var recentObservation = UUID()
     public var providerName: () -> String = { "Claude" }
     private var drafts: [Mode: String] = [:]
     private let theme: Theme
@@ -110,6 +115,7 @@ public final class CaptureCoordinator {
         barView.textView.string = ""
         barView.textView.undoManager?.removeAllActions()
 
+        observeRecent()
         restingFrame = frame(on: preferredScreen ?? Self.screenWithMouse())
         // 새로 뜰 때는 조금 아래에서 시작한다. 사라지는 중에 다시 열면 지금 자리에서 되돌아온다.
         if !panel.isVisible {
@@ -142,6 +148,8 @@ public final class CaptureCoordinator {
         guard isVisible, mode != next, let barView, !barView.textView.hasMarkedText() else { return }
         drafts[mode] = barView.textView.string
         mode = next
+        observeRecent()
+        resizeForRecent()
         let text = drafts[next] ?? ""
         barView.setMode(next)
         barView.input.stringValue = text
@@ -240,6 +248,11 @@ public final class CaptureCoordinator {
             guard let self else { return }
             switchMode(to: mode == .memo ? .request : .memo)
         }
+        barView.onRecent = { [weak self] id in
+            guard let self else { return }
+            dismiss(returningFocus: false)
+            openRecent(id)
+        }
         barView.textView.onCommand = { [weak self] in self?.perform($0) }
         barView.textView.onTextChange = { [weak self] in self?.refresh(animated: true) }
 
@@ -275,8 +288,30 @@ public final class CaptureCoordinator {
         refresh(animated: false)
     }
 
+    private func observeRecent() {
+        let generation = UUID()
+        recentObservation = generation
+        guard mode == .request else { barView?.setRecent(nil); return }
+        let recent = withObservationTracking {
+            recentRequest()
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.recentObservation == generation, self.isVisible else { return }
+                self.observeRecent()
+                self.resizeForRecent()
+            }
+        }
+        barView?.setRecent(recent)
+    }
+
+    private func resizeForRecent() {
+        guard let panel, isVisible else { return }
+        restingFrame = frame(on: panel.screen)
+        if panel.frame.size != restingFrame.size { panel.setFrame(restingFrame, display: true) }
+    }
+
     private func frame(on screen: NSScreen?) -> NSRect {
-        let size = NSSize(width: theme.component(.captureWidth), height: theme.component(.captureHeight))
+        let size = NSSize(width: theme.component(.captureWidth), height: theme.component(.captureHeight) + (barView?.recentHeight ?? 0))
         guard let screen else { return NSRect(origin: .zero, size: size) }
         return CapturePlacement.frame(
             size: size, visibleFrame: screen.visibleFrame, bottomRatio: theme.ratio(.captureBottomScreen)
@@ -356,13 +391,12 @@ public final class CaptureCoordinator {
         guard !isClosing else { return }
         if mode == .request {
             switch command {
-            case .submit, .submitAsNewNote:
+            case .submit:
                 guard let input = barView?.textView, !input.hasMarkedText(), !input.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-                let opens = command == .submitAsNewNote
                 staysOpenWithoutKey = true
-                let sent = onRequest?(input.string, opens) == true
+                let sent = onRequest?(input.string) == true
                 staysOpenWithoutKey = false
-                if sent { dismiss(returningFocus: !opens) }
+                if sent { dismiss(returningFocus: false) }
             case .cancel: hide()
             default: break
             }
