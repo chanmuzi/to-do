@@ -10,17 +10,18 @@ final class ToastView: NSView {
     private let theme: Theme
     private let effectView = NSVisualEffectView()
     private let surfaceView = NSView()
+    private let divider = NSBox()
     private let label = NSTextField(labelWithString: "")
 
     private let faceView: NSView?
     private let tint: CAGradientLayer?
     private var faceWidth: CGFloat { faceView == nil ? 0 : theme.component(.agentFaceMedium) + theme.space(.sp2) }
 
-    init(theme: Theme, message: String, actionTitle: String, face: AgentFaceState? = nil, working: Bool = false) {
+    init(theme: Theme, message: String, actionTitle: String? = nil, face: AgentFaceState? = nil, working: Bool = false) {
         faceView = face.map { NSHostingView(rootView: AgentFace(theme: theme, state: $0, size: .medium)) }
         tint = working ? CAGradientLayer() : nil
         self.theme = theme
-        actionButton = ToastActionButton(theme: theme, title: actionTitle)
+        actionButton = ToastActionButton(theme: theme, title: actionTitle ?? "")
         super.init(frame: .zero)
         wantsLayer = true
         effectView.material = .popover
@@ -34,7 +35,13 @@ final class ToastView: NSView {
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
         label.cell?.usesSingleLineMode = true
-        [effectView, surfaceView, label, actionButton].forEach(addSubview)
+        divider.boxType = .custom
+        divider.borderWidth = 0
+        divider.fillColor = theme.nsColor(.line)
+        divider.setAccessibilityElement(false)
+        actionButton.isHidden = actionTitle?.isEmpty != false
+        divider.isHidden = actionButton.isHidden
+        [effectView, surfaceView, label, divider, actionButton].forEach(addSubview)
         if let faceView { addSubview(faceView) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
@@ -51,8 +58,9 @@ final class ToastView: NSView {
     /// 글과 동작이 다 보이는 크기. 너비는 `maxWidth`를 넘지 않고, 넘치면 글이 말줄임표로 줄어든다.
     func fittingSize(maxWidth: CGFloat) -> NSSize {
         let padding = theme.component(.toastPadding)
-        let natural = padding * 2 + faceWidth + messageSize.width
-            + theme.component(.toastGap) + actionButton.preferredSize.width
+        let actionWidth = actionButton.isHidden ? 0 : theme.component(.toastGap) * 2
+            + theme.shape(.borderWidth) + actionButton.labelSize.width
+        let natural = padding * 2 + faceWidth + messageSize.width + actionWidth
         return NSSize(width: min(natural, maxWidth), height: theme.component(.toastHeight))
     }
 
@@ -105,13 +113,18 @@ final class ToastView: NSView {
         )
         actionButton.layoutSubtreeIfNeeded()
         let labelHeight = messageSize.height
-        let labelEnd = actionButton.frame.minX + theme.space(.sp2) - theme.component(.toastGap)
+        let gap = theme.component(.toastGap)
+        let lineWidth = theme.shape(.borderWidth)
+        let lineHeight = theme.component(.iconMedium)
+        divider.frame = NSRect(x: actionButton.frame.minX + theme.space(.sp2) - gap - lineWidth,
+                               y: bounds.midY - lineHeight / 2, width: lineWidth, height: lineHeight)
+        let labelEnd = actionButton.isHidden ? bounds.maxX - padding : divider.frame.minX - gap
         // 안내 글은 동작 글자와 같은 기준선에 둔다. 글꼴 굵기가 달라도 글자가 같은 줄에 앉는다.
         let centered = ((bounds.height - labelHeight) / 2).rounded()
         let baselineShift = actionButton.frame.minY + actionButton.labelBaselineFromTop
             - (centered + label.firstBaselineOffsetFromTop)
         label.frame = NSRect(
-            x: padding + faceWidth, y: (centered + baselineShift).rounded(),
+            x: padding + faceWidth, y: actionButton.isHidden ? centered : (centered + baselineShift).rounded(),
             width: max(0, labelEnd - padding - faceWidth), height: labelHeight
         )
     }

@@ -6,6 +6,7 @@ enum MoreMenuAction: Hashable {
     case setReminder
     case moveToSpace
     case togglePin
+    case toggleFormatBar
     /// 팔레트 키. 색 없음이면 `nil`.
     case setColor(String?)
     case openLibrary
@@ -36,7 +37,7 @@ struct NoteMenuBuilder {
     /// - Parameter isAvailable: 그 항목을 고르면 일어나는 일이 있는지. 여는 화면이 아직 이어지지 않은 항목은
     ///   자리를 그대로 둔 채 고를 수 없게 흐려 둔다(눌러도 아무 일이 없는 것을 내놓지 않는다).
     func moreMenu(
-        isPinned: Bool, isArchived: Bool = false, selectedPaletteID: String?,
+        isPinned: Bool, isArchived: Bool = false, showsFormatBar: Bool = false, selectedPaletteID: String?,
         isAvailable: (MoreMenuAction) -> Bool = { _ in true },
         handler: @escaping (MoreMenuAction) -> Void
     ) -> NSMenu {
@@ -53,6 +54,9 @@ struct NoteMenuBuilder {
             separator(),
             row("노트 찾기", symbol: "magnifyingglass") { handler(.findNote) },
             row("라이브러리", symbol: "rectangle.split.2x1", isEnabled: isAvailable(.openLibrary)) { handler(.openLibrary) },
+            row(showsFormatBar ? "서식 막대 숨기기" : "서식 막대 보이기", symbol: "pencil", isEnabled: isAvailable(.toggleFormatBar)) {
+                handler(.toggleFormatBar)
+            },
             separator(),
             row("창 닫기", symbol: "xmark") { handler(.closeWindow) },
             row(isArchived ? "되돌리기" : "보관함으로", symbol: "archivebox") { handler(.toggleArchive) },

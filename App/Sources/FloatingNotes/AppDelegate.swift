@@ -131,6 +131,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 schedules?.register(id, itemID: itemID, requestPermission: true)
             }
             // 빠른 캡처와 노트 찾기. 노트 창과 같은 창 상태를 넘겨 "떠 있는 노트"와 핀이 보이게 한다.
+            notePanels.toggleFormatBar = { [settings = environment.settings] in
+                do { try settings.update { $0.showsFormatBar.toggle() } }
+                catch { RouteFailureAlert.present(title: "서식 막대 설정을 저장하지 못했습니다", error: error) }
+            }
             let quickPanels = QuickPanels(
                 theme: environment.theme, notes: environment.notes, spaces: environment.spaces,
                 windowStates: environment.windowStates, router: router, notePanels: notePanels,

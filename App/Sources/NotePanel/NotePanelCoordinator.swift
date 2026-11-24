@@ -88,7 +88,8 @@ public final class NotePanelCoordinator {
     /// App이 "되돌리기"가 붙은 짧은 알림을 띄운다(D-041).
     package var windowsChanged: () -> Void = {}
     public var onAcceptTitleDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
-    public var onMovedToTrash: ((NoteID, NSScreen?) -> Void)?
+    package var toggleFormatBar: (() -> Void)?
+    public var onMovedToTrash: ((NoteID, NSScreen?, CGRect?) -> Void)?
     /// 휴지통 되돌리기가 끝났다(되살렸거나, "바로 뒤"가 지났다). 알림을 거둔다.
     public var onTrashUndoEnded: (() -> Void)?
     /// 지금 휴지통으로 보내는 중인 노트. 그 창이 내려갈 때 키 입력을 어디에 둘지 정하는 데 쓴다.
@@ -228,7 +229,9 @@ public final class NotePanelCoordinator {
     public func moveToTrash(_ id: NoteID) {
         // 편집기가 아직 알리지 않은 글까지 받아 둔다. 저장소가 옮기기 전에 그것을 쓴다.
         controllers[id]?.flushPendingEdits()
-        let screen = controllers[id]?.panel.screen
+        let panel = controllers[id]?.panel
+        let screen = panel?.screen
+        let frame = panel?.isVisible == true ? panel?.frame : nil
         let trashed = TrashedNote(id: id, windowState: recorder.savedState(for: id))
         trashInProgress = id
         defer { trashInProgress = nil }
@@ -244,7 +247,7 @@ public final class NotePanelCoordinator {
         }
         noteDisappeared(id)
         lastTrashed = trashed
-        onMovedToTrash?(id, screen)
+        onMovedToTrash?(id, screen, frame)
     }
 
     /// 방금 휴지통으로 보낸 노트를 되돌릴 수 있는지(spec 5.3의 "바로 뒤라면 ⌘Z").

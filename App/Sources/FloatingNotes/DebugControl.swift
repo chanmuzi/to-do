@@ -1190,6 +1190,8 @@ final class DebugControl {
             "lastKeyHandled": lastKeyHandled.map { $0 ? "yes" : "no" } ?? "",
             "unavailableCommands": commands.unavailable.map(\.rawValue),
             "quickPanels": quickPanels.dump(),
+            "visibleScreenFrames": NSScreen.screens.map { NSStringFromRect($0.visibleFrame) },
+            "toastFrame": toastWindow().map { NSStringFromRect($0.frame) } ?? "",
             "toastWindowNumber": toastWindow()?.isVisible == true ? toastWindow()?.windowNumber ?? 0 : 0,
             "statusItemLength": statusItem?.length ?? 0,
         ]
