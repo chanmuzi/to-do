@@ -9,6 +9,10 @@ import Observation
 @MainActor
 @Observable
 public final class Theme {
+    #if DEBUG
+    package var verificationSurfaceHover = false
+    #endif
+
     /// 덮어쓰기나 라이트, 다크가 바뀐 뒤에 보낸다. `object`는 이 테마.
     public static let didChangeNotification = Notification.Name("FloatingNotes.Theme.didChange")
 

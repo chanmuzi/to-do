@@ -269,7 +269,6 @@ final class AgentRequestCoordinator {
     private func finish(_ result: Result<String, Error>, draft: AgentDraft, request: AgentRequest) {
         guard let i = draft.conversation.requests.firstIndex(where: { $0.runID == request.runID }) else { return }
         var final = draft.conversation.requests[i]
-        for j in final.steps.indices { end(&final.steps[j], now: Date()) }
         let completed = result.flatMap { answer in
             Result {
                 try Task.checkCancellation()
@@ -294,6 +293,12 @@ final class AgentRequestCoordinator {
                 final.resumeAt = failure?.resumeAt
             }
             paused = priority == nil
+        }
+        let finishedAt = Date()
+        for index in final.steps.indices where final.steps[index].endedAt == nil {
+            if final.status == .interrupted { final.steps[index].result = "중단" }
+            if final.status == .failed { final.steps[index].result = "실패" }
+            end(&final.steps[index], now: finishedAt)
         }
         draft.conversation.requests[i] = final
         if final.stopReason == .shutdown { draft.conversation.interruptForShutdown(at: i) }

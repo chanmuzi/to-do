@@ -42,7 +42,7 @@ struct CaptureRecentRow: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SurfaceHoverButton(theme, shape: Rectangle()))
         .accessibilityLabel("직전 대화 열기, " + recent.question + ", " + recent.detail)
         .overlay(alignment: .top) { Rectangle().fill(theme.color(.line)).frame(height: theme.shape(.borderWidth)) }
     }
