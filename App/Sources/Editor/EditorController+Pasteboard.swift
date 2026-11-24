@@ -25,13 +25,29 @@ extension EditorController {
     /// 붙여 넣는다. 이 앱에서 복사한 것이면 원문 조각을, 아니면 글자를 그대로 넣는다.
     /// 줄바꿈은 `\n`으로 맞춘다.
     func paste(from pasteboard: NSPasteboard) {
-        guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string),
+        guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string)
+                ?? pasteboard.string(forType: .URL),
               !text.isEmpty else { return }
         guard !textView.hasMarkedText() else {
             textView.insertText(LineEndings.normalized(text), replacementRange: textView.selectedRange())
             return
         }
         let selection = clamped(textView.selectedRange())
+        let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if selection.length > 0, !address.contains(where: \.isWhitespace), LinkPolicy.openableURL(address) != nil {
+            let line = document.line(at: selection.location)
+            let pastesLiterally = line.kind.isCode || line.spans.contains { span in
+                guard span.contains(selection) else { return false }
+                switch span.kind { case .code, .link: return true; default: return false }
+            }
+            if !pastesLiterally {
+                guard case .new(let range) = currentLinkTarget,
+                      let edit = EditorCommands.setLink(document, target: .new(range), address: address)
+                else { explainRejectedLink(linkSelectionHelp); return }
+                apply(edit)
+                return
+            }
+        }
         let prepared = EditorCommands.preparedForPaste(document, LineEndings.normalized(text), replacing: selection, runEnd: continuingRunEnd)
         guard !prepared.isEmpty else { return }
         textView.insertText(prepared, replacementRange: selection)

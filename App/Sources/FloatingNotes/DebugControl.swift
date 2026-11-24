@@ -686,6 +686,8 @@ final class DebugControl {
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
         case ("format-link", let id?, _) where isPassive:
             editor(of: id)?.perform(.link)
+        case ("format-link-commit", let id?, let address?) where isPassive:
+            editor(of: id)?.commitLink(address)
         case ("input-select-all", let target?, _) where isPassive:
             verificationInput(target.rawValue)?.selectAll(nil)
         case ("input-check", let target?, let name?):

@@ -211,8 +211,9 @@ extension EditorController {
 
     func widthDidChange() {
         updateDateSuggestion()
-        reportContentHeight()
         layoutCopyButton()
         layoutLinkField()
+        reportContentHeight()
+        if linkSession != nil { textView.scrollToVisible(linkField.frame) }
     }
 }
