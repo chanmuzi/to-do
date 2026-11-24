@@ -126,11 +126,14 @@
 | 구성 요소 | `codeblock-pad-y` | `9px` | 코드 블록의 위아래 안쪽 여백 |
 | 구성 요소 | `codeblock-gap` | `5px` | 코드 블록의 위아래 바깥 간격 |
 | 구성 요소 | `link-field-w` | `220px` | 링크 주소를 적는 칸의 너비 |
-| 구성 요소 | `icon-btn` | `24px` | 테두리 없는 아이콘 버튼 크기 |
+| 구성 요소 | `icon-btn` | `24px` | 테두리 없는 아이콘 버튼의 기본 크기 |
+| 구성 요소 | `note-top-button-size` | `20px` | 노트 상단 줄 아이콘 칸 |
+| 구성 요소 | `note-top-button-gap` | `2px` | 노트 상단 줄 아이콘 칸 사이 |
+| 구성 요소 | `note-top-pad-end` | `8px` | 노트 상단 줄의 오른쪽 여백 |
 | 구성 요소 | `menubar-icon` | `18px` | 메뉴 막대 아이콘 캔버스 크기 (그림은 그 안에서 16pt) |
 | 구성 요소 | `browse-w` | `300px` | 노트 찾기 목록 너비 |
 | 구성 요소 | `chrome-gap` | `6px` | 노트 상단 줄의 요소 사이 |
-| 구성 요소 | `chrome-pad-end` | `6px` | 노트 상단 줄의 오른쪽 여백 (왼쪽은 `sp-3`) |
+| 구성 요소 | `chrome-pad-end` | `6px` | 노트 하단 서식 버튼 줄의 좌우 여백 |
 | 구성 요소 | `icon-s`, `icon-m`, `icon-l` | `12px`, `13px`, `14px` | 선 아이콘 크기 (18.2의 표) |
 | 구성 요소 | `icon-btn-gap` | `2px` | 나란히 놓인 아이콘 버튼 사이 (노트 오른쪽 아래) |
 | 구성 요소 | `swatch-size`, `swatch-gap`, `swatch-ring` | `13px`, `5px`, `1.5px` | 노트 색 칸 크기, 사이, 고른 칸의 테두리 두께이자 띄우는 거리 |
