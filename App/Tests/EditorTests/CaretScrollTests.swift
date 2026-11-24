@@ -34,7 +34,7 @@ import Testing
         #expect(h.document.lines.last?.kind == .todo(done: false))
         #expect(h.view.visibleRect.maxY == h.view.bounds.maxY)
         let last = try #require(h.controller.segmentRects(for: h.view.selectedRange()).last)
-        #expect(h.view.visibleRect.maxY - last.maxY >= h.theme.docPadding.bottom - 1)
+        #expect(abs(h.view.visibleRect.maxY - last.maxY - 12) <= 1)
         h.paste(String(repeating: "다음 문장 ", count: 90))
         let paragraph = try #require(h.document.lines.last)
         h.caret(at: paragraph.contentStart + 4)
@@ -46,13 +46,16 @@ import Testing
 
     @Test func middleLinesHaveRoomInBothDirections() throws {
         let h = try editor()
-        let room = h.theme.component(.editorCaretScrollRoom)
+        let room: CGFloat = 6
         for index in [8, 3] {
             h.caret(atEndOfLine: index)
             h.type("가")
             let line = try #require(h.controller.segmentRects(for: h.view.selectedRange()).last)
             #expect(line.minY - h.view.visibleRect.minY >= room - 1)
             #expect(h.view.visibleRect.maxY - line.maxY >= room - 1)
+            let target = try #require(h.controller.caretScrollTarget(for: h.view.selectedRange()))
+            #expect(abs(line.minY - target.minY - room) <= 1)
+            #expect(abs(target.maxY - line.maxY - room) <= 1)
             let visible = h.view.visibleRect
             h.type("나")
             #expect(h.view.visibleRect == visible)

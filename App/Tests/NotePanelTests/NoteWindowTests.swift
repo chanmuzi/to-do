@@ -163,6 +163,8 @@ import Theme
         let id = try coordinator.createNote(.init(draft: NoteDraft(title: "크기 기억")))
         let window = try #require(coordinator.window(for: id))
         let initial = window.frame
+        // 기본 글꼴에서 머리와 구분선 33pt, 본문 여섯 줄 144pt, 위아래 여백 24pt.
+        #expect(initial.height == 201)
         let height = initial.height + fixture.theme.lineHeight(.body)
         window.setContentSize(NSSize(width: initial.width, height: height))
         coordinator.closeWindow(id)
