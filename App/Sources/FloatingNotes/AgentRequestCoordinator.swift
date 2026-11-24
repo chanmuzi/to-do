@@ -13,7 +13,6 @@ final class AgentRequestCoordinator {
     }
     struct Failure: Error {
         let message: String
-        var settings = false
         var resumeAt: Date?
     }
     typealias Execute = (AgentConversation, AgentRequest, @escaping @Sendable (AgentEvent) -> Void) async throws -> String
@@ -26,9 +25,7 @@ final class AgentRequestCoordinator {
     private let execute: Execute
     private let note: (String) -> (NoteID, String)?
     var inbox: ProposalInbox?
-    var progress: (AgentDraft, AgentRequest) -> Void = { _, _ in }
     var finished: (AgentDraft, AgentRequest) -> Void = { _, _ in }
-    var openSettings: (String) -> Void = { _ in }
     private var order: [Entry] = []
     private var activeDraft: AgentDraft?
     private var isolationFailed = false
@@ -201,10 +198,10 @@ final class AgentRequestCoordinator {
             }
         }) else { paused = true; hold([draft], afterFailure: false); return }
         order.removeAll { $0.id == entry.id }
-        start(draft, request, execute: execute, automatic: entry.automatic)
+        start(draft, request, execute: execute)
     }
 
-    private func start(_ draft: AgentDraft, _ request: AgentRequest, execute: @escaping Execute, automatic: Bool = false) {
+    private func start(_ draft: AgentDraft, _ request: AgentRequest, execute: @escaping Execute) {
         activeDraft = draft
         let snapshot = draft.conversation
         task = Task {
@@ -213,9 +210,7 @@ final class AgentRequestCoordinator {
                 var files: [String: String] = [:]
                 for await event in events {
                     guard let i = draft.conversation.requests.firstIndex(where: { $0.runID == request.runID }) else { continue }
-                    let before = draft.conversation.requests[i].steps.last?.kind
                     apply(event, to: &draft.conversation.requests[i], files: &files)
-                    if before != draft.conversation.requests[i].steps.last?.kind { progress(draft, draft.conversation.requests[i]) }
                     if case .toolEnded = event { draft.save() }
                 }
             }
@@ -227,7 +222,7 @@ final class AgentRequestCoordinator {
             } catch { result = .failure(error) }
             continuation.finish()
             await consumer.value
-            finish(result, draft: draft, request: request, automatic: automatic)
+            finish(result, draft: draft, request: request)
         }
     }
 
@@ -271,11 +266,10 @@ final class AgentRequestCoordinator {
         step.elapsed = max(0, now.timeIntervalSince(step.startedAt))
     }
 
-    private func finish(_ result: Result<String, Error>, draft: AgentDraft, request: AgentRequest, automatic: Bool) {
+    private func finish(_ result: Result<String, Error>, draft: AgentDraft, request: AgentRequest) {
         guard let i = draft.conversation.requests.firstIndex(where: { $0.runID == request.runID }) else { return }
         var final = draft.conversation.requests[i]
         for j in final.steps.indices { end(&final.steps[j], now: Date()) }
-        var settings = false
         let completed = result.flatMap { answer in
             Result {
                 try Task.checkCancellation()
@@ -298,7 +292,6 @@ final class AgentRequestCoordinator {
                 let failure = error as? Failure
                 final.failure = failure?.message ?? "요청을 마치지 못했어요"
                 final.resumeAt = failure?.resumeAt
-                settings = failure?.settings == true
             }
             paused = priority == nil
         }
@@ -321,7 +314,6 @@ final class AgentRequestCoordinator {
             if final.status == .failed { failedQueue = true }
             if paused { hold(order.map(\.draft), afterFailure: final.status == .failed) }
             if final.status != .interrupted { finished(draft, final) }
-            if settings && !automatic && draft.conversation.barRequestID != final.id { openSettings(final.engine) }
             advance()
         }
     }

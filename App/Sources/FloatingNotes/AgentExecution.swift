@@ -38,14 +38,14 @@ struct AgentExecution {
         let installation: AgentInstallation
         do { installation = try await connection.discover(in: directory) }
         catch AgentError.missingExecutable {
-            throw AgentRequestCoordinator.Failure(message: "에이전트 설치가 필요해요", settings: true)
+            throw AgentRequestCoordinator.Failure(message: "에이전트 설치가 필요해요")
         }
         let account = try await connection.account(installation)
         if connection.isExpired(account) {
             if notifyExpiry { try? await notifications.blocked(connection, taskName: "에이전트 작업") }
-            throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
+            throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요")
         }
-        guard account.loggedIn else { throw AgentRequestCoordinator.Failure(message: "에이전트 연결이 필요해요", settings: true) }
+        guard account.loggedIn else { throw AgentRequestCoordinator.Failure(message: "에이전트 연결이 필요해요") }
         return installation
     }
 
@@ -65,7 +65,7 @@ struct AgentExecution {
             let effort = try await resolvedEffort(request, installation: installation)
             return try await runner.run(prompt, engine: engine, installation: installation, effort: effort, runID: request.runID, proposalInbox: inbox, notifyExpiry: notifyExpiry, onEvent: emit).text
         } catch AgentError.loginExpired {
-            throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요", settings: true)
+            throw AgentRequestCoordinator.Failure(message: "로그인이 만료됐어요")
         } catch AgentError.rateLimited(let reset) {
             throw AgentRequestCoordinator.Failure(message: "사용 한도에 도달했어요", resumeAt: reset.map(Date.init(timeIntervalSince1970:)))
         } catch AgentError.isolation("process_group") {

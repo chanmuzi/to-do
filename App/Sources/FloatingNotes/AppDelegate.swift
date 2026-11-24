@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let system = SystemReminderNotifier()
                 system.openNote = { [weak router] id in router?.route(.openNote(id)) }
                 system.openAgent = { [weak self] provider in self?.settingsWindow?.showAgent(provider) }
-                system.openConversation = { [weak router] id in router?.openBarConversation(id, source: "notification") }
+                system.openConversation = { [weak router] id, proposal in router?.openReply(id, proposal: proposal) }
                 system.installDelegate()
                 notifier = system
                 makeBridge = { EventKitBridge() }
@@ -576,7 +576,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             agent.modelPicker = { model.inlinePicker(theme: environment.theme, visible: $0, lineSpace: $1) }
         }
         let bar = BarRequestFlow(agent: agent, requests: coordinator)
-        if options.usesFakeCalendar { bar.deliver = { _ in true } }
         panels.capture.recentRequest = { bar.recent }
         panels.capture.openRecent = { [weak router, weak panels] id in
             router?.openBarConversation(id, source: "bar-recent", screen: panels?.capture.screen)
@@ -586,30 +585,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             router?.showAgent(draft, source: "bar", screen: panels?.capture.screen, reuseForBar: true)
             return true
         }
-        coordinator.openSettings = { [weak self] in self?.settingsWindow?.showAgent($0) }
-        coordinator.progress = { [weak self, weak coordinator] draft, request in
-            guard draft.conversation.barRequestID != request.id else { return }
-            let face = request.face
-            self?.toasts?.presenter.show(.init(kind: "agent-working", message: face.rawValue, actionTitle: "취소", face: face),
-                                         on: self?.toasts?.pointerScreen()) { coordinator?.task?.cancel() }
-        }
-        coordinator.finished = { [weak self, weak router] draft, request in
-            if draft.conversation.barRequestID == request.id {
-                bar.finished(draft, request)
-                return
-            }
-            let success = request.status == .completed
-            var message = success ? draft.conversation.completionMessage(for: request)
-                : request.failure ?? "막혔어요"
-            if let reset = request.resumeTime { message += ". " + reset + "부터 다시 돼요" }
-            self?.toasts?.presenter.show(.init(kind: "agent", message: message, actionTitle: success ? "보기" : "다시 시도",
-                                               face: success ? .done : .blocked),
-                                         on: self?.toasts?.pointerScreen()) { [weak self] in
-                if let id = request.proposals.first?.id, success { self?.proposalController?.open(id, source: "toast"); return }
-                router?.showAgent(draft, source: "toast")
-                if !success { self?.requests?.retry(draft, id: request.id) }
-            }
-        }
+        var replies = AgentReplyNotifications(showsConversation: agent.showsConversation)
+        if options.usesFakeCalendar { replies.deliver = { _ in true } }
+        coordinator.finished = { replies.finished($0, $1) }
         coordinator.restore(agent.drafts)
     }
 

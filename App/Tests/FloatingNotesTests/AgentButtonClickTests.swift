@@ -482,7 +482,7 @@ extension AgentButtonClickTests {
         let window = try #require(agent.window(id: id))
         defer { window.close() }
         #expect(!fx.capture.isVisible)
-        fx.router.openBarConversation(id, source: "notification")
+        fx.router.openReply(id, proposal: nil)
         #expect(agent.window(id: id) === window)
     }
 }

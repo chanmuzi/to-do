@@ -62,11 +62,13 @@ package struct AgentReplyNotification: Equatable, Sendable {
     fileprivate static let category = "float.agent.reply"
     package let conversation: UUID
     package let request: UUID
+    package let proposal: UUID?
     package let title: String
     package let body: String
 
-    package init(conversation: UUID, request: UUID, title: String, body: String) {
+    package init(conversation: UUID, request: UUID, proposal: UUID?, title: String, body: String) {
         self.conversation = conversation
+        self.proposal = proposal
         self.request = request
         self.title = title
         self.body = body
@@ -82,6 +84,7 @@ package struct AgentReplyNotification: Equatable, Sendable {
         content.body = body
         content.categoryIdentifier = Self.category
         content.userInfo = ["floatConversation": conversation.uuidString]
+        if let proposal { content.userInfo["floatProposal"] = proposal.uuidString }
         try await center.add(UNNotificationRequest(identifier: Self.category + "." + request.uuidString,
                                                    content: content, trigger: nil))
         return true

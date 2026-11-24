@@ -74,10 +74,6 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         customName ?? (requests.first?.userText ?? queued.first?.text).flatMap(NotePreviewText.firstLine) ?? "새 대화"
     }
 
-    package func completionMessage(for request: AgentRequest) -> String {
-        customName ?? request.answer.flatMap(NotePreviewText.firstLine) ?? "끝났어요"
-    }
-
     public init(targets: [NoteID], now: Date = Date()) {
         formatVersion = Self.currentVersion
         id = UUID()

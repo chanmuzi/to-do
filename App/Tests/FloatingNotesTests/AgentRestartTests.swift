@@ -19,25 +19,35 @@ import Theme
         AgentRequestCoordinator(choice: { .init(provider: .claude, model: nil) }, note: { _ in nil }, execute: run)
     }
 
-    @Test func completionAndConversationNameUseTheFirstVisibleMarkdownLine() throws {
+    @Test func completionAndConversationNameUseTheFirstVisibleMarkdownLine() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        var notices: [AgentReplyNotification] = []
+        let replies = AgentReplyNotifications(showsConversation: { _ in false }, deliver: { notices.append($0); return true })
         var conversation = AgentConversation(targets: [])
         let prompt = "\n---\n- [x] *오늘* [일정](https://example.com)과 `할 일`"
         conversation.queued = [.init(text: prompt)]
         #expect(conversation.name == "오늘 일정과 할 일")
         var request = AgentRequest(id: UUID(), text: prompt, engine: "fixture", model: nil)
+        request.status = .completed
         request.answer = "  \n---\n# 노트를 확인했지만, **오늘 할 일은 없어요.**\n다음 줄"
         conversation.requests = [request]
-        #expect(conversation.completionMessage(for: request) == "노트를 확인했지만, 오늘 할 일은 없어요.")
+        let draft = AgentDraft(conversation, store: store)
+        await replies.finished(draft, request)?.value
+        #expect(notices.last?.body == "노트를 확인했지만, 오늘 할 일은 없어요.\n다음 줄")
         let restored = try JSONDecoder().decode(AgentConversation.self, from: JSONEncoder().encode(conversation))
         #expect(restored.name == "오늘 일정과 할 일")
         #expect(restored.requests.first?.userText == prompt)
         request.answer = "---\n- [ ]\n##"
-        #expect(conversation.completionMessage(for: request) == "끝났어요")
+        await replies.finished(draft, request)?.value
+        #expect(notices.last?.body == "끝났어요")
         request.answer = "1. `*literal*`와 _기울임_"
-        #expect(conversation.completionMessage(for: request) == "*literal*와 기울임")
+        await replies.finished(draft, request)?.value
+        #expect(notices.last?.body == "*literal*와 기울임")
         conversation.customName = "내 *이름*"
         #expect(conversation.name == "내 *이름*")
-        #expect(conversation.completionMessage(for: request) == "내 *이름*")
+        draft.change { $0.customName = conversation.customName }
+        await replies.finished(draft, request)?.value
+        #expect(notices.last?.title == "오늘 일정과 할 일" && notices.last?.body == "*literal*와 기울임")
     }
 
     @Test func crashAndRepeatedShutdownKeepOneBubbleAndGlobalOrder() async throws {
@@ -58,9 +68,16 @@ import Theme
         let next = try catalog()
         var calls: [String] = []
         let final = queue { _, request, _ in calls.append(request.userText); return "완료" }
+        var notices: [AgentReplyNotification] = []
+        var deliveries: [Task<Void, Never>] = []
+        let replies = AgentReplyNotifications(showsConversation: next.showsConversation, deliver: { notices.append($0); return true })
+        final.finished = { if let task = replies.finished($0, $1) { deliveries.append(task) } }
         final.restore(next.drafts)
         final.restore(next.drafts)
         while let active = final.task { await active.value }
+        for delivery in deliveries { await delivery.value }
+        #expect(notices.map(\.title) == calls && notices.allSatisfy { $0.body == "완료" })
+        #expect(next.window(id: a.conversation.id) == nil && next.window(id: b.conversation.id) == nil)
         #expect(calls == ["하나", "둘", "셋", "넷"])
         let value = try #require(next.record(id: a.conversation.id)?.conversation)
         let first = try #require(value.requests.first)
@@ -77,7 +94,6 @@ import Theme
         b.change { $0.queued = [.init(text: "둘", order: 2)] }
         let q = queue { _, _, _ in calls += 1; return "답" }
         q.prepareRecovery = { _ in probes += 1; return nil }
-        q.openSettings = { _ in Issue.record("설정 열림") }
         q.finished = { _, _ in completions += 1 }
         q.restore([b, a])
         while let active = q.task { await active.value }
