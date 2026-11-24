@@ -1,14 +1,14 @@
 import AppKit
 
 /// 설정 값 버튼에 붙는 메뉴. 창은 포커스를 가져가지 않고 선택 결과를 원래 메뉴 액션으로 돌려준다.
-final class SettingsValueMenu: NSPanel {
+package final class SettingsValueMenu: NSPanel {
     private weak var anchor: NSView?
     private let choices: NSMenu
     private var rowsByItem: [NSMenuItem: PickerMenuRow] = [:]
     private var highlighted: PickerMenuRow?
     private var eventMonitor: Any?
 
-    init?(menu: NSMenu, anchor: NSView, offset: CGSize) {
+    package init?(menu: NSMenu, anchor: NSView, offset: CGSize) {
         guard let host = anchor.window, let screen = host.screen,
               let first = menu.items.compactMap({ $0.view as? PickerMenuRow }).first else { return nil }
         self.anchor = anchor
@@ -91,12 +91,12 @@ final class SettingsValueMenu: NSPanel {
         }
     }
 
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
+    package override var canBecomeKey: Bool { false }
+    package override var canBecomeMain: Bool { false }
 
     @objc private func dismiss() { close() }
 
-    override func close() {
+    package override func close() {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         eventMonitor = nil
         NotificationCenter.default.removeObserver(self)

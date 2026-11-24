@@ -143,6 +143,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let library = LibraryCoordinator(theme: environment.theme, notes: environment.notes,
                 spaces: environment.spaces, windows: environment.windowStates,
                 preferences: try LibraryPreferencesStore(location: environment.location), router: router)
+            library.model.updateOpenWindowPin = { [weak notePanels] id, pinned in
+                notePanels?.setPinned(pinned, for: id)
+            }
             let instructionEditor = InstructionEditor(theme: environment.theme, store: store)
             self.instructionEditor = instructionEditor
             library.model.instructionView = instructionEditor.editor.view

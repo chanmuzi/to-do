@@ -64,7 +64,9 @@ struct LibrarySymbol: View {
 final class LibraryHostingView<Content: View>: NSHostingView<Content> {
     override func layout() {
         super.layout()
+        let pointer = window?.mouseLocationOutsideOfEventStream
         func suppressRing(_ view: NSView) {
+            if let row = view as? LibraryRowInputView { row.synchronizeHover(at: pointer) }
             view.focusRingType = .none
             if let scroll = view as? NSScrollView, scroll.scrollerStyle != .overlay {
                 scroll.scrollerStyle = .overlay
