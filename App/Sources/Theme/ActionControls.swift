@@ -32,16 +32,18 @@ package struct WhiteControl: ButtonStyle {
 package struct TextActionLink: View {
     let theme: Theme
     let title: String
-    let symbol: String
+    let symbol: String?
+    let showsHover: Bool
     let action: () -> Void
     let minimumHeight: CGFloat
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduced
 
-    package init(theme: Theme, title: String, symbol: String, minimumHeight: CGFloat? = nil, action: @escaping () -> Void) {
+    package init(theme: Theme, title: String, symbol: String? = nil, minimumHeight: CGFloat? = nil, showsHover: Bool = false, action: @escaping () -> Void) {
         self.theme = theme
         self.title = title
         self.symbol = symbol
+        self.showsHover = showsHover
         self.minimumHeight = minimumHeight ?? theme.component(.libraryMoreSize)
         self.action = action
     }
@@ -50,9 +52,9 @@ package struct TextActionLink: View {
         Button(action: action) {
             HStack(spacing: theme.space(.sp1)) {
                 Text(title)
-                Image(systemName: symbol).accessibilityHidden(true)
+                if let symbol { Image(systemName: symbol).accessibilityHidden(true) }
             }.font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
-                .foregroundStyle(theme.color(hovered ? .text : .text2))
+                .foregroundStyle(theme.color(hovered || showsHover ? .text : .text2))
                 .frame(minHeight: minimumHeight).contentShape(Rectangle())
         }.buttonStyle(.plain).onHover { hovered = $0 }
             .animation(reduced ? nil : theme.motion.animation, value: hovered)

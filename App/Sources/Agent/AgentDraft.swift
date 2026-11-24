@@ -30,6 +30,9 @@ import Store
     var expanded: Set<UUID> = []
     var hovered: UUID?
     #if DEBUG
+    var previewProgressHover: String?
+    @ObservationIgnored package var progressFrames: [String: CGRect] = [:]
+    var measuresProgress = false
     package var previewInputHover: Bool?
     var still = false
     package var verificationBottom: Bool?

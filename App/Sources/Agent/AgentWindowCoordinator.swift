@@ -240,6 +240,10 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         case "history": draft.showsHistory.toggle()
         case "send": send(draft)
         case "retry": if let id = draft.conversation.requests.last?.id { retry(draft, id) }
+        case "progress-hover-summary": draft.previewProgressHover = "summary"
+        case "progress-hover-link": draft.previewProgressHover = "link"
+        case "progress-hover-off": draft.previewProgressHover = nil
+        case "measure-progress": draft.measuresProgress = true
         case "expand": if let id = draft.conversation.requests.last?.id { draft.expanded.insert(id) }
         case "collapse": draft.expanded.removeAll()
         case "hover": draft.hovered = draft.conversation.queued.last?.id

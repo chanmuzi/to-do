@@ -55,6 +55,7 @@ import Testing
         #expect(calls == ["첫째"])
         let previous = try #require(a.conversation.requests.first)
         #expect(previous.status == .failed)
+        #expect(previous.steps.last?.result == "실패")
         queue.retry(a, id: previous.id)
         queue.retry(a, id: previous.id)
         while let task = queue.task { await task.value }
@@ -102,7 +103,8 @@ import Testing
     @Test func shutdownMakesOneRetryReservation() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let a = draft()
-        let queue = AgentRequestCoordinator(choice: { .init(provider: .codex, model: nil) }, note: { _ in nil }) { _, _, _ in
+        let queue = AgentRequestCoordinator(choice: { .init(provider: .codex, model: nil) }, note: { _ in nil }) { _, _, emit in
+            emit(.started(model: nil))
             try await Task.sleep(for: .seconds(3))
             return "답"
         }
@@ -111,6 +113,7 @@ import Testing
         await queue.shutdown()
         let saved = try #require(store.loadConversations { Issue.record("\($0)") }.first)
         #expect(saved.requests.first?.stopReason == .shutdown)
+        #expect(saved.requests.first?.steps.last?.result == "중단")
         #expect(saved.queued.map(\.text) == ["첫 요청", "다음 요청"])
         #expect(saved.queued.first?.id == saved.requests.first?.id)
     }

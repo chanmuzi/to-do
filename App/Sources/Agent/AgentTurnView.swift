@@ -4,24 +4,19 @@ import Theme
 
 extension AgentRequest {
     package var progressTitle: String {
-        if steps.last?.kind == .read, let title = steps.last?.noteTitle { return title + " 읽는 중" }
-        return face.rawValue
+        activeStep?.title(for: .active) ?? face.rawValue
     }
+
+    private var activeStep: Step? { steps.last { $0.endedAt == nil } }
 
     package var face: AgentFaceState {
         switch status {
-        case .running: steps.last?.kind.face ?? .think
+        case .running: activeStep?.kind.face ?? .think
         case .completed: .done
         case .interrupted: .idle
         case .failed: .blocked
         case .awaitingAnswer: .ask
         }
-    }
-}
-
-private extension AgentRequest.Step.Kind {
-    var face: AgentFaceState {
-        switch self { case .think: .think; case .search: .search; case .read: .read; case .write: .write }
     }
 }
 
@@ -53,7 +48,7 @@ struct AgentTurnView: View {
                     AgentFace(theme: theme, state: .idle, forceStill: still)
                         .frame(width: theme.component(.agentAnswerFaceSlot), alignment: .leading)
                     VStack(alignment: .leading, spacing: theme.component(.agentRowInset)) {
-                        if !attempt.steps.isEmpty { stepList(attempt.steps) }
+                        if !attempt.steps.isEmpty { stepList(attempt.steps, status: .interrupted) }
                         if let answer = attempt.answer { AgentAnswerView(theme: theme, answer: answer) }
                         stoppedLine("앱을 끄면서 멈췄어요")
                     }
@@ -68,7 +63,10 @@ struct AgentTurnView: View {
                             if expanded { draft.expanded.remove(request.id) } else { draft.expanded.insert(request.id) }
                         } label: {
                             HStack(spacing: theme.component(.agentChipGap)) {
-                                Image(systemName: expanded ? "chevron.down" : "chevron.right")
+                                symbol("chevron.right", size: .iconSmall)
+                                    .rotationEffect(.degrees(expanded ? 90 : 0))
+                                    .animation(still ? nil : theme.motion.animation, value: expanded)
+                                    .progressFrame("chevron", draft: draft)
                                 if request.status == .running && !still {
                                     TimelineView(.animation) { timeline in
                                         let t = timeline.date.timeIntervalSinceReferenceDate / theme.tokens.period(.agentShimmerPeriod)
@@ -78,11 +76,18 @@ struct AgentTurnView: View {
                                             startPoint: .init(x: x, y: 0), endPoint: .init(x: x + 1, y: 0)))
                                     }
                                 } else { Text(summary) }
-                            }
-                        }.buttonStyle(.plain).foregroundStyle(theme.color(.text3)).font(smallFont)
+                            }.font(smallFont)
+                                .frame(maxWidth: .infinity, minHeight: theme.component(.agentProgressHeight), alignment: .leading)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(SettingsButton(theme: theme, selected: false, showsHover: previewHover == "summary"))
+                            .accessibilityValue(expanded ? "펼쳐짐" : "접힘")
                     }
-                    if expanded { stepList(request.steps) }
-                    if let answer = request.answer { AgentAnswerView(theme: theme, answer: answer) }
+                    if expanded { stepList(request.steps, status: request.status) }
+                    if let answer = request.answer {
+                        AgentAnswerView(theme: theme, answer: answer)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .progressFrame("answer", draft: draft)
+                    }
                     ForEach(request.proposals) { proposal in
                         Button { openProposal(proposal.id) } label: {
                             HStack(spacing: theme.space(.sp2)) {
@@ -118,20 +123,56 @@ struct AgentTurnView: View {
             .frame(minHeight: theme.component(.agentProgressHeight))
     }
 
-    private func stepList(_ steps: [AgentRequest.Step]) -> some View {
+    private var previewHover: String? {
+        #if DEBUG
+        draft.previewProgressHover
+        #else
+        nil
+        #endif
+    }
+
+    @ViewBuilder private func symbol(_ name: String, size: ComponentToken) -> some View {
+        if let image = theme.symbolImage(name, size: size) {
+            Image(nsImage: image).renderingMode(.template)
+                .frame(width: theme.component(size), height: theme.component(size)).accessibilityHidden(true)
+        }
+    }
+
+    private func stepList(_ steps: [AgentRequest.Step], status: AgentRequest.Status) -> some View {
         VStack(alignment: .leading, spacing: theme.component(.iconButtonGap)) {
             ForEach(steps, id: \.id) { step in
-                HStack(spacing: theme.component(.agentRowInset)) {
-                    if step.endedAt != nil { Image(systemName: step.result == "실패" ? "xmark" : "checkmark") }
-                    if let note = step.noteID, let title = step.noteTitle {
-                        Button(title) { openNote(note) }.buttonStyle(.plain).underline()
-                    } else { Text(step.kind.face.rawValue) }
+                let phase = step.phase(in: status, last: step.id == steps.last?.id)
+                let title = step.title(for: phase)
+                HStack(alignment: .firstTextBaseline, spacing: theme.component(.agentRowInset)) {
+                    Group {
+                        switch phase {
+                        case .completed: symbol("checkmark", size: .valueMenuCheck)
+                        case .failed: symbol("xmark", size: .valueMenuCheck)
+                        case .active, .stopped: Color.clear
+                        }
+                    }.frame(width: theme.component(.valueMenuCheck), height: theme.component(.valueMenuCheck))
+                        .accessibilityHidden(true)
+                    Group {
+                        if let note = step.noteID {
+                            TextActionLink(theme: theme, title: title, minimumHeight: theme.component(.agentStepHeight),
+                                           showsHover: previewHover == "link") { openNote(note) }
+                        } else { Text(title) }
+                    }.progressBaseline("label-" + step.id.uuidString, draft: draft)
                     Spacer(minLength: 0)
-                    if let elapsed = step.elapsed { Text("\(elapsed, specifier: "%.1f")초").monospacedDigit() }
+                    if let duration = step.durationLabel {
+                        Text(duration).fixedSize().monospacedDigit()
+                            .progressBaseline("time-" + step.id.uuidString, draft: draft)
+                            .progressFrame("time-" + step.id.uuidString, draft: draft)
+                    }
                 }.frame(minHeight: theme.component(.agentStepHeight))
+                    .progressFrame("row-" + step.id.uuidString, draft: draft)
             }
         }.font(smallFont).foregroundStyle(theme.color(.text2))
-            .padding(.leading, theme.component(.agentInputInset))
-            .overlay(alignment: .leading) { Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth)) }
+            .padding(.leading, theme.component(.iconSmall) + theme.component(.agentChipGap))
+            .overlay(alignment: .leading) {
+                Rectangle().fill(theme.color(.line)).frame(width: theme.shape(.borderWidth))
+                    .progressFrame("rail", draft: draft)
+                    .frame(width: theme.component(.iconSmall)).allowsHitTesting(false)
+            }
     }
 }
