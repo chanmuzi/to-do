@@ -158,6 +158,8 @@ final class DebugControl {
             guard let menu = notePanels.moreMenuForVerification(for: id),
                   let anchor = notePanels.window(for: id)?.contentView, let url = output(named: name) else { return }
             snapshotLiveMenu(menu, anchor: anchor, to: url)
+        case ("checkbox-hover", let id?, let line?) where isPassive:
+            editor(of: id)?.previewCheckboxHover(line: Int(line))
         case ("audit-hover", let id?, let label?):
             guard let root = notePanels.window(for: id)?.contentView else { return }
             DebugViewAudit.hover(root, label: label)
