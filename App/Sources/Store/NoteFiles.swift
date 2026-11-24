@@ -100,17 +100,9 @@ struct NoteFiles {
     func read(_ id: NoteID, in directory: URL) throws(StoreError) -> NoteFile {
         let text = try readText(id, in: directory)
         let stamp = try stamp(id, in: directory)
-        let content = NoteFileCodec.decode(text)
         let url = url(id, in: directory)
         let creation = (try? fileManager.attributesOfItem(atPath: url.path))?[.creationDate] as? Date
-        var note = Note(
-            id: id, title: content.title, body: content.body, spaceID: content.spaceID,
-            colorID: content.colorID, reminder: content.reminder, schedules: content.schedules,
-            // 머리에 만든 날짜가 없으면 파일의 날짜를 쓴다. 머리에 적을 때와 같게 초 아래를 버린다.
-            created: content.created ?? NoteFileCodec.truncatedToSeconds(creation ?? stamp.modified),
-            modified: stamp.modified
-        )
-        note.isArchived = content.archived ?? (note.created < archiveCutoff)
+        let note = NoteFileCodec.note(text, id: id, creation: creation ?? stamp.modified, modified: stamp.modified, archiveCutoff: archiveCutoff)
         return NoteFile(note: note, text: text, stamp: stamp)
     }
 

@@ -19,7 +19,7 @@ package final class EngineAccount {
     private let location: StoreLocation
     private let directory: URL?
     private var installation: AgentInstallation?
-    @ObservationIgnored private var generation = 0
+    private(set) var generation = 0
     @ObservationIgnored private var task: Task<Void, Never>?
 
     init(_ provider: AgentProvider, location: StoreLocation, directory: URL?) {
@@ -42,6 +42,8 @@ package final class EngineAccount {
         case .expired: return "다시 로그인 필요"
         }
     }
+
+    func loadIfNeeded() { if !requestedModels && activity == nil { refresh() } }
 
     package func refresh() {
         start(.checking) { connection in

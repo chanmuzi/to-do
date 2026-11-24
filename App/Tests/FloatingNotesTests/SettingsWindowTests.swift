@@ -1,3 +1,4 @@
+@testable import Agent
 import AppKit
 @_spi(Verification) import Editor
 @testable import FloatSettings
@@ -6,11 +7,108 @@ import Library
 import Models
 import Scheduling
 import Store
+import SwiftUI
 import Testing
 import Theme
 @testable import FloatingNotes
 
 @Suite struct SettingsWindowTests {
+    @Test func inlinePickerLimitsOnlyTheModelNameAndSharesSettings() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let theme = fixture.theme
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location), read: { store.settings },
+                                  save: store.update, schedules: ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(),
+                                  makeBridge: { FakeCalendarBridge() }), shortcuts: [], openPrivacy: { _ in })
+        let menu = model.choices.menu(.both, theme: theme)
+        model.chooseModelOption(try #require(menu.item(withTitle: "Opus")))
+        model.chooseModelOption(try #require(menu.item(withTitle: "High")))
+        #expect(store.settings.agentModel == "opus" && model.selectedEffort == "high")
+        #expect(model.choices.menu(.both, theme: theme).items.filter { $0.state == .on }.map(\.title) == ["Opus", "High"])
+        let name = String(repeating: "Research Preview ", count: 6)
+        let control = InlineValuePopup(theme: theme, name: name, detail: "High", visible: true,
+                                       label: name, makeMenu: { menu }, choose: model.chooseModelOption)
+        let host = NSHostingView(rootView: control.fixedSize())
+        let size = host.fittingSize
+        let font = theme.nsFont(.body, size: theme.component(.agentModelFont))
+        let detail = ceil(("High" as NSString).size(withAttributes: [.font: font]).width)
+        #expect(size.width == theme.component(.agentModelNameMax) + detail + theme.component(.captureValueGap) * 4 + theme.component(.agentModelChevron))
+        #expect(!font.isFixedPitch)
+    }
+
+    @Test func hoveringModelPreservesInputHeightAndLines() async throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let theme = fixture.theme
+        let draft = AgentDraft(.init(targets: []), store: AgentStore(location: fixture.location))
+        let modelName = "Opus 5.5 Research Preview Extended"
+        let view = AgentWindowView(theme: theme, modelPicker: { visible, space in
+            AnyView(InlineValuePopup(theme: theme, name: modelName, detail: "High", visible: visible, lineSpace: space,
+                                     label: modelName, makeMenu: { NSMenu() }, choose: { _ in }))
+        }, title: "", draft: draft, history: { [] }, openHistory: { _ in }, newChat: {}, delete: {}, send: {},
+           sendAll: {}, retry: { _ in }, sendNow: { _ in }, openNote: { _ in }, chooseTarget: {},
+           titleForNote: { _ in nil }, fit: { _ in }, close: {})
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 340, height: 235), styleMask: .borderless,
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let host = NSHostingView(rootView: view)
+        host.sizingOptions = []
+        window.contentView = host
+        func find<T: NSView>(_ type: T.Type, in root: NSView) -> T? {
+            if let match = root as? T { return match }
+            return root.subviews.lazy.compactMap { find(type, in: $0) }.first
+        }
+        func settle() async throws {
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(for: .milliseconds(120))
+            host.layoutSubtreeIfNeeded()
+        }
+        try await settle()
+        let field = try #require(find(CommandInputField.self, in: host))
+        func snapshot() throws -> (CGRect, Int) {
+            let value = field.stringValue.isEmpty ? field.placeholderAttributedString : field.attributedStringValue
+            let storage = NSTextStorage(attributedString: try #require(value))
+            let layout = NSLayoutManager()
+            let cell = try #require(field.cell)
+            let container = NSTextContainer(size: CGSize(width: cell.titleRect(forBounds: field.bounds).width,
+                                                         height: .greatestFiniteMagnitude))
+            storage.addLayoutManager(layout)
+            layout.addTextContainer(container)
+            var lines = 0
+            layout.enumerateLineFragments(forGlyphRange: layout.glyphRange(for: container)) { _, _, _, _, _ in lines += 1 }
+            return (field.convert(field.bounds, to: host), lines)
+        }
+        for (text, shouldShow, expectedLines) in [("", true, 1), ("짧은 글", true, 1),
+                                                 (String(repeating: "가", count: 25), true, 2),
+                                                 ("윗줄\n짧게", true, 2), ("윗줄\n마지막 줄에는 글을 길게 적어 둡니다", false, 2)] {
+            draft.update(text)
+            draft.previewInputHover = false
+            try await settle()
+            let before = try snapshot()
+            #expect(before.1 == expectedLines)
+            draft.previewInputHover = true
+            try await settle()
+            let after = try snapshot()
+            #expect(before == after)
+            func picker(in view: NSView) -> NSButton? {
+                if let button = view as? NSButton, button.title == modelName { return button }
+                return view.subviews.lazy.compactMap(picker).first
+            }
+            let button = try #require(picker(in: host))
+            #expect((button.frame.width > theme.shape(.borderWidth) && button.layer?.opacity == 1) == shouldShow)
+            if text.isEmpty {
+                let placeholder = try #require(field.placeholderAttributedString)
+                let start = try #require(field.cell).titleRect(forBounds: field.bounds).minX
+                #expect(button.convert(button.bounds, to: field).minX > start + placeholder.size().width)
+            }
+            draft.previewInputHover = false
+            try await settle()
+            #expect(try snapshot() == before)
+        }
+    }
+
     @Test func routingReusesWindowAndRequestsOnlyOnConnect() async throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }

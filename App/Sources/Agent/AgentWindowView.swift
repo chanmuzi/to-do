@@ -4,6 +4,9 @@ import Theme
 
 struct AgentWindowView: View {
     let theme: Theme
+    var modelPicker: ((Bool, CommandLineSpace) -> AnyView)?
+    @State private var inputHovered = false
+    @State private var lineSpace: CommandLineSpace?
     let title: String
     let draft: AgentDraft
     let history: () -> [AgentConversation]
@@ -136,16 +139,24 @@ struct AgentWindowView: View {
                 if let error = draft.errorMessage {
                     Text(error).font(theme.font(.ui)).foregroundStyle(theme.color(.warn)).padding(.horizontal, theme.space(.sp3))
                 }
-                HStack(spacing: theme.space(.sp1)) {
+                HStack(spacing: theme.space(.sp2)) {
                     CommandTextField(text: Binding(get: { draft.conversation.draft }, set: draft.update), theme: theme,
                                      placeholder: "에이전트에게 요청하기", font: theme.nsFont(.body, size: theme.component(.agentInputFont)),
-                                     submit: send, cancel: close)
+                                     wraps: true, submit: send, cancel: close)
+                        .onLineSpaceChange { lineSpace = $0 }
+                        .overlay(alignment: lineSpace?.multiline == true ? .bottomTrailing : .trailing) {
+                            if let modelPicker, let lineSpace {
+                                modelPicker(showsModel, lineSpace)
+                            }
+                        }
                     control("보내기", .send, action: draft.conversation.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : send)
                 }
                 .padding(.leading, theme.component(.agentInputInset))
                 .padding(.trailing, theme.space(.sp1))
-                .frame(height: theme.shape(.chromeHeight))
+                .frame(minHeight: theme.shape(.chromeHeight))
                 .overlay(RoundedRectangle(cornerRadius: theme.space(.sp2)).strokeBorder(theme.color(.outline), lineWidth: theme.shape(.borderWidth)))
+                .contentShape(Rectangle())
+                .onHover { inputHovered = $0 }
                 .padding([.horizontal, .bottom], theme.space(.sp3))
             }
         }
@@ -162,6 +173,13 @@ struct AgentWindowView: View {
             }.allowsHitTesting(false)
         }
         .onChange(of: requiredHeight) { _, height in fit(height) }
+    }
+
+    private var showsModel: Bool {
+        #if DEBUG
+        if let preview = draft.previewInputHover { return preview }
+        #endif
+        return inputHovered
     }
 
     private struct Viewport: Equatable {

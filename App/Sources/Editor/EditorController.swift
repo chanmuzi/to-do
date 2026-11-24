@@ -40,6 +40,8 @@ final class EditorController: NSObject {
     let textView: EditorTextView
     let scrollView = NSScrollView()
     let editorUndoManager = EditorUndoManager()
+    let checkboxHover = CheckboxHover()
+    var hoveredCheckbox: Int?
     let copyButton = CodeCopyButton()
     let linkField: LinkField
     var dateSuggestion: InlineDateProposal?
@@ -248,6 +250,10 @@ final class EditorController: NSObject {
         scrollView.scrollerStyle = .overlay
 
         copyButton.onPress = { [weak self] in self?.copyHoveredCodeBlock() }
+        checkboxHover.wantsLayer = true
+        checkboxHover.alphaValue = 0
+        checkboxHover.setAccessibilityElement(false)
+        textView.addSubview(checkboxHover)
         textView.addSubview(copyButton)
         linkField.isHidden = true
         linkField.onCommit = { [weak self] in self?.commitLink($0) }
@@ -366,6 +372,7 @@ final class EditorController: NSObject {
         isSettingText = false
         selectionVersion = documentVersion
         textView.setSelectedRange(clamped(selection))
+        setHoveredCheckbox(nil)
         hoveredLink = nil
         setHoveredCodeBlock(nil)
         restyleAll()

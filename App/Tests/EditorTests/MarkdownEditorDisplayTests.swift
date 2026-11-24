@@ -58,6 +58,21 @@ import Theme
         #expect(style.minimumLineHeight == h.theme.lineHeight(.body))
     }
 
+    @Test func checkboxHoverUsesTheClickableGutterOnly() throws {
+        let h = try EditorHarness("[ ] 열린 일\n[x] 끝낸 일")
+        let controller = h.editor.controller
+        for line in 0...1 {
+            let point = try #require(controller.gutterPoint(forLine: line))
+            #expect(controller.handleMouseMoved(at: point))
+            #expect(controller.hoveredCheckbox == line)
+            #expect(controller.checkboxHover.frame.width == h.theme.component(.checkSize) + h.theme.space(.sp1) * 2)
+            let text = try #require(controller.textPoint(forLine: line))
+            #expect(!controller.handleMouseMoved(at: text))
+            #expect(controller.hoveredCheckbox == nil)
+        }
+        #expect(h.editor.text == "[ ] 열린 일\n[x] 끝낸 일")
+    }
+
     @Test func gutterGlyphsPerKindAndLevel() throws {
         let h = try EditorHarness("- 0\n\t- 1\n\t\t- 2\n\t\t\t- 3\n+ 토글\n\t하위\n[x] 끝")
         func gutter(_ line: Int) throws -> FragmentDecoration.Gutter? {

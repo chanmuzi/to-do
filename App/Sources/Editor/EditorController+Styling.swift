@@ -63,6 +63,7 @@ extension EditorController: NSTextStorageDelegate {
     ) {
         // 글자가 바뀌면 문단을 다시 만들기 전에 곧바로 다시 푼다(문단을 만들 때 이 값을 쓴다).
         guard editedMask.contains(.editedCharacters) else { return }
+        setHoveredCheckbox(nil)
         let old = document
         document = MarkdownDocument(textStorage.string)
         documentVersion += 1

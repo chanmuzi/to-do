@@ -55,9 +55,20 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     /// 이 노트가 마지막으로 키 창이 된 때. 기존에 기록된 시각은 이어 쓴다(D-130).
     /// 기록이 없으면 최근에서 제외하고 검색으로 찾는다.
     public var lastOpened: Date?
+    public struct ReadingPosition: Hashable, Codable, Sendable {
+        public var selection: NSRange
+        public var scrollY: Double
+
+        public init(selection: NSRange, scrollY: Double) {
+            self.selection = selection
+            self.scrollY = scrollY
+        }
+    }
+    public var readingPosition: ReadingPosition?
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        readingPosition = try values.decodeIfPresent(ReadingPosition.self, forKey: .readingPosition)
         frame = try values.decodeIfPresent(WindowFrame.self, forKey: .frame)
         // 옛 파일에는 마지막 프레임만 있다. 새 파일은 자동 높이도 명시한다.
         heightPreference = try values.decodeIfPresent(HeightPreference.self, forKey: .heightPreference)

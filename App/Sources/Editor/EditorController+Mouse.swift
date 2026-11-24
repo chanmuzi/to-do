@@ -87,7 +87,9 @@ extension EditorController {
         switch hit {
         case .checkbox(let line):
             guard !textView.hasMarkedText() else { return true }
+            setHoveredCheckbox(nil)
             apply(EditorCommands.toggleDone(document, lines: line...line, selection: clamped(textView.selectedRange())))
+            setHoveredCheckbox(line)
         case .chevron(let line):
             toggleFold(line: line)
         case .link(_, _, let url):
@@ -115,6 +117,7 @@ extension EditorController {
     /// - Returns: 누를 수 있는 것(복사 버튼 포함) 위면 `true`(화살표 커서).
     func handleMouseMoved(at point: CGPoint) -> Bool {
         let hit = hit(at: point)
+        if case .checkbox(let line) = hit { setHoveredCheckbox(line) } else { setHoveredCheckbox(nil) }
         var link: (line: Int, offset: Int)?
         if case .link(let line, let offset, _) = hit { link = (line, offset) }
         if link?.line != hoveredLink?.line || link?.offset != hoveredLink?.offset {
@@ -129,7 +132,18 @@ extension EditorController {
         return hit != nil || isOverCopyButton(point)
     }
 
+    func setHoveredCheckbox(_ line: Int?) {
+        guard line != hoveredCheckbox else { return }
+        hoveredCheckbox = line
+        if let line, document.lines.indices.contains(line), case .todo(let done) = document.lines[line].kind {
+            checkboxHover.update(center: gutterPoint(forLine: line), done: done, style: style, theme: theme)
+        } else {
+            checkboxHover.update(center: nil, done: false, style: style, theme: theme)
+        }
+    }
+
     func handleMouseExited() {
+        setHoveredCheckbox(nil)
         if hoveredLink != nil {
             hoveredLink = nil
             refreshStyling()

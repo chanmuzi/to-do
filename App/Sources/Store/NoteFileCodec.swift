@@ -35,7 +35,7 @@ struct NoteFileContent: Equatable {
 /// 아는 항목은 줄 맨 앞(들여쓰기 없음)에서 시작하는 `title`, `space`, `color`, `reminder`, `schedules`, `created`다.
 /// 들여쓴 줄과 그 밖의 줄은 모르는 줄로 두고 건드리지 않는다.
 /// 이미 있는 파일을 고쳐 쓸 때는 `encode(_:over:)`를 쓴다.
-enum NoteFileCodec {
+package enum NoteFileCodec {
     static let delimiter = "---"
     static let byteOrderMark: Unicode.Scalar = "\u{FEFF}"
 
@@ -71,6 +71,19 @@ enum NoteFileCodec {
             }
         }
         return content
+    }
+
+    package static func note(_ text: String, id: NoteID, creation: Date, modified: Date, archiveCutoff: Date) -> Note {
+        let content = decode(text)
+        var note = Note(
+            id: id, title: content.title, body: content.body, spaceID: content.spaceID,
+            colorID: content.colorID, reminder: content.reminder, schedules: content.schedules,
+            // 머리에 만든 날짜가 없으면 파일의 날짜를 쓴다. 머리에 적을 때와 같게 초 아래를 버린다.
+            created: content.created ?? NoteFileCodec.truncatedToSeconds(creation),
+            modified: modified
+        )
+        note.isArchived = content.archived ?? (note.created < archiveCutoff)
+        return note
     }
 
     /// 날짜는 초 단위까지만 적는다. 저장 전후가 같도록 미리 초 아래를 버릴 때 쓴다.

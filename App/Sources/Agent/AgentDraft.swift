@@ -30,6 +30,7 @@ import Store
     var expanded: Set<UUID> = []
     var hovered: UUID?
     #if DEBUG
+    package var previewInputHover: Bool?
     var still = false
     package var verificationBottom: Bool?
     @ObservationIgnored package var scrollMetrics: [String: Double] = [:]

@@ -66,7 +66,7 @@ let package = Package(
 
         .target(name: "FloatSettings", dependencies: ["Models", "Theme", "Scheduling", "AgentRunner", "Store"], swiftSettings: uiSettings),
 
-        .executableTarget(name: "FloatMCP", dependencies: ["Models"]),
+        .executableTarget(name: "FloatMCP", dependencies: ["Models", "Store", "MarkdownSyntax"]),
 
         // MARK: App
         .executableTarget(

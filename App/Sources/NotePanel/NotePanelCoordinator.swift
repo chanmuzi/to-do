@@ -180,6 +180,7 @@ public final class NotePanelCoordinator {
         if focus { endTrashUndo() }
         order.append(id)
         controller.show(focus: focus)
+        controller.restoreReadingPosition(state.readingPosition)
         windowsChanged()
     }
 
@@ -197,6 +198,7 @@ public final class NotePanelCoordinator {
     public func closeWindow(_ id: NoteID) {
         guard let controller = controllers[id], controller.flushBeforeClosing() else { return }
         let isBlank = controller.isBlankAndSettled
+        controller.saveReadingPosition()
         recorder.recordClosed(id)
         discard(id)
         if isBlank { deleteBlankNote(id) }
@@ -284,6 +286,10 @@ public final class NotePanelCoordinator {
     /// 떠 있는 모든 노트 창에서 고치던 제목을 마무리하고 편집기가 아직 알리지 않은 본문을 받는다.
     /// App이 끝내기 전에 `flushPendingSaves()`보다 먼저 부른다.
     package func flushPendingEdits(for id: NoteID) { controllers[id]?.flushPendingEdits() }
+
+    public func saveReadingPositions() {
+        for controller in controllers.values { controller.saveReadingPosition() }
+    }
 
     public func flushPendingEdits() {
         order.compactMap { controllers[$0] }.forEach { $0.flushPendingEdits() }

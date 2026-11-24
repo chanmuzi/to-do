@@ -35,6 +35,7 @@ public struct ValuePopup: View {
         let popup: ValuePopup
         func makeNSView(context: Context) -> ValueButton { ValueButton(theme: popup.theme, inSettings: popup.inSettings) }
         func updateNSView(_ button: ValueButton, context: Context) {
+            button.isEnabled = context.environment.isEnabled
             button.title = popup.value
             button.image = popup.dot
             button.font = popup.theme.nsFont(.body, size: popup.theme.tokens.textStyle(popup.inSettings ? .micro : .ui).size)
@@ -50,12 +51,12 @@ public struct ValuePopup: View {
     }
 }
 
-private final class ValueButton: NSButton {
+class ValueButton: NSButton {
     let theme: Theme
     var choose: ((NSMenuItem) -> Void)?
     var menuOffset: CGSize = .zero
-    private var popup: SettingsValueMenu?
-    private var hovered = false
+    var popup: SettingsValueMenu?
+    var hovered = false
     let inSettings: Bool
     init(theme: Theme, inSettings: Bool) {
         self.inSettings = inSettings
@@ -118,11 +119,15 @@ private final class ValueButton: NSButton {
         }
     }
     @objc private func selectChoice(_ sender: NSMenuItem) { choose?(sender) }
-    @objc private func openChoices() {
+    var usesFloatingMenu: Bool { inSettings }
+    func popupVisibilityChanged() {}
+    @objc func openChoices() {
         guard let menu else { return }
-        if inSettings {
+        if usesFloatingMenu {
             if popup?.isVisible == true { popup?.close() }
             popup = SettingsValueMenu(menu: menu, anchor: self, offset: menuOffset)
+            popup?.onDismiss = { [weak self] in self?.popupVisibilityChanged() }
+            popupVisibilityChanged()
             needsDisplay = true
         }
         else { menu.popUp(positioning: menu.items.first { $0.state == .on }, at: NSPoint(x: 0, y: bounds.midY), in: self) }

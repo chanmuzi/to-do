@@ -325,6 +325,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let notes = environment?.notes else { return .terminateNow }
         // 편집기가 아직 알리지 않은 글과 고치던 제목을 먼저 받는다.
         notePanels?.flushPendingEdits()
+        notePanels?.saveReadingPositions()
         flushWindowStates()
         do {
             try instructionStore?.flushInstructions()
@@ -507,14 +508,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  panels: QuickPanels, notes: NotePanelCoordinator) throws {
         try agent.restore()
         var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment), instructionStore: instructionStore)
+        execution.supportedEfforts = settingsWindow?.model.supportedEfforts
+        execution.noteContext = {
+            AgentNoteContext(windows: Dictionary(uniqueKeysWithValues: environment.windowStates.all.map {
+                ($0.key.rawValue, .init($0.value))
+            }), spaces: Dictionary(uniqueKeysWithValues: environment.spaces.spaces.map { ($0.id.rawValue, $0.name) }),
+            archiveCutoff: environment.notes.archiveCutoff)
+        }
         #if DEBUG
         if options.debugIsPassive { execution.notifications = AgentExpiryNotifications(notifier: VerificationExpiryNotifier()) }
         #endif
+        let modelSettings = settingsWindow?.model
         let coordinator = AgentRequestCoordinator(choice: {
             let settings = environment.settings.settings
             let provider = AgentProvider(rawValue: settings.agentProvider) ?? .claude
             let model = provider == .codex ? settings.codexModel : AgentEngine.claude(settings.agentModel).model
-            return .init(provider: provider, model: model)
+            return .init(provider: provider, model: model, effort: modelSettings?.selectedEffort)
         }, note: { file in
             guard let item = try? environment.notes.list().notes.first(where: { $0.id.rawValue + ".md" == file }) else { return nil }
             return (item.id, item.title.isEmpty ? "제목 없음" : item.title)
@@ -559,7 +568,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 router?.showAgent(draft, source: "target")
             }
         }
-        panels.capture.providerName = { environment.settings.settings.agentProvider == "codex" ? "Codex" : "Claude" }
+        if let model = settingsWindow?.model {
+            panels.capture.modelPicker = { model.inlinePicker(theme: environment.theme, visible: true) }
+            agent.modelPicker = { model.inlinePicker(theme: environment.theme, visible: $0, lineSpace: $1) }
+        }
         let bar = BarRequestFlow(agent: agent, requests: coordinator)
         if options.usesFakeCalendar { bar.deliver = { _ in true } }
         panels.capture.recentRequest = { bar.recent }

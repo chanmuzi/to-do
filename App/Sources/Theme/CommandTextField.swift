@@ -8,6 +8,8 @@ public struct CommandTextField: NSViewRepresentable {
     let placeholder: String
     let font: NSFont
     let ranges: [NSRange]
+    private var reportLineSpace: ((CommandLineSpace) -> Void)?
+    let wraps: Bool
     let focusToken: Int
     let submit: () -> Void
     let cancel: () -> Void
@@ -15,16 +17,29 @@ public struct CommandTextField: NSViewRepresentable {
     let moveDay: ((Int) -> Void)?
     let tab: ((Bool) -> Void)?
     public init(text: Binding<String>, theme: Theme, placeholder: String, style: TextStyle = .body, font: NSFont? = nil,
-                ranges: [NSRange] = [], focusToken: Int = 0, submit: @escaping () -> Void, cancel: @escaping () -> Void,
+                ranges: [NSRange] = [], focusToken: Int = 0, wraps: Bool = false, submit: @escaping () -> Void, cancel: @escaping () -> Void,
                 move: @escaping (Int) -> Void = { _ in }, moveDay: ((Int) -> Void)? = nil, tab: ((Bool) -> Void)? = nil) {
         _text = text; self.theme = theme; self.placeholder = placeholder; self.font = font ?? theme.nsFont(style)
         self.moveDay = moveDay
         self.tab = tab
         self.focusToken = focusToken
+        self.wraps = wraps
         self.ranges = ranges; self.submit = submit; self.cancel = cancel; self.move = move
     }
+    package func onLineSpaceChange(_ action: @escaping (CommandLineSpace) -> Void) -> Self {
+        var field = self
+        field.reportLineSpace = action
+        return field
+    }
+
     public func makeNSView(context: Context) -> CommandInputField {
         let field = CommandField(theme: theme)
+        if wraps {
+            field.maximumNumberOfLines = 0
+            field.cell?.isScrollable = false
+            field.cell?.wraps = true
+            field.lineBreakMode = .byWordWrapping
+        }
         field.delegate = context.coordinator
         field.setAccessibilityLabel(placeholder)
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -32,6 +47,10 @@ public struct CommandTextField: NSViewRepresentable {
     }
     public func updateNSView(_ field: CommandInputField, context: Context) {
         context.coordinator.parent = self
+        if let field = field as? CommandField {
+            field.reportLineSpace = reportLineSpace
+            field.scheduleMeasurement()
+        }
         if context.coordinator.focusToken != focusToken {
             context.coordinator.focusToken = focusToken
             DispatchQueue.main.async { [weak field] in if let field { field.window?.makeFirstResponder(field) } }
@@ -50,6 +69,13 @@ public struct CommandTextField: NSViewRepresentable {
             field.attributedStringValue = value
         }
     }
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView field: CommandInputField, context: Context) -> CGSize? {
+        guard wraps, let width = proposal.width, width.isFinite, width > 0,
+              let cell = field.cell else { return nil }
+        let size = cell.cellSize(forBounds: CGRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: max(field.intrinsicContentSize.height, ceil(size.height)))
+    }
+
     public func makeCoordinator() -> Coordinator { Coordinator(self) }
     @MainActor public final class Coordinator: NSObject, NSTextFieldDelegate {
         var focusToken: Int?
@@ -95,6 +121,30 @@ public struct CommandTextField: NSViewRepresentable {
     }
 }
 private final class CommandField: CommandInputField {
+    var reportLineSpace: ((CommandLineSpace) -> Void)?
+    private var measurementPending = false
+    private var lastSpace: CommandLineSpace?
+
+    func scheduleMeasurement() {
+        guard reportLineSpace != nil, !measurementPending else { return }
+        measurementPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            measurementPending = false
+            guard let space = CommandLineSpace(self), space != lastSpace else { return }
+            lastSpace = space
+            reportLineSpace?(space)
+        }
+    }
+    override func layout() {
+        super.layout()
+        scheduleMeasurement()
+    }
+    override func textDidChange(_ notification: Notification) {
+        super.textDidChange(notification)
+        scheduleMeasurement()
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if let window { DispatchQueue.main.async { [weak self, weak window] in

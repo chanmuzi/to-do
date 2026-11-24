@@ -11,6 +11,23 @@ import Testing
     var store: AgentStore { AgentStore(location: .isolated(notesDirectory: root)) }
     func draft() -> AgentDraft { AgentDraft(.init(targets: []), store: store) }
 
+    @Test func effortIsCapturedAtDispatch() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let conversation = draft()
+        var selection = AgentRequestCoordinator.Choice(provider: .claude, model: "opus", effort: "high")
+        var efforts: [String?] = []
+        let queue = AgentRequestCoordinator(choice: { selection }, note: { _ in nil }) { _, request, _ in
+            efforts.append(request.effort)
+            return "완료"
+        }
+        queue.submit(conversation, text: "처음")
+        selection.effort = "low"
+        queue.submit(conversation, text: "다음")
+        while let task = queue.task { await task.value }
+        #expect(efforts == ["high", "low"])
+        #expect(conversation.conversation.requests.map(\.effort) == efforts)
+    }
+
     @Test func orderedAcrossConversationsAndFailurePausesUntilRetry() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let a = draft(), b = draft()

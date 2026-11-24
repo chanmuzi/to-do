@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Observation
 import Models
 import Routing
@@ -19,6 +20,7 @@ public final class CaptureCoordinator {
     package var openRecent: (UUID) -> Void = { _ in }
     package var screen: NSScreen? { panel?.screen }
     private var recentObservation = UUID()
+    package var modelPicker: (() -> AnyView)?
     public var providerName: () -> String = { "Claude" }
     private var drafts: [Mode: String] = [:]
     private let theme: Theme
@@ -110,6 +112,7 @@ public final class CaptureCoordinator {
         selectedSpace = CaptureSpaceCycle.initial(
             remembered: hasSelectedSpace ? .some(selectedSpace) : nil, in: spaces.spaces
         )
+        barView.setModelPicker(mode == .request ? modelPicker?() : nil)
         barView.setMode(mode)
         barView.input.stringValue = ""
         barView.textView.string = ""
@@ -151,6 +154,7 @@ public final class CaptureCoordinator {
         observeRecent()
         resizeForRecent()
         let text = drafts[next] ?? ""
+        barView.setModelPicker(next == .request ? modelPicker?() : nil)
         barView.setMode(next)
         barView.input.stringValue = text
         barView.textView.string = text
@@ -170,6 +174,7 @@ public final class CaptureCoordinator {
         guard let panel, isClosing else { return }
         isClosing = false
         panel.orderOut(nil)
+        barView?.setModelPicker(nil)
         land(panel, frame: offstageFrame, alpha: 0)
     }
 
@@ -339,8 +344,8 @@ public final class CaptureCoordinator {
     private func refresh(animated: Bool) {
         guard let barView else { return }
         if mode == .request {
-            barView.apply(space: .init(symbolName: nil, symbolSize: .iconMedium, text: providerName(),
-                                       accessibilityLabel: providerName()), reminder: nil, timeRanges: [], animated: animated)
+            barView.apply(space: modelPicker == nil ? .init(symbolName: nil, symbolSize: .iconMedium, text: providerName(),
+                                       accessibilityLabel: providerName()) : nil, reminder: nil, timeRanges: [], animated: animated)
             return
         }
         let entry = interpretation()

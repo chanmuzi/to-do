@@ -4,10 +4,14 @@ package struct ClaudeModel: Decodable, Sendable {
     package let value: String
     package let displayName: String
 
-    private enum CodingKeys: String, CodingKey { case value, displayName, description }
+    package let efforts: [String]?
+
+    private enum CodingKeys: String, CodingKey { case value, displayName, description, supportsEffort, supportedEffortLevels }
 
     package init(from decoder: Decoder) throws {
         let fields = try decoder.container(keyedBy: CodingKeys.self)
+        efforts = try fields.decodeIfPresent(Bool.self, forKey: .supportsEffort) == false ? []
+            : fields.decodeIfPresent([String].self, forKey: .supportedEffortLevels)
         value = try fields.decode(String.self, forKey: .value)
         let name = try fields.decode(String.self, forKey: .displayName)
         let description = try? fields.decode(String.self, forKey: .description)

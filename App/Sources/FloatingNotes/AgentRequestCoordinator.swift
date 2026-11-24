@@ -9,6 +9,7 @@ final class AgentRequestCoordinator {
     struct Choice {
         var provider: AgentProvider
         var model: String?
+        var effort: String?
     }
     struct Failure: Error {
         let message: String
@@ -134,7 +135,7 @@ final class AgentRequestCoordinator {
         guard !closing, task == nil, let previous = draft.conversation.requests.first(where: { $0.id == id }),
               previous.status == .failed else { return }
         let selection = choice()
-        var request = AgentRequest(id: id, text: previous.userText, engine: selection.provider.rawValue, model: selection.model)
+        var request = AgentRequest(id: id, text: previous.userText, engine: selection.provider.rawValue, model: selection.model, effort: selection.effort)
         request.stoppedAttempts = previous.stoppedAttempts
         guard draft.change({ value in
             if let index = value.requests.firstIndex(where: { $0.id == id }) { value.requests[index] = request }
@@ -158,7 +159,7 @@ final class AgentRequestCoordinator {
         var selection = choice()
         if let previous = entry.draft.conversation.requests.first(where: { $0.id == entry.id }),
            let provider = AgentProvider(rawValue: previous.engine) {
-            selection = Choice(provider: provider, model: previous.model)
+            selection = Choice(provider: provider, model: previous.model, effort: previous.effort)
         }
         if entry.automatic, let prepareRecovery {
             activeDraft = entry.draft
@@ -183,7 +184,7 @@ final class AgentRequestCoordinator {
     private func dispatch(_ entry: Entry, selection: Choice, execute: @escaping Execute) {
         let draft = entry.draft
         guard let item = draft.conversation.queued.first(where: { $0.id == entry.id }) else { advance(); return }
-        var request = AgentRequest(id: item.id, text: item.text, engine: selection.provider.rawValue, model: selection.model)
+        var request = AgentRequest(id: item.id, text: item.text, engine: selection.provider.rawValue, model: selection.model, effort: selection.effort)
         guard draft.change({ value in
             value.queued.removeAll { $0.id == item.id }
             for index in value.requests.indices where value.requests[index].status == .awaitingAnswer {

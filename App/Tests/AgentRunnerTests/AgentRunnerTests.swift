@@ -99,7 +99,8 @@ private struct Fixture {
         """#)
         defer { try! fx.cleanup() }
         let events = Mutex<[AgentEvent]>([])
-        let result = try await fx.runner.run("--user-prompt", engine: .claude(model), installation: fx.installation) { event in
+        let effort = model == "fable" ? "high" : nil
+        let result = try await fx.runner.run("--user-prompt", engine: .claude(model), installation: fx.installation, effort: effort) { event in
             events.withLock { $0.append(event) }
         }
         #expect(result.text == "가")
@@ -110,7 +111,7 @@ private struct Fixture {
         let bin = fx.installation.executable.deletingLastPathComponent()
         let args = try String(contentsOf: bin.appending(path: "args"), encoding: .utf8).components(separatedBy: "\n")
         let conf = try #require(args.firstIndex(of: "--mcp-config")).advanced(by: 1)
-        let prefix = model == "auto" ? ["-p"] : ["-p", "--model", model]
+        let prefix = ["-p"] + (effort.map { ["--effort", $0] } ?? []) + (model == "auto" ? [] : ["--model", model])
         #expect(args == prefix + [ "--setting-sources", "", "--strict-mcp-config", "--mcp-config", args[conf],
                          "--tools", "", "--allowedTools", "mcp__float__list_notes,mcp__float__read_note", "--disable-slash-commands",
                          "--permission-mode", "dontAsk", "--no-session-persistence", "--output-format", "stream-json",
@@ -174,13 +175,14 @@ private struct Fixture {
         JSON
         """#)
         defer { try! fx.cleanup() }
-        let result = try await fx.runner.run("prompt", engine: .codex(model: model), installation: fx.installation)
+        let result = try await fx.runner.run("prompt", engine: .codex(model: model), installation: fx.installation, effort: model == nil ? nil : "ultra")
         #expect(result.text == "ok")
         #expect(result.actualModel == nil)
         #expect(result.usage == AgentUsage(inputTokens: 11, outputTokens: 3, costUSD: nil))
         let args = try String(contentsOf: fx.root.appending(path: "bin/args"), encoding: .utf8).components(separatedBy: "\n")
         #expect(Array(args.prefix(7)) == ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "-C"])
         #expect(Array(args[8..<10]) == ["-s", "read-only"])
+        #expect(args.contains(#"model_reasoning_effort="ultra""#) == (model != nil))
         if let model { #expect(Array(args[10..<12]) == ["-m", model]) }
         else { #expect(!args.contains("-m")) }
         #expect(args.contains("mcp_servers.float.command=\"\(fx.runner.server.path)\""))
@@ -244,7 +246,7 @@ private struct Fixture {
           failed) exit 7 ;;
           wrongShape) echo '{"models":{}}' ;;
           empty) echo '{"models":[]}' ;;
-          *) echo '{"models":[{"slug":"b","display_name":"Second","visibility":"list","priority":2},{"slug":"x","display_name":"Hidden","visibility":"hide","priority":0},{"slug":"a","display_name":"First","visibility":"list","priority":1}]}' ;;
+          *) echo '{"models":[{"slug":"b","display_name":"Second","visibility":"list","priority":2},{"slug":"x","display_name":"Hidden","visibility":"hide","priority":0},{"slug":"a","display_name":"First","visibility":"list","priority":1,"supported_reasoning_levels":[{"effort":"high"}]}]}' ;;
         esac
         """#)
         defer { try! fx.cleanup() }
@@ -254,6 +256,7 @@ private struct Fixture {
         switch scenario {
         case "list":
             #expect(list?.map(\.slug) == ["a", "b"])
+            #expect(list?.first?.efforts == ["high"])
             #expect(list?.map(\.displayName) == ["First", "Second"])
         case "empty":
             #expect(list?.isEmpty == true)

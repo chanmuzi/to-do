@@ -213,6 +213,9 @@ public final class MarkdownEditor {
         controller.gutterPoint(forLine: line)
     }
 
+    @_spi(Verification)
+    public func previewCheckboxHover(line: Int?) { controller.setHoveredCheckbox(line) }
+
     /// 그 줄 글자 영역 안의 한 점(텍스트 뷰 좌표). 마우스 올림을 흉내 낼 때 쓴다.
     @_spi(Verification)
     public func textPoint(forLine line: Int) -> CGPoint? {

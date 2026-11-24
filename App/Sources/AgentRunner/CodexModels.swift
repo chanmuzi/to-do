@@ -4,10 +4,13 @@ public struct CodexModel: Decodable, Sendable {
     public let slug: String
     public let displayName: String
     fileprivate let visibility: String
+    struct Level: Decodable, Sendable { let effort: String }
+    let levels: [Level]?
+    package var efforts: [String]? { levels?.map(\.effort) }
     fileprivate let priority: Int
 
     private enum CodingKeys: String, CodingKey {
-        case slug, displayName = "display_name", visibility, priority
+        case slug, displayName = "display_name", visibility, priority, levels = "supported_reasoning_levels"
     }
 }
 
