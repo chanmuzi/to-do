@@ -1,4 +1,5 @@
-import CoreGraphics
+import AppKit
+import Models
 import Testing
 import Theme
 @testable import NotePanel
@@ -8,9 +9,9 @@ import Theme
     init() throws {
         let theme = try Theme.bundled()
         metrics = .init(height: theme.shape(.chromeHeight), paddingLeading: theme.space(.sp3),
-                        paddingTrailing: theme.component(.chromePaddingEnd), gap: theme.component(.chromeGap),
-                        iconButton: theme.component(.iconButton), dividerWidth: theme.shape(.borderWidth),
-                        buttonGap: theme.component(.iconButtonGap))
+                        paddingTrailing: theme.component(.noteTopPaddingEnd), gap: theme.component(.chromeGap),
+                        iconButton: theme.component(.noteTopButtonSize), dividerWidth: theme.shape(.borderWidth),
+                        buttonGap: theme.component(.noteTopButtonGap))
     }
 
     private func layout(
@@ -33,6 +34,33 @@ import Theme
         #expect(frames.reminder?.maxX == frames.pin.minX - metrics.gap)
         #expect(frames.reminder?.width == 57)
         #expect(frames.pin.maxX + metrics.buttonGap == frames.more.minX)
+    }
+
+    @Test func hitAndReleaseMeetBetweenVisibleButtonsIncludingTheDivider() throws {
+        let theme = try Theme.bundled()
+        let row = TopRowView(style: PanelStyle(theme: theme))
+        let panel = NotePanelWindow(contentRect: CGRect(x: 0, y: 0, width: 340, height: metrics.height))
+        panel.allowsKey = false
+        panel.contentView = row
+        let now = Date()
+        let note = Note(id: NoteID(rawValue: "top"), title: "노트", reminder: now.addingTimeInterval(-86400), created: now, modified: now)
+        row.apply(TopRowState(note: note, isPinned: true, isHovered: true, isEditingTitle: false,
+                              problem: nil, options: .init(), now: now, calendar: .current), animated: false)
+        let buttons = row.subviews.compactMap { $0 as? IconButton }
+            .filter { !$0.isHidden && $0.alphaValue > 0 }.sorted { $0.frame.minX < $1.frame.minX }
+        #expect(buttons.count == 5)
+        for (left, right) in zip(buttons, buttons.dropFirst()) {
+            let midpoint = (left.frame.maxX + right.frame.minX) / 2
+            for x in stride(from: left.frame.maxX, to: right.frame.minX, by: 0.25) {
+                let point = row.convert(CGPoint(x: x, y: left.frame.midY), to: nil)
+                let target = x < midpoint ? left : right
+                #expect(panel.button(at: point) === target)
+                #expect(target.acceptsRelease(at: point))
+                #expect(!(target === left ? right : left).acceptsRelease(at: point))
+            }
+        }
+        let dragPoint = row.convert(CGPoint(x: 90, y: metrics.height / 2), to: nil)
+        #expect(panel.button(at: dragPoint) == nil)
     }
 
     @Test func restingFaceAndPinHaveDistinctSlots() {

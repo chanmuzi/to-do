@@ -19,6 +19,27 @@ import Theme
         AgentRequestCoordinator(choice: { .init(provider: .claude, model: nil) }, note: { _ in nil }, execute: run)
     }
 
+    @Test func completionAndConversationNameUseTheFirstVisibleMarkdownLine() throws {
+        var conversation = AgentConversation(targets: [])
+        let prompt = "\n---\n- [x] *오늘* [일정](https://example.com)과 `할 일`"
+        conversation.queued = [.init(text: prompt)]
+        #expect(conversation.name == "오늘 일정과 할 일")
+        var request = AgentRequest(id: UUID(), text: prompt, engine: "fixture", model: nil)
+        request.answer = "  \n---\n# 노트를 확인했지만, **오늘 할 일은 없어요.**\n다음 줄"
+        conversation.requests = [request]
+        #expect(conversation.completionMessage(for: request) == "노트를 확인했지만, 오늘 할 일은 없어요.")
+        let restored = try JSONDecoder().decode(AgentConversation.self, from: JSONEncoder().encode(conversation))
+        #expect(restored.name == "오늘 일정과 할 일")
+        #expect(restored.requests.first?.userText == prompt)
+        request.answer = "---\n- [ ]\n##"
+        #expect(conversation.completionMessage(for: request) == "끝났어요")
+        request.answer = "1. `*literal*`와 _기울임_"
+        #expect(conversation.completionMessage(for: request) == "*literal*와 기울임")
+        conversation.customName = "내 *이름*"
+        #expect(conversation.name == "내 *이름*")
+        #expect(conversation.completionMessage(for: request) == "내 *이름*")
+    }
+
     @Test func crashAndRepeatedShutdownKeepOneBubbleAndGlobalOrder() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let original = try catalog()

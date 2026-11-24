@@ -130,7 +130,7 @@ final class ReminderBadgeView: ClickableView {
     override func mouseDown(with event: NSEvent) {}
 
     override func mouseUp(with event: NSEvent) {
-        guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        guard acceptsRelease(at: event.locationInWindow) else { return }
         onPress?()
     }
 

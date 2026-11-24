@@ -139,7 +139,7 @@ final class IconButton: ClickableView {
     override func mouseDown(with event: NSEvent) {}
 
     override func mouseUp(with event: NSEvent) {
-        guard bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
+        guard acceptsRelease(at: event.locationInWindow) else { return }
         onPress?()
         // 메뉴가 떴다 닫히면 마우스가 나갔다는 알림이 오지 않을 수 있다.
         if let window, !bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) {
