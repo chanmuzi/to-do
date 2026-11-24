@@ -28,8 +28,8 @@ if [ -z "$IDENTITY" ]; then
   fi
 fi
 
-swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatingNotes
-swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatMCP
+swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatingNotes ${FLOAT_BUILD_JOBS:+-j "$FLOAT_BUILD_JOBS"}
+swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --product FloatMCP ${FLOAT_BUILD_JOBS:+-j "$FLOAT_BUILD_JOBS"}
 BIN_DIR="$(swift build --package-path "$PACKAGE" --configuration "$CONFIGURATION" --show-bin-path)"
 
 rm -rf "$APP"
