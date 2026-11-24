@@ -33,7 +33,7 @@ extension EditorController {
         guard let spot = caretSpot(range.location, lineIndex: index) else { return nil }
         let origin = textView.textContainerOrigin
         let line = spot.line.offsetBy(dx: origin.x, dy: origin.y)
-        let room = max(theme.component(.editorCaretScrollRoom), ceil(line.height / 2))
+        let room = theme.component(.editorCaretScrollRoom)
         var bottom = line.maxY + room
         if index == document.lines.count - 1,
            let last = caretSpot(document.length, lineIndex: index), last.line.midY == spot.line.midY {
