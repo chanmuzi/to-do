@@ -46,7 +46,8 @@ struct AgentWindowView: View {
                     HStack(spacing: theme.space(.sp1)) {
                         ForEach(draft.conversation.targets, id: \.self) { id in
                             HStack(spacing: theme.component(.agentChipGap)) {
-                                Image(nsImage: AgentWindowGlyph.note.image(theme: theme))
+                                Image(nsImage: AgentWindowGlyph.note.image(theme: theme)).renderingMode(.template)
+                                    .foregroundStyle(theme.color(.text2))
                                 Text(titleForNote(id) ?? title).lineLimit(1)
                             }
                             .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
@@ -109,7 +110,7 @@ struct AgentWindowView: View {
                                     .frame(width: side, height: side)
                                     .background(theme.color(.surface), in: Circle())
                                     .shadow(color: shadow?.color.color ?? .clear, radius: (shadow?.blur ?? 0) / 2, y: shadow?.y ?? 0)
-                            }.buttonStyle(.plain).accessibilityLabel("맨 아래로").help("맨 아래로")
+                            }.buttonStyle(SurfaceHoverButton(theme, shape: Circle())).accessibilityLabel("맨 아래로").help("맨 아래로")
                                 .padding(.bottom, theme.space(.sp2))
                         }
                     }

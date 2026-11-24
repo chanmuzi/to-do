@@ -132,7 +132,7 @@ private struct CornerButton: View {
                 .background(theme.color(.surface), in: Circle())
                 .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SurfaceHoverButton(theme, shape: Circle()))
         .accessibilityLabel("에이전트 열기").accessibilityValue(state.rawValue)
         .padding(inset)
         .background {

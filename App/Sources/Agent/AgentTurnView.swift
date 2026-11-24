@@ -99,7 +99,7 @@ struct AgentTurnView: View {
                                 .frame(minHeight: theme.component(.proposalLinkHeight))
                                 .proposalBackground(theme, pending: proposal.status == .pending, radius: theme.space(.sp2))
                                 .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(SurfaceHoverButton(theme, shape: RoundedRectangle(cornerRadius: theme.space(.sp2))))
                     }
                     if request.status == .interrupted {
                         stoppedLine(request.stopReason == .shutdown ? "앱을 끄면서 멈췄어요" : "여기서 멈췄어요")
@@ -107,7 +107,7 @@ struct AgentTurnView: View {
                     if request.status == .failed {
                         stoppedLine(request.failure ?? "막혔어요")
                         if let reset = request.resumeTime { Text("\(reset)부터 다시 돼요").font(smallFont) }
-                        Button("다시 시도", action: retry).buttonStyle(SettingsButton(theme: theme, selected: false))
+                        Button("다시 시도", action: retry).buttonStyle(WhiteControl(theme: theme))
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }

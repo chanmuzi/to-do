@@ -632,6 +632,8 @@ final class DebugControl {
             guard let agent, let panel = agent.window(for: id), let url = output(named: name) else { return }
             write(json: ["target": id.rawValue, "draft": agent.draft(for: id) ?? "", "frame": NSStringFromRect(panel.frame),
                          "key": panel.isKeyWindow, "minWidth": panel.minSize.width, "maxWidth": panel.maxSize.width], to: url)
+        case ("surface-hover", let state?, _) where isPassive:
+            theme?.verificationSurfaceHover = state.rawValue == "on"
         case ("agent-progress-frames", let id?, let name?) where isPassive:
             guard let draft = try? agent?.record(for: id), let url = output(named: name) else { return }
             write(json: draft.progressFrames.mapValues { [$0.minX, $0.minY, $0.width, $0.height] }, to: url)

@@ -4,6 +4,7 @@ package struct SettingsSwitch: ToggleStyle {
     let theme: Theme
     package init(theme: Theme) { self.theme = theme }
     @Environment(\.accessibilityReduceMotion) private var reduced
+    @State private var hovered = false
     package func makeBody(configuration: Configuration) -> some View {
         let inset = theme.component(.iconButtonGap)
         let height = theme.component(.settingsSwitchHeight)
@@ -14,7 +15,10 @@ package struct SettingsSwitch: ToggleStyle {
                     Circle().fill(theme.color(configuration.isOn ? .onAccent : .text2))
                         .frame(width: height - inset * 2, height: height - inset * 2)
                         .padding(inset)
-                }.frame(height: theme.component(.controlHeight))
+                }.overlay { Capsule().fill(hovered || theme.previewsSurfaceHover ? theme.color(.hover) : .clear).allowsHitTesting(false) }
+                .frame(height: theme.component(.controlHeight)).contentShape(Rectangle())
+                .onHover { hovered = $0 }
+                .animation(reduced ? nil : theme.motion.animation, value: hovered)
                 .animation(reduced ? nil : theme.motion.animation, value: configuration.isOn)
         }.buttonStyle(.plain)
             .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label }.toggleStyle(.switch) }

@@ -83,7 +83,11 @@ package struct TodoProposalView: View {
                 rows.padding(theme.component(.agentInputInset))
                     .proposalBackground(theme, pending: pending, radius: theme.shape(.windowRadius))
             }
-            else { Button(action: review) { rows.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityLabel("미리보기") }
+            else {
+                Button(action: review) { rows }
+                    .buttonStyle(SurfaceHoverButton(theme, shape: RoundedRectangle(cornerRadius: theme.space(.sp2))))
+                    .accessibilityLabel("미리보기")
+            }
             if proposal.requiresReview == true { Text(proposal.target == .instructions ? "지침이 바뀌었어요. 미리보기를 다시 확인해 주세요." : "노트가 바뀌었어요. 미리보기를 다시 확인해 주세요.").foregroundStyle(theme.color(.text2)) }
             HStack(spacing: theme.component(.agentRowInset)) {
                 if !full { TextActionLink(theme: theme, title: "노트로 보기", symbol: "chevron.right", action: review) }
