@@ -14,16 +14,30 @@ final class NoteDirectory {
 
     deinit { close(descriptor) }
 
-    func list() throws -> [String] {
-        try FileManager.default.contentsOfDirectory(atPath: url.path).filter { name in
-            guard valid(name) else { return false }
-            var info = stat()
-            return fstatat(descriptor, name, &info, AT_SYMLINK_NOFOLLOW) == 0
-                && (info.st_mode & S_IFMT) == S_IFREG
-        }.sorted()
+    struct Entry {
+        var name: String
+        var modified: Date
     }
 
-    func read(_ name: String) throws -> String {
+    func entries() throws -> [Entry] {
+        try FileManager.default.contentsOfDirectory(atPath: url.path).compactMap { name in
+            guard valid(name) else { return nil }
+            var info = stat()
+            guard fstatat(descriptor, name, &info, AT_SYMLINK_NOFOLLOW) == 0,
+                  (info.st_mode & S_IFMT) == S_IFREG else { return nil }
+            return Entry(name: name, modified: date(info.st_mtimespec))
+        }
+    }
+
+    func list() throws -> [String] { try entries().map(\.name) }
+
+    private func date(_ value: timespec) -> Date {
+        Date(timeIntervalSince1970: Double(value.tv_sec) + Double(value.tv_nsec) / 1e9)
+    }
+
+    func read(_ name: String) throws -> String { try file(name).text }
+
+    func file(_ name: String) throws -> (text: String, created: Date, modified: Date) {
         guard valid(name) else { throw CocoaError(.fileReadInvalidFileName) }
         let fd = openat(descriptor, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         guard fd >= 0 else { throw CocoaError(.fileReadNoSuchFile) }
@@ -32,7 +46,7 @@ final class NoteDirectory {
         guard fstat(fd, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG,
               let text = String(validating: try handle.readToEnd() ?? Data(), as: UTF8.self)
         else { throw CocoaError(.fileReadCorruptFile) }
-        return text
+        return (text, date(info.st_birthtimespec), date(info.st_mtimespec))
     }
 
     private func valid(_ name: String) -> Bool {

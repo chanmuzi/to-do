@@ -3,8 +3,11 @@ import Foundation
 typealias Object = [String: Any]
 
 let tools: [Object] = [
-    ["name": "list_notes", "description": "읽을 수 있는 노트 파일 이름을 나열합니다.",
-     "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]],
+    ["name": "list_notes", "description": "수정 시각이 최근인 순서로 노트의 시각, 상태, 할 일과 예정을 나열합니다.",
+     "inputSchema": ["type": "object", "properties": [
+        "limit": ["type": "integer", "minimum": 1, "maximum": 200, "default": 50],
+        "offset": ["type": "integer", "minimum": 0, "default": 0],
+        "since": ["type": "string", "format": "date-time"]], "additionalProperties": false]],
     ["name": "read_note", "description": "목록에서 고른 노트 파일 원문을 읽습니다.",
      "inputSchema": ["type": "object", "properties": ["name": ["type": "string"]],
                      "required": ["name"], "additionalProperties": false]]
@@ -39,13 +42,13 @@ func reply(_ line: String, notes: NoteDirectory, intake: ProposalIntake?) -> Obj
         do {
             let text: String
             switch name {
-            case "list_notes" where args.isEmpty: text = try notes.list().joined(separator: "\n")
+            case "list_notes": text = try NoteCatalog(directory: notes, context: intake?.noteContext()).list(args)
             case "propose_change":
                 guard let intake else { return error(-32602, "Unknown tool") }
                 text = try intake.receive(args, notes: notes)
             case "read_note":
                 guard args.count == 1, let filename = args["name"] as? String else { return error(-32602, "Invalid arguments") }
-                text = try notes.read(filename)
+                text = try NoteCatalog(directory: notes, context: intake?.noteContext()).read(filename)
             default: return error(-32602, "Unknown tool or invalid arguments")
             }
             result = ["content": [["type": "text", "text": text]]]

@@ -507,6 +507,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                  panels: QuickPanels, notes: NotePanelCoordinator) throws {
         try agent.restore()
         var execution = AgentExecution(location: environment.location, directory: agentDirectory(environment), instructionStore: instructionStore)
+        execution.noteContext = {
+            AgentNoteContext(windows: Dictionary(uniqueKeysWithValues: environment.windowStates.all.map {
+                ($0.key.rawValue, .init($0.value))
+            }), spaces: Dictionary(uniqueKeysWithValues: environment.spaces.spaces.map { ($0.id.rawValue, $0.name) }),
+            archiveCutoff: environment.notes.archiveCutoff)
+        }
         #if DEBUG
         if options.debugIsPassive { execution.notifications = AgentExpiryNotifications(notifier: VerificationExpiryNotifier()) }
         #endif

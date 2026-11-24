@@ -17,6 +17,8 @@ import Models
 public final class FileNoteStore: NoteStoring {
     public let location: StoreLocation
 
+    package var archiveCutoff: Date { files.archiveCutoff }
+
     private let autosaveDelay: Duration
     private let autosaveMaxWait: Duration
     private let files: NoteFiles

@@ -47,6 +47,17 @@ final class ProposalIntake {
 
     deinit { close(directory) }
 
+    func noteContext() throws -> AgentNoteContext? {
+        let fd = openat(directory, AgentNoteContext.filename, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
+        if fd < 0 && errno == ENOENT { return nil }
+        guard fd >= 0 else { throw IntakeFailure("노트 상태를 열 수 없습니다.") }
+        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(fd, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_uid == getuid(),
+              info.st_mode & 0o777 == 0o400 else { throw IntakeFailure("노트 상태 파일 권한을 확인해 주세요.") }
+        return try JSONDecoder().decode(AgentNoteContext.self, from: handle.readToEnd() ?? Data())
+    }
+
     func receive(_ arguments: Object, notes: NoteDirectory) throws -> String {
         let raw = try JSONSerialization.data(withJSONObject: arguments)
         guard raw.count <= 224 * 1024,
