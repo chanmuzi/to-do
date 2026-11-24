@@ -3,6 +3,11 @@
 상태: 기획만 해 둔 문서다. 구현을 시작하지 않았고, 어느 범위까지 갈지는 정하지 않았다(2026-11-24).
 계정이나 조직에 따라 달라지는 사실은 일반적인 조건으로만 적었다.
 
+장면 그림, 구조 그림, 설정 화면 제안, 근거 링크는 비공개 아티팩트에 있다(작성자만 열 수 있다).
+
+- 기획: https://claude.ai/artifact/QyGFeVDGjSneeJwythjxDX
+- 화면 시안과 고른 결정: https://claude.ai/artifact/G6B94FmH5e2SjHGBqHdkz9
+
 ## 목표
 
 | 번호 | 목표 |
