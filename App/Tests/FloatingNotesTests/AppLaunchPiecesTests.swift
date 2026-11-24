@@ -150,6 +150,29 @@ import Testing
         #expect(switched)
     }
 
+    /// 설치된 앱의 로그(10:11:01): 시스템이 먼저 활성화하고 누름은 그 뒤에 전달됐다.
+    @Test func latePressKeepsTheWindowForTheWholeActivation() {
+        var policy = ActivationFocusPolicy()
+        policy.launchFinished(at: 0)
+        _ = policy.decide(at: 5)
+        policy.didResignActive()
+        let first = policy.decide(at: 10, window: .floatWindow, mouseAge: 6.386, keyAge: 3.886)
+        #expect(first.reason == .showLibrary)
+        #expect(ActivationFocusPolicy.waitsForLatePress(window: .floatWindow))
+        policy.adoptLatePress()
+        let repeated = policy.decide(at: 10.05, window: .floatWindow, mouseAge: 6.4, keyAge: 3.9)
+        #expect(repeated.reason == .localPress)
+        #expect(repeated.reused)
+        policy.didResignActive()
+        #expect(policy.decide(at: 20).reason == .showLibrary)
+    }
+
+    @Test func onlyAFloatWindowUnderThePointerWaitsForALatePress() {
+        #expect(!ActivationFocusPolicy.waitsForLatePress(window: .library))
+        #expect(!ActivationFocusPolicy.waitsForLatePress(window: .external))
+        #expect(!ActivationFocusPolicy.waitsForLatePress(window: .none))
+    }
+
     @Test func pointerActivationDecisions() {
         typealias Window = ActivationDecision.WindowKind
         typealias Reason = ActivationDecision.Reason

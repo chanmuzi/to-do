@@ -25,6 +25,20 @@ struct ActivationFocusPolicy {
         activeReason = nil
     }
 
+    /// 시스템이 앱을 먼저 활성화하고 누름을 나중에 전달하면 활성화 알림 때는 누름 기록이 없다.
+    /// 포인터가 Float 창 위에 있으면 이만큼 기다려 누름이 오는지 본 뒤에 라이브러리를 올린다.
+    static let latePressWait: TimeInterval = 0.25
+
+    /// 근거 없이 활성화됐을 때 라이브러리를 바로 올릴지, 늦게 오는 누름을 기다릴지.
+    static func waitsForLatePress(window: ActivationDecision.WindowKind) -> Bool {
+        window == .floatWindow
+    }
+
+    /// 활성화 뒤에 그 창의 누름이 확인됐다. 같은 활성화의 다음 알림도 이 판단을 따른다.
+    mutating func adoptLatePress() {
+        activeReason = .localPress
+    }
+
     enum CarbonTarget: String { case noEvent, otherEvent, unspecified, clickedWindow }
 
     /// 알림이 어느 이벤트 안에서 왔는지와 창 인자의 유무를 구별해 기록한다.
