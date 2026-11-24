@@ -1,3 +1,4 @@
+import AppKit
 import Agent
 import Models
 import Foundation
@@ -68,11 +69,19 @@ final class AppRouter: Routing {
         }
     }
 
-    func showAgent(_ draft: AgentDraft, source: String) {
-        guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first)
+    func openBarConversation(_ id: UUID, source: String, screen: NSScreen? = nil) {
+        guard let draft = agent?.record(id: id) else { return }
+        showAgent(draft, source: source, screen: screen, reuseForBar: true)
+    }
+
+    func showAgent(_ draft: AgentDraft, source: String, screen: NSScreen? = nil, reuseForBar: Bool = false) {
+        guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first, preferredScreen: screen)
             ?? notePanels?.agentWindowAnchor(for: nil) else { return }
+        let wasRouting = isRouting
+        isRouting = true
+        defer { isRouting = wasRouting }
         traceActivation("agent-open " + source)
-        agent.open(record: draft, title: anchor.title, frame: anchor.frame, visible: anchor.visible)
+        agent.open(record: draft, title: anchor.title, frame: anchor.frame, visible: anchor.visible, reuseForBar: reuseForBar)
         activateApp()
     }
     var onScheduleCreated: (@MainActor (NoteID, String) -> Void)?

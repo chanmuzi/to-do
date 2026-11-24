@@ -25,7 +25,7 @@ final class AgentRequestCoordinator {
     private let execute: Execute
     private let note: (String) -> (NoteID, String)?
     var inbox: ProposalInbox?
-    var progress: (AgentRequest) -> Void = { _ in }
+    var progress: (AgentDraft, AgentRequest) -> Void = { _, _ in }
     var finished: (AgentDraft, AgentRequest) -> Void = { _, _ in }
     var openSettings: (String) -> Void = { _ in }
     private var order: [Entry] = []
@@ -75,7 +75,7 @@ final class AgentRequestCoordinator {
         advance()
     }
 
-    @discardableResult func submit(_ draft: AgentDraft, text: String, fromInput: Bool = true) -> Bool {
+    @discardableResult func submit(_ draft: AgentDraft, text: String, fromInput: Bool = true, fromBar: Bool = false) -> Bool {
         guard !closing, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         prune()
         if task == nil && order.isEmpty { paused = false; failedQueue = false; draft.queueHeld = false }
@@ -83,6 +83,7 @@ final class AgentRequestCoordinator {
         let item = AgentConversation.Queued(text: text, order: lastOrder, held: failedQueue && (paused || draft.queueHeld) ? true : nil)
         if paused { draft.queueHeld = true }
         guard draft.change({
+            if fromBar { $0.barRequestID = item.id }
             $0.queued.append(item)
             if fromInput { $0.draft = "" }
         }) else { return false }
@@ -213,7 +214,7 @@ final class AgentRequestCoordinator {
                     guard let i = draft.conversation.requests.firstIndex(where: { $0.runID == request.runID }) else { continue }
                     let before = draft.conversation.requests[i].steps.last?.kind
                     apply(event, to: &draft.conversation.requests[i], files: &files)
-                    if before != draft.conversation.requests[i].steps.last?.kind { progress(draft.conversation.requests[i]) }
+                    if before != draft.conversation.requests[i].steps.last?.kind { progress(draft, draft.conversation.requests[i]) }
                     if case .toolEnded = event { draft.save() }
                 }
             }
@@ -246,7 +247,10 @@ final class AgentRequestCoordinator {
         case let .toolStarted(id, name, file):
             if request.steps.contains(where: { $0.callID == id }) { return }
             begin(name == "propose_change" ? .write : name == "read_note" ? .read : .search, id: id)
-            if name == "read_note" { files[id] = file }
+            if name == "read_note", let file {
+                files[id] = file
+                request.steps[request.steps.count - 1].noteTitle = note(file)?.1
+            }
         case let .toolEnded(id, succeeded):
             guard let i = request.steps.firstIndex(where: { $0.callID == id && $0.endedAt == nil }) else { return }
             let file = files.removeValue(forKey: id)
@@ -316,7 +320,7 @@ final class AgentRequestCoordinator {
             if final.status == .failed { failedQueue = true }
             if paused { hold(order.map(\.draft), afterFailure: final.status == .failed) }
             if final.status != .interrupted { finished(draft, final) }
-            if settings && !automatic { openSettings(final.engine) }
+            if settings && !automatic && draft.conversation.barRequestID != final.id { openSettings(final.engine) }
             advance()
         }
     }

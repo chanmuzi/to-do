@@ -9,13 +9,21 @@ public struct SystemAgentExpiryNotifier: AgentExpiryNotifying {
     public static let category = "float.agent.expired"
     public static let action = "float.agent.reconnect"
 
+    fileprivate static func registerCategories(in center: UNUserNotificationCenter) async {
+        let reconnect = UNNotificationAction(identifier: action, title: "다시 로그인", options: [.foreground])
+        let view = UNNotificationAction(identifier: "float.agent.view", title: "보기", options: [.foreground])
+        let categories = [UNNotificationCategory(identifier: category, actions: [reconnect], intentIdentifiers: []),
+                          UNNotificationCategory(identifier: AgentReplyNotification.category, actions: [view], intentIdentifiers: [])]
+        let others = await center.notificationCategories().filter { existing in
+            !categories.contains { $0.identifier == existing.identifier }
+        }
+        center.setNotificationCategories(Set(others + categories))
+    }
+
     public func notify(_ provider: AgentProvider, taskName: String) async throws {
         let center = UNUserNotificationCenter.current()
         guard try await center.requestAuthorization(options: [.alert, .sound]) else { return }
-        let reconnect = UNNotificationAction(identifier: Self.action, title: "다시 로그인", options: [.foreground])
-        let category = UNNotificationCategory(identifier: Self.category, actions: [reconnect], intentIdentifiers: [])
-        let others = await center.notificationCategories().filter { $0.identifier != Self.category }
-        center.setNotificationCategories(Set(others + [category]))
+        await Self.registerCategories(in: center)
         let content = UNMutableNotificationContent()
         content.title = (provider == .claude ? "Claude" : "Codex") + " 로그인이 만료됐어요"
         content.body = taskName
@@ -47,5 +55,35 @@ public actor AgentExpiryNotifications {
         let marker = connection.config.appending(path: "float-expiry-notified")
         do { try FileManager.default.removeItem(at: marker) }
         catch CocoaError.fileNoSuchFile { }
+    }
+}
+
+package struct AgentReplyNotification: Equatable, Sendable {
+    fileprivate static let category = "float.agent.reply"
+    package let conversation: UUID
+    package let request: UUID
+    package let title: String
+    package let body: String
+
+    package init(conversation: UUID, request: UUID, title: String, body: String) {
+        self.conversation = conversation
+        self.request = request
+        self.title = title
+        self.body = body
+    }
+
+    package func deliver() async throws -> Bool {
+        let center = UNUserNotificationCenter.current()
+        let permission = await center.notificationSettings().authorizationStatus
+        guard permission == .authorized || permission == .provisional else { return false }
+        await SystemAgentExpiryNotifier.registerCategories(in: center)
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.categoryIdentifier = Self.category
+        content.userInfo = ["floatConversation": conversation.uuidString]
+        try await center.add(UNNotificationRequest(identifier: Self.category + "." + request.uuidString,
+                                                   content: content, trigger: nil))
+        return true
     }
 }

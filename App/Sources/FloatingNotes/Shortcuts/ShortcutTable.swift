@@ -100,8 +100,7 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
     ]
 
     private static let agent: [ShortcutEntry] = [
-        row(.agent, "요청 모드에서 보내고 닫기", [.returnKey]),
-        row(.agent, "요청 모드에서 보내면서 에이전트 창 열기", [.returnKey], .command),
+        row(.agent, "요청을 보내고 대화 열기", [.returnKey]),
         row(.agent, "노트에서 에이전트 창 열기", [.j], .command, command: .openAgentWindow),
     ]
 
