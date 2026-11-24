@@ -65,6 +65,24 @@ import SpaceIcons
         view.keyDown(with: event)
     }
 
+    @Test func libraryInstallsControlStylesWhenContentChanges() throws {
+        let f = try Fixture()
+        defer { try? f.close() }
+        _ = try f.notes.create(NoteDraft(title: "첫째"))
+        f.coordinator.allowsKeyWindows = false
+        f.coordinator.show()
+        let root = try #require(f.coordinator.window?.contentView)
+        for page in [LibrarySelection.all, .proposals, .all] {
+            f.model.select(page)
+            settle()
+            root.layoutSubtreeIfNeeded()
+            let views = descendants(root)
+            let rings = views.filter { $0.focusRingType != .none }.map { String(describing: type(of: $0)) }
+            #expect(rings.isEmpty)
+            #expect(views.compactMap { $0 as? NSScrollView }.allSatisfy { $0.scrollerStyle == .overlay })
+        }
+    }
+
     @Test func visibleRowOwnsClicksIncludingRightIconsAndNeverFocusesPlus() throws {
         let f = try Fixture(); defer { try? f.close() }
         let first = try f.notes.create(NoteDraft(title: "첫째", body: "[ ] 할 일", reminder: Date().addingTimeInterval(3600)))
