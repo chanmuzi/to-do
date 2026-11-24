@@ -33,7 +33,7 @@ struct CaptureRecentRow: View {
                 Text(recent.detail).foregroundStyle(theme.color(.text2))
                 Spacer(minLength: 0)
                 TimelineView(.everyMinute) { _ in
-                    Text(recent.date.formatted(.relative(presentation: .numeric).locale(Locale(identifier: "ko_KR"))))
+                    Text(Self.elapsed(since: recent.date))
                         .font(elapsedFont).foregroundStyle(theme.color(.text3))
                 }.fixedSize()
             }
@@ -45,5 +45,13 @@ struct CaptureRecentRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel("직전 대화 열기, " + recent.question + ", " + recent.detail)
         .overlay(alignment: .top) { Rectangle().fill(theme.color(.line)).frame(height: theme.shape(.borderWidth)) }
+    }
+}
+
+extension CaptureRecentRow {
+    /// 1분이 안 됐으면 "방금". 그 뒤로는 지난 시간을 숫자로 적는다(앞으로의 시각으로 읽히지 않게 한다).
+    static func elapsed(since date: Date, now: Date = Date()) -> String {
+        guard now.timeIntervalSince(date) >= 60 else { return "방금" }
+        return date.formatted(.relative(presentation: .numeric).locale(Locale(identifier: "ko_KR")))
     }
 }
