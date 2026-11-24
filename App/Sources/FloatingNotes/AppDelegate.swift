@@ -37,6 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var activationFocus = ActivationFocusPolicy()
     private var hotKeys: GlobalHotKeys?
     private var pointerPresses: PointerPressMonitor?
+    /// 늦게 오는 누름을 기다리는 동안 미뤄 둔 라이브러리 올리기.
+    private var pendingLibraryRaise: DispatchWorkItem?
     private var toasts: AppToasts?
     #if DEBUG
     private var debugControl: DebugControl?
@@ -217,6 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 inactiveWindowPress: { [weak self] window, time in
                     guard window !== self?.library?.window else { return }
                     self?.activationFocus.windowPressedWhileInactive(at: time)
+                },
+                windowPress: { [weak self] window in
+                    guard let self, window !== self.library?.window else { return }
+                    self.latePressArrived()
                 }
             )
             let shortcuts = ShortcutTable.standard
@@ -258,10 +264,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             + String(format: " mouseAge=%.3f keyAge=%.3f", pointer.mouseAge, pointer.keyAge)
             + " decision=\(decision.reason.rawValue) reused=\(decision.reused)"
         activationLog.notice("\(message, privacy: .public)")
-        if decision.reason == .showLibrary { library?.bringForward() }
+        guard decision.reason == .showLibrary else { return }
+        guard ActivationFocusPolicy.waitsForLatePress(window: pointer.window) else {
+            library?.bringForward()
+            return
+        }
+        // 누른 채로 활성화됐으면 그 창을 누른 것이다.
+        if NSEvent.pressedMouseButtons & 1 != 0 {
+            activationFocus.adoptLatePress()
+            activationLog.notice("late-press decision=localPress source=buttonDown")
+            return
+        }
+        pendingLibraryRaise?.cancel()
+        let raise = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            pendingLibraryRaise = nil
+            guard NSApp.isActive else { return }
+            activationLog.notice("late-press decision=showLibrary source=timeout")
+            library?.bringForward()
+        }
+        pendingLibraryRaise = raise
+        DispatchQueue.main.asyncAfter(deadline: .now() + ActivationFocusPolicy.latePressWait, execute: raise)
+    }
+
+    /// 활성화 알림 뒤에 Float 창(라이브러리 밖)의 누름이 전달됐다. 기다리던 라이브러리 올리기를 거둔다.
+    private func latePressArrived() {
+        guard let raise = pendingLibraryRaise else { return }
+        raise.cancel()
+        pendingLibraryRaise = nil
+        activationFocus.adoptLatePress()
+        activationLog.notice("late-press decision=localPress source=event")
     }
 
     func applicationDidResignActive(_ notification: Notification) {
+        pendingLibraryRaise?.cancel()
+        pendingLibraryRaise = nil
         activationFocus.didResignActive()
     }
 
