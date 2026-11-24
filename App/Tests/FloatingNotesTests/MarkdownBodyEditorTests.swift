@@ -95,6 +95,7 @@ import Theme
     @Test func windowKeepsItsHeightUnderTheCaretAndFollowsTypingOnALinkLine() async throws {
         defer { fixture.cleanUp() }
         fixture.notePanels.displayOptions.heightMode = .fitContent
+        fixture.notePanels.displayOptions.formatBar = .editing
         // 본문 영역의 가장 낮은 높이(네 줄)보다 길어야 창 높이가 내용을 그대로 따른다.
         let body = "## 아이디어\n하나\n둘\n셋\n+ 참고 링크\n\t- [PR #482 포커스 투명도](https://github.com/example/floating-notes/pull/482)"
         let (id, adapter) = try fixture.open(NoteDraft(title: "링크", body: body))

@@ -26,7 +26,8 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
     package var bodyLineHeight: Int?
     package enum MarkedTextStyle: String, Codable, Sendable { case none, underline }
     package var markedTextStyle: MarkedTextStyle = .none
-    package var formatBar = "editing"
+    package var showsFormatBar = false
+    private enum LegacyKeys: String, CodingKey { case formatBar }
     package var recognizesDates = true
     package var calendarID: String?
     package var reminderListID: String?
@@ -64,7 +65,12 @@ package nonisolated struct SettingsValues: Codable, Equatable, Sendable {
         bodyLineHeight = try container.decodeIfPresent(Int.self, forKey: .bodyLineHeight)
         let markedStyle = try container.decodeIfPresent(String.self, forKey: .markedTextStyle)
         markedTextStyle = markedStyle.flatMap(MarkedTextStyle.init(rawValue:)) ?? .none
-        formatBar = try container.decodeIfPresent(String.self, forKey: .formatBar) ?? "editing"
+        if let enabled = try container.decodeIfPresent(Bool.self, forKey: .showsFormatBar) {
+            showsFormatBar = enabled
+        } else {
+            let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+            showsFormatBar = try legacy.decodeIfPresent(String.self, forKey: .formatBar) == "always"
+        }
         recognizesDates = try container.decodeIfPresent(Bool.self, forKey: .recognizesDates) ?? true
         calendarID = try container.decodeIfPresent(String.self, forKey: .calendarID)
         reminderListID = try container.decodeIfPresent(String.self, forKey: .reminderListID)

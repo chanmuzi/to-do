@@ -281,6 +281,46 @@ import Theme
         #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.noteHeightMode == .fitContent)
     }
 
+    @Test func appearanceFormatSwitchUpdatesAFocusedNoteWithoutResizing() throws {
+        let fixture = try AppFixture()
+        defer { fixture.cleanUp() }
+        let releaseAccessibility = TestAccessibility.enableForTest()
+        defer { releaseAccessibility() }
+        let store = try AppSettingsStore(stateDirectory: fixture.location.stateDirectory)
+        SettingsApplication.follow(store, theme: fixture.theme, appearanceOverride: nil, setAppearance: { _ in },
+            applyDisplay: { options, _ in fixture.notePanels.displayOptions = options }, showMenuIcon: { _ in })
+        let (id, adapter) = try fixture.open(NoteDraft(title: "서식"))
+        adapter.editor.forcesActiveAppearance = true
+        let window = try #require(fixture.notePanels.window(for: id))
+        #expect(window.makeFirstResponder(adapter.view))
+        let scroll = try #require(adapter.view.enclosingScrollView)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let initial = window.frame
+        let bodyHeight = scroll.frame.height
+        #expect(!store.settings.showsFormatBar && adapter.isEditingBody)
+
+        let service = ScheduleService(notes: fixture.notes, notifier: FakeReminderNotifier(), makeBridge: { FakeCalendarBridge() })
+        let model = SettingsModel(preferences: try LibraryPreferencesStore(location: fixture.location),
+                                  read: { store.settings }, save: store.update, schedules: service, shortcuts: [], openPrivacy: { _ in })
+        let settings = SettingsCoordinator(model: model, theme: fixture.theme)
+        settings.allowsKeyWindows = false
+        settings.show(.appearance)
+        defer { settings.window?.close() }
+        let root = try #require(settings.window?.contentView)
+        root.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        let control = try #require(elements(in: root).first { $0.accessibilityLabel?() == "서식 막대 항상 보이기"
+            && $0.accessibilityRole?() == .checkBox })
+        #expect(control.accessibilityPerformPress?() == true)
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(try AppSettingsStore(stateDirectory: fixture.location.stateDirectory).settings.showsFormatBar)
+        #expect(window.frame == initial)
+        #expect(scroll.frame.height == bodyHeight - fixture.theme.shape(.chromeHeight))
+        try store.update { $0.showsFormatBar = false }
+        window.contentView?.layoutSubtreeIfNeeded()
+        #expect(scroll.frame.height == bodyHeight && window.frame == initial)
+    }
+
     @Test func generalSidebarGripActionsAndOpeningTooltip() throws {
         let fixture = try AppFixture()
         defer { fixture.cleanUp() }

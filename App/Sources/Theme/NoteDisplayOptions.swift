@@ -30,7 +30,7 @@ public struct NoteDisplayOptions: Hashable, Sendable {
 
     public enum FormatBar: String, Codable, Sendable { case always, editing, hidden }
     public var showsNoteAgent = true
-    public var formatBar: FormatBar = .editing
+    public var formatBar: FormatBar = .hidden
     public var underlineMarkedText = false
     public var dateFormat: DateFormat
     public var space: SpaceDisplay

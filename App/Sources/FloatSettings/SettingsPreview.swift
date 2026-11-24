@@ -38,7 +38,7 @@ struct SettingsPreview: View {
             }.font(theme.font(.body, size: fontSize))
                 .modifier(PreviewFlash(theme: theme, value: [fontSize, lineHeight]))
                 .padding(.horizontal, theme.space(.sp4)).padding(.vertical, theme.space(.sp3))
-            if values.formatBar != "hidden" {
+            if values.showsFormatBar {
                 separator
                 HStack(spacing: theme.space(.sp3)) {
                     Text("B").bold()
@@ -52,7 +52,7 @@ struct SettingsPreview: View {
         }.frame(width: theme.component(.settingsPreviewWidth))
             .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
             .overlay { RoundedRectangle(cornerRadius: theme.shape(.windowRadius)).strokeBorder(theme.color(.line)) }
-            .modifier(PreviewFlash(theme: theme, value: [values.appearance, values.formatBar, String(values.recognizesDates)]))
+            .modifier(PreviewFlash(theme: theme, value: [values.appearance, String(values.showsFormatBar), String(values.recognizesDates)]))
             .padding(.vertical, theme.space(.sp4)).frame(maxWidth: .infinity)
             .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
             .allowsHitTesting(false).focusable(false)

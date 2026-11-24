@@ -32,6 +32,7 @@ extension SettingsView {
                     model.change { $0.noteHeightMode = mode }
                 }
             }.frame(height: theme.component(.settingsRow))
+            toggle("서식 막대 항상 보이기", \.showsFormatBar)
         }
     }
 
@@ -41,7 +42,6 @@ extension SettingsView {
             setting("체크박스", \.checkbox, [("box", "상자"), ("bracket", "[ ]")])
             segment("입력 중 글자", value: model.values.markedTextStyle,
                     choices: [(.none, "표시 없음"), (.underline, "옅은 밑줄")]) { value in model.change { $0.markedTextStyle = value } }
-            setting("서식 표시줄", \.formatBar, [("always", "항상"), ("editing", "편집할 때"), ("hidden", "숨김")])
             toggle("날짜 알아보기", \.recognizesDates)
         }
     }

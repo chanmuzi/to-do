@@ -194,6 +194,7 @@ final class NoteWindowController: NSObject {
     func refreshFormatBar(animated: Bool = false) {
         let formatting = editor as? any NoteBodyFormatting
         let mode = environment.options().formatBar
+        root.cornerButtons.isHidden = mode == .hidden
         let visible = formatting != nil && (mode == .always || (mode == .editing && formatting?.isEditingBody == true))
         let changed = visible != root.cornerButtons.showsFormats
         root.cornerButtons.apply(visible: visible, active: visible ? formatting?.activeFormats ?? [] : [])

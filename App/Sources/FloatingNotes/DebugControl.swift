@@ -433,8 +433,8 @@ final class DebugControl {
                 }
             }
         case ("settings-format-bar", let mode?, _) where isPassive:
-            guard NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) != nil else { return }
-            settingsWindow?.model.change { $0.formatBar = mode.rawValue }
+            guard let formatMode = NoteDisplayOptions.FormatBar(rawValue: mode.rawValue) else { return }
+            settingsWindow?.model.change { $0.showsFormatBar = formatMode != .hidden }
         case ("settings-input-style", let value?, _) where isPassive:
             settingsWindow?.model.change { $0.markedTextStyle = value.rawValue == "underline" ? .underline : .none }
         case ("settings-reset-sheet", _, _) where isPassive:
