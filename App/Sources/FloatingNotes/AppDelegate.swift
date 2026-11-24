@@ -214,9 +214,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             pointerPresses = PointerPressMonitor(
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
                 ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() },
-                inactiveWindowPress: { [weak self, weak notePanels] window, time in
-                    guard let notePanels, notePanels.openNoteIDs.contains(where: { notePanels.window(for: $0) === window || notePanels.window(for: $0) === window.parent && window.parent != nil }) else { return }
-                    self?.activationFocus.notePressedWhileInactive(at: time)
+                inactiveWindowPress: { [weak self] window, time in
+                    guard window !== self?.library?.window else { return }
+                    self?.activationFocus.windowPressedWhileInactive(at: time)
                 }
             )
             let shortcuts = ShortcutTable.standard
@@ -243,23 +243,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillBecomeActive(_ notification: Notification) {
         let carbon = ActivationFocusPolicy.carbonTarget(GetCurrentEvent())
         let appKit = ActivationFocusPolicy.carbonTarget(NSApp.currentEvent?.eventRef.map { EventRef($0) })
-        let clickedWindow = carbon == .clickedWindow || appKit == .clickedWindow
         let pointer = ActivationPointer(library: library?.window)
         let requested = requestedWindowActivation
         requestedWindowActivation = false
         let routing = router?.isRouting == true
         let modal = NSApp.modalWindow != nil
         let quick = quickPanels?.isAnyVisible == true
-        let state = activationFocus.consumeActivation(at: ProcessInfo.processInfo.systemUptime)
-        let reason = state.reason(explicitTarget: requested || routing || modal || quick, carbonWindow: clickedWindow,
-                                  window: pointer.window, mouseAge: pointer.mouseAge, keyAge: pointer.keyAge)
-        let pending = state.pendingAge.map { String(format: "%.3f", $0) } ?? "none"
-        let message = "launch=\(state.launching) requested=\(requested) routing=\(routing) modal=\(modal) quick=\(quick)"
+        let decision = activationFocus.decide(at: ProcessInfo.processInfo.systemUptime, explicitTarget: requested || routing || modal || quick,
+                                              carbon: carbon, appKit: appKit, window: pointer.window,
+                                              mouseAge: pointer.mouseAge, keyAge: pointer.keyAge)
+        let pending = decision.pendingAge.map { String(format: "%.3f", $0) } ?? "none"
+        let message = "requested=\(requested) routing=\(routing) modal=\(modal) quick=\(quick)"
             + " carbon=\(carbon.rawValue) appKitEvent=\(appKit.rawValue) pendingAge=\(pending) window=\(pointer.window.rawValue)"
             + String(format: " mouseAge=%.3f keyAge=%.3f", pointer.mouseAge, pointer.keyAge)
-            + " decision=\(reason.rawValue)"
+            + " decision=\(decision.reason.rawValue) reused=\(decision.reused)"
         activationLog.notice("\(message, privacy: .public)")
-        if reason == .showLibrary { library?.bringForward() }
+        if decision.reason == .showLibrary { library?.bringForward() }
+    }
+
+    func applicationDidResignActive(_ notification: Notification) {
+        activationFocus.didResignActive()
     }
 
     /// 다른 프로그램이 제자리에서 고친 파일도 앞으로 올 때 다시 읽는다.
@@ -428,9 +431,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do { try self?.environment?.settings.update { $0.scheduleDateFormat = value } }
             catch { AppLog.warning("표시 설정 저장 실패: \(error)") }
         }
-        control.simulateActivation = { [weak self] in
-            self?.applicationWillBecomeActive(Notification(name: NSApplication.willBecomeActiveNotification))
-            self?.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        control.simulateActivation = { [weak self] repeatLocalPress in
+            guard let self else { return }
+            applicationDidResignActive(Notification(name: NSApplication.didResignActiveNotification))
+            let willActivate = Notification(name: NSApplication.willBecomeActiveNotification)
+            if repeatLocalPress {
+                activationFocus.windowPressedWhileInactive(at: ProcessInfo.processInfo.systemUptime)
+                applicationWillBecomeActive(willActivate)
+            }
+            applicationWillBecomeActive(willActivate)
+            applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
         }
         control.reopen = { [weak self] in _ = self?.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false) }
         control.toastWindow = { [unowned self] in toasts?.presenter.window }
