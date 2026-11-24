@@ -29,7 +29,7 @@ struct ScheduleProposalPreview: View {
                     Divider()
                     ProposalNoteBody(theme: theme, markdown: note.body).padding(.vertical, theme.space(.sp2))
                 }
-            }.background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius)))
+            }.proposalPreviewSurface(theme, pending: pending, radius: pending ? theme.space(.sp2) : theme.shape(.windowRadius))
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("다가오는 일정").font(theme.font(.rowSub)).foregroundStyle(theme.color(.text3))

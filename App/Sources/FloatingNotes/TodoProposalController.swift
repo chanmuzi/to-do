@@ -204,7 +204,9 @@ final class TodoProposalController {
                                         accept: { [weak self] in self?.accept([p.id], source: "card") },
                                         discard: { [weak self] in self?.discard(p.id, source: "card") })
             let width = min(parent.frame.width, theme.component(.noteWidth))
-            let host = NSHostingView(rootView: view.frame(width: width).fixedSize(horizontal: false, vertical: true))
+            // 독립된 투명 패널에 카드가 놓일 면을 마련한다.
+            let host = NSHostingView(rootView: view.frame(width: width).fixedSize(horizontal: false, vertical: true)
+                .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.shape(.windowRadius))))
             let height = min(host.fittingSize.height, (parent.screen?.visibleFrame.height ?? parent.frame.height) * theme.ratio(.noteMaxScreenHeight))
             let scroll = NSScrollView()
             scroll.drawsBackground = false

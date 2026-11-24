@@ -14,12 +14,12 @@ final class ToastView: NSView {
     private let label = NSTextField(labelWithString: "")
 
     private let faceView: NSView?
-    private let tint: CAGradientLayer?
+    private let workingBorder: NSView?
     private var faceWidth: CGFloat { faceView == nil ? 0 : theme.component(.agentFaceMedium) + theme.space(.sp2) }
 
     init(theme: Theme, message: String, actionTitle: String? = nil, face: AgentFaceState? = nil, working: Bool = false) {
         faceView = face.map { NSHostingView(rootView: AgentFace(theme: theme, state: $0, size: .medium)) }
-        tint = working ? CAGradientLayer() : nil
+        workingBorder = working ? NSHostingView(rootView: theme.stationaryAgentBorder(radius: theme.shape(.windowRadius))) : nil
         self.theme = theme
         actionButton = ToastActionButton(theme: theme, title: actionTitle ?? "")
         super.init(frame: .zero)
@@ -29,7 +29,7 @@ final class ToastView: NSView {
         effectView.state = .active
         effectView.maskImage = Self.roundedMask(radius: theme.shape(.windowRadius))
         surfaceView.wantsLayer = true
-        if let tint { surfaceView.layer?.addSublayer(tint) }
+        if let workingBorder { surfaceView.addSubview(workingBorder) }
         label.stringValue = message
         label.font = theme.nsFont(.body, size: theme.tokens.textStyle(.title).size)
         label.lineBreakMode = .byTruncatingTail
@@ -81,12 +81,8 @@ final class ToastView: NSView {
     override func updateLayer() {
         guard let layer = surfaceView.layer else { return }
         layer.cornerRadius = theme.shape(.windowRadius)
-        layer.borderWidth = theme.shape(.borderWidth)
+        layer.borderWidth = workingBorder == nil ? theme.shape(.borderWidth) : 0
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            tint?.colors = [ColorToken.agentBgA, .agentBgM, .agentBgB].map { theme.nsColor($0).cgColor }
-            tint?.startPoint = .zero
-            tint?.endPoint = CGPoint(x: 1, y: 1)
-            tint?.cornerRadius = theme.shape(.windowRadius)
             layer.borderColor = theme.nsColor(.outline).cgColor
             layer.backgroundColor = theme.nsColor(.surface).withAlphaComponent(theme.material.opacity).cgColor
         }
@@ -103,7 +99,7 @@ final class ToastView: NSView {
         effectView.frame = bounds
         surfaceView.frame = bounds
         let padding = theme.component(.toastPadding)
-        tint?.frame = surfaceView.bounds
+        workingBorder?.frame = surfaceView.bounds
         let size = theme.component(.agentFaceMedium)
         faceView?.frame = NSRect(x: padding, y: (bounds.height - size) / 2, width: size, height: size)
         let button = actionButton.preferredSize

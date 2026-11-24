@@ -93,6 +93,7 @@ struct AgentTurnView: View {
                             }.padding(.horizontal, theme.component(.agentInputInset))
                                 .frame(minHeight: theme.component(.proposalLinkHeight))
                                 .proposalBackground(theme, pending: proposal.status == .pending, radius: theme.space(.sp2))
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }
                     if request.status == .interrupted {
