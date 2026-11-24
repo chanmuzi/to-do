@@ -213,3 +213,12 @@
 | agent-list-indent | 17pt | 답의 목록 들여쓰기 |
 | agent-answer-line | 21pt | 답 한 줄의 최소 높이 |
 | agent-heading-gap | 5pt | 묶음 제목 위 여백 |
+
+| 토큰 | 값 | 쓰는 곳 |
+| --- | --- | --- |
+| agent-model-name-max | 150pt | 요청 입력 칸의 모델 이름 최대 폭 |
+| agent-model-font | 13pt | 모델 이름과 강도의 본문 가족 글꼴 |
+| agent-model-chevron | 10pt | 아래 꺾쇠 |
+| agent-model-inset-y | 3pt | 모델 단추 위아래 여백 |
+
+모델 단추의 간격과 좌우 여백은 `capture-val-gap` 6pt다. 체크박스 올림 바탕은 `check-size` 14pt에 `sp-1` 4pt를 사방으로 더하고 `r-control`을 쓴다.

@@ -101,7 +101,7 @@ App의 AgentCorner는 대화에서 노트별 얼굴을 계산해 NotePanel에 �
 - 연결 화면은 `AgentConnection(provider:location:)`에서 `discover()`로 CLI, 버전, Codex용 node를 찾는다. `account(_:)`는 로그인 여부와 CLI가 제공한 계정 정보만 읽는다. `loginCommand(_:)`는 실행 파일, 인자, 환경, cwd만 반환한다. 로그인 시작은 연결 화면의 명시적 동작이다. waitForLogin()은 기존 프로세스 그룹 실행기를 재사용한다. 디버그의 --debug-agent-bin은 해당 폴더에서만 탐색하며 --debug-passive도 실제 CLI로 폴백하지 않는다.
 - 읽기 실행은 `AgentRunner(location:server:)`에서 `run(_:engine:installation:timeout:onEvent:)`를 호출한다. 서버의 기본 위치는 앱의 보조 실행 파일이다. `AgentEvent`는 시작, 본문, 도구 호출, 사용 한도, 사용량을 전달한다. 완료 값은 본문, 확인된 모델, 사용량이다. Swift Task를 취소하면 실행기가 만든 프로세스 그룹을 종료한다.
 - `AgentEngine`은 Claude 별칭, Codex 모델명, API 키 공급자를 구분한다. `APIKeyStoring`의 기본 구현 `KeychainAPIKeyStore`는 공급자별 일반 암호를 읽고 갱신하고 삭제한다. G0에서 API 엔진을 실행하면 `unsupportedEngine`을 반환한다.
-- `FloatMCP <노트 폴더> [실행 전용 접수 폴더]`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes({})` 결과는 정렬한 파일명이며 `read_note({"name":"파일명.md"})`는 머리를 포함한 UTF-8 원문을 반환한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
+- `FloatMCP <노트 폴더> [실행 전용 접수 폴더]`는 한 줄에 JSON-RPC 메시지 하나를 읽고 응답한다. `list_notes`는 최근 수정 순으로 노트의 메타 정보를 나누어 반환한다. `read_note`는 같은 메타 정보와 머리를 포함한 UTF-8 원문을 구분한다. 파일 해석은 Store의 노트 코덱을 공유한다. 목록에 숨김 파일, 링크, 폴더를 넣지 않으며 읽을 때도 같은 조건을 검사한다.
 
 ### Theme
 
