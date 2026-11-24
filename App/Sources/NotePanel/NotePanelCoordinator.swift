@@ -81,10 +81,8 @@ public final class NotePanelCoordinator {
     /// 켤 때 지난번의 창을 되살리는 중이다. 사용자가 연 것이 아니므로 "마지막으로 연 때"를 적지 않는다.
     /// 방금 휴지통으로 보낸 노트. "바로 뒤"가 끝나면 비운다(`endTrashUndo()`를 부르는 곳들, D-024).
     private var lastTrashed: TrashedNote? {
-        didSet { if lastTrashed == nil, oldValue != nil, !isHoldingTrashUndo { onTrashUndoEnded?() } }
+        didSet { if lastTrashed == nil, oldValue != nil { onTrashUndoEnded?() } }
     }
-    /// 키 창을 돌려주는 동안(`returnKey`) 되돌리기를 잠깐 비웠다 되돌린다. 그사이에는 끝났다고 알리지 않는다.
-    private var isHoldingTrashUndo = false
 
     /// 노트를 휴지통으로 보냈다(되돌릴 수 있게 된 뒤에 불린다). 그 노트의 창이 있던 화면을 함께 넘긴다.
     /// App이 "되돌리기"가 붙은 짧은 알림을 띄운다(D-041).
@@ -164,6 +162,7 @@ public final class NotePanelCoordinator {
     public func open(_ id: NoteID, nextTo: NoteID? = nil, focus: Bool = true) throws {
         setAllHidden(false)
         if let controller = controllers[id] {
+            if focus { endTrashUndo() }
             controller.show(focus: focus)
             return
         }
@@ -177,6 +176,7 @@ public final class NotePanelCoordinator {
         controller.coordinator = self
         controller.panel.allowsKey = allowsKeyWindows
         controllers[id] = controller
+        if focus { endTrashUndo() }
         order.append(id)
         controller.show(focus: focus)
         windowsChanged()
@@ -243,8 +243,6 @@ public final class NotePanelCoordinator {
             return
         }
         noteDisappeared(id)
-        // 창이 내려가며 다음 노트가 키 창을 이어받았다면 그것은 사용자가 다른 노트로 옮겨 간 것이 아니다.
-        // 이어받기가 끝난 여기서 적어, 그 키 창 알림이 되돌리기를 끝내지 않게 한다.
         lastTrashed = trashed
         onMovedToTrash?(id, screen)
     }
@@ -253,7 +251,7 @@ public final class NotePanelCoordinator {
     ///
     /// "바로 뒤"는 다음 가운데 하나가 일어나기 전까지다(D-024). 그동안의 ⌘Z는 노트를 되살리고, 끝난 뒤의 ⌘Z는
     /// 글의 실행 취소로 간다(다른 노트에는 제 실행 취소 기록이 있다).
-    /// - 다른 노트가 키 창이 되거나 사용자가 노트 창을 누른다(보낸 직후 다음 노트가 키 창을 이어받는 것은 빼고).
+    /// - 사용자가 노트 창을 누르거나 다른 노트로 직접 이동한다.
     /// - 글을 고친다(본문, 제목, 색) 또는 새 노트를 만든다.
     /// - 되살렸다. 또는 되살릴 수 없다는 것이 드러났다(`undoTrash()`).
     public var canUndoTrash: Bool { lastTrashed != nil }
@@ -329,11 +327,7 @@ public final class NotePanelCoordinator {
     @discardableResult
     public func returnKey(to id: NoteID) -> Bool {
         guard !areNotesHidden, let controller = controllers[id], controller.panel.isVisible else { return false }
-        let trashed = lastTrashed
-        isHoldingTrashUndo = true
         controller.takeKey()
-        lastTrashed = trashed
-        isHoldingTrashUndo = false
         return true
     }
 
@@ -356,6 +350,7 @@ public final class NotePanelCoordinator {
         let current = frontmostNoteID.flatMap(order.firstIndex(of:))
         let next = order[current.map { ($0 + 1) % order.count } ?? 0]
         setAllHidden(false)
+        endTrashUndo()
         controllers[next]?.show(focus: true)
         return next
     }
@@ -364,6 +359,7 @@ public final class NotePanelCoordinator {
     public func beginTitleEditing(for id: NoteID) {
         guard let controller = controllers[id] else { return }
         setAllHidden(false)
+        endTrashUndo()
         controller.beginTitleEditing()
     }
 
@@ -390,6 +386,7 @@ public final class NotePanelCoordinator {
     public func focusBody(of id: NoteID) {
         guard let controller = controllers[id] else { return }
         setAllHidden(false)
+        endTrashUndo()
         controller.focusBody()
     }
 
@@ -427,7 +424,7 @@ public final class NotePanelCoordinator {
     }
 
     /// 휴지통 되돌리기의 "바로 뒤"가 끝났다: 사용자가 글을 고쳤거나, 새 노트를 만들었거나, 노트 창을 눌렀거나,
-    /// 다른 노트가 키 창이 되었다(`canUndoTrash`).
+    /// 노트로 직접 이동했다(`canUndoTrash`).
     func endTrashUndo() {
         lastTrashed = nil
     }
@@ -491,8 +488,7 @@ public final class NotePanelCoordinator {
     /// 노트 창은 눌러도 앱을 앞으로 가져오지 않으므로(앱이 앞으로 올 때의 `refresh`가 돌지 않는다)
     /// 여기서 노트 폴더를 다시 훑는다. 훑는 일은 파일마다 겉모습(수정 시각, 크기)만 보므로 매번 해도 가볍다.
     func noteWindowDidBecomeKey() {
-        // 사용자가 다른 노트로 옮겨 갔다. 그 노트의 ⌘Z는 그 글의 실행 취소다.
-        endTrashUndo()
+        // 메뉴 종료나 앱 활성화 뒤에도 오는 알림이다. 되돌리기 종료는 사용자 동작에서 처리한다.
         // 훑다가 창이 닫히면 다른 창이 키 창이 되어 다시 들어온다.
         guard !isRefreshingStore else { return }
         isRefreshingStore = true

@@ -218,7 +218,7 @@ import Testing
     // MARK: - 휴지통 되돌리기의 "바로 뒤"
 
     /// 검토에서 나온 문제: B에 글을 쓰고, A를 휴지통으로 보내고, B로 돌아가 ⌘Z를 누르면 A가 되살아났다.
-    /// B에는 제 실행 취소 기록이 있다. 다른 노트가 키 창이 되거나 노트 창을 누르면 "바로 뒤"가 끝난다.
+    /// B에는 제 실행 취소 기록이 있다. 사용자가 다른 노트로 이동하거나 노트 창을 누르면 "바로 뒤"가 끝난다.
     @Test func focusingAnotherNoteEndsTheTrashUndo() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
@@ -227,7 +227,7 @@ import Testing
 
         coordinator.moveToTrash(ids[1])
         #expect(coordinator.canUndoTrash)
-        other.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification))
+        coordinator.focusBody(of: ids[0])
         #expect(!coordinator.canUndoTrash)
         #expect(try coordinator.undoTrash() == nil)
 

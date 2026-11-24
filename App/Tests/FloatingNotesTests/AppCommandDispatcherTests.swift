@@ -173,15 +173,13 @@ import Testing
         defer { fixture.cleanUp() }
         var forwarded = 0
         fixture.commands.forwardUndo = { _ in forwarded += 1 }
-        let (_, other) = try fixture.open(NoteDraft(title: "B", body: "처음"))
+        let (otherID, other) = try fixture.open(NoteDraft(title: "B", body: "처음"))
         other.editor.textView.insertText("!", replacementRange: NSRange(location: 0, length: 0))
         let (trashed, _) = try fixture.open(NoteDraft(title: "A"))
         fixture.notePanels.moveToTrash(trashed)
         #expect(fixture.notePanels.canUndoTrash)
 
-        // 사용자가 B를 눌러 B가 키 창이 되었다.
-        let window = try #require(other.view.window)
-        window.delegate?.windowDidBecomeKey?(Notification(name: NSWindow.didBecomeKeyNotification, object: window))
+        fixture.notePanels.focusBody(of: otherID)
         fixture.commands.undoOrRestoreTrash(nil)
 
         #expect(forwarded == 1)
