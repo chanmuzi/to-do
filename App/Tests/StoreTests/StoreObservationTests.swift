@@ -30,7 +30,7 @@ import Models
         #expect(changes == [
             StoreChange(id: note.id, kind: .created, origin: .local),
             StoreChange(id: note.id, kind: .updated, origin: .local),
-            StoreChange(id: note.id, kind: .removed, origin: .local),
+            StoreChange(id: note.id, kind: .removed, origin: .local, trashedSchedules: []),
         ])
 
         observation.cancel()

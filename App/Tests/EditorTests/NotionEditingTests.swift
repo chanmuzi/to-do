@@ -54,7 +54,7 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.marked == "# |제목")
         let steps: [(typed: String, result: String)] = [
             ("-", "- |제목"), ("##", "## |제목"), ("[]", "[ ] |제목"), (">", "+ |제목"),
-            ("###", "### |제목"), ("-", "- |제목"), ("[]", "- [ ] |제목"), ("#", "# |제목"),
+            ("###", "+ ### |제목"), ("-", "- |제목"), ("[]", "- [ ] |제목"), ("#", "# |제목"),
         ]
         var previous = h.marked
         for step in steps {

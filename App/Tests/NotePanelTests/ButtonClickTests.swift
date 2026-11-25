@@ -41,6 +41,7 @@ import Theme
         try coordinator.open(note.id, focus: false)
         let controller = try #require(coordinator.controllers[note.id])
         controller.hoverOverride = true
+        controller.root.topRow.advanceDrawer(by: 1)
         controller.root.layoutSubtreeIfNeeded()
         return (coordinator, controller)
     }
@@ -119,6 +120,13 @@ import Theme
         controller.hoverOverride = true
         RealClick.click(pin)
         #expect(!controller.isPinned)
+        // 고정을 푼 핀도 서랍에서 보이는 즉시 새 위치에서 다시 누를 수 있다.
+        if fixture.animates {
+            #expect(controller.root.topRow.advanceDrawer(by: 0.3))
+            #expect(pin.alphaValue > 0 && pin.alphaValue < 1)
+        }
+        RealClick.click(pin)
+        #expect(controller.isPinned)
     }
 
     /// 글을 친 뒤, 다른 버튼을 막 쓴 뒤에도 버튼이 한 번에 동작한다.
