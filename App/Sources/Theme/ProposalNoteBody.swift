@@ -65,7 +65,7 @@ struct ProposalLineContent: View {
                     .frame(width: theme.component(.indent), alignment: .leading)
                 Text(text)
             }
-        } else if case .heading = line.kind {
+        } else if line.kind.headingLevel != nil {
             Text(text).fontWeight(.semibold)
         } else if line.kind != .fenceOpen && line.kind != .fenceClose { Text(text) }
     }

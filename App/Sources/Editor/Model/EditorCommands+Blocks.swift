@@ -6,8 +6,8 @@ nonisolated extension EditorCommands {
         LinePrefixEdit.make(doc, lines: doc.lineRange(for: selection), selection: selection) { line in
             guard !line.kind.isCode else { return nil }
             let indent = doc.string(in: line.indentRange)
-            let marker = line.kind == .heading(level) ? "" : String(repeating: "#", count: level) + " "
-            return .init(oldLength: line.prefixLength, new: indent + marker)
+            let marker = line.kind.headingLevel == level ? "" : String(repeating: "#", count: level) + " "
+            return .init(oldLength: line.prefixLength, new: indent + (line.kind.isToggle ? "+ " : "") + marker)
         }
     }
 

@@ -14,10 +14,9 @@ package enum NotePreviewText {
         for line in document.lines where line.kind != .fenceOpen && line.kind != .fenceClose {
             // Float의 체크박스는 목록 머리 없이도 올 수 있다.
             let source: String
-            if case .todo = line.kind {
-                source = document.string(in: line.contentRange)
-            } else {
-                source = document.string(in: line.range)
+            switch line.kind {
+            case .todo, .toggleHeading: source = document.string(in: line.contentRange)
+            default: source = document.string(in: line.range)
             }
             let trimmed = source.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { continue }

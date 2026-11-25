@@ -4,7 +4,7 @@ import Foundation
 nonisolated enum FoldState {
     /// 토글이 아닌 줄 번호를 버린다.
     static func sanitized(_ folded: Set<Int>, in doc: MarkdownDocument) -> Set<Int> {
-        folded.filter { $0 >= 0 && $0 < doc.lines.count && doc.lines[$0].kind == .toggle }
+        folded.filter { $0 >= 0 && $0 < doc.lines.count && doc.lines[$0].kind.isToggle }
     }
 
     /// 접혀서 보이지 않는 줄 번호.
@@ -91,15 +91,16 @@ nonisolated enum FoldState {
     static func fold(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> (folded: Set<Int>, selection: NSRange)? {
         let index = doc.lineIndex(at: selection.location)
         var target: Int?
-        if doc.lines[index].kind == .toggle, !folded.contains(index) {
+        if doc.lines[index].kind.isToggle, !folded.contains(index) {
             target = index
         } else {
             target = (0..<index).reversed().first {
-                doc.lines[$0].kind == .toggle && doc.lines[$0].subtreeEnd > index && !folded.contains($0)
+                doc.lines[$0].kind.isToggle && doc.lines[$0].subtreeEnd > index && !folded.contains($0)
             }
         }
         guard let target else { return nil }
         let title = doc.lines[target]
+        guard title.subtreeEnd > target + 1 else { return nil }
         let inside = selection.location > title.end || NSMaxRange(selection) > title.end
         return (folded.union([target]), inside ? NSRange(location: title.end, length: 0) : selection)
     }

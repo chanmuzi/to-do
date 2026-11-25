@@ -36,22 +36,27 @@ nonisolated package enum LineClassifier {
     package static func classify(_ u: [unichar], from start: Int, to end: Int) -> (kind: LineKind, markerLength: Int) {
         guard start < end else { return (.paragraph, 0) }
         let c = u[start]
-        if c == hash {
-            var n = 0
-            while start + n < end, u[start + n] == hash { n += 1 }
-            if n <= 3, start + n < end, u[start + n] == space { return (.heading(n), n + 1) }
-            return (.paragraph, 0)
-        }
+        if let level = headingLevel(u, from: start, to: end) { return (.heading(level), level + 1) }
         if c == dash || c == star, start + 1 < end, u[start + 1] == space {
             if let todo = todo(u, from: start + 2, to: end) { return (.todo(done: todo.done), 2 + todo.length) }
             return (.bullet, 2)
         }
         // 토글은 `+ `(표준 Markdown의 목록 기호라 다른 앱에서는 하위 항목을 가진 목록으로 읽힌다),
         // `> `는 표준대로 인용문이다(D-044).
-        if c == plus, start + 1 < end, u[start + 1] == space { return (.toggle, 2) }
+        if c == plus, start + 1 < end, u[start + 1] == space {
+            if let level = headingLevel(u, from: start + 2, to: end) { return (.toggleHeading(level), level + 3) }
+            return (.toggle, 2)
+        }
         if c == greater, start + 1 < end, u[start + 1] == space { return (.quote, 2) }
         if let todo = todo(u, from: start, to: end) { return (.todo(done: todo.done), todo.length) }
         return (.paragraph, 0)
+    }
+
+    private static func headingLevel(_ units: [unichar], from start: Int, to end: Int) -> Int? {
+        var i = start
+        while i < end, units[i] == hash { i += 1 }
+        let level = i - start
+        return (1...3).contains(level) && i < end && units[i] == space ? level : nil
     }
 
     /// `[ ] `, `[x] `. 줄 끝에서는 공백이 없어도 받는다.

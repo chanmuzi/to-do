@@ -54,9 +54,9 @@ nonisolated extension EditorCommands {
 
     private static func marker(for kind: LineKind, replacing line: MarkdownLine, in doc: MarkdownDocument) -> String {
         switch kind {
-        case .heading(let level): return String(repeating: "#", count: level) + " "
+        case .heading(let level): return (line.kind.isToggle ? "+ " : "") + String(repeating: "#", count: level) + " "
         case .bullet: return "- "
-        case .toggle: return "+ "
+        case .toggle: return "+ " + (line.kind.headingLevel.map { String(repeating: "#", count: $0) + " " } ?? "")
         case .quote: return "> "
         case .todo:
             // 표준 문법의 글머리표(`- `)에서 바꾸면 그 꼴(`- [ ] `)을 지킨다(D-017).

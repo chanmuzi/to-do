@@ -330,6 +330,9 @@ import Scheduling
             #expect(model.candidates.allSatisfy { $0.title == "본문 첫 줄" })
             #expect(model.submitCandidate())
             #expect(try store.load(id).schedules.last?.title == "본문 첫 줄")
+            try store.update(id) { $0.body = "+ ### 제목 토글" }
+            model.input = "내일 5pm"
+            #expect(model.candidates.first?.title == "제목 토글")
             try store.update(id) { $0.body = "" }
             model.input = "내일 4pm"
             #expect(model.candidates.allSatisfy { $0.title.isEmpty })

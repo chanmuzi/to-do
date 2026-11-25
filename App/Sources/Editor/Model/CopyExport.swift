@@ -105,6 +105,8 @@ nonisolated struct CopyExport: Sendable {
                 return indent + String(repeating: "#", count: level) + " " + inlineMarkdown(line)
             case .todo(let done):
                 return indent + (done ? "- [x] " : "- [ ] ") + inlineMarkdown(line)
+            case .toggleHeading(let level):
+                return indent + "- " + String(repeating: "#", count: level) + " " + inlineMarkdown(line)
             case .bullet, .toggle:
                 return indent + "- " + inlineMarkdown(line)
             case .quote:
@@ -153,7 +155,7 @@ nonisolated struct CopyExport: Sendable {
                     .joined(separator: "\n")
                 out += "<pre><code>" + Self.escape(code) + "</code></pre>"
                 index = last + 1
-            case .todo, .bullet, .toggle:
+            case .todo, .bullet, .toggle, .toggleHeading:
                 out += "<ul>"
                 while index < range.upperBound, doc.lines[index].kind.isListItem, doc.lines[index].level == line.level {
                     let item = doc.lines[index]
@@ -162,7 +164,9 @@ nonisolated struct CopyExport: Sendable {
                     if case .todo(let done) = item.kind {
                         out += "<input type=\"checkbox\" disabled\(done ? " checked" : "")> "
                     }
-                    out += inline(item.contentRange, item.spans, colors)
+                    let content = inline(item.contentRange, item.spans, colors)
+                    if let level = item.kind.headingLevel { out += "<h\(level)>\(content)</h\(level)>" }
+                    else { out += content }
                     if index + 1 < end { out += blocks((index + 1)..<end, colors) }
                     out += "</li>"
                     index = end

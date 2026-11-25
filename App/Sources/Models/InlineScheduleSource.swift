@@ -33,6 +33,12 @@ extension Note {
         var suffix = 0
         while suffix < min(old.count, new.count) - prefix,
               old[old.count - suffix - 1] == new[new.count - suffix - 1] { suffix += 1 }
+        // 여러 줄의 들여쓰기만 바뀌면 줄 번호와 내용은 그대로여서 예정도 같은 줄을 따른다.
+        let changed = prefix..<(old.count - suffix)
+        let indentOnly = old.count == new.count && changed.count > 1 && changed.allSatisfy { index in
+            old[index].drop(while: { $0 == " " || $0 == "\t" })
+                == new[index].drop(while: { $0 == " " || $0 == "\t" })
+        }
         for index in schedules.indices {
             guard var source = schedules[index].inlineSource, let oldIndex = source.line, oldIndex >= 0 else { continue }
             // 되돌리기가 먼저 복원한 연결은 뒤이어 복원되는 본문에서 제자리를 찾는다.
@@ -53,7 +59,8 @@ extension Note {
             }
             let matches = new.indices.filter { new[$0] == source.text }
             let destination: Int?
-            if matches.count == 1 { destination = matches.first }
+            if indentOnly { destination = oldIndex }
+            else if matches.count == 1 { destination = matches.first }
             else if matches.isEmpty, old.count - prefix - suffix == 1, new.count - prefix - suffix == 1,
                     oldIndex == prefix, !new[prefix].isEmpty { destination = prefix }
             else { destination = nil }

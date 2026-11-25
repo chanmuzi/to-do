@@ -51,7 +51,7 @@ extension EditorController {
     /// 그 줄의 기본 글꼴.
     private func lineFont(for line: MarkdownLine, at index: Int) -> EditorStyle.TextFont {
         switch line.kind {
-        case .heading(let level): style.heading(level)
+        case .heading(let level), .toggleHeading(let level): style.heading(level)
         case .fenceOpen, .fenceClose, .code: style.codeBlock
         default: style.body
         }
