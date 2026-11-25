@@ -29,6 +29,9 @@ class ClickableView: NSView {
 
     /// 상단 줄이 칸 사이의 누름을 이 버튼에 건넨 경우 뗄 때에도 같은 경계를 쓴다.
     func acceptsRelease(at windowPoint: NSPoint) -> Bool {
+        if superview is TopRowView {
+            return (window as? NotePanelWindow)?.button(at: windowPoint) === self
+        }
         if bounds.contains(convert(windowPoint, from: nil)) { return true }
         return (window as? NotePanelWindow)?.button(at: windowPoint) === self
     }

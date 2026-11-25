@@ -36,11 +36,9 @@ final class TopRowView: NSView {
     private let problemButton: IconButton
     private let pinButton: IconButton
     private var state: TopRowState?
-    private var animatesPinPlacement = false
-    private var animatesClockPlacement = false
-    private var clockTargetFrame: CGRect?
+    private var drawerPhase: CGFloat = 0
+    private var drawerAnimation: Task<Void, Never>?
     private var clockFade: Task<Void, Never>?
-    private var pinTargetFrame: CGRect?
     /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
     private var holdsProblemSlot = false
     /// 표시가 다 사라진 뒤 자리를 비우는 일(`dur` 뒤). 그사이 다시 바뀌면 취소한다.
@@ -64,6 +62,7 @@ final class TopRowView: NSView {
             style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "항상 위에 고정", tint: .text3
         )
         super.init(frame: .zero)
+        clipsToBounds = true
         divider.wantsLayer = true
         [agentButton, closeButton, clockButton, divider, title, moreButton, problemButton, pinButton]
             .forEach(addSubview)
@@ -121,9 +120,6 @@ final class TopRowView: NSView {
 
     func apply(_ state: TopRowState, animated: Bool) {
         let previous = self.state
-        let movesOnHover = animated && previous?.hoverControlsAlpha != state.hoverControlsAlpha && style.transitionDuration > 0
-        animatesPinPlacement = movesOnHover && previous?.pin.isOn == true && state.pin.isOn
-        animatesClockPlacement = movesOnHover && previous?.hasSchedules == true && state.hasSchedules
         self.state = state
         divider.layer?.backgroundColor = style.cgColor(.line, in: self)
         title.paletteID = state.paletteID
@@ -148,18 +144,36 @@ final class TopRowView: NSView {
         pinButton.setAccessibilityValue(state.pin.isOn ? "켜짐" : "꺼짐")
         applyProblem(state.problemLabel, wasShown: previous?.problemLabel != nil, animated: animated)
 
-        let alphas: [(NSView, Double)] = [
-            (agentButton, allowsAgent ? (agentState == .idle ? state.hoverControlsAlpha : 1) : 0), (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
-            (moreButton, state.hoverControlsAlpha),
-            (pinButton, state.pin.alpha),
-        ]
-        if animated {
-            style.animate { alphas.forEach { $0.0.animator().alphaValue = $0.1 } }
-        } else {
-            alphas.forEach { $0.0.alphaValue = $0.1 }
+        let target = state.hoverControlsAlpha
+        if !animated || previous == nil || style.transitionDuration == 0 {
+            drawerAnimation?.cancel()
+            drawerAnimation = nil
+            drawerPhase = target
+        } else if previous?.hoverControlsAlpha != target {
+            animateDrawer(to: target)
         }
         needsLayout = true
         layoutSubtreeIfNeeded()
+    }
+
+    private func animateDrawer(to target: CGFloat) {
+        drawerAnimation?.cancel()
+        let from = drawerPhase
+        let start = ProcessInfo.processInfo.systemUptime
+        let duration = style.transitionDuration
+        let direction: CGFloat = target > from ? 1 : -1
+        let interval = 1.0 / Double(max(1, window?.screen?.maximumFramesPerSecond ?? 60))
+        drawerAnimation = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let elapsed = ProcessInfo.processInfo.systemUptime - start
+                drawerPhase = style.reducesMotion ? target : min(1, max(0, from + direction * elapsed / duration))
+                needsLayout = true
+                layoutSubtreeIfNeeded()
+                if drawerPhase == target { return }
+                try? await Task.sleep(for: .seconds(interval))
+            }
+        }
     }
 
     /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.
@@ -194,7 +208,8 @@ final class TopRowView: NSView {
     override func layout() {
         super.layout()
         let theme = style.theme
-        let frames = TopRowLayout(
+        let progress = style.theme.motion.curve.progress(at: drawerPhase)
+        let frames = TopRowLayout.drawer(
             TopRowLayout.Input(
                 width: bounds.width,
                 // 고치는 동안에는 남는 너비를 다 쓴다.
@@ -215,10 +230,19 @@ final class TopRowView: NSView {
                 iconButton: theme.component(.noteTopButtonSize),
                 dividerWidth: theme.shape(.borderWidth),
                 buttonGap: theme.component(.noteTopButtonGap)
-            )
+            ), progress: progress
         )
         agentButton.frame = frames.agent
-        agentButton.setAccessibilityElement(frames.agent != .zero)
+        let agentAlpha = allowsAgent ? (agentState == .idle ? progress : 1) : 0
+        agentButton.alphaValue = agentAlpha
+        agentButton.isHidden = agentAlpha == 0
+        agentButton.setAccessibilityElement(agentAlpha > 0)
+        for view in [moreButton, closeButton, divider] {
+            view.alphaValue = progress
+            view.isHidden = progress == 0
+        }
+        pinButton.alphaValue = state?.pin.isOn == true ? 1 : progress
+        pinButton.isHidden = pinButton.alphaValue == 0
         closeButton.frame = frames.close
         let dividerHeight = theme.component(.iconMedium)
         divider.frame = CGRect(x: frames.divider.minX, y: (bounds.height - dividerHeight) / 2,
@@ -229,28 +253,16 @@ final class TopRowView: NSView {
         if let problem = frames.problem { problemButton.frame = problem }
         // 사라지는 시계는 마지막 자리에서 전환을 마친다.
         if frames.clock != .zero || clockButton.isHidden {
-            place(clockButton, at: frames.clock, target: &clockTargetFrame, animated: animatesClockPlacement)
+            clockButton.frame = frames.clock
         }
-        place(pinButton, at: frames.pin, target: &pinTargetFrame, animated: animatesPinPlacement)
-        animatesClockPlacement = false
-        animatesPinPlacement = false
-    }
-
-    private func place(_ button: IconButton, at frame: CGRect, target: inout CGRect?, animated: Bool) {
-        guard target != frame else { return }
-        target = frame
-        if animated {
-            style.animate { button.animator().frame = frame }
-        } else {
-            button.frame = frame
-        }
+        pinButton.frame = frames.pin
     }
 
     // MARK: - 끌기와 제목 누르기
 
     /// 버튼과 고치는 중인 제목만 스스로 마우스를 받는다. 나머지는 이 줄이 받아 창을 끈다.
     override func hitTest(_ point: NSPoint) -> NSView? {
-        guard let hit = super.hitTest(point) else { return nil }
+        guard bounds.contains(convert(point, from: superview)), let hit = super.hitTest(point) else { return nil }
         var view: NSView? = hit
         while let current = view, current !== self {
             if current is IconButton { return hit }
@@ -261,7 +273,7 @@ final class TopRowView: NSView {
         let local = convert(point, from: superview)
         let controls = subviews.compactMap { $0 as? ClickableView }.filter {
             !$0.isHidden && $0.alphaValue > 0 && !$0.frame.isEmpty
-                && local.y >= $0.frame.minY && local.y < $0.frame.maxY
+                && bounds.intersects($0.frame) && local.y >= $0.frame.minY && local.y < $0.frame.maxY
         }
         let left = controls.filter { $0.frame.maxX <= local.x }.max { $0.frame.maxX < $1.frame.maxX }
         let right = controls.filter { $0.frame.minX > local.x }.min { $0.frame.minX < $1.frame.minX }
