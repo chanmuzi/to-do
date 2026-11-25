@@ -107,7 +107,8 @@ nonisolated extension EditorCommands {
 
     /// ⌦ (선택이 없을 때).
     ///
-    /// - 글자가 끝나는 자리에서: 줄바꿈과 함께 아랫줄의 감춘 줄 머리(들여쓰기, 목록과 제목의 기호)를
+    /// - 빈 본문 줄에서는 그 줄만 지우고 아랫줄의 글자 맨 앞으로 간다. 코드 블록 경계는 따로 처리한다.
+    /// - 그 밖의 줄 끝에서는 줄바꿈과 함께 아랫줄의 감춘 줄 머리(들여쓰기, 목록과 제목의 기호)를
     ///   지운다. 그대로 두면 감춰 있던 기호가 글자로 드러난다. 코드 블록의 ``` 줄과는 합치지 않는다.
     /// - 그 밖에는 보이는 글자 하나를 지운다(⌫와 같은 규칙).
     static func deleteForward(_ doc: MarkdownDocument, selection: NSRange) -> KeyOutcome {
@@ -144,6 +145,13 @@ nonisolated extension EditorCommands {
                     selection: NSRange(location: next.codeBlock.flatMap { block in
                         block.first { doc.lines[$0].kind == .code }.map { doc.lines[$0].caretStart - (next.start - line.start) }
                     } ?? line.start, length: 0)
+                ))
+            }
+            if ListStructure.isBlank(line) {
+                return .edit(TextEdit(
+                    range: line.fullRange,
+                    replacement: "",
+                    selection: NSRange(location: next.caretStart - line.fullRange.length, length: 0)
                 ))
             }
             if next.caretStart == next.start, position == line.end { return .passThrough }
