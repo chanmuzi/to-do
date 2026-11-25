@@ -44,7 +44,7 @@ import Theme
 
     // MARK: - 크기와 상태 조합
 
-    @Test func windowFrameStaysFixedAsHoverRepositionsTheChip() throws {
+    @Test func windowFrameStaysFixedAsHoverRepositionsTheClock() throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft(
@@ -462,12 +462,23 @@ import Theme
         let topRow = controller.root.topRow
         controller.hoverOverride = true
         topRow.layoutSubtreeIfNeeded()
+        let title = try #require(topRow.subviews.compactMap { $0 as? TitleField }.first)
+        let font = try #require(title.font)
+        let baseline = title.frame.minY + title.firstBaselineOffsetFromTop
+        let iconCenter = fixture.theme.shape(.chromeHeight) / 2
+        #expect(abs(baseline - font.capHeight / 2 - iconCenter) <= 0.5)
         let buttonFrames = topRow.subviews.filter { $0 is IconButton }.map(\.frame)
         let windowFrame = controller.panel.frame
 
         topRow.beginTitleEditing()
         #expect(topRow.isEditingTitle)
         let fieldEditor = try #require(controller.panel.firstResponder as? NSTextView)
+        let layout = try #require(fieldEditor.layoutManager)
+        let container = try #require(fieldEditor.textContainer)
+        layout.ensureLayout(for: container)
+        let glyph = layout.location(forGlyphAt: 0)
+        let glyphInRow = fieldEditor.convert(NSPoint(x: glyph.x, y: fieldEditor.textContainerOrigin.y + glyph.y), to: topRow)
+        #expect(glyphInRow.y == baseline)
         fieldEditor.insertText(" 고침", replacementRange: fieldEditor.selectedRange())
         topRow.layoutSubtreeIfNeeded()
 
@@ -700,8 +711,8 @@ import Theme
             view.subviews.flatMap { [$0] + descendants(of: $0) }
         }
         let all = descendants(of: controller.root)
-        let pressable = all.filter { $0 is IconButton || $0 is ReminderBadgeView }
-        // 얼굴, 더 보기, 닫기, 핀과 예정 칩이 각자의 커서 영역을 가진다.
+        let pressable = all.filter { $0 is IconButton }
+        // 얼굴, 더 보기, 닫기, 핀과 시계가 각자의 커서 영역을 가진다.
         #expect(pressable.filter { !$0.isHidden }.count == 5)
         let clickables = pressable.compactMap { $0 as? ClickableView }
         #expect(clickables.count == pressable.count)
@@ -731,7 +742,7 @@ import Theme
         topRow.layoutSubtreeIfNeeded()
         let buttons = topRow.subviews.compactMap { $0 as? IconButton }
         let indicator = try #require(buttons.first { $0.accessibilityLabel() == "" })
-        let reserved = topRow.subviews.filter { !$0.isHidden && (($0 is IconButton && $0 !== indicator) || $0 is ReminderBadgeView) }
+        let reserved = buttons.filter { !$0.isHidden && $0 !== indicator }
         let reservedFrames = reserved.map(\.frame)
         let title = try #require(topRow.subviews.first { $0 is TitleField })
         let titleFrame = title.frame
@@ -766,33 +777,33 @@ import Theme
     }
 
     /// 리마인더가 생기고 없어질 때도 `dur` 동안 나타나고 사라진다(규칙 8).
-    @Test func reminderBadgeFadesInAndOut() async throws {
+    @Test func reminderClockFadesInAndOut() async throws {
         let coordinator = try fixture.makeCoordinator()
         defer { fixture.cleanUp(coordinator) }
         let note = try fixture.notes.create(NoteDraft(title: "리마인더"))
         try coordinator.open(note.id, focus: false)
         let controller = try #require(coordinator.controllers[note.id])
         let topRow = controller.root.topRow
-        let badge = try #require(topRow.subviews.first { $0 is ReminderBadgeView })
-        #expect(badge.isHidden)
-        #expect(badge.alphaValue == 0)
+        let clock = topRow.reminderAnchor
+        #expect(clock.isHidden)
+        #expect(clock.alphaValue == 0)
 
         try fixture.notes.update(note.id) { $0.reminder = Date().addingTimeInterval(3600) }
-        #expect(!badge.isHidden)
-        #expect(await fixture.wait { badge.alphaValue == 1 })
+        #expect(!clock.isHidden)
+        #expect(await fixture.wait { clock.alphaValue == 1 })
         topRow.layoutSubtreeIfNeeded()
-        let shown = badge.frame
+        let shown = clock.frame
         #expect(shown.width > 0)
 
         try fixture.notes.update(note.id) { $0.reminder = nil }
         // 사라지는 동안에는 마지막 자리에 그대로 있다.
         if fixture.animates {
-            #expect(!badge.isHidden)
+            #expect(!clock.isHidden)
             topRow.layoutSubtreeIfNeeded()
-            #expect(badge.frame == shown)
+            #expect(clock.frame == shown)
         }
-        #expect(await fixture.wait { badge.isHidden })
-        #expect(badge.alphaValue == 0)
+        #expect(await fixture.wait { clock.isHidden })
+        #expect(clock.alphaValue == 0)
     }
 
     /// 숨긴 중에 노트 하나에 커서를 두면 숨김이 모두 풀린다. 한 창만 보이는 어중간한 상태는 없다.

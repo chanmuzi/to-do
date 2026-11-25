@@ -15,11 +15,11 @@ import Theme
     }
 
     private func layout(
-        width: CGFloat = 340, title: CGFloat = 60, reminder: CGFloat? = 57,
+        width: CGFloat = 340, title: CGFloat = 60, hasSchedules: Bool = true,
         problem: Bool = false
     ) -> TopRowLayout {
         TopRowLayout(
-            .init(width: width, titleWidth: title, reminderWidth: reminder, showsProblem: problem),
+            .init(width: width, titleWidth: title, hasSchedules: hasSchedules, showsProblem: problem),
             metrics: metrics
         )
     }
@@ -30,9 +30,9 @@ import Theme
         #expect(frames.title.width == 60)
         #expect(frames.close.maxX == 340 - metrics.paddingTrailing)
         #expect(frames.close.height == metrics.iconButton)
-        #expect(frames.reminder?.midY == frames.close.midY)
-        #expect(frames.reminder?.maxX == frames.pin.minX - metrics.gap)
-        #expect(frames.reminder?.width == 57)
+        #expect(frames.clock.midY == frames.close.midY)
+        #expect(frames.clock.maxX == frames.pin.minX - metrics.buttonGap)
+        #expect(frames.clock.width == metrics.iconButton)
         #expect(frames.pin.maxX + metrics.buttonGap == frames.more.minX)
     }
 
@@ -66,7 +66,7 @@ import Theme
     @Test func restingFaceAndPinHaveDistinctSlots() {
         for allows in [true, false] {
             for pinned in [true, false] {
-                let frames = TopRowLayout(.init(width: 260, titleWidth: 300, reminderWidth: 80,
+                let frames = TopRowLayout(.init(width: 260, titleWidth: 300, hasSchedules: true,
                     showsControls: false, allowsAgent: allows, hasAgentActivity: true,
                     isPinned: pinned, showsProblem: false), metrics: metrics)
                 #expect((frames.agent != .zero) == allows)
@@ -77,32 +77,33 @@ import Theme
         }
     }
 
-    @Test func clockReplacesAbsentChip() {
-        let frames = layout(reminder: nil)
-        #expect(frames.reminder == nil)
+    @Test func hoverOnlyReservesClockForActiveSchedules() {
+        let frames = layout()
+        #expect(layout(hasSchedules: false).clock == .zero)
         #expect(frames.title.minX == metrics.paddingLeading)
         #expect(frames.agent.maxX + metrics.buttonGap == frames.clock.minX)
         #expect(frames.clock.maxX + metrics.buttonGap == frames.pin.minX)
     }
 
-    @Test func restingPinReservesTheTrailingSlotAndTheChipGap() {
+    @Test func restingClockUsesTheTrailingSlotOrSitsLeftOfThePin() {
         for pinned in [false, true] {
-            for chip: CGFloat? in [nil, 57] {
-                let frames = TopRowLayout(.init(width: 340, titleWidth: 1000, reminderWidth: chip,
+            for scheduled in [false, true] {
+                let frames = TopRowLayout(.init(width: 340, titleWidth: 1000, hasSchedules: scheduled,
                                                 showsControls: false, isPinned: pinned, showsProblem: false),
                                           metrics: metrics)
                 let right = 340 - metrics.paddingTrailing
-                #expect(frames.agent == .zero && frames.more == .zero && frames.close == .zero && frames.divider == .zero && frames.clock == .zero)
+                #expect(frames.agent == .zero && frames.more == .zero && frames.close == .zero && frames.divider == .zero)
                 if pinned {
                     #expect(frames.pin.maxX == right && frames.pin.width == metrics.iconButton)
                 } else {
                     #expect(frames.pin == .zero)
                 }
                 let contentRight = pinned ? frames.pin.minX : right
-                if let reminder = frames.reminder {
-                    #expect(reminder.maxX == contentRight - (pinned ? metrics.gap : 0))
-                    #expect(frames.title.maxX == reminder.minX - metrics.gap)
+                if scheduled {
+                    #expect(frames.clock.maxX == contentRight - (pinned ? metrics.buttonGap : 0))
+                    #expect(frames.title.maxX == frames.clock.minX - metrics.gap)
                 } else {
+                    #expect(frames.clock == .zero)
                     #expect(frames.title.maxX == contentRight - metrics.gap)
                 }
             }
@@ -115,12 +116,12 @@ import Theme
     }
 
     @Test func narrowNoteShrinksTheTitleFirst() {
-        let wide = layout(width: 340, title: 1000, reminder: 93)
-        let narrow = layout(width: 260, title: 1000, reminder: 93)
+        let wide = layout(width: 340, title: 1000)
+        let narrow = layout(width: 260, title: 1000)
         #expect(narrow.title.width < wide.title.width)
         #expect(narrow.title.width > 0)
         #expect(narrow.pin.width == metrics.iconButton)
-        #expect(narrow.reminder?.width == 93)
+        #expect(narrow.clock.width == metrics.iconButton)
         #expect(narrow.close.maxX == 260 - metrics.paddingTrailing)
         #expect(narrow.more.minX >= narrow.title.maxX + metrics.gap)
     }
@@ -139,7 +140,7 @@ import Theme
         #expect(with.problem?.width == metrics.iconButton)
         #expect(with.more == without.more)
         #expect(with.pin == without.pin)
-        #expect(with.reminder == without.reminder)
+        #expect(with.clock == without.clock)
         #expect(with.title.minX == without.title.minX)
         #expect(with.title.maxX == (with.problem?.minX ?? 0) - metrics.gap)
         // 짧은 제목은 그대로다.

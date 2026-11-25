@@ -34,10 +34,12 @@ final class TopRowView: NSView {
     private let title: TitleField
     private let moreButton: IconButton
     private let problemButton: IconButton
-    private let reminderBadge: ReminderBadgeView
     private let pinButton: IconButton
     private var state: TopRowState?
     private var animatesPinPlacement = false
+    private var animatesClockPlacement = false
+    private var clockTargetFrame: CGRect?
+    private var clockFade: Task<Void, Never>?
     private var pinTargetFrame: CGRect?
     /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
     private var holdsProblemSlot = false
@@ -56,13 +58,14 @@ final class TopRowView: NSView {
         problemButton = IconButton(
             style: style, symbolName: "exclamationmark.triangle", iconSize: .iconMedium, label: ""
         )
-        reminderBadge = ReminderBadgeView(style: style)
+        clockButton.isHidden = true
+        clockButton.alphaValue = 0
         pinButton = IconButton(
             style: style, symbolName: "pin.fill", iconSize: .iconMedium, label: "항상 위에 고정", tint: .text3
         )
         super.init(frame: .zero)
         divider.wantsLayer = true
-        [agentButton, closeButton, clockButton, divider, title, moreButton, problemButton, reminderBadge, pinButton]
+        [agentButton, closeButton, clockButton, divider, title, moreButton, problemButton, pinButton]
             .forEach(addSubview)
         problemButton.isHidden = true
         problemButton.alphaValue = 0
@@ -79,7 +82,6 @@ final class TopRowView: NSView {
         clockButton.onPress = { [unowned self] in actions.reminder() }
         moreButton.onPress = { [unowned self] in actions.more(moreButton) }
         problemButton.onPress = { [unowned self] in actions.problem(problemButton) }
-        reminderBadge.onPress = { [unowned self] in actions.reminder() }
         pinButton.onPress = { [unowned self] in actions.pin() }
         title.onChange = { [unowned self] in actions.titleChanged($0) }
         title.onReturn = { [unowned self] in actions.titleReturned() }
@@ -104,7 +106,7 @@ final class TopRowView: NSView {
     var isEditingTitle: Bool { title.isEditing }
     /// 더 보기 메뉴를 띄울 기준(단축키로 열 때도 쓴다).
     var moreAnchor: NSView { moreButton }
-    var reminderAnchor: NSView { state?.reminder == nil ? clockButton : reminderBadge }
+    var reminderAnchor: NSView { clockButton }
 
     func beginTitleEditing() {
         guard let state else { return }
@@ -118,26 +120,37 @@ final class TopRowView: NSView {
     // MARK: - 상태
 
     func apply(_ state: TopRowState, animated: Bool) {
-        let hadProblem = self.state?.problem != nil || (self.state?.syncFailure == true && self.state?.reminder == nil)
-        animatesPinPlacement = animated && self.state?.pin.isOn == true && state.pin.isOn
-            && self.state?.hoverControlsAlpha != state.hoverControlsAlpha && style.transitionDuration > 0
+        let previous = self.state
+        let movesOnHover = animated && previous?.hoverControlsAlpha != state.hoverControlsAlpha && style.transitionDuration > 0
+        animatesPinPlacement = movesOnHover && previous?.pin.isOn == true && state.pin.isOn
+        animatesClockPlacement = movesOnHover && previous?.hasSchedules == true && state.hasSchedules
         self.state = state
         divider.layer?.backgroundColor = style.cgColor(.line, in: self)
         title.paletteID = state.paletteID
-        reminderBadge.paletteID = state.paletteID
         title.show(
             title: state.title, color: state.titleColor,
             animated: animated
         )
-        reminderBadge.apply(state.reminder, count: state.additionalSchedules, animated: animated)
+        if let label = state.clockLabel {
+            clockButton.set(symbolName: "clock", tint: state.clockColor, animated: animated)
+            clockButton.toolTip = label
+            clockButton.setAccessibilityLabel(label)
+        }
+        if state.hasSchedules != (previous?.hasSchedules == true) {
+            clockFade?.cancel()
+            clockFade = style.fade(clockButton, visible: state.hasSchedules, animated: animated) { [weak self] in
+                guard let self, self.state?.hasSchedules == false else { return }
+                clockButton.isHidden = true
+                needsLayout = true
+            }
+        }
         pinButton.set(symbolName: state.pin.symbolName, tint: state.pin.color, animated: animated)
         pinButton.setAccessibilityValue(state.pin.isOn ? "켜짐" : "꺼짐")
-        applyProblem(state.problem, wasShown: hadProblem, animated: animated)
+        applyProblem(state.problemLabel, wasShown: previous?.problemLabel != nil, animated: animated)
 
-        clockButton.isHidden = !state.hasSchedules || state.reminder != nil
         let alphas: [(NSView, Double)] = [
             (agentButton, allowsAgent ? (agentState == .idle ? state.hoverControlsAlpha : 1) : 0), (closeButton, state.hoverControlsAlpha), (divider, state.hoverControlsAlpha),
-            (clockButton, state.hasSchedules && state.reminder == nil ? state.hoverControlsAlpha : 0), (moreButton, state.hoverControlsAlpha),
+            (moreButton, state.hoverControlsAlpha),
             (pinButton, state.pin.alpha),
         ]
         if animated {
@@ -150,10 +163,9 @@ final class TopRowView: NSView {
     }
 
     /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.
-    private func applyProblem(_ problem: NoteProblem?, wasShown: Bool, animated: Bool) {
-        if let problem { problemButton.setAccessibilityLabel(problem.accessibilityLabel) }
-        let isShown = problem != nil || (state?.syncFailure == true && state?.reminder == nil)
-        if problem == nil && isShown { problemButton.setAccessibilityLabel("예정 연동 실패") }
+    private func applyProblem(_ label: String?, wasShown: Bool, animated: Bool) {
+        if let label { problemButton.setAccessibilityLabel(label) }
+        let isShown = label != nil
         guard isShown != wasShown else { return }
         if isShown { holdsProblemSlot = true }
         problemFade?.cancel()
@@ -161,7 +173,7 @@ final class TopRowView: NSView {
             guard let self else { return }
             problemFade = nil
             // 다 사라졌으면 자리를 비운다. 움직임이 어디까지 갔든 끝의 값으로 놓는다.
-            guard self.state?.problem == nil, !(self.state?.syncFailure == true && self.state?.reminder == nil) else { return }
+            guard self.state?.problemLabel == nil else { return }
             problemButton.alphaValue = 0
             problemButton.isHidden = true
             holdsProblemSlot = false
@@ -171,7 +183,6 @@ final class TopRowView: NSView {
 
     func refreshTheme() {
         title.refreshTheme()
-        reminderBadge.refresh()
         [moreButton, problemButton, pinButton, closeButton, clockButton].forEach { $0.refresh() }
         needsLayout = true
     }
@@ -188,7 +199,6 @@ final class TopRowView: NSView {
                 width: bounds.width,
                 // 고치는 동안에는 남는 너비를 다 쓴다.
                 titleWidth: title.isEditing ? .greatestFiniteMagnitude : title.idealWidth,
-                reminderWidth: reminderBadge.fittingWidth,
                 hasSchedules: state?.hasSchedules == true,
                 showsControls: state?.hoverControlsAlpha == 1,
                 allowsAgent: allowsAgent,
@@ -210,38 +220,40 @@ final class TopRowView: NSView {
         agentButton.frame = frames.agent
         agentButton.setAccessibilityElement(frames.agent != .zero)
         closeButton.frame = frames.close
-        clockButton.frame = frames.clock
         let dividerHeight = theme.component(.iconMedium)
         divider.frame = CGRect(x: frames.divider.minX, y: (bounds.height - dividerHeight) / 2,
                                width: frames.divider.width, height: dividerHeight)
-        let titleHeight = title.idealHeight
-        title.frame = NSRect(
-            x: frames.title.minX, y: ((style.theme.shape(.chromeHeight) - titleHeight) / 2).rounded(),
-            width: frames.title.width, height: titleHeight
-        )
+        title.place(in: frames.title)
         moreButton.frame = frames.more
         // 사라지는 중인 것은 자리가 없어져도 마지막 자리에서 사라진다.
         if let problem = frames.problem { problemButton.frame = problem }
-        if let reminder = frames.reminder { reminderBadge.frame = reminder }
-        if pinTargetFrame != frames.pin {
-            pinTargetFrame = frames.pin
-            if animatesPinPlacement {
-                style.animate { pinButton.animator().frame = frames.pin }
-            } else {
-                pinButton.frame = frames.pin
-            }
+        // 사라지는 시계는 마지막 자리에서 전환을 마친다.
+        if frames.clock != .zero || clockButton.isHidden {
+            place(clockButton, at: frames.clock, target: &clockTargetFrame, animated: animatesClockPlacement)
         }
+        place(pinButton, at: frames.pin, target: &pinTargetFrame, animated: animatesPinPlacement)
+        animatesClockPlacement = false
         animatesPinPlacement = false
+    }
+
+    private func place(_ button: IconButton, at frame: CGRect, target: inout CGRect?, animated: Bool) {
+        guard target != frame else { return }
+        target = frame
+        if animated {
+            style.animate { button.animator().frame = frame }
+        } else {
+            button.frame = frame
+        }
     }
 
     // MARK: - 끌기와 제목 누르기
 
-    /// 버튼과 리마인더, 고치는 중인 제목만 스스로 마우스를 받는다. 나머지는 이 줄이 받아 창을 끈다.
+    /// 버튼과 고치는 중인 제목만 스스로 마우스를 받는다. 나머지는 이 줄이 받아 창을 끈다.
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let hit = super.hitTest(point) else { return nil }
         var view: NSView? = hit
         while let current = view, current !== self {
-            if current is IconButton || current is ReminderBadgeView { return hit }
+            if current is IconButton { return hit }
             if current === title, title.isEditing { return hit }
             view = current.superview
         }
