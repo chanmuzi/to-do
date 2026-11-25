@@ -748,6 +748,12 @@ final class DebugControl {
         case ("input-window-resign", let id?, _) where isPassive:
             guard let window = notePanels.window(for: id) else { return }
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        case ("editor-block-command", let id?, let action?) where isPassive:
+            switch action {
+            case "indent": editor(of: id)?.perform(.indent)
+            case "done": editor(of: id)?.perform(.toggleDone)
+            default: break
+            }
         case ("format-link", let id?, _) where isPassive:
             editor(of: id)?.perform(.link)
         case ("format-link-commit", let id?, let address?) where isPassive:

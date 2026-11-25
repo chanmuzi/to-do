@@ -199,7 +199,8 @@ public final class ReminderEditorModel {
         let note = try notes.load(noteID)
         let title = note.title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !title.isEmpty { return title }
-        return (note.body.components(separatedBy: .newlines).first ?? "").trimmingCharacters(in: .whitespaces)
+        let firstLine = note.body.components(separatedBy: .newlines).first ?? ""
+        return NotePreviewText.firstLine(in: firstLine) ?? ""
     }
     public func moveCandidate(_ offset: Int) { candidateIndex = min(max(0, candidateIndex + offset), max(0, candidates.count - 1)) }
     @discardableResult public func submitCandidate() -> Bool {

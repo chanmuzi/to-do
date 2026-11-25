@@ -28,6 +28,37 @@ import Testing
         #expect(rendered.allSatisfy { $0.width < 150 })
     }
 
+    @Test func selectionPaintsOverFormattingAndReleasesItsOriginalBackground() throws {
+        let source = "p p\n==h h h==\n`i i i`\n```\nc c c\n```\n[l l](https://example.com)"
+        let h = try EditorHarness(source)
+        // 공백 가운데 한 픽셀을 읽어 글자의 안티앨리어싱을 제외한다.
+        func pixel(in rect: CGRect) throws -> NSColor {
+            let view = h.view
+            let image = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: image)
+            let x = Int(rect.midX * CGFloat(image.pixelsWide) / view.bounds.width)
+            let y = Int(rect.midY * CGFloat(image.pixelsHigh) / view.bounds.height)
+            return try #require(image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+        }
+        for focused in [true, false] {
+            if focused { h.editor.focus() } else { h.window.makeFirstResponder(nil) }
+            h.place(at: 1, length: 1)
+            let plain = try pixel(in: #require(h.controller.selectionRects().first))
+            for word in ["h h", "i i", "c c", "l l"] {
+                let start = (source as NSString).range(of: word).location + 1
+                h.place(at: start, length: 1)
+                let rect = try #require(h.controller.selectionRects().first)
+                let selected = try pixel(in: rect)
+                #expect(selected == plain)
+                h.caret(at: 0)
+                let released = try pixel(in: rect)
+                #expect(released != selected)
+                if word != "l l" { #expect(released.alphaComponent > 0) }
+            }
+        }
+        #expect(h.editor.text == source && !h.editor.undoManager.canUndo)
+    }
+
     @Test func newlineOnlyAndHiddenMarkersHaveNoPaint() throws {
         let h = try EditorHarness("a\n\n**b**\n```\nc\n```\n")
         for range in [NSRange(location: 1, length: 2), NSRange(location: 3, length: 2), NSRange(location: 9, length: 3)] {

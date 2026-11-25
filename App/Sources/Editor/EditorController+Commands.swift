@@ -15,7 +15,14 @@ extension EditorController {
         case .outdent: apply(EditorCommands.outdent(document, selection: selection, folded: folded))
         case .toggleBullet: apply(EditorCommands.toggleBullet(document, selection: selection))
         case .toggleTodo: apply(EditorCommands.toggleTodo(document, selection: selection))
-        case .toggleDone: apply(EditorCommands.toggleDone(document, selection: selection))
+        case .toggleDone:
+            let lines = document.lineRange(for: selection)
+            let first = lines.lowerBound
+            if lines.count == 1, document.lines[first].kind.isToggle {
+                if document.lines[first].subtreeEnd > first + 1 { toggleFold(line: first) }
+            } else {
+                apply(EditorCommands.toggleDone(document, selection: selection))
+            }
         case .moveLineUp: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, direction: .up))
         case .moveLineDown: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, direction: .down))
         case .heading(let level):
@@ -264,7 +271,7 @@ extension EditorController: NSTextViewDelegate {
         case #selector(NSResponder.cancelOperation(_:)) where dateSuggestion != nil:
             return dismissDateSuggestion()
         case #selector(NSResponder.insertTab(_:)):
-            if acceptDateSuggestion() { return true }
+            if selection.length == 0, acceptDateSuggestion() { return true }
             apply(EditorCommands.indent(document, selection: selection, folded: folded))
             return true
         case #selector(NSResponder.insertBacktab(_:)):

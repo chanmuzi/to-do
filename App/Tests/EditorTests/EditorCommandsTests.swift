@@ -30,9 +30,9 @@ import Testing
         #expect(indent(deepest + "- 부모\n" + deepest + "- 끝|") == nil)
     }
 
-    /// 위에서부터 차례로 따진다. 첫 줄은 부모가 없어 그대로이고, 그 아래 줄들이 첫 줄의 하위가 된다(D-043).
+    /// 묶음 밖에 부모가 있어야 고른 줄 모두 함께 들어간다.
     @Test func indentsEverySelectedLine() {
-        #expect(indent("- |a\n- b\n- c|\n- d") == "- |a\n\t- b\n\t- c|\n- d")
+        #expect(indent("- |a\n- b\n- c|\n- d") == nil)
         #expect(indent("- p\n- |a\n- b\n- c|\n- d") == "- p\n\t- |a\n\t- b\n\t- c|\n- d")
     }
 
@@ -173,7 +173,7 @@ import Testing
         #expect(space("[x] >|끝낸 일") == "+ |끝낸 일")
         #expect(space("+ []|토글") == "[ ] |토글")
         #expect(space("- [ ] -|표준 투두") == "- |표준 투두")
-        #expect(space("+ ###|토글") == "### |토글")
+        #expect(space("+ ###|토글") == "+ ### |토글")
         // 들여쓰기는 그대로다.
         #expect(space("\t- #|항목") == "\t# |항목")
         #expect(space("\t\t[ ] -|할 일") == "\t\t- |할 일")

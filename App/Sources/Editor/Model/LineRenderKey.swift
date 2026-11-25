@@ -8,7 +8,6 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var isCollapsed = false
     /// 접힌 토글 자신.
     var isFolded = false
-    var childCount = 0
     /// 문서의 첫 줄(위 여백을 두지 않는다).
     var isFirst = false
     /// 코드 블록의 첫 줄, 마지막 줄(상자의 둥근 모서리를 그린다).
@@ -38,7 +37,6 @@ nonisolated enum LinePresentation {
             var key = LineRenderKey(kind: line.kind, level: line.level)
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)
-            key.childCount = line.kind == .toggle ? line.childCount : 0
             key.isFirst = index == 0
             if let block = line.codeBlock {
                 key.isCodeTop = index == block.lowerBound

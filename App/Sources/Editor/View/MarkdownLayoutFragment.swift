@@ -1,7 +1,6 @@
 import AppKit
 
-/// 글자 뒤에 둥근 바탕(형광펜, 인라인 코드, 코드 블록)을 먼저 그리고,
-/// 왼쪽 칸의 그림(체크박스, 글머리표, 꺾쇠)을 그리는 문단 조각(spec 19).
+/// 둥근 바탕은 텍스트 뷰의 배경 그리기에 제공하고 글자와 왼쪽 칸 장식은 TextKit에서 그린다.
 nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     /// 미리 보기가 들어갈 전용 공간. TextKit이 뒤의 모든 글자를 함께 밀어 원문을 덮지 않는다.
     private lazy var paragraphString: NSAttributedString? = (textElement as? NSTextParagraph)?.attributedString
@@ -31,7 +30,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         return CGRect(
             x: decoration.gutterX - layoutFragmentFrame.minX,
             y: bounds.minY,
-            width: decoration.style.gutter,
+            width: decoration.gutterWidth,
             height: bounds.height
         )
     }
@@ -83,9 +82,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
-        drawCodeBox(decoration, in: context)
         drawQuoteBar(decoration, in: context)
-        drawInlineBackgrounds(decoration, in: context)
         context.restoreGState()
 
         // TextKit은 고정한 줄 높이의 남는 공간을 모두 글자 위에 둔다. 글자가 줄의 세로 가운데에 오도록
@@ -95,7 +92,16 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
         drawGutter(decoration, in: context)
-        drawCount(decoration, in: context)
+        context.restoreGState()
+    }
+
+    /// NSTextView가 선택을 그리기 전에 글자 뒤의 바탕만 칠한다.
+    func drawBackground(at origin: CGPoint, in context: CGContext) {
+        guard let decoration, !decoration.isCollapsed else { return }
+        context.saveGState()
+        context.translateBy(x: origin.x, y: origin.y)
+        drawCodeBox(decoration, in: context)
+        drawInlineBackgrounds(decoration, in: context)
         context.restoreGState()
     }
 
@@ -105,13 +111,6 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         let bounds = line.typographicBounds
         let centered = bounds.height / 2 + (font.ascender + font.descender) / 2
         return line.glyphOrigin.y - centered
-    }
-
-    /// 가운데에 놓은 글자의 기준선(조각 좌표).
-    private func baseline(of line: NSTextLineFragment, _ decoration: FragmentDecoration) -> CGFloat {
-        let bounds = line.typographicBounds
-        let font = decoration.lineFont ?? decoration.style.body.font
-        return bounds.midY + (font.ascender + font.descender) / 2
     }
 
     /// 이 문단이 세로로 차지하는 높이. 문서 끝의 빈 줄 조각(이 조각에 붙어 놓인다)은 넣지 않는다.
@@ -188,16 +187,6 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
     private func drawGutter(_ decoration: FragmentDecoration, in context: CGContext) {
         guard let gutter = decoration.gutter, let rect = gutterRect else { return }
-        GutterGlyph.draw(gutter, in: rect, style: decoration.style, context: context)
-    }
-
-    private func drawCount(_ decoration: FragmentDecoration, in context: CGContext) {
-        guard let count = decoration.count, let line = contentLines.last else { return }
-        let style = decoration.style
-        let bounds = line.typographicBounds
-        let x = bounds.minX + line.locationForCharacter(at: decoration.countIndex).x + style.metrics.countGap
-        let text = NSAttributedString(string: count, attributes: [.font: style.micro, .foregroundColor: style.text3])
-        // 제목 글자와 기준선을 맞춘다.
-        GutterGlyph.draw(text, at: CGPoint(x: x, y: baseline(of: line, decoration) - style.micro.ascender), context: context)
+        GutterGlyph.draw(gutter, in: rect, decoration: decoration, context: context)
     }
 }

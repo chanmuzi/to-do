@@ -125,13 +125,16 @@ nonisolated package struct MarkdownDocument: Sendable {
         for index in lines.indices {
             let level = lines[index].level
             var end = index + 1
-            var childLevel = Int.max
-            while end < lines.count, lines[end].level > level {
-                childLevel = min(childLevel, lines[end].level)
-                end += 1
+            var cursor = end
+            while cursor < lines.count {
+                let child = lines[cursor]
+                cursor += 1
+                // 토글 안쪽의 빈 구분 줄은 다음 자식과 함께 접고, 마지막 자식 뒤의 빈 줄은 밖에 둔다.
+                if lines[index].kind.isToggle, child.isBlankParagraph, child.level <= level { continue }
+                guard child.level > level else { break }
+                end = cursor
             }
             lines[index].subtreeEnd = end
-            lines[index].childCount = (index + 1..<end).count { lines[$0].level == childLevel }
         }
     }
 }

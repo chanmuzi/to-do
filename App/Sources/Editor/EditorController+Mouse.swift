@@ -28,7 +28,7 @@ extension EditorController {
         if let gutter = found.fragment.gutterRect, gutter.contains(found.local) {
             switch line.kind {
             case .todo: return .checkbox(line: found.line)
-            case .toggle: return .chevron(line: found.line)
+            case .toggle, .toggleHeading: return .chevron(line: found.line)
             default: return nil
             }
         }
@@ -103,7 +103,7 @@ extension EditorController {
     }
 
     func toggleFold(line: Int) {
-        guard document.lines.indices.contains(line), document.lines[line].kind == .toggle else { return }
+        guard document.lines.indices.contains(line), document.lines[line].kind.isToggle else { return }
         if folded.contains(line) {
             setFolded(folded.subtracting([line]), notify: true)
         } else {

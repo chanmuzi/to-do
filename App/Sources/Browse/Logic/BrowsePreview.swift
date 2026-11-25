@@ -42,7 +42,7 @@ nonisolated enum BrowsePreview {
         return prefix[preferred...].indices.first(where: isWordStart) ?? prefix.endIndex
     }
 
-    private static let lineMarker = regex(#"^\s*(?:(?:[-*]\s+)?\[[ xX]\]\s+|[-*+]\s+|>\s*|#{1,3}\s+|```.*$)?"#)
+    private static let lineMarker = regex(#"^\s*(?:(?:[-*]\s+)?\[[ xX]\]\s+|\+ #{1,3} |[-*+]\s+|>\s*|#{1,3}\s+|```.*$)?"#)
     private static let inlineMarks = regex(#"\*\*|~~|==(?:\{[1-4]\})?|`"#)
     private static let link = regex(#"\[([^\]]+)\]\([^)\s]+\)"#)
 

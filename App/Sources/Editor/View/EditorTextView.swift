@@ -15,6 +15,22 @@ final class EditorTextView: PlainTextInputView {
 
     override var shouldDrawInsertionPoint: Bool { false }
 
+    override func draw(_ dirtyRect: NSRect) {
+        if let manager = textLayoutManager, let context = NSGraphicsContext.current?.cgContext {
+            let origin = textContainerOrigin
+            let start = manager.textViewportLayoutController.viewportRange?.location
+            manager.enumerateTextLayoutFragments(from: start, options: [.ensuresLayout]) { fragment in
+                let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+                guard frame.minY <= dirtyRect.maxY else { return false }
+                if frame.maxY >= dirtyRect.minY, let paragraph = fragment as? MarkdownLayoutFragment {
+                    paragraph.drawBackground(at: frame.origin, in: context)
+                }
+                return true
+            }
+        }
+        super.draw(dirtyRect)
+    }
+
     override func layout() {
         super.layout()
         editor?.layoutScheduleButtons()

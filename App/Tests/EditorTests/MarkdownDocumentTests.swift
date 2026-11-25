@@ -87,11 +87,10 @@ import Testing
         #expect(doc.lines[2].codeBlock == 0...2)
     }
 
-    @Test func toggleCountsDirectChildrenOnly() {
+    @Test func toggleSubtreeEndsAtNextSibling() {
         let doc = MarkdownDocument(DemoNote.text)
         let toggle = doc.lines[5]
         #expect(toggle.kind == .toggle)
-        #expect(toggle.childCount == 3)
         #expect(toggle.subtreeEnd == 10)
         #expect(doc.lines[1].subtreeEnd == 4)
         #expect(doc.lines[0].subtreeEnd == 1)

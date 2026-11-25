@@ -109,7 +109,7 @@ nonisolated enum ParagraphStyler {
             let font: EditorStyle.TextFont
             var tracking: CGFloat = 0
             var spacing: (before: CGFloat, after: CGFloat) = (0, 0)
-            if case .heading(let level) = key.kind {
+            if let level = key.kind.headingLevel {
                 font = style.heading(level)
                 tracking = style.headingTracking[level - 1]
                 spacing = style.metrics.headingSpacing[level - 1]
@@ -122,7 +122,10 @@ nonisolated enum ParagraphStyler {
             let baseColor = isDone ? style.text3 : isQuote ? style.text2 : style.text
 
             let left = CGFloat(key.level) * style.indent
-            let textStart = left + (key.kind.isListItem ? style.gutter : isQuote ? style.quotePadding : 0)
+            if case .toggleHeading = key.kind {
+                decoration.chevronSize = font.font.pointSize * style.metrics.headingChevronScale
+            }
+            let textStart = left + (key.kind.isListItem ? decoration.gutterWidth : isQuote ? style.quotePadding : 0)
             let paragraph = NSMutableParagraphStyle()
             paragraph.minimumLineHeight = font.lineHeight
             paragraph.maximumLineHeight = font.lineHeight
@@ -148,7 +151,7 @@ nonisolated enum ParagraphStyler {
                 ], range: local(line.contentRange))
             }
 
-            let isHeading = if case .heading = key.kind { true } else { false }
+            let isHeading = key.kind.headingLevel != nil
             for span in line.spans { apply(span, lineFont: font, isHeading: isHeading, isDone: isDone) }
 
             // 줄 머리(들여쓰기, 목록 기호, 제목의 `#`)는 늘 감춘다.
@@ -159,12 +162,7 @@ nonisolated enum ParagraphStyler {
             switch key.kind {
             case .todo(let done): decoration.gutter = .checkbox(done: done)
             case .bullet: decoration.gutter = .bullet(key.level % 3)
-            case .toggle:
-                decoration.gutter = .chevron(open: !key.isFolded)
-                if key.childCount > 0 {
-                    decoration.count = String(key.childCount)
-                    decoration.countIndex = line.end - line.start
-                }
+            case .toggle, .toggleHeading: decoration.gutter = .chevron(open: !key.isFolded)
             case .quote: decoration.quoteBar = true
             default: break
             }

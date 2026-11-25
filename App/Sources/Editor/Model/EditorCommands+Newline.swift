@@ -42,7 +42,7 @@ nonisolated extension EditorCommands {
             }
             return insert(doc, "\n" + indent, replacing: selection)
 
-        case .todo, .bullet, .toggle, .quote:
+        case .todo, .bullet, .toggle, .toggleHeading, .quote:
             // 빈 항목(빈 인용문 줄 포함)에서는 기호를 지우거나 한 단계 내어 쓴다. 인용문은 `> `로 이어 간다.
             if isCaret, line.contentRange.length == 0 {
                 if line.indentLength > 0, let edit = outdent(doc, selection: selection, folded: folded) { return edit }
@@ -53,7 +53,7 @@ nonisolated extension EditorCommands {
             case .todo:
                 let next = marker.hasPrefix("[") ? "[ ] " : String(marker.prefix(2)) + "[ ] "
                 return insert(doc, "\n" + indent + next, replacing: selection)
-            case .toggle:
+            case .toggle, .toggleHeading:
                 if isCaret, folded.contains(index) {
                     // 접힌 토글은 감춘 줄들 뒤에 새 토글을 만든다.
                     let at = doc.lines[line.subtreeEnd - 1].end

@@ -5,6 +5,13 @@ import Testing
 @testable import Library
 
 @Suite struct NotePreviewLineJoiningTests {
+    @Test func toggleHeadingProvidesTheUntitledNotesDisplayTitle() {
+        let body = "+ ### **제목**\n\t- 항목"
+        #expect(LibraryPreview(title: "", markdown: body).title == "제목")
+        #expect(BrowsePreview.flatten(body) == "제목, 항목")
+        #expect(NotePreviewText.firstLine(in: body) == "제목")
+    }
+
     @Test(arguments: [
         ("정리했습니다.  \n\n- [ ] 창 크기 확인\n다음 항목", "정리했습니다. 창 크기 확인, 다음 항목"),
         ("기록한다.\n작업실에서", "기록한다. 작업실에서"),

@@ -30,7 +30,6 @@ nonisolated struct EditorStyle {
     let headingTracking: [CGFloat]
     let inlineCode: NSFont
     let codeBlock: TextFont
-    let micro: NSFont
     let hidden: NSFont
 
     let text: NSColor
@@ -93,7 +92,6 @@ nonisolated struct EditorStyle {
         headingTracking = [TextStyle.h1, .h2, .h3].map { theme.tracking($0) * scale }
         inlineCode = noteFont(.code)
         codeBlock = TextFont(noteFont(.codeBlock), lineHeight: theme.lineHeight(.codeBlock) * scale)
-        micro = theme.nsFont(.micro)
         hidden = NSFont.systemFont(ofSize: EditorMetrics.hiddenFontSize)
 
         text = color(.text)

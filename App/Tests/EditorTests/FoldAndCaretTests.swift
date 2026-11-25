@@ -154,7 +154,6 @@ import Testing
         let keys = LinePresentation.keys(for: doc, folded: [5])
         #expect(keys[5].isFolded)
         #expect(keys.indices.filter { keys[$0].isCollapsed } == [6, 7, 8, 9])
-        #expect(keys[5].childCount == 3)
     }
 
     @Test func codeBlockKnowsItsTopAndBottom() {

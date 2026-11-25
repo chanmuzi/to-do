@@ -7,6 +7,7 @@ nonisolated package enum LineKind: Hashable, Sendable {
     case bullet
     /// 접고 펴는 토글. 원문은 `+ `(D-044).
     case toggle
+    case toggleHeading(Int)
     /// 인용문. 원문은 표준 Markdown의 `> `(D-044).
     case quote
     /// 코드 블록을 여는 ``` 줄, 닫는 ``` 줄, 그 사이의 줄.
@@ -14,9 +15,23 @@ nonisolated package enum LineKind: Hashable, Sendable {
     case fenceClose
     case code
 
+    package var isToggle: Bool {
+        switch self {
+        case .toggle, .toggleHeading: true
+        default: false
+        }
+    }
+
+    package var headingLevel: Int? {
+        switch self {
+        case .heading(let level), .toggleHeading(let level): level
+        default: nil
+        }
+    }
+
     package var isListItem: Bool {
         switch self {
-        case .todo, .bullet, .toggle: true
+        case .todo, .bullet, .toggle, .toggleHeading: true
         default: false
         }
     }
@@ -24,7 +39,7 @@ nonisolated package enum LineKind: Hashable, Sendable {
     /// 하위 계층의 부모가 될 수 있는 줄(목록, 투두, 토글, 인용문). 들여 쓴 줄은 이런 줄 아래에만 놓인다(D-043).
     package var isParentItem: Bool {
         switch self {
-        case .todo, .bullet, .toggle, .quote: true
+        case .todo, .bullet, .toggle, .toggleHeading, .quote: true
         default: false
         }
     }
@@ -53,13 +68,12 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     package var spans: [InlineSpan] = []
     /// 이 줄의 하위 줄이 끝나는 줄 번호(그 줄은 포함하지 않음).
     package var subtreeEnd = 0
-    /// 바로 아래 단계의 줄 수(토글 제목 뒤에 보이는 수).
-    package var childCount = 0
     /// 코드 블록에 속하면 그 블록의 줄 번호 범위(``` 줄 포함).
     package var codeBlock: ClosedRange<Int>?
 
     package var start: Int { range.location }
     package var end: Int { NSMaxRange(range) }
+    package var isBlankParagraph: Bool { kind == .paragraph && contentRange.length == 0 }
     package var prefixLength: Int { indentLength + markerLength }
     package var contentStart: Int { start + prefixLength }
     package var contentRange: NSRange { NSRange(location: contentStart, length: end - contentStart) }
@@ -73,7 +87,7 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     package var caretStart: Int {
         switch kind {
         case .fenceOpen, .fenceClose, .code: start + indentLength
-        case .paragraph, .heading, .todo, .bullet, .toggle, .quote: contentStart
+        case .paragraph, .heading, .todo, .bullet, .toggle, .toggleHeading, .quote: contentStart
         }
     }
 }

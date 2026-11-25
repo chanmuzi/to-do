@@ -129,7 +129,7 @@ import Theme
     @Test func editingRowsMatchTheKeysTheEditorActuallyHears() throws {
         let expected: [String: [EditorAction]] = [
             "투두로 바꾸기": [.toggleTodo],
-            "완료 표시": [.toggleDone],
+            "완료 표시, 토글 접기와 펼치기": [.toggleDone],
             "줄 위로, 아래로 옮기기": [.moveLineUp, .moveLineDown],
             "접기, 펼치기": [.fold, .unfold],
             "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],
@@ -149,7 +149,7 @@ import Theme
             return result
         }
         // Tab, ⇧Tab은 편집기가 글자 입력 경로에서 받는다(단축키 목록에 없다).
-        let typed: Set<String> = ["들여쓰기 (날짜 제안이 없을 때)", "내어쓰기 / 본문 처음에서 제목으로", "현재 줄 날짜 제안 받기", "날짜 제안만 닫기"]
+        let typed: Set<String> = ["들여쓰기 (여러 줄 선택 또는 날짜 제안이 없을 때)", "내어쓰기 / 본문 처음에서 제목으로", "현재 줄 날짜 제안 받기", "날짜 제안만 닫기"]
         let rows = ShortcutTable.standard.entries(in: .editing).filter { !typed.contains($0.action) }
         #expect(ShortcutTable.standard.entries(in: .editing).count == rows.count + typed.count)
         #expect(Set(rows.map(\.action)) == Set(expected.keys))
@@ -180,6 +180,7 @@ import Theme
             "글머리표": [.bullet],
             "투두": [.todo(done: false), .todo(done: false)],
             "토글": [.toggle],
+            "제목 토글 (토글 줄에서)": [.toggleHeading(1), .toggleHeading(2), .toggleHeading(3)],
             "인용문": [.quote, .quote],
         ]
         let rows = ShortcutTable.standard.entries(in: .markdownInput).filter { expected[$0.action] != nil }
@@ -188,17 +189,18 @@ import Theme
             let kinds = try #require(expected[row.action])
             #expect(row.keyLabels.count == kinds.count, "\(row.action)")
             for (label, kind) in zip(row.keyLabels, kinds) {
-                let doc = MarkdownDocument(label)
+                let source = row.action == "제목 토글 (토글 줄에서)" ? "+ " + label : label
+                let doc = MarkdownDocument(source)
                 // [ ] 표기는 닫는 괄호까지 입력하면 이미 투두로 파싱된다.
                 if label == "[ ]" {
                     #expect(doc.lines[0].kind == kind)
                     continue
                 }
                 let edit = try #require(
-                    EditorCommands.spaceTrigger(doc, selection: NSRange(location: label.utf16.count, length: 0)),
+                    EditorCommands.spaceTrigger(doc, selection: NSRange(location: doc.length, length: 0)),
                     "\(row.action) \(label)"
                 )
-                #expect(MarkdownDocument(edit.applied(to: label)).lines[0].kind == kind, "\(row.action) \(label)")
+                #expect(MarkdownDocument(edit.applied(to: source)).lines[0].kind == kind, "\(row.action) \(label)")
             }
         }
     }

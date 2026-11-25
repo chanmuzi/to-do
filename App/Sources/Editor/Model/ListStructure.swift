@@ -26,7 +26,7 @@ nonisolated enum ListStructure {
 
     /// 글자가 없는 본문 줄.
     static func isBlank(_ line: MarkdownLine) -> Bool {
-        line.kind == .paragraph && line.contentRange.length == 0
+        line.isBlankParagraph
     }
 
     /// 줄마다 부모가 있는지(0단계 줄은 언제나 있다).

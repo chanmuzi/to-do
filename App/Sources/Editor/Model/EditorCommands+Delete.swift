@@ -53,7 +53,7 @@ nonisolated extension EditorCommands {
 
         if line.isVisualStart(position) {
             switch line.kind {
-            case .todo, .bullet, .toggle, .quote, .heading:
+            case .todo, .bullet, .toggle, .toggleHeading, .quote, .heading:
                 return .edit(TextEdit(
                     range: line.markerRange,
                     replacement: "",
