@@ -1,5 +1,6 @@
 import Foundation
 import Models
+import MarkdownSyntax
 
 /// 같은 본문 줄의 활성 예정은 가장 이른 항목의 모습으로 한 번만 표시한다.
 package struct ScheduleLineMarker: Equatable {
@@ -12,10 +13,10 @@ package struct ScheduleLineMarker: Equatable {
                                 calendar: Calendar) -> [Int: Self] {
         let active = note.schedules.filter { !$0.isDeleted && !$0.isCompleted && $0.inlineSource?.line != nil }
         guard !active.isEmpty else { return [:] }
-        let lines = note.body.components(separatedBy: "\n")
+        let document = MarkdownDocument(note.body)
         let valid = active.filter {
-            guard let source = $0.inlineSource, let line = source.line, lines.indices.contains(line) else { return false }
-            return lines[line] == source.text
+            guard let source = $0.inlineSource, let line = source.line, document.lines.indices.contains(line) else { return false }
+            return document.lines[line].continuationOf == nil && document.blockSource(at: line) == source.text
         }
         var timeOptions = options
         timeOptions.reminder = .time

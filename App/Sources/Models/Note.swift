@@ -49,6 +49,7 @@ public struct Note: Identifiable, Hashable, Codable, Sendable {
         self.schedules = schedules ?? reminder.map { [ScheduleItem(id: "legacy-" + id.rawValue, start: $0, modified: $0)] } ?? []
         self.created = created
         self.modified = modified
+        resolveLegacyScheduleLines()
     }
     private enum CodingKeys: String, CodingKey {
         case isArchived, id, title, body, spaceID, colorID, reminder, schedules, created, modified

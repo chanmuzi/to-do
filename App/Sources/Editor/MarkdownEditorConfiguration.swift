@@ -33,6 +33,7 @@ nonisolated public enum EditorAction: Sendable, Hashable {
     case outdent
     case toggleBullet
     case toggleTodo
+    case duplicate
     case toggleDone
     case moveLineUp
     case moveLineDown

@@ -763,10 +763,19 @@ final class DebugControl {
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
         case ("editor-block-command", let id?, let action?) where isPassive:
             switch action {
+            case "select": editor(of: id)?.selectBlocksForVerification()
+            case "clear": editor(of: id)?.clearBlocksForVerification()
+            case "duplicate": editor(of: id)?.perform(.duplicate)
             case "indent": editor(of: id)?.perform(.indent)
             case "done": editor(of: id)?.perform(.toggleDone)
             default: break
             }
+        case ("unfold-snapshot", let id?, let args?) where isPassive:
+            let parts = args.split(separator: " ")
+            guard parts.count == 2, let row = Int(parts[0]), let url = output(named: String(parts[1])),
+                  let editor = editor(of: id) else { return }
+            setFolded(false, line: row, in: id)
+            editor.unfoldingFrame(for: row) { write(notePanels.window(for: id), to: url) }
         case ("format-link", let id?, _) where isPassive:
             editor(of: id)?.perform(.link)
         case ("format-link-commit", let id?, let address?) where isPassive:
@@ -1120,6 +1129,7 @@ final class DebugControl {
         view.window?.contentView?.layoutSubtreeIfNeeded()
         write(json: [
             "text": editor.text,
+            "selectedBlocks": editor.selectedBlockRows.map(Array.init) ?? [],
             "scheduleDots": editor.scheduleButtonFrames.sorted { $0.key < $1.key }.map { line, rect in
                 ["line": line, "x": rect.midX, "y": rect.midY, "width": rect.width,
                  "firstLineY": editor.textPoint(forLine: line)?.y as Any] as [String: Any]

@@ -140,11 +140,13 @@ nonisolated struct ShortcutTable: Hashable, Sendable {
     /// 편집기(`Editor` 모듈)가 스스로 받는 키. 여기서는 표에 보일 내용만 든다.
     private static let editing: [ShortcutEntry] = [
         row(.editing, "현재 줄 날짜 제안 받기", [.tab]),
-        row(.editing, "날짜 제안만 닫기", [.escape]),
+        row(.editing, "날짜 제안 닫기, 블록 고르기 또는 풀기", [.escape]),
+        ShortcutEntry(group: .editing, action: "같은 블록 안에서 줄바꿈", keys: .typed(["⇧↵", "/", "⌃↵"]), command: nil),
         row(.editing, "들여쓰기 (여러 줄 선택 또는 날짜 제안이 없을 때)", [.tab]),
         row(.editing, "내어쓰기 / 본문 처음에서 제목으로", [.tab], [.shift]),
         row(.editing, "투두로 바꾸기", [.nine], [.shift, .command]),
         row(.editing, "완료 표시, 토글 접기와 펼치기", [.returnKey], [.command]),
+        row(.editing, "블록 복제", [.d], [.command]),
         row(.editing, "줄 위로, 아래로 옮기기", [.up, .down], [.control, .command]),
         row(.editing, "접기, 펼치기", [.leftBracket, .rightBracket], [.option, .command]),
         row(.editing, "제목 1, 2, 3", [.one, .two, .three], [.option, .command]),

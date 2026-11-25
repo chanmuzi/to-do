@@ -109,6 +109,9 @@ nonisolated enum CaretSnapping {
         }
 
         let line = doc.lines[index]
+        if line.hasHardBreak, position == line.end {
+            return forward && old.location == line.contentEnd ? doc.lines[index + 1].caretStart : line.contentEnd
+        }
         if line.kind == .fenceOpen || line.kind == .fenceClose {
             // 줄이 없는 블록에는 커서 자리가 하나 있다(`EditorCommands.emptyBlockCaret`).
             if let block = EditorCommands.emptyBlock(doc, at: index) {
@@ -133,7 +136,7 @@ nonisolated enum CaretSnapping {
 
     private static func previousLineEnd(_ index: Int, in doc: MarkdownDocument, folded: Set<Int>) -> Int {
         let previous = FoldState.foldRoot(of: index - 1, in: doc, folded: folded) ?? index - 1
-        return doc.lines[previous].end
+        return doc.lines[previous].contentEnd
     }
 
     /// ``` 줄은 보이지 않는다. 블록 안에서 나오는 길이면 블록 밖의 이웃 줄로, 밖에서 들어오는 길이면

@@ -20,7 +20,7 @@ nonisolated extension EditorCommands {
         guard selection.length == 0 else { return nil }
         let position = selection.location
         let line = doc.line(at: position)
-        guard !line.kind.isCode, position >= line.contentStart else { return nil }
+        guard line.continuationOf == nil, !line.kind.isCode, position >= line.contentStart else { return nil }
         for trigger in spaceTriggers {
             let length = trigger.text.utf16.count
             let start = position - length
@@ -91,7 +91,7 @@ nonisolated extension EditorCommands {
             return compose(erase, then: exit, middle: middle)
         }
         // 백틱 둘의 앞, 사이, 뒤 어디에 쳐도 줄 머리가 ``` 가 된다(세 번째 백틱).
-        guard !line.kind.isCode, line.contentStart + 2 <= line.end,
+        guard line.continuationOf == nil, !line.kind.isCode, line.contentStart + 2 <= line.end,
               NSLocationInRange(position, NSRange(location: line.contentStart, length: 3)),
               doc.string(in: NSRange(location: line.contentStart, length: 2)) == "``" else { return nil }
         let indent = doc.string(in: line.indentRange)

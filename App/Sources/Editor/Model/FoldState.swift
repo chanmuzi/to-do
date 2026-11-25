@@ -11,7 +11,7 @@ nonisolated enum FoldState {
     static func hiddenLines(_ doc: MarkdownDocument, folded: Set<Int>) -> Set<Int> {
         var hidden = Set<Int>()
         for index in sanitized(folded, in: doc) {
-            hidden.formUnion((index + 1)..<doc.lines[index].subtreeEnd)
+            hidden.formUnion((doc.blockLines(at: index).upperBound + 1)..<doc.lines[index].subtreeEnd)
         }
         return hidden
     }
@@ -23,14 +23,14 @@ nonisolated enum FoldState {
 
     /// 그 줄을 감추고 있는 가장 바깥의 접힌 토글.
     static func foldRoot(of line: Int, in doc: MarkdownDocument, folded: Set<Int>) -> Int? {
-        sanitized(folded, in: doc).filter { $0 < line && doc.lines[$0].subtreeEnd > line }.min()
+        sanitized(folded, in: doc).filter { doc.blockLines(at: $0).upperBound < line && doc.lines[$0].subtreeEnd > line }.min()
     }
 
     /// 선택한 줄을 접힌 덩어리 단위로 넓힌다. 접힌 토글이 걸쳐 있으면 감춘 줄까지 넣는다.
     static func expanded(_ lines: ClosedRange<Int>, in doc: MarkdownDocument, folded: Set<Int>) -> ClosedRange<Int> {
         let folded = sanitized(folded, in: doc)
-        var first = lines.lowerBound
-        var last = lines.upperBound
+        var first = doc.blockLines(at: lines.lowerBound).lowerBound
+        var last = doc.blockLines(at: lines.upperBound).upperBound
         if let root = foldRoot(of: first, in: doc, folded: folded) { first = root }
         for index in first...last where folded.contains(index) {
             last = max(last, doc.lines[index].subtreeEnd - 1)
@@ -46,9 +46,9 @@ nonisolated enum FoldState {
         let lower = range.location
         let upper = NSMaxRange(range)
         return sanitized(folded, in: doc).filter { root in
-            let title = doc.lines[root]
-            guard title.subtreeEnd > root + 1 else { return false }
-            let last = doc.lines[title.subtreeEnd - 1]
+            let title = doc.lines[doc.blockLines(at: root).upperBound]
+            guard doc.lines[root].subtreeEnd > doc.blockLines(at: root).upperBound + 1 else { return false }
+            let last = doc.lines[doc.lines[root].subtreeEnd - 1]
             return range.length == 0
                 ? lower > title.end && lower <= last.end
                 : lower < NSMaxRange(last.fullRange) && upper > title.end
@@ -89,7 +89,7 @@ nonisolated enum FoldState {
 
     /// 접기. 커서 줄이 토글이면 그 줄을, 아니면 그 줄을 품은 가장 가까운 토글을 접는다.
     static func fold(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> (folded: Set<Int>, selection: NSRange)? {
-        let index = doc.lineIndex(at: selection.location)
+        let index = doc.blockLines(at: doc.lineIndex(at: selection.location)).lowerBound
         var target: Int?
         if doc.lines[index].kind.isToggle, !folded.contains(index) {
             target = index
@@ -100,14 +100,14 @@ nonisolated enum FoldState {
         }
         guard let target else { return nil }
         let title = doc.lines[target]
-        guard title.subtreeEnd > target + 1 else { return nil }
-        let inside = selection.location > title.end || NSMaxRange(selection) > title.end
-        return (folded.union([target]), inside ? NSRange(location: title.end, length: 0) : selection)
+        guard title.subtreeEnd > doc.blockLines(at: target).upperBound + 1 else { return nil }
+        let end = doc.lines[doc.blockLines(at: target).upperBound].end
+        return (folded.union([target]), NSMaxRange(selection) > end ? NSRange(location: end, length: 0) : selection)
     }
 
     /// 펼치기. 커서 줄이 접힌 토글일 때만.
     static func unfold(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> Set<Int>? {
-        let index = doc.lineIndex(at: selection.location)
+        let index = doc.blockLines(at: doc.lineIndex(at: selection.location)).lowerBound
         guard folded.contains(index) else { return nil }
         return folded.subtracting([index])
     }

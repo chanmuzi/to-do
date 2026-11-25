@@ -51,6 +51,10 @@ nonisolated extension EditorCommands {
             ))
         }
 
+        if line.continuationOf != nil, line.isVisualStart(position) {
+            let start = doc.lines[index - 1].contentEnd
+            return .edit(.insert("", replacing: NSRange(location: start, length: line.contentStart - start)))
+        }
         if line.isVisualStart(position) {
             switch line.kind {
             case .todo, .bullet, .toggle, .toggleHeading, .quote, .heading:
@@ -117,6 +121,9 @@ nonisolated extension EditorCommands {
         let index = doc.lineIndex(at: position)
         let line = doc.lines[index]
 
+        if line.hasHardBreak, position == line.contentEnd {
+            return .edit(.insert("", replacing: NSRange(location: position, length: doc.lines[index + 1].contentStart - position)))
+        }
         if line.kind.isCode {
             if let block = emptyBlock(doc, caretAt: position) { return .edit(removingBlock(doc, block)) }
             guard line.kind == .code, position == line.end else { return .passThrough }

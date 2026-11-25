@@ -8,7 +8,7 @@ nonisolated enum BrowsePreview {
     private static let maximumLeadingContext = 12
 
     static func flatten(_ body: String) -> String {
-        let lines = body.split(whereSeparator: \.isNewline).map { line in
+        let lines = NotePreviewText.removingHardBreakMarkers(in: body).split(whereSeparator: \.isNewline).map { line in
             stripInline(stripLineMarker(String(line)))
         }
         return NotePreviewText.join(lines)

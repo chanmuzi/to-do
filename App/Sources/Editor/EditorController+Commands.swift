@@ -9,17 +9,19 @@ extension EditorController {
             textView.unmarkText()
             textView.inputContext?.discardMarkedText()
         }
+        if editSelectedBlocks(action) { return }
         let selection = clamped(textView.selectedRange())
         switch action {
+        case .duplicate: duplicateBlocks()
         case .indent: apply(EditorCommands.indent(document, selection: selection, folded: folded))
         case .outdent: apply(EditorCommands.outdent(document, selection: selection, folded: folded))
         case .toggleBullet: apply(EditorCommands.toggleBullet(document, selection: selection))
         case .toggleTodo: apply(EditorCommands.toggleTodo(document, selection: selection))
         case .toggleDone:
             let lines = document.lineRange(for: selection)
-            let first = lines.lowerBound
-            if lines.count == 1, document.lines[first].kind.isToggle {
-                if document.lines[first].subtreeEnd > first + 1 { toggleFold(line: first) }
+            let first = document.blockLines(at: lines.lowerBound).lowerBound
+            if document.blockLines(at: first).contains(lines.upperBound), document.lines[first].kind.isToggle {
+                if document.lines[first].subtreeEnd > document.blockLines(at: first).upperBound + 1 { toggleFold(line: first) }
             } else {
                 apply(EditorCommands.toggleDone(document, selection: selection))
             }
@@ -42,10 +44,10 @@ extension EditorController {
         case .fold:
             guard let result = FoldState.fold(document, selection: selection, folded: folded) else { return }
             setSelection(result.selection)
-            setFolded(result.folded, notify: true)
+            changeUserFolds(result.folded)
         case .unfold:
             guard let unfolded = FoldState.unfold(document, selection: selection, folded: folded) else { return }
-            setFolded(unfolded, notify: true)
+            changeUserFolds(unfolded)
         }
     }
 
@@ -202,7 +204,7 @@ extension EditorController {
         let selection = clamped(textView.selectedRange())
         let lines = Set([selection.location, NSMaxRange(selection)].map(document.lineIndex(at:)))
         let roots = folded.filter { root in
-            lines.contains { root < $0 && document.lines[root].subtreeEnd > $0 }
+            lines.contains { document.blockLines(at: root).upperBound < $0 && document.lines[root].subtreeEnd > $0 }
         }
         guard !roots.isEmpty else { return }
         setFolded(folded.subtracting(roots), notify: true)
@@ -218,6 +220,7 @@ extension EditorController {
         // 바깥의 변경을 넣는 중에는 알리지 않는다. 알리지 않은 사용자의 변경은 다음 차례에 나간다.
         guard hasPendingChange, !isSettingText, !isApplyingOutsideChange else { return }
         hasPendingChange = false
+        textView.window?.invalidateCursorRects(for: textView)
         refreshStyling()
         recordFoldChangeForUndo()
         notifyFoldChangeIfNeeded()
@@ -267,9 +270,16 @@ extension EditorController: NSTextViewDelegate {
         let tag = codeTag
         codeTag = nil
         absorbRun = nil
+        if handleBlockCommand(selector) { return true }
         switch selector {
         case #selector(NSResponder.cancelOperation(_:)) where dateSuggestion != nil:
             return dismissDateSuggestion()
+        case #selector(NSResponder.cancelOperation(_:)):
+            selectBlocks()
+            return true
+        case #selector(NSResponder.insertLineBreak(_:)):
+            apply(EditorCommands.lineBreak(document, selection: selection, folded: folded))
+            return true
         case #selector(NSResponder.insertTab(_:)):
             if selection.length == 0, acceptDateSuggestion() { return true }
             apply(EditorCommands.indent(document, selection: selection, folded: folded))
@@ -283,7 +293,6 @@ extension EditorController: NSTextViewDelegate {
             return true
         case #selector(NSResponder.insertNewline(_:)),
              #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
-             #selector(NSResponder.insertLineBreak(_:)),
              #selector(NSResponder.insertParagraphSeparator(_:)):
             // 세 번째 백틱으로 코드 블록이 이미 만들어졌다. 이어 누른 Return은 넣지 않는다.
             if swallows { return true }

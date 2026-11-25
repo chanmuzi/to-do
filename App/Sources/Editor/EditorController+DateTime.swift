@@ -21,15 +21,24 @@ extension EditorController {
         dateSuggestionLine = nil
         moveDateDismissals()
         let selection = selectedRange
+        let rows = document.blockLines(at: document.lineIndex(at: selection.location))
         if configuration.recognizesDates, onAcceptDate != nil, (isActive || forcesActiveAppearance), !textView.hasMarkedText(),
            !isEndingComposition, !isReplayingUndo, !isSettingText, !isApplyingOutsideChange,
-           selection.length == 0, deferredOutsideEdit == nil,
-           dismissedDateLines[document.lineIndex(at: selection.location)] == nil {
-            let index = document.lineIndex(at: selection.location)
+           blockSelection == nil, selection.length == 0, deferredOutsideEdit == nil,
+           dismissedDateLines[rows.lowerBound] == nil {
+            let index = rows.lowerBound
             let line = document.lines[index]
             if !line.kind.isCode, selection.location >= line.contentStart {
                 var excluded: [NSRange] = []
-                for span in line.spans {
+                let end = document.lines[rows.upperBound].contentEnd
+                let range = NSRange(location: line.contentStart, length: end - line.contentStart)
+                let text = NSMutableString(string: document.string(in: range))
+                for i in rows.dropFirst() {
+                    let start = document.lines[i - 1].contentEnd
+                    let gap = NSRange(location: start - line.contentStart, length: document.lines[i].contentStart - start)
+                    text.replaceCharacters(in: gap, with: String(repeating: " ", count: gap.length))
+                }
+                for span in document.lines[rows].flatMap(\.spans) {
                     switch span.kind {
                     case .code: excluded.append(span.range)
                     case .link where span.openMarker.length == 0: excluded.append(span.range)
@@ -37,7 +46,7 @@ extension EditorController {
                     }
                 }
                 let local = excluded.map { NSRange(location: $0.location - line.contentStart, length: $0.length) }
-                dateSuggestion = InlineDateProposal.find(in: document.string(in: line.contentRange),
+                dateSuggestion = InlineDateProposal.find(in: text as String,
                     caret: selection.location - line.contentStart, now: dateNow(), calendar: dateCalendar, excluding: local)
                 if dateSuggestion != nil { dateSuggestionLine = index }
             }
@@ -53,7 +62,9 @@ extension EditorController {
                 restyleAll()
             } else {
                 for index in Set([oldLine, dateSuggestionLine].compactMap { $0 }).sorted() {
-                    invalidate(lines: index..<(index + 1))
+                    guard document.lines.indices.contains(index) else { continue }
+                    let rows = document.blockLines(at: index)
+                    invalidate(lines: rows.lowerBound..<(rows.upperBound + 1))
                 }
             }
         }
@@ -67,8 +78,8 @@ extension EditorController {
     }
 
     func dismissCurrentDateLine() {
-        let index = document.lineIndex(at: selectedRange.location)
-        dismissedDateLines[index] = document.string(in: document.lines[index].range)
+        let index = document.blockLines(at: document.lineIndex(at: selectedRange.location)).lowerBound
+        dismissedDateLines[index] = document.blockSource(at: index)
         dismissedDateDocument = document
     }
 
@@ -82,7 +93,7 @@ extension EditorController {
                 guard NSIntersectionRange(line.range, edit.range).length == 0 else { continue }
                 let start = edit.moved(line.start, sticksToEnd: true)
                 let next = document.lineIndex(at: min(start, document.length))
-                if document.string(in: document.lines[next].range) == source { moved[next] = source }
+                if document.blockSource(at: next) == source { moved[next] = source }
             }
             dismissedDateLines = moved
         }
@@ -101,12 +112,17 @@ extension EditorController {
         updateDateSuggestion()
         guard let proposal = dateSuggestion, let accept = onAcceptDate else { return false }
         let old = document
-        let index = old.lineIndex(at: selectedRange.location)
+        let rows = old.blockLines(at: old.lineIndex(at: selectedRange.location))
+        let index = rows.lowerBound
         let line = old.lines[index]
         var planned = old
         var caret = selectedRange.location
-        for local in proposal.expression.ranges.reversed() {
-            let range = NSRange(location: line.contentStart + local.location, length: local.length)
+        let ranges = proposal.expression.ranges.flatMap { local in
+            let match = NSRange(location: line.contentStart + local.location, length: local.length)
+            return rows.map { NSIntersectionRange(match, old.lines[$0].contentRange) }.filter { $0.length > 0 }
+        }
+        for range in ranges.reversed() {
+            let expressionLine = planned.lineIndex(at: range.location)
             let edit = EditorCommands.finalized(planned, EditorCommands.insert(planned, "", replacing: range))
             guard EditorCommands.keepsFencesBalanced(planned, edit), !EditorCommands.exposesHiddenMarkers(planned, edit) else {
                 onRejectedEdit(); return true
@@ -114,13 +130,13 @@ extension EditorController {
             caret = InlineDateProposal.caret(caret, replacing: edit.range, withLength: edit.replacement.utf16.count)
             planned = MarkdownDocument(edit.applied(to: planned.text))
             // 삭제 접점의 공백만 정리한다. 다른 곳의 정렬용 공백, 인라인 코드는 보존한다.
-            let currentLine = planned.lines[index]
-            var lower = min(max(edit.selection.location, currentLine.contentStart), currentLine.end)
+            let currentLine = planned.lines[expressionLine]
+            var lower = min(max(edit.selection.location, currentLine.contentStart), currentLine.contentEnd)
             var upper = lower
             while lower > currentLine.contentStart, InlineParser.isWhitespace(planned.units[lower - 1]) { lower -= 1 }
-            while upper < currentLine.end, InlineParser.isWhitespace(planned.units[upper]) { upper += 1 }
+            while upper < currentLine.contentEnd, InlineParser.isWhitespace(planned.units[upper]) { upper += 1 }
             if upper > lower {
-                let space = lower > currentLine.contentStart && upper < currentLine.end ? " " : ""
+                let space = lower > currentLine.contentStart && upper < currentLine.contentEnd ? " " : ""
                 let cleanup = EditorCommands.finalized(planned, EditorCommands.insert(planned, space,
                     replacing: NSRange(location: lower, length: upper - lower)))
                 guard !EditorCommands.exposesHiddenMarkers(planned, cleanup) else { onRejectedEdit(); return true }
@@ -129,19 +145,16 @@ extension EditorController {
             }
         }
         guard let diff = OutsideEdit(from: old.text, to: planned.text) else { return true }
-        let nextLine = planned.lines[index]
-        let todo: TodoAnchor?
-        if case .todo = nextLine.kind { todo = TodoAnchor(line: index, text: planned.string(in: nextLine.contentRange)) }
-        else { todo = nil }
+        let source = planned.blockSource(at: index)
         let request = InlineDateAcceptance(item: proposal.item,
-            source: InlineScheduleSource(line: index, text: planned.string(in: nextLine.range)), todo: todo,
+            source: InlineScheduleSource(line: index, text: source), todo: TodoAnchor(line: index, sourceLine: source),
             previousText: old.text, nextText: planned.text)
         closeUndoRecord()
         let effect: InlineDateEffect
         do { effect = try accept(request) }
         catch { onDateError(error); onRejectedEdit(); return true }
         let edit = TextEdit(range: diff.range, replacement: diff.replacement,
-            selection: NSRange(location: min(caret, nextLine.end), length: 0),
+            selection: NSRange(location: min(caret, planned.length), length: 0),
             preservesLines: true)
         // 미리 검증한 삭제는 기존 편집 경로에서 한 단계로 기록한다.
         apply(edit)

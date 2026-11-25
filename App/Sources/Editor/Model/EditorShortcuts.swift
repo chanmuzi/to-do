@@ -16,6 +16,7 @@ nonisolated enum EditorShortcuts {
         static let nine: UInt16 = 25
         static let b: UInt16 = 11
         static let c: UInt16 = 8
+        static let d: UInt16 = 2
         static let e: UInt16 = 14
         static let h: UInt16 = 4
         static let l: UInt16 = 37
@@ -46,6 +47,7 @@ nonisolated enum EditorShortcuts {
         Binding(modifiers: [.command, .option], keyCode: Key.one, action: .heading(1)),
         Binding(modifiers: [.command, .option], keyCode: Key.two, action: .heading(2)),
         Binding(modifiers: [.command, .option], keyCode: Key.three, action: .heading(3)),
+        Binding(modifiers: [.command], keyCode: Key.d, action: .duplicate),
         Binding(modifiers: [.command], keyCode: Key.b, action: .bold),
         Binding(modifiers: [.command, .shift], keyCode: Key.x, action: .strikethrough),
         Binding(modifiers: [.command, .shift], keyCode: Key.h, action: .highlight),

@@ -29,7 +29,7 @@ struct LibraryPreview {
                 text += document.string(in: NSRange(location: start, length: marker.range.location - start))
                 start = NSMaxRange(marker.range)
             }
-            text += document.string(in: NSRange(location: start, length: line.end - start))
+            text += document.string(in: NSRange(location: start, length: line.contentEnd - start))
             let trimmed = text.trimmingCharacters(in: .whitespaces)
             if !trimmed.isEmpty { visible.append(trimmed) }
         }

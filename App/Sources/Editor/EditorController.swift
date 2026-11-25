@@ -6,6 +6,7 @@ import DateTime
 struct KeyStamp: Equatable {
     var documentVersion: Int
     var folded: Set<Int>
+    var animating: Set<Int>
     var hoveredLine: Int?
     var hoveredOffset: Int?
 }
@@ -61,6 +62,15 @@ final class EditorController: NSObject {
     var onDateError: (Error) -> Void = { _ in }
     var dateEffects: [UUID: InlineDateEffect] = [:]
 
+    var lastBodyEdit: (previous: String, range: NSRange)?
+    let foldDrawing = FoldDrawing()
+    var foldTransitions: [Int: FoldTransition] = [:]
+    var foldTask: Task<Void, Never>?
+    var foldClock: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    lazy var foldAnimationsEnabled: () -> Bool = { [weak self] in
+        self?.textView.window?.isVisible == true && !EditorController.reduceMotion
+    }
+    var blockSelection: BlockSelection?
     var document = MarkdownDocument("")
     var folded: Set<Int> = []
     /// 화면에 입혀 둔 줄별 모양. 다음 모양과 견주어 달라진 줄만 다시 입힌다.
@@ -321,6 +331,7 @@ final class EditorController: NSObject {
 
     isolated deinit {
         MainActor.assumeIsolated {
+            foldTask?.cancel()
             observers.forEach(NotificationCenter.default.removeObserver)
             observers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         }
@@ -394,6 +405,7 @@ final class EditorController: NSObject {
         let sanitized = FoldState.sanitized(newValue, in: document)
         guard sanitized != folded else { return }
         folded = sanitized
+        textView.window?.invalidateCursorRects(for: textView)
         refreshStyling()
         reportContentHeight()
     }

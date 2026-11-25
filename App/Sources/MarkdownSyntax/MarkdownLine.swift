@@ -65,6 +65,11 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     package var kind: LineKind = .paragraph
     /// 들여쓰기 뒤 기호(`- `, `[ ] `, `+ `, `> `, `# `)의 길이.
     package var markerLength = 0
+    /// 강제 줄바꿈으로 이어진 줄의 첫 물리 줄 번호.
+    package var continuationOf: Int?
+    var blockLast = 0
+    package var hasHardBreak = false
+    package var contentEnd: Int { end - (hasHardBreak ? 1 : 0) }
     package var spans: [InlineSpan] = []
     /// 이 줄의 하위 줄이 끝나는 줄 번호(그 줄은 포함하지 않음).
     package var subtreeEnd = 0
@@ -73,10 +78,10 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
 
     package var start: Int { range.location }
     package var end: Int { NSMaxRange(range) }
-    package var isBlankParagraph: Bool { kind == .paragraph && contentRange.length == 0 }
+    package var isBlankParagraph: Bool { continuationOf == nil && !hasHardBreak && kind == .paragraph && contentRange.length == 0 }
     package var prefixLength: Int { indentLength + markerLength }
     package var contentStart: Int { start + prefixLength }
-    package var contentRange: NSRange { NSRange(location: contentStart, length: end - contentStart) }
+    package var contentRange: NSRange { NSRange(location: contentStart, length: contentEnd - contentStart) }
     package var indentRange: NSRange { NSRange(location: start, length: indentLength) }
     package var markerRange: NSRange { NSRange(location: start + indentLength, length: markerLength) }
     package var prefixRange: NSRange { NSRange(location: start, length: prefixLength) }

@@ -10,10 +10,10 @@ nonisolated extension EditorCommands {
         _ doc: MarkdownDocument,
         selection: NSRange,
         folded: Set<Int>,
-        direction: MoveDirection
+        direction: MoveDirection, selectedRows: ClosedRange<Int>? = nil
     ) -> TextEdit? {
         let folded = FoldState.sanitized(folded, in: doc)
-        var block = FoldState.expanded(doc.lineRange(for: selection), in: doc, folded: folded)
+        var block = FoldState.expanded(selectedRows ?? doc.lineRange(for: selection), in: doc, folded: folded)
         // 코드 블록의 ``` 줄을 넘어 옮기지 않는다. 블록 안의 줄은 블록 안에서만 움직이고, 그 밖에는 블록이
         // 통째로 한 덩어리다. 넘겨 옮기면 줄이 없는 블록이나 짝 잃은 ``` 줄이 남는다.
         let inside = doc.lines[block.lowerBound].codeBlock.flatMap { code in
@@ -42,7 +42,16 @@ nonisolated extension EditorCommands {
                 guard doc.lines[code.upperBound].kind == .fenceClose, code.count > 1 else { return nil }
                 neighbor = code
             } else {
-                neighbor = (FoldState.foldRoot(of: above, in: doc, folded: folded) ?? above)...above
+                var root = FoldState.foldRoot(of: above, in: doc, folded: folded) ?? doc.blockLines(at: above).lowerBound
+                if selectedRows != nil {
+                    var candidate = root
+                    while candidate > 0, doc.lines[candidate].level > doc.lines[first].level {
+                        candidate = doc.blockLines(at: candidate - 1).lowerBound
+                    }
+                    if doc.lines[candidate].level == doc.lines[first].level,
+                       doc.lines[candidate].subtreeEnd == first { root = candidate }
+                }
+                neighbor = root...above
             }
         case .down:
             guard last < doc.lines.count - 1 else { return nil }
@@ -54,7 +63,7 @@ nonisolated extension EditorCommands {
                 guard doc.lines[code.upperBound].kind == .fenceClose, code.count > 1 else { return nil }
                 neighbor = code
             } else {
-                neighbor = below...(folded.contains(below) ? doc.lines[below].subtreeEnd - 1 : below)
+                neighbor = below...((folded.contains(below) || selectedRows != nil) ? doc.lines[below].subtreeEnd - 1 : doc.blockLines(at: below).upperBound)
             }
         }
 

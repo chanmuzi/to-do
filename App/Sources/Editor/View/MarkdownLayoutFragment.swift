@@ -2,6 +2,9 @@ import AppKit
 
 /// 둥근 바탕은 텍스트 뷰의 배경 그리기에 제공하고 글자와 왼쪽 칸 장식은 TextKit에서 그린다.
 nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
+    weak var foldDrawing: FoldDrawing?
+    var row = 0
+
     /// 미리 보기가 들어갈 전용 공간. TextKit이 뒤의 모든 글자를 함께 밀어 원문을 덮지 않는다.
     private lazy var paragraphString: NSAttributedString? = (textElement as? NSTextParagraph)?.attributedString
 
@@ -49,6 +52,15 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         }
     }
 
+    var openableLinkRects: [CGRect] {
+        guard let string = paragraphString, decoration?.isCollapsed != true else { return [] }
+        var result: [CGRect] = []
+        string.enumerateAttribute(.markdownLink, in: NSRange(location: 0, length: string.length)) { value, range, _ in
+            if let url = value as? String, LinkPolicy.openableURL(url) != nil { result += rects(for: range) }
+        }
+        return result
+    }
+
     /// 그 점(조각 좌표)에 있는 링크의 주소와 문단 안 위치.
     func link(at point: CGPoint) -> (url: String, location: Int)? {
         guard let string = paragraphString else { return nil }
@@ -79,6 +91,9 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
             return
         }
         if decoration.isCollapsed { return }
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.setAlpha(foldDrawing?.opacity(at: row) ?? 1)
 
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
@@ -99,6 +114,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     func drawBackground(at origin: CGPoint, in context: CGContext) {
         guard let decoration, !decoration.isCollapsed else { return }
         context.saveGState()
+        context.setAlpha(foldDrawing?.opacity(at: row) ?? 1)
         context.translateBy(x: origin.x, y: origin.y)
         drawCodeBox(decoration, in: context)
         drawInlineBackgrounds(decoration, in: context)
@@ -187,6 +203,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
     private func drawGutter(_ decoration: FragmentDecoration, in context: CGContext) {
         guard let gutter = decoration.gutter, let rect = gutterRect else { return }
-        GutterGlyph.draw(gutter, in: rect, decoration: decoration, context: context)
+        GutterGlyph.draw(gutter, in: rect, decoration: decoration, context: context,
+                         openness: foldDrawing?.frames[row]?.openness)
     }
 }

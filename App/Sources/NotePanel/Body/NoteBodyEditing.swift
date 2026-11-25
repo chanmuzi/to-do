@@ -48,6 +48,7 @@ public protocol NoteBodyEditing: AnyObject {
     var view: NSView { get }
     /// 본문 Markdown 원문.
     var text: String { get set }
+    func editedRange(from previous: String) -> NSRange?
     var onTextChange: ((String) -> Void)? { get set }
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
     func setNotePalette(_ id: String?)
@@ -72,6 +73,7 @@ public protocol NoteBodyEditing: AnyObject {
 }
 
 extension NoteBodyEditing {
+    public func editedRange(from previous: String) -> NSRange? { nil }
     public func setNotePalette(_ id: String?) {}
     public func setTitleFocusAction(_ action: @escaping () -> Void) {}
     public func scheduleRemoved(fromBodyLine line: Int) {}

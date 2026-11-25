@@ -233,7 +233,7 @@ private func namedPasteboard() -> NSPasteboard {
         #expect(h.editor.text == "앞")
     }
 
-    @Test(arguments: ["insertLineBreak:", "insertParagraphSeparator:", "insertNewlineIgnoringFieldEditor:", "insertNewline:"])
+    @Test(arguments: ["insertParagraphSeparator:", "insertNewlineIgnoringFieldEditor:", "insertNewline:"])
     func everyReturnVariantInsertsALineFeedAndContinuesTheList(selector: String) throws {
         let h = try EditorHarness("- 하나")
         h.caret(atEndOfLine: 0)
@@ -383,5 +383,66 @@ private func namedPasteboard() -> NSPasteboard {
         #expect(k.document.lines.last?.kind == .code)
         let open = try lastFragment(k)
         #expect(open.codeBoxRect?.maxY == open.textLineFragments.last?.typographicBounds.maxY)
+    }
+}
+
+extension LinkSchemeTests {
+    @Test @MainActor func linkHitFollowsTheViewportAfterResizeAndScroll() throws {
+        let prefix = String(repeating: "본문\n", count: 28)
+        let label = String(repeating: "링크 글자 ", count: 12)
+        let h = try EditorHarness(prefix + "[\(label)](https://example.com)", width: 180)
+        let scroll = try #require(h.view.enclosingScrollView)
+        let row = h.document.lines[28]
+        let at = try #require(h.controller.contentStorage.location(h.controller.contentStorage.documentRange.location, offsetBy: row.start))
+        func rects() throws -> [CGRect] {
+            h.controller.layoutManager.ensureLayout(for: h.controller.layoutManager.documentRange)
+            let f = try #require(h.controller.layoutManager.textLayoutFragment(for: at) as? MarkdownLayoutFragment)
+            return f.openableLinkRects.map {
+                $0.offsetBy(dx: h.view.textContainerOrigin.x + f.layoutFragmentFrame.minX,
+                            dy: h.view.textContainerOrigin.y + f.layoutFragmentFrame.minY)
+            }
+        }
+        let narrow = try rects()
+        h.window.setContentSize(NSSize(width: 360, height: 150))
+        scroll.layoutSubtreeIfNeeded()
+        let wide = try rects()
+        #expect(wide.count < narrow.count)
+        let rect = try #require(wide.last)
+        h.view.scrollToVisible(rect)
+        let viewport = scroll.contentView
+        let p = CGPoint(x: rect.midX, y: rect.midY)
+        let visiblePoint = viewport.convert(p, from: h.view)
+        #expect(viewport.bounds.contains(visiblePoint) && viewport.bounds.minY > 0)
+        #expect(h.controller.pointer(at: h.view.convert(visiblePoint, from: viewport), selectingText: false) == .pointingHand)
+        #expect(h.controller.pointer(at: CGPoint(x: rect.maxX + 2, y: rect.midY), selectingText: false) != .pointingHand)
+    }
+
+    @Test @MainActor func wrappedAndAutomaticLinksUseOnlyTheirVisibleFragments() throws {
+        let label = String(repeating: "자료 확인 ", count: 10)
+        let h = try EditorHarness("[\(label)끝](https://example.com) 뒤\nhttps://example.com\n[차단](file:///tmp)", width: 158)
+        func linkRects(_ row: Int) throws -> [CGRect] {
+            let c = h.controller
+            c.layoutManager.ensureLayout(for: c.layoutManager.documentRange)
+            let at = try #require(c.contentStorage.location(c.contentStorage.documentRange.location, offsetBy: h.document.lines[row].start))
+            let f = try #require(c.layoutManager.textLayoutFragment(for: at) as? MarkdownLayoutFragment)
+            let origin = h.view.textContainerOrigin
+            return f.openableLinkRects.map { $0.offsetBy(dx: origin.x + f.layoutFragmentFrame.minX, dy: origin.y + f.layoutFragmentFrame.minY) }
+        }
+        let wrapped = try linkRects(0)
+        #expect(wrapped.count > 1)
+        for rect in wrapped {
+            let point = CGPoint(x: rect.midX, y: rect.midY)
+            #expect(h.controller.pointer(at: point, selectingText: false) == .pointingHand)
+            #expect(h.controller.pointer(at: point, selectingText: true) == .iBeam)
+        }
+        let automatic = try #require(try linkRects(1).first)
+        let point = CGPoint(x: automatic.midX, y: automatic.midY)
+        #expect(h.controller.pointer(at: point, selectingText: false) == .pointingHand)
+        #expect(try linkRects(2).isEmpty)
+        h.controller.selectBlocks()
+        #expect(h.controller.pointer(at: point, selectingText: false) == .iBeam)
+        h.controller.clearBlocks()
+        h.editor.text = "일반 본문\n새 줄"
+        #expect(h.controller.pointer(at: point, selectingText: false) != .pointingHand)
     }
 }

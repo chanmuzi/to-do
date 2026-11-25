@@ -91,8 +91,32 @@ nonisolated struct CopyExport: Sendable {
     /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 인용문은 `> `로, 형광펜은 색 번호 없이 `==글자==`로.
     var markdown: String {
         let base = baseLevel
+        func usesInlineBreaks(_ row: Int) -> Bool {
+            let rows = doc.blockLines(at: row)
+            guard rows.count > 1 else { return false }
+            if doc.lines[rows.lowerBound].kind.headingLevel != nil { return true }
+            return rows.contains { i in
+                let line = doc.lines[i]
+                guard line.contentRange.length > 0 else { return true }
+                guard line.continuationOf != nil else { return false }
+                let text = doc.string(in: line.contentRange).trimmingCharacters(in: .whitespaces)
+                guard let first = text.first else { return true }
+                // CommonMark의 목록, 인용문, 제목, 코드와 HTML 블록이 문단을 끊을 수 있다.
+                return first.isNumber || "#>+-*_`~=<".contains(first)
+            }
+        }
+        var inlineBreaks = false
         return lines.compactMap { line -> String? in
+            let row = doc.lineIndex(at: line.start)
+            if line.continuationOf == nil { inlineBreaks = usesInlineBreaks(row) }
+            if inlineBreaks && line.continuationOf != nil { return nil }
+            let content = inlineBreaks ? doc.blockLines(at: row).map { inlineMarkdown(doc.lines[$0], keepingBreak: false) }.joined(separator: "<br>") : inlineMarkdown(line)
             let indent = String(repeating: "    ", count: max(0, line.level - base))
+            if let owner = line.continuationOf {
+                let kind = doc.lines[owner].kind
+                let prefix = kind == .quote ? "> " : kind.isListItem ? "  " : ""
+                return indent + prefix + content
+            }
             switch line.kind {
             case .fenceClose where startsInCode && line.codeBlock?.lowerBound == 0:
                 // 코드 블록 가운데부터 복사했으면 여는 줄이 없으므로 닫는 줄도 내보내지 않는다.
@@ -100,17 +124,17 @@ nonisolated struct CopyExport: Sendable {
             case .fenceOpen, .fenceClose, .code:
                 return indent + doc.string(in: NSRange(location: line.start + line.indentLength, length: line.end - line.start - line.indentLength))
             case .paragraph:
-                return line.contentRange.length == 0 ? "" : indent + inlineMarkdown(line)
+                return content.isEmpty ? "" : indent + content
             case .heading(let level):
-                return indent + String(repeating: "#", count: level) + " " + inlineMarkdown(line)
+                return indent + String(repeating: "#", count: level) + " " + content
             case .todo(let done):
-                return indent + (done ? "- [x] " : "- [ ] ") + inlineMarkdown(line)
+                return indent + (done ? "- [x] " : "- [ ] ") + content
             case .toggleHeading(let level):
-                return indent + "- " + String(repeating: "#", count: level) + " " + inlineMarkdown(line)
+                return indent + "- " + String(repeating: "#", count: level) + " " + content
             case .bullet, .toggle:
-                return indent + "- " + inlineMarkdown(line)
+                return indent + "- " + content
             case .quote:
-                return indent + "> " + inlineMarkdown(line)
+                return indent + "> " + content
             }
         }.joined(separator: "\n")
     }
@@ -120,8 +144,8 @@ nonisolated struct CopyExport: Sendable {
         lines.filter { $0.range.length > 0 }.map(\.level).min() ?? 0
     }
 
-    private func inlineMarkdown(_ line: MarkdownLine) -> String {
-        var units = Array(doc.units[line.contentStart..<line.end])
+    private func inlineMarkdown(_ line: MarkdownLine, keepingBreak: Bool = true) -> String {
+        var units = Array(doc.units[line.contentStart..<(keepingBreak ? line.end : line.contentEnd)])
         // 형광펜의 색 번호 `{n}`을 뒤에서부터 지운다.
         let suffixes = line.spans.compactMap { span -> Int? in
             guard case .highlight = span.kind, span.closeMarker.length > 2 else { return nil }
@@ -164,10 +188,11 @@ nonisolated struct CopyExport: Sendable {
                     if case .todo(let done) = item.kind {
                         out += "<input type=\"checkbox\" disabled\(done ? " checked" : "")> "
                     }
-                    let content = inline(item.contentRange, item.spans, colors)
+                    let content = blockContent(at: index, colors)
                     if let level = item.kind.headingLevel { out += "<h\(level)>\(content)</h\(level)>" }
                     else { out += content }
-                    if index + 1 < end { out += blocks((index + 1)..<end, colors) }
+                    let children = doc.blockLines(at: index).upperBound + 1
+                    if children < end { out += blocks(children..<end, colors) }
                     out += "</li>"
                     index = end
                 }
@@ -178,22 +203,27 @@ nonisolated struct CopyExport: Sendable {
                 while index < range.upperBound, doc.lines[index].kind == .quote, doc.lines[index].level == line.level {
                     let item = doc.lines[index]
                     let end = min(item.subtreeEnd, range.upperBound)
-                    out += "<p>" + inline(item.contentRange, item.spans, colors) + "</p>"
-                    if index + 1 < end { out += blocks((index + 1)..<end, colors) }
+                    out += "<p>" + blockContent(at: index, colors) + "</p>"
+                    let children = doc.blockLines(at: index).upperBound + 1
+                    if children < end { out += blocks(children..<end, colors) }
                     index = end
                 }
                 out += "</blockquote>"
             case .heading(let level):
-                out += "<h\(level)>" + inline(line.contentRange, line.spans, colors) + "</h\(level)>"
-                index += 1
+                out += "<h\(level)>" + blockContent(at: index, colors) + "</h\(level)>"
+                index = doc.blockLines(at: index).upperBound + 1
             case .paragraph:
-                if line.contentRange.length > 0 {
-                    out += "<p>" + inline(line.contentRange, line.spans, colors) + "</p>"
+                if line.contentRange.length > 0 || line.hasHardBreak {
+                    out += "<p>" + blockContent(at: index, colors) + "</p>"
                 }
-                index += 1
+                index = doc.blockLines(at: index).upperBound + 1
             }
         }
         return out
+    }
+
+    private func blockContent(at index: Int, _ colors: [Int: String]) -> String {
+        doc.blockLines(at: index).map { inline(doc.lines[$0].contentRange, doc.lines[$0].spans, colors) }.joined(separator: "<br>")
     }
 
     private func inline(_ range: NSRange, _ spans: [InlineSpan], _ colors: [Int: String]) -> String {

@@ -43,7 +43,7 @@ struct ProposalLineContent: View {
             value += document.string(in: NSRange(location: start, length: marker.range.location - start))
             start = NSMaxRange(marker.range)
         }
-        return value + document.string(in: NSRange(location: start, length: line.end - start))
+        return value + document.string(in: NSRange(location: start, length: line.contentEnd - start))
     }
 
     @ViewBuilder var body: some View {

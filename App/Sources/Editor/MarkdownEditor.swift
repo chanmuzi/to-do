@@ -90,6 +90,10 @@ public final class MarkdownEditor {
 
     /// 사용자가 고쳐서 원문이 바뀌었을 때. `text`를 직접 넣을 때는 부르지 않는다.
     /// 한글을 조합하는 중에도 조합 중인 글자가 들어간 원문으로 부른다.
+    package func editedRange(from previous: String) -> NSRange? {
+        controller.lastBodyEdit.flatMap { $0.previous == previous ? $0.range : nil }
+    }
+
     public var onTextChange: ((String) -> Void)? {
         get { controller.onTextChange }
         set { controller.onTextChange = newValue }
@@ -143,6 +147,18 @@ public final class MarkdownEditor {
         set { controller.onDateError = newValue }
     }
     #if DEBUG
+    package func selectBlocksForVerification() { controller.selectBlocks() }
+    package func clearBlocksForVerification() { controller.clearBlocks() }
+    package var selectedBlockRows: ClosedRange<Int>? { controller.blockSelection?.rows }
+    package func unfoldingFrame(for row: Int, draw: () -> Void) {
+        guard let transition = controller.foldTransitions[row], transition.to == 1 else { return }
+        let clock = controller.foldClock
+        defer { controller.foldClock = clock }
+        controller.foldClock = { transition.start + transition.duration / 2 }
+        controller.advanceFoldMotion()
+        draw()
+    }
+
     @_spi(Verification) public func removeBodyLineForVerification(_ index: Int) {
         let document = controller.document
         guard document.lines.indices.contains(index) else { return }
@@ -198,6 +214,7 @@ public final class MarkdownEditor {
     public var formattingState: EditorFormattingState { controller.formattingState }
 
     package static var editLinkAction: Selector { #selector(EditorTextView.editMarkdownLink(_:)) }
+    package static var duplicateBlockAction: Selector { #selector(EditorTextView.duplicateMarkdownBlock(_:)) }
     package static var toggleBoldAction: Selector { #selector(EditorTextView.toggleMarkdownBold(_:)) }
 
     /// 선택 범위(원문의 UTF-16 위치).

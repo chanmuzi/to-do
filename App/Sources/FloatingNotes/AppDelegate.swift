@@ -130,7 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let inlineWriter = InlineScheduleWriter(notes: environment.notes, service: schedules)
             editors.onAcceptDate = { id, request in try inlineWriter.accept(request, in: id) }
             editors.onDeleteScheduleLines = { [weak self, weak editors] id, previous, next, token in
-                guard let deletion = try inlineWriter.removeMissingSources(from: previous, to: next, in: id) else { return nil }
+                guard let deletion = try inlineWriter.removeMissingSources(from: previous, to: next, in: id,
+                    replacing: editors?.editor(for: id)?.editedRange(from: previous)) else { return nil }
                 let showToast = { [weak self, weak editors] in
                     self?.toasts?.scheduleDeletion(deletion.items, in: id, token: token) { [weak editors] in
                         editors?.editor(for: id)?.editor.undoScheduleDeletion(token)

@@ -3,6 +3,8 @@ import Foundation
 /// 한 줄을 어떻게 그릴지 정하는 값. 글자가 그대로여도 이 값이 달라진 줄은 다시 입힌다.
 nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
+    var isContinuation = false
+    var hasHardBreak = false
     var level: Int
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
@@ -27,14 +29,14 @@ nonisolated enum LinePresentation {
     static func keys(
         for doc: MarkdownDocument,
         folded: Set<Int>,
-        hoveredLink: (line: Int, offset: Int)? = nil
+        hoveredLink: (line: Int, offset: Int)? = nil, animating: Set<Int> = []
     ) -> [LineRenderKey] {
         let folded = FoldState.sanitized(folded, in: doc)
-        let hidden = FoldState.hiddenLines(doc, folded: folded)
+        let hidden = FoldState.hiddenLines(doc, folded: folded.subtracting(animating))
         let trailingCode = trailingCodeLine(in: doc) != nil
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
-            var key = LineRenderKey(kind: line.kind, level: line.level)
+            var key = LineRenderKey(kind: doc.lines[line.continuationOf ?? index].kind, isContinuation: line.continuationOf != nil, hasHardBreak: line.hasHardBreak, level: line.level)
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)
             key.isFirst = index == 0

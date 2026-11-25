@@ -5,6 +5,13 @@ import Testing
 @testable import Library
 
 @Suite struct NotePreviewLineJoiningTests {
+    @Test func hardBreakIsHiddenInSearchPreviewAndDerivedTitle() {
+        let body = "- [ ] 첫 줄\\\n다음 줄"
+        #expect(LibraryPreview(title: "", markdown: body).title == "첫 줄")
+        #expect(NotePreviewText.firstLine(in: body) == "첫 줄")
+        #expect(BrowsePreview.flatten(body) == "첫 줄, 다음 줄")
+    }
+
     @Test func toggleHeadingProvidesTheUntitledNotesDisplayTitle() {
         let body = "+ ### **제목**\n\t- 항목"
         #expect(LibraryPreview(title: "", markdown: body).title == "제목")

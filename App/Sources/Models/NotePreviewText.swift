@@ -16,11 +16,10 @@ package enum NotePreviewText {
             let source: String
             switch line.kind {
             case .todo, .toggleHeading: source = document.string(in: line.contentRange)
-            default: source = document.string(in: line.range)
+            default: source = document.string(in: NSRange(location: line.start, length: line.contentEnd - line.start))
             }
             let trimmed = source.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { continue }
-
 
             let rendered = line.kind == .code ? nil : try? AttributedString(markdown: trimmed)
             if rendered?.runs.first?.presentationIntent?.components.contains(where: { $0.kind == .thematicBreak }) == true { continue }
@@ -29,6 +28,13 @@ package enum NotePreviewText {
             if lines.count == limit { break }
         }
         return lines
+    }
+
+    /// 줄 단위의 기존 검색 정규화에 넘기기 전에 구조적인 줄바꿈 기호만 제거한다.
+    package static func removingHardBreakMarkers(in markdown: String) -> String {
+        guard markdown.contains("\\") else { return markdown }
+        let doc = MarkdownDocument(markdown)
+        return doc.lines.map { doc.string(in: NSRange(location: $0.start, length: $0.contentEnd - $0.start)) + doc.terminator(of: $0) }.joined()
     }
 
     package static func join(_ lines: some Sequence<String>) -> String {
