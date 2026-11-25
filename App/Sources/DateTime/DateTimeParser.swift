@@ -61,6 +61,8 @@ public nonisolated enum DateTimeParser {
     }
 
     private static let connector = regex(#"^\s*(?:~|-|부터|에서|[tT][oO])\s*$"#)
+    private static let fromPrefix = regex(#"(?i)\bfrom\s+$"#)
+    private static let toConnector = regex(#"(?i)^\s*to\s*"#)
     private static let blank = regex(#"^\s*$"#)
     /// 날 뒤에 시각이 올 때 사이에 있어도 되는 말.
     private static let dateTimeGap = regex(#"^\s*(?:(?:,|에는|에|은|는|엔|[aA][tT]|@)\s*)?$"#)
@@ -68,7 +70,7 @@ public nonisolated enum DateTimeParser {
     private static let timeDateGap = regex(#"^\s*(?:(?:,|에|[oO][nN])\s*)?$"#)
     private static let untilSuffix = regex(#"^\s*까지"#)
     private static let bareRangeStart = regex(
-        #"(?:(오전|오후|아침|낮|점심|저녁|밤|새벽|AM|PM)\s*)?(?<![\d.:/A-Za-z])(\d{1,2})\s*(?:~|-|부터|에서)\s*$"#
+        #"(?:(오전|오후|아침|낮|점심|저녁|밤|새벽|AM|PM)\s*)?(?<![\d.:/A-Za-z])(\d{1,2})\s*(?:~|-|부터|에서|[tT][oO]\b)\s*$"#
     )
     /// 오전, 오후가 붙은 시각 뒤에 수만 적은 범위의 끝(`2pm-4`).
     private static let bareRangeEnd = regex(#"^\s*(?:~|-|[tT][oO]\s)\s*(\d{1,2})(?![\d:.,/%가-힣A-Za-z])"#)
@@ -88,7 +90,7 @@ public nonisolated enum DateTimeParser {
             } else if index < points.count, connects(start, points[index], source: source) {
                 let end = points[index]
                 index += 1
-                var range = NSUnionRange(start.range, end.range)
+                var range = rangeIncludingFrom(start, end, source: source)
                 // "2시부터 4시까지"의 "까지"도 표현에 넣는다.
                 let rest = NSRange(location: NSMaxRange(range), length: source.length - NSMaxRange(range))
                 if let suffix = untilSuffix.firstMatch(in: text, range: rest) {
@@ -96,12 +98,24 @@ public nonisolated enum DateTimeParser {
                 }
                 result.append(Candidate(start: start, end: end, ranges: [range]))
             } else if let end = bareEnd(after: start, source: source) {
-                result.append(Candidate(start: start, end: end, ranges: [NSUnionRange(start.range, end.range)]))
+                result.append(Candidate(start: start, end: end, ranges: [rangeIncludingFrom(start, end, source: source)]))
             } else if !start.isBareRangeStart {
                 result.append(Candidate(start: start, end: nil, ranges: [start.range]))
             }
         }
         return joiningSeparatedDateAndTime(result).filter(isReadable)
+    }
+
+    private static func rangeIncludingFrom(_ start: Located, _ end: Located, source: NSString) -> NSRange {
+        let range = NSUnionRange(start.range, end.range)
+        let tail = NSRange(location: NSMaxRange(start.range), length: NSMaxRange(range) - NSMaxRange(start.range))
+        let hasTo = start.isBareRangeStart
+            ? source.substring(with: start.range).trimmingCharacters(in: .whitespaces).lowercased().hasSuffix("to")
+            : toConnector.firstMatch(in: source as String, range: tail) != nil
+        guard hasTo,
+              let prefix = fromPrefix.firstMatch(in: source as String, range: NSRange(location: 0, length: range.location))
+        else { return range }
+        return NSUnionRange(prefix.range, range)
     }
 
     /// 조각을 시점으로 묶는다: 붙어 있는 날과 시각은 한 시점이다.
