@@ -109,9 +109,9 @@ struct NoteFiles {
     // MARK: - 쓰기
 
     /// 노트 폴더의 파일을 통째로 바꿔 쓴다.
-    func write(_ text: String, _ id: NoteID) throws(StoreError) {
+    func write(_ text: String, _ id: NoteID, in directory: URL? = nil) throws(StoreError) {
         do {
-            try Data(text.utf8).write(to: url(id, in: location.notesDirectory), options: .atomic)
+            try Data(text.utf8).write(to: url(id, in: directory ?? location.notesDirectory), options: .atomic)
         } catch {
             throw .writeFailed(id, message: error.localizedDescription)
         }

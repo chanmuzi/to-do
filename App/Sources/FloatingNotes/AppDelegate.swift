@@ -97,6 +97,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #if DEBUG
             reminderEditor.allowsKeyWindows = !options.debugIsPassive
             #endif
+            editors.onOpenSchedule = { [weak notePanels, weak reminderEditor] noteID, itemID, anchor in
+                notePanels?.flushPendingEdits(for: noteID)
+                do { try reminderEditor?.show(noteID, anchor: anchor, selectedID: itemID) }
+                catch { AppLog.warning("본문 예정 열기 실패: \(error)") }
+            }
             self.reminderEditor = reminderEditor
             router.reminders = reminderEditor
             let notifier: any ReminderNotifier
@@ -239,6 +244,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 capture: quickPanels.capture, notes: environment.notes, router: router,
                 undoTrash: { [unowned commands] in commands.undoOrRestoreTrash(nil) }
             )
+            toasts?.removedExternalItems = { [weak schedules] in schedules?.removedFromTrashMove($0) ?? [] }
             try connectRequests(environment, router: router, agent: agent, panels: quickPanels, notes: notePanels)
             // 노트 찾기를 닫은 누름과 그 누름이 보낸 "노트 찾기 열기"를 한데 묶는다(`QuickPanels`).
             pointerPresses = PointerPressMonitor(

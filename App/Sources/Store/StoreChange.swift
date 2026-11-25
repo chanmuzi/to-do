@@ -26,7 +26,11 @@ public struct StoreChange: Hashable, Sendable {
     public let kind: Kind
     public let origin: Origin
 
-    public init(id: NoteID, kind: Kind, origin: Origin) {
+    /// 휴지통으로 옮긴 경우에만 옮기기 직전의 예정이 들어 있다.
+    package let trashedSchedules: [ScheduleItem]?
+
+    public init(id: NoteID, kind: Kind, origin: Origin, trashedSchedules: [ScheduleItem]? = nil) {
+        self.trashedSchedules = trashedSchedules
         self.id = id
         self.kind = kind
         self.origin = origin

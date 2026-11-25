@@ -27,6 +27,14 @@ import Testing
         toasts.pointerScreen = { NSScreen.main }
     }
 
+    @Test func trashMessageCountsOnlySuccessfulExternalDeletions() {
+        defer { fixture.cleanUp() }
+        #expect(AppToasts.trashMessage(removed: []) == "휴지통으로 보냈습니다")
+        #expect(AppToasts.trashMessage(removed: [.reminder, .reminder]) == "휴지통으로 보냈습니다. 리마인더 2개도 지웠습니다")
+        #expect(AppToasts.trashMessage(removed: [.event]) == "휴지통으로 보냈습니다. 일정 1개도 지웠습니다")
+        #expect(AppToasts.trashMessage(removed: [.reminder, .event]) == "휴지통으로 보냈습니다. 예정 2개도 지웠습니다")
+    }
+
     @Test func scheduleDeletionMessages() {
         defer { fixture.cleanUp() }
         let reminder = ScheduleItem(start: Date())

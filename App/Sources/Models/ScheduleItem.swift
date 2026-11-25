@@ -49,6 +49,9 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
         public let title: String
     }
     public var value: Value { Value(start: start, end: end, dateOnly: isDateOnly, completed: isCompleted, title: title) }
+    /// 휴지통에 있을 때의 외부 삭제 의도와 되살릴 때의 재등록 범위.
+    package enum TrashState: String, Codable, Sendable { case pendingRemoval, removed, local }
+    package var trashState: TrashState?
     public var syncError: String?
     /// 삭제 실패/오프라인에서도 연결을 잃지 않고 다음 동기화에서 다시 삭제한다.
     public var isDeleted: Bool
@@ -66,13 +69,14 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
-        case imminentLeadMinutes, pendingCalendarID, id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
+        case trashState, imminentLeadMinutes, pendingCalendarID, id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
     }
     private enum KindKey: String, CodingKey { case kind }
     package static let storedFieldNames = Set(CodingKeys.allCases.map(\.stringValue) + [KindKey.kind.stringValue])
 
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(trashState, forKey: .trashState)
         try c.encodeIfPresent(imminentLeadMinutes, forKey: .imminentLeadMinutes)
         try c.encodeIfPresent(pendingCalendarID, forKey: .pendingCalendarID)
         try c.encode(id, forKey: .id); try c.encode(start, forKey: .start); try c.encodeIfPresent(end, forKey: .end)

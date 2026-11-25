@@ -16,6 +16,11 @@ public final class ScheduleService {
     private var registrations: [NoteID: [String: Bool]] = [:]
     private var worker: Task<Void, Never>?
     private var writing = false
+    private var lastTrashRemoval: (id: NoteID, kinds: [ScheduleItem.Kind])?
+
+    package func removedFromTrashMove(_ id: NoteID) -> [ScheduleItem.Kind] {
+        lastTrashRemoval?.id == id ? lastTrashRemoval?.kinds ?? [] : []
+    }
 
     public init(notes: any NoteStoring, notifier: any ReminderNotifier,
                 makeBridge: @escaping @MainActor () -> any CalendarBridge,
@@ -36,15 +41,58 @@ public final class ScheduleService {
                     enqueue(change.id)
                 }
             case .removed:
-                // 휴지통은 외부 일정 삭제 동작이 아니다. 앱 자체 알림만 취소한다.
-                known[change.id]?.schedules.forEach { notifier.cancel($0, noteID: change.id) }
+                pending.remove(change.id)
+                registrations[change.id] = nil
+                let items = change.trashedSchedules ?? known[change.id]?.schedules ?? []
+                items.forEach { notifier.cancel($0, noteID: change.id) }
+                if change.trashedSchedules != nil {
+                    lastTrashRemoval = (change.id, removeTrashedLinks(change.id, items: items))
+                }
                 known[change.id] = nil
             case .conflict, .saveFailed: break
             }
         }
         // 과거 사용한 연결은 권한 요청 없이 재개한다. 빈 앱은 bridge를 만들지도 않는다.
+        try retryTrashedLinks()
         for note in known.values where !note.schedules.isEmpty { enqueue(note.id) }
     }
+    private func retryTrashedLinks() throws {
+        for note in try notes.listTrash().notes {
+            _ = removeTrashedLinks(note.id, items: note.schedules)
+        }
+    }
+
+    private func removeTrashedLinks(_ id: NoteID, items: [ScheduleItem]) -> [ScheduleItem.Kind] {
+        guard items.contains(where: { $0.trashState == .pendingRemoval }) else { return [] }
+        var removed: [ScheduleItem.Kind] = []
+        do {
+            try notes.updateTrashSchedules(id) { values in
+                for index in values.indices {
+                    let item = values[index]
+                    guard item.trashState == .pendingRemoval, let link = item.link,
+                          !item.isDeleted, !item.isCompleted else { continue }
+                    let kind = link.kind ?? item.kind
+                    guard bridge.access(for: kind) == .available else { continue }
+                    do {
+                        let destination = bridge.destination(for: item)?.calendarID
+                        let didRemove = try bridge.remove(item)
+                        values[index].link = nil
+                        values[index].syncedAt = nil
+                        values[index].syncBaseline = nil
+                        values[index].syncError = nil
+                        values[index].pendingCalendarID = item.pendingCalendarID ?? destination
+                        values[index].trashState = .removed
+                        if didRemove { removed.append(kind) }
+                    } catch {
+                        values[index].syncError = error.localizedDescription
+                        log("휴지통 예정 삭제 대기 \(item.id): \(error)")
+                    }
+                }
+            }
+        } catch { log("휴지통 예정 기록 실패 \(id): \(error)") }
+        return removed
+    }
+
     private var bridge: any CalendarBridge {
         if let bridgeStorage { return bridgeStorage }
         let value = makeBridge()
@@ -81,7 +129,8 @@ public final class ScheduleService {
     public func destination(for item: ScheduleItem) -> ScheduleDestination? { bridge.destination(for: item) }
     public func refreshLinked() {
         do {
-            for note in try notes.list().notes where note.schedules.contains(where: { $0.link != nil }) {
+            try retryTrashedLinks()
+            for note in try notes.list().notes where note.schedules.contains(where: { $0.link != nil || $0.trashState != nil }) {
                 enqueue(note.id)
             }
         } catch { log("예정 다시 읽기 실패: \(error)") }
@@ -138,14 +187,15 @@ public final class ScheduleService {
                 continue
             }
             let isNew = expected.link == nil || expected.link?.kind != expected.kind
-            let allowPrompt = intents[expected.id] == true && isNew && !expected.isDeleted
+            let allowPrompt = intents[expected.id] == true && isNew && !expected.isDeleted && expected.trashState == nil
             // 연결 없는 삭제는 로컬에서 끝낸다. 권한이 없어도 삭제 대기를 남길 필요가 없다.
             if expected.isDeleted && expected.link == nil {
                 notifier.cancel(expected, noteID: id)
                 try replace(expected, with: nil, in: id)
                 continue
             }
-            if expected.link == nil && expected.id.hasPrefix("legacy-") {
+            if expected.trashState != nil && expected.link == nil && !expected.isUpcoming(at: Date()) { continue }
+            if expected.link == nil && expected.id.hasPrefix("legacy-") && expected.trashState != .removed {
                 // 옛 항목은 이미 권한이 있어도 그 항목을 열어 저장한 경우에만 이관한다.
                 guard intents[expected.id] != nil, expected.isUpcoming(at: Date()) else { continue }
             }
@@ -154,7 +204,17 @@ public final class ScheduleService {
                     guard try await bridge.authorize(linkedKind, request: false) else { continue }
                 }
                 // 권한 없음은 연동 실패가 아니다. 파일과 앱 알림 권한을 건드리지 않는다.
-                guard try await bridge.authorize(expected.kind, request: allowPrompt) else { continue }
+                guard try await bridge.authorize(expected.kind, request: allowPrompt) else {
+                    if expected.trashState != nil, expected.link == nil,
+                       !expected.isDateOnly, expected.isUpcoming(at: Date()),
+                       try notes.load(id).schedules.contains(expected) {
+                        try await notifier.schedule(expected, noteID: id, requestPermission: false)
+                        if (try? notes.load(id).schedules.contains(expected)) != true {
+                            notifier.cancel(expected, noteID: id)
+                        }
+                    }
+                    continue
+                }
             } catch {
                 // 권한 API의 오류도 실제 등록 시도 실패와 구분한다.
                 log("예정 권한 확인 실패 \(expected.id): \(error.localizedDescription)")
@@ -175,7 +235,14 @@ public final class ScheduleService {
                 if expected.link != nil {
                     guard let remote = try bridge.fetch(expected.calendarFields) else {
                         notifier.cancel(expected, noteID: id)
-                        try replace(expected, with: nil, in: id)
+                        if expected.trashState == .pendingRemoval {
+                            // 이전 실행이 외부 삭제 뒤 파일에 결과를 쓰기 전에 끝났다.
+                            var detached = expected
+                            detached.link = nil
+                            detached.trashState = .removed
+                            try replace(expected, with: detached, in: id)
+                            enqueue(id)
+                        } else { try replace(expected, with: nil, in: id) }
                         continue
                     }
                     let baseline = expected.syncedAt ?? .distantPast
@@ -193,8 +260,8 @@ public final class ScheduleService {
                         continue
                     }
                     if !localChanged {
-                        if expected.syncError != nil || expected.link != remote.link {
-                            var recovered = expected; recovered.syncError = nil; recovered.link = remote.link
+                        if expected.syncError != nil || expected.link != remote.link || expected.trashState != nil {
+                            var recovered = expected; recovered.syncError = nil; recovered.link = remote.link; recovered.trashState = nil
                             try replace(expected, with: recovered, in: id)
                         }
                         notifier.cancel(expected, noteID: id)
@@ -219,8 +286,8 @@ public final class ScheduleService {
                 if expected.link == nil && !expected.isDeleted && !expected.isCompleted && !expected.isDateOnly && expected.start > Date() {
                     do { try await notifier.schedule(expected, noteID: id, requestPermission: allowPrompt) }
                     catch { log("앱 알림 실패 \(expected.id): \(error.localizedDescription)") }
-                    let latest = try notes.load(id).schedules.first { $0.id == expected.id }
-                    if latest != failed { notifier.cancel(expected, noteID: id); enqueue(id) }
+                    let latest = try? notes.load(id).schedules.first { $0.id == expected.id }
+                    if latest != failed { notifier.cancel(expected, noteID: id); if latest != nil { enqueue(id) } }
                 } else { notifier.cancel(expected, noteID: id) }
             }
         }
@@ -255,6 +322,7 @@ private extension ScheduleItem {
     var calendarFields: ScheduleItem {
         var item = self
         item.imminentLeadMinutes = nil
+        item.trashState = nil
         return item
     }
 }

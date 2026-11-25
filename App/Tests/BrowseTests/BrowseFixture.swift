@@ -234,6 +234,9 @@ final class UnreadableListNoteStore: NoteStoring {
     func discardPendingChanges(_ id: NoteID) { base.discardPendingChanges(id) }
     func moveToTrash(_ id: NoteID) throws { try base.moveToTrash(id) }
     func delete(_ id: NoteID) throws { try base.delete(id) }
+    func updateTrashSchedules(_ id: NoteID, _ change: (inout [ScheduleItem]) -> Void) throws {
+        try base.updateTrashSchedules(id, change)
+    }
     func listTrash() throws -> NoteListing { try base.listTrash() }
     func restoreFromTrash(_ id: NoteID) throws -> Note { try base.restoreFromTrash(id) }
     func refresh() throws { try base.refresh() }
