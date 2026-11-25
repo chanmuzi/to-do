@@ -25,7 +25,7 @@ Core         모든 기능이 공유하는 바탕
 | Core | `DateTime` | 캡처, 본문, 제목 공용 날짜 읽기, UTF-16 인식 범위, InlineDateProposal, Acceptance, Effect. Models만 참조 | 07a |
 | Core | `MarkdownSyntax` | 편집기, 라이브러리와 Theme의 제안 본문이 함께 읽는 줄, 인라인 서식과 숨김 범위. Foundation만 참조 | 06, 09 |
 | Core | `Models` | 노트, 스페이스, 리마인더 같은 값 타입 | |
-| Core | `Scheduling` | CalendarBridge, ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models, Store만 참조 | 21 |
+| Core | `Scheduling` | CalendarBridge, ReminderNotifier, 지연 EventKit, 직렬 양방향 동기화. Models, Store, DateTime, MarkdownSyntax만 참조(블록 원문으로 예정 연결, D-313) | 21 |
 | Core | `Store` | 노트 파일 읽기, 쓰기, 변경 감시. 저장 방식이 바뀌어도 이 모듈만 바뀐다 | decisions D-003 |
 | Core | `AgentRunner` | 구독 CLI 탐색, 전용 로그인, 격리된 자식 실행과 로컬 사용량 기록. Store의 경로 계약을 사용 | 11 |
 | 실행 파일 | `FloatMCP` | 노트는 읽기만 하는 stdio MCP 서버. 대화 요청은 실행 전용 접수 폴더에만 제안을 쓴다. Models의 접수 값과 지문을 공유한다 | 11 |
