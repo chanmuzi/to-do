@@ -63,6 +63,7 @@ struct LibrarySymbol: View {
 /// 키 뷰 순서와 acceptsFirstResponder는 바꾸지 않는다.
 class LibraryHostingView<Content: View>: NSHostingView<Content> {
     private let styledViews = NSHashTable<NSView>.weakObjects()
+    private let noteRows = NSHashTable<LibraryRowInputView>.weakObjects()
     private var hierarchyChanged = true
 
     override func didAddSubview(_ subview: NSView) {
@@ -72,9 +73,16 @@ class LibraryHostingView<Content: View>: NSHostingView<Content> {
 
     override func layout() {
         super.layout()
-        guard hierarchyChanged else { return }
-        hierarchyChanged = false
-        configureBranch(self)
+        if hierarchyChanged {
+            hierarchyChanged = false
+            configureBranch(self)
+        }
+        // SwiftUI가 조상 뷰를 옮기면 줄의 추적 영역이 그대로여도 포인터 아래의 노트가 바뀐다.
+        guard let window, noteRows.count > 0 else { return }
+        let point = window.mouseLocationOutsideOfEventStream
+        for row in noteRows.allObjects where row.window === window {
+            row.synchronizeHover(at: point)
+        }
     }
 
     private func markHierarchyChanged() {
@@ -110,6 +118,7 @@ class LibraryHostingView<Content: View>: NSHostingView<Content> {
     }
 
     private func configure(_ view: NSView) {
+        if let row = view as? LibraryRowInputView { noteRows.add(row) }
         if view.focusRingType != .none { view.focusRingType = .none }
         if let scroll = view as? NSScrollView, scroll.scrollerStyle != .overlay {
             scroll.scrollerStyle = .overlay
