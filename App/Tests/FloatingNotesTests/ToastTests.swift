@@ -27,6 +27,15 @@ import Testing
         toasts.pointerScreen = { NSScreen.main }
     }
 
+    @Test func scheduleDeletionMessages() {
+        defer { fixture.cleanUp() }
+        let reminder = ScheduleItem(start: Date())
+        let event = ScheduleItem(start: Date(), end: Date())
+        #expect(AppToasts.scheduleDeletionMessage([reminder]) == "리마인더도 지웠습니다")
+        #expect(AppToasts.scheduleDeletionMessage([event]) == "일정도 지웠습니다")
+        #expect(AppToasts.scheduleDeletionMessage([reminder, event]) == "예정 2개도 지웠습니다")
+    }
+
     private func clickAction() throws {
         let window = try #require(presenter.window)
         let button = try #require(window.contentView?.subviews.first { $0 is ToastActionButton })

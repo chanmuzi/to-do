@@ -104,6 +104,16 @@ public final class MarkdownEditor {
         controller.scheduleRemoved(fromBodyLine: line)
     }
 
+    package var onDeleteScheduleLines: ((String, String, UUID) throws -> InlineDateEffect?)? {
+        get { controller.onDeleteScheduleLines }
+        set { controller.onDeleteScheduleLines = newValue }
+    }
+    package func undoScheduleDeletion(_ token: UUID) {
+        let history = controller.history
+        guard (history.open ?? history.undoStack.last)?.dateEffect == token else { return }
+        controller.replayUndo(redo: false)
+    }
+
     public var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)? {
         get { controller.onAcceptDate }
         set { controller.onAcceptDate = newValue }
@@ -112,6 +122,19 @@ public final class MarkdownEditor {
         get { controller.onDateError }
         set { controller.onDateError = newValue }
     }
+    #if DEBUG
+    @_spi(Verification) public func removeBodyLineForVerification(_ index: Int) {
+        let document = controller.document
+        guard document.lines.indices.contains(index) else { return }
+        var range = document.lines[index].fullRange
+        if index == document.lines.count - 1, index > 0 {
+            range.location -= 1
+            range.length += 1
+        }
+        controller.apply(EditorCommands.insert(document, "", replacing: range))
+    }
+    #endif
+
     @_spi(Verification) public func refreshDateSuggestion() { controller.updateDateSuggestion() }
 
     /// 내용 높이(안쪽 여백 포함)가 바뀌었을 때. 노트 창이 이 높이에 맞춘다.

@@ -6,7 +6,9 @@ package struct ScheduleMarker: View {
     let destination: ScheduleDestination?
     let theme: Theme
     let tall: Bool
-    package init(item: ScheduleItem, destination: ScheduleDestination?, theme: Theme, tall: Bool = false) {
+    let highlighted: Bool
+    package init(item: ScheduleItem, destination: ScheduleDestination?, theme: Theme, tall: Bool = false, highlighted: Bool = false) {
+        self.highlighted = highlighted
         self.tall = tall
         self.item = item
         self.destination = destination
@@ -23,7 +25,7 @@ package struct ScheduleMarker: View {
             if item.kind == .event {
                 Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(tall ? .detailRow : .scheduleReminderCircle))
             } else {
-                Circle().strokeBorder(color, lineWidth: theme.shape(.borderWidth))
+                Circle().strokeBorder(highlighted ? theme.color(.text) : color, lineWidth: theme.shape(.borderWidth))
                     .background(Circle().fill(item.isCompleted ? color : .clear))
                     .frame(width: theme.component(.scheduleReminderCircle), height: theme.component(.scheduleReminderCircle))
             }

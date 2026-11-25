@@ -13,6 +13,24 @@ extension EditorController {
         let oldRange = NSRange(location: editedRange.location, length: editedRange.length - delta)
         let edit = UndoEdit(location: editedRange.location, old: old.string(in: oldRange), new: document.string(in: editedRange))
         guard edit.old != edit.new else { return }
+        if let previous = (history.open ?? history.undoStack.last)?.dateEffect {
+            dateEffects[previous]?.onUndoUnavailable?()
+        }
+        var deletionToken: UUID?
+        if let remove = onDeleteScheduleLines, deferredOutsideEdit == nil,
+           !edit.old.isEmpty, (edit.old.contains("\n") || document.lines[document.lineIndex(at: editedRange.location)].range.length == 0) {
+            let token = UUID()
+            do {
+                if let effect = try remove(old.text, document.text, token) {
+                    deletionToken = token
+                    dateEffects[token] = effect
+                }
+            } catch { onDateError(error) }
+        }
+        // 예정이 붙은 삭제는 앞뒤 편집과 별도 단계로 남긴다.
+        if deletionToken != nil || history.open?.dateEffect != nil {
+            history.close(selectionAfter: selectionBeforeEdit ?? textView.selectedRange(), coalescesTyping: false)
+        }
         if history.open == nil {
             let selection = selectionBeforeEdit ?? textView.selectedRange()
             history.open = UndoRecord(selectionBefore: selection, selectionAfter: selection)
@@ -22,6 +40,10 @@ extension EditorController {
             history.open?.isTyping = false
         }
         if textView.hasMarkedText() { openRecordIsComposition = true }
+        if let deletionToken {
+            history.open?.dateEffect = deletionToken
+            history.open?.isTyping = false
+        }
         history.open?.edits.append(edit)
     }
 

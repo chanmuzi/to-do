@@ -86,6 +86,11 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
         try type.encode(kind, forKey: .kind)
     }
 
+    package mutating func markDeleted() {
+        isDeleted = true
+        modified = Date()
+    }
+
     public func isUpcoming(at now: Date, calendar: Calendar = .current) -> Bool {
         !isDeleted && !isCompleted && (isDateOnly
             ? calendar.startOfDay(for: start) >= calendar.startOfDay(for: now) : start >= now)

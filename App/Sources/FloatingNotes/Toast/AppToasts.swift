@@ -60,6 +60,17 @@ final class AppToasts {
         }
     }
 
+    func scheduleDeletion(_ items: [ScheduleItem], in id: NoteID, token: UUID, undo: @escaping () -> Void) {
+        guard let window = notePanels.window(for: id) else { return }
+        presenter.show(.init(kind: token.uuidString, message: Self.scheduleDeletionMessage(items),
+                             actionTitle: Self.undoTitle), on: window.screen, noteFrame: window.frame, action: undo)
+    }
+
+    static func scheduleDeletionMessage(_ items: [ScheduleItem]) -> String {
+        if items.count == 1 { return items[0].kind == .event ? "일정도 지웠습니다" : "리마인더도 지웠습니다" }
+        return "예정 \(items.count)개도 지웠습니다"
+    }
+
     static func captureMessage(title: String?) -> String {
         "“\(title ?? todayNoteName)”에 넣었습니다"
     }

@@ -10,6 +10,11 @@ import DateTime
 public final class ReminderEditorModel {
     public let noteID: NoteID
     public private(set) var items: [ScheduleItem] = []
+    private var completedInList: Set<String> = []
+    var listItems: [ScheduleItem] { items.filter { !$0.isCompleted || completedInList.contains($0.id) } }
+    #if DEBUG
+    package var previewCompletionHoverID: String?
+    #endif
     public var selectedID: String?
     public var input = "" { didSet { if input != oldValue { rebuildCandidates() } } }
     public private(set) var candidates: [ScheduleItem] = []
@@ -214,7 +219,9 @@ public final class ReminderEditorModel {
                 if let todo = note.schedules[index].todo { note.body = todo.settingCompleted(note.schedules[index].isCompleted, in: note.body) }
             }
             reload()
-            if selectedID == id { completed = items.first { $0.id == id }?.isCompleted ?? false }
+            guard let item = items.first(where: { $0.id == id }), item.kind == .reminder else { return }
+            if item.isCompleted { completedInList.insert(id) } else { completedInList.remove(id) }
+            if selectedID == id { completed = item.isCompleted }
         } catch { self.error = error.localizedDescription }
     }
     public func presentation(_ item: ScheduleItem) -> ReminderPresentation {
@@ -264,8 +271,7 @@ public final class ReminderEditorModel {
         do {
             try notes.update(noteID) { note in
                 guard let index = note.schedules.firstIndex(where: { $0.id == selectedID }) else { return }
-                note.schedules[index].isDeleted = true
-                note.schedules[index].modified = Date()
+                note.schedules[index].markDeleted()
             }
             reload(); select(nil)
             return true

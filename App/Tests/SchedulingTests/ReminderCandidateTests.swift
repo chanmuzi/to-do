@@ -22,6 +22,28 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
+    @Test func listKeepsOnlyRemindersCompletedDuringThisPresentation() throws {
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now, title: "연결", todo: TodoAnchor(line: 0, text: "연결"))
+            let done = ScheduleItem(start: now, isCompleted: true)
+            let event = ScheduleItem(start: now, end: now.addingTimeInterval(3600))
+            try store.update(id) { $0.body = "[ ] 연결"; $0.schedules = [item, done, event] }
+            model.reload()
+            model.toggleCompleted(event.id)
+            model.toggleCompleted(item.id)
+            #expect(Set(model.listItems.map(\.id)) == [item.id, event.id])
+            #expect(try store.load(id).body == "[x] 연결")
+            model.toggleCompleted(item.id)
+            #expect(try store.load(id).body == "[ ] 연결")
+            try store.update(id) { $0.schedules.removeAll { $0.id == event.id } }
+            model.toggleCompleted(item.id)
+            #expect(model.listItems.map(\.id) == [item.id])
+            #expect(try store.load(id).displayedSchedule(at: now) == nil)
+            let reopened = try ReminderEditorModel(noteID: id, notes: store)
+            #expect(reopened.listItems.isEmpty)
+        }
+    }
+
     @Test func imminentMenuShowsTheCurrentDefaultAndSavesTheSelectedValue() throws {
         try fixture { model, store, id in
             let item = ScheduleItem(start: now)
