@@ -90,7 +90,7 @@ package final class ConversationMenuButton: NSButton {
             let item = menu.addItem(withTitle: title, action: action, keyEquivalent: "")
             item.target = self
             item.isEnabled = commands.enabled
-            let image = theme.symbolImage(symbol, size: .iconSmall)?.withSymbolConfiguration(
+            let image = theme.symbolImage(symbol, size: .menuIcon)?.withSymbolConfiguration(
                 NSImage.SymbolConfiguration(paletteColors: [theme.nsColor(commands.enabled ? .text2 : .text3)]))
             item.view = PickerMenuRow(theme: theme, text: title, dot: image,
                                       selected: false, width: theme.component(.conversationMenuWidth),

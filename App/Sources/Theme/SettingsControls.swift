@@ -2,15 +2,16 @@ import SwiftUI
 
 package struct SettingsSwitch: ToggleStyle {
     let theme: Theme
-    package init(theme: Theme) { self.theme = theme }
+    let compact: Bool
+    package init(theme: Theme, compact: Bool = false) { self.theme = theme; self.compact = compact }
     @Environment(\.accessibilityReduceMotion) private var reduced
     @State private var hovered = false
     package func makeBody(configuration: Configuration) -> some View {
-        let inset = theme.component(.iconButtonGap)
-        let height = theme.component(.settingsSwitchHeight)
+        let height = theme.component(compact ? .scheduleSwitchHeight : .settingsSwitchHeight)
+        let inset = compact ? (height - theme.component(.menuIcon)) / 2 : theme.component(.iconButtonGap)
         Button { configuration.isOn.toggle() } label: {
             Capsule().fill(theme.color(configuration.isOn ? .text : .surface3))
-                .frame(width: theme.component(.settingsSwitchWidth), height: height)
+                .frame(width: theme.component(compact ? .scheduleSwitchWidth : .settingsSwitchWidth), height: height)
                 .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                     Circle().fill(theme.color(configuration.isOn ? .onAccent : .text2))
                         .frame(width: height - inset * 2, height: height - inset * 2)
@@ -57,7 +58,7 @@ package struct SegmentGroup<Content: View>: View {
     }
     package var body: some View {
         HStack(spacing: theme.component(.iconButtonGap)) { content() }
-            .padding(.horizontal, theme.component(.iconButtonGap)).frame(height: theme.component(.segmentHeight))
-            .overlay { RoundedRectangle(cornerRadius: theme.shape(.controlRadius)).strokeBorder(theme.color(.line), lineWidth: theme.shape(.borderWidth)).allowsHitTesting(false) }
+            .padding(theme.component(.iconButtonGap)).frame(height: theme.component(.settingsSegmentH))
+            .background(theme.color(.surface3), in: RoundedRectangle(cornerRadius: theme.component(.settingsSegmentRadius)))
     }
 }

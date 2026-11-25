@@ -14,6 +14,7 @@ public final class ReminderEditorModel {
     var listItems: [ScheduleItem] { items.filter { !$0.isCompleted || completedInList.contains($0.id) } }
     #if DEBUG
     package var previewCompletionHoverID: String?
+    @ObservationIgnored package var previewCenters: [String: CGFloat] = [:]
     #endif
     public var selectedID: String?
     public var input = "" { didSet { if input != oldValue { rebuildCandidates() } } }
@@ -37,14 +38,31 @@ public final class ReminderEditorModel {
     }
     public var datePicker: ScheduleDateSelection?
     public var selectedItem: ScheduleItem? { items.first { $0.id == selectedID } }
-    @ObservationIgnored weak var startField: NSTextField?
-    @ObservationIgnored weak var endField: NSTextField?
+    @ObservationIgnored weak var startField: ClockPicker?
+    @ObservationIgnored weak var endField: ClockPicker?
 
-    func focusTime(isEnd: Bool) {
+    func focusTime(isEnd: Bool, backward: Bool = false) {
         let field = isEnd ? endField : startField
         DispatchQueue.main.async { [weak field] in
-            if let field { field.window?.makeFirstResponder(field) }
+            guard let field, let window = field.window else { return }
+            if backward { window.selectKeyView(preceding: field.exit) }
+            else { window.selectKeyView(following: field.exit) }
         }
+    }
+
+    func changeTime(_ time: Date, isEnd: Bool) {
+        let day = isEnd ? end : start
+        let clock = calendar.dateComponents([.hour, .minute], from: time)
+        guard let hour = clock.hour, let minute = clock.minute,
+              let value = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day),
+              value != day else { return }
+        if isEnd {
+            end = value
+        } else {
+            end = value.addingTimeInterval(end.timeIntervalSince(start))
+            start = value
+        }
+        if save() { error = nil }
     }
 
     var tabDestination: Bool?

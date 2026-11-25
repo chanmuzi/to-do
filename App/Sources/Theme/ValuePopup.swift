@@ -4,6 +4,7 @@ import SwiftUI
 /// 이름 열 뒤에서 세그먼트와 글자 시작선을 공유하는 팝업.
 public struct ValuePopup: View {
     let inSettings: Bool
+    let fillsRow: Bool
     let label: String
     let value: String
     let dot: NSImage?
@@ -12,9 +13,10 @@ public struct ValuePopup: View {
     let makeMenu: () -> NSMenu
     let choose: (NSMenuItem) -> Void
 
-    public init(label: String, value: String, dot: NSImage? = nil, theme: Theme, inSettings: Bool = false,
+    public init(label: String, value: String, dot: NSImage? = nil, theme: Theme, inSettings: Bool = false, fillsRow: Bool = false,
                 menuOffset: CGSize? = nil, makeMenu: @escaping () -> NSMenu, choose: @escaping (NSMenuItem) -> Void) {
         self.menuOffset = menuOffset ?? CGSize(width: 0, height: theme.shape(.borderWidth))
+        self.fillsRow = fillsRow
         self.inSettings = inSettings
         self.label = label
         self.value = value
@@ -25,15 +27,16 @@ public struct ValuePopup: View {
     }
 
     public var body: some View {
-        let firstLetter = theme.component(.iconButtonGap) + theme.space(.sp3)
-        let leading = firstLetter - theme.component(.chromePaddingEnd)
-            - (dot.map { $0.size.width + theme.component(.badgePad) } ?? 0)
-        ValuePopupHost(popup: self).fixedSize().padding(.leading, inSettings ? 0 : leading)
+        ValuePopupHost(popup: self).fixedSize(horizontal: !fillsRow, vertical: true)
     }
 
     private struct ValuePopupHost: NSViewRepresentable {
         let popup: ValuePopup
         func makeNSView(context: Context) -> ValueButton { ValueButton(theme: popup.theme, inSettings: popup.inSettings) }
+        func sizeThatFits(_ proposal: ProposedViewSize, nsView: ValueButton, context: Context) -> CGSize? {
+            let size = nsView.intrinsicContentSize
+            return CGSize(width: popup.fillsRow ? proposal.width ?? size.width : size.width, height: size.height)
+        }
         func updateNSView(_ button: ValueButton, context: Context) {
             button.isEnabled = context.environment.isEnabled
             button.title = popup.value
@@ -76,12 +79,12 @@ class ValueButton: NSButton {
         NSAttributedString(string: title, attributes: [.font: font ?? theme.nsFont(.body), .foregroundColor: theme.nsColor(.text)])
     }
     private var textX: CGFloat {
-        theme.component(inSettings ? .settingsSegmentPad : .chromePaddingEnd) + (image.map { $0.size.width + theme.component(.badgePad) } ?? 0)
+        (inSettings ? theme.component(.settingsSegmentPad) : 0) + (image.map { $0.size.width + theme.space(.sp2) } ?? 0)
     }
-    private var chevronWidth: CGFloat { theme.component(inSettings ? .settingsChevronWidth : .menuDot) }
+    private var chevronWidth: CGFloat { theme.component(.settingsChevronWidth) }
     private var valueGap: CGFloat { theme.component(inSettings ? .chromeGap : .badgePad) }
     override var intrinsicContentSize: NSSize {
-        NSSize(width: textX + ceil(text.size().width) + valueGap + chevronWidth + (inSettings ? theme.space(.sp2) : theme.component(.chromePaddingEnd)),
+        NSSize(width: textX + ceil(text.size().width) + valueGap + chevronWidth + (inSettings ? theme.space(.sp2) : 0),
                height: theme.component(inSettings ? .controlHeight : .connectHeight))
     }
     override func mouseEntered(with event: NSEvent) { hovered = true; needsDisplay = true }
@@ -93,16 +96,17 @@ class ValueButton: NSButton {
             NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
         }
         if let image {
-            image.draw(in: CGRect(x: theme.component(inSettings ? .settingsSegmentPad : .chromePaddingEnd), y: (bounds.height - image.size.height) / 2,
+            image.draw(in: CGRect(x: inSettings ? theme.component(.settingsSegmentPad) : 0, y: (bounds.height - image.size.height) / 2,
                                   width: image.size.width, height: image.size.height))
         }
-        let value = text
-        value.draw(at: NSPoint(x: textX, y: (bounds.height - value.size().height) / 2))
-        drawChevron(at: textX + ceil(value.size().width) + valueGap, single: inSettings)
+        let arrowX = bounds.maxX - chevronWidth - (inSettings ? theme.space(.sp2) : 0)
+        MenuText.draw(title, font: font ?? theme.nsFont(.body), color: theme.nsColor(.text),
+                      x: textX, width: arrowX - valueGap - textX, center: bounds.midY, flipped: isFlipped)
+        drawChevron(at: arrowX, single: inSettings)
     }
     func drawChevron(at x: CGFloat, single: Bool) {
-        let width = theme.component(single ? .settingsChevronWidth : .menuDot)
-        let height = single ? theme.component(.settingsChevronHeight) : theme.space(.sp3)
+        let width = theme.component(.settingsChevronWidth)
+        let height = theme.component(.settingsChevronHeight)
         let y = bounds.midY - (single ? (isFlipped ? 1 : -1) * height / 3 : 0)
         let path = NSBezierPath()
         for sign: CGFloat in (single ? [isFlipped ? 1 : -1] : [-1, 1]) {

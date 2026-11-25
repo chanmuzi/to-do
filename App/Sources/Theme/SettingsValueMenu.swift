@@ -19,7 +19,7 @@ package final class SettingsValueMenu: NSPanel {
         let padding = theme.component(.settingsPopupGap)
         let width = min(first.preferredWidth, screen.visibleFrame.width)
         let rows = FlippedMenuDocument()
-        let innerWidth = width - 2 * padding
+        let innerWidth = width
         rows.frame.size.width = innerWidth
         var y: CGFloat = 0
         for item in menu.items {
@@ -36,15 +36,10 @@ package final class SettingsValueMenu: NSPanel {
                 rows.addSubview(row)
                 y += row.frame.height
             } else if item.isSeparatorItem {
-                let margin = theme.space(.sp1)
-                let inset = theme.space(.sp2)
-                let line = NSBox(frame: NSRect(x: inset, y: y + margin, width: innerWidth - 2 * inset,
-                                               height: theme.shape(.borderWidth)))
-                line.boxType = .custom
-                line.borderWidth = 0
-                line.fillColor = theme.nsColor(.valueMenuRule)
-                rows.addSubview(line)
-                y += 2 * margin + line.frame.height
+                let separator = MenuSeparatorView(theme: theme)
+                separator.frame = NSRect(x: 0, y: y, width: innerWidth, height: separator.bounds.height)
+                rows.addSubview(separator)
+                y += separator.frame.height
             }
         }
         rows.frame.size = NSSize(width: innerWidth, height: y)
@@ -70,7 +65,7 @@ package final class SettingsValueMenu: NSPanel {
         contentView = surface
         surface.setAccessibilityRole(.menu)
         surface.setAccessibilityLabel(anchor.accessibilityLabel())
-        let scroll = NSScrollView(frame: surface.bounds.insetBy(dx: padding, dy: padding))
+        let scroll = NSScrollView(frame: surface.bounds.insetBy(dx: 0, dy: padding))
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
         scroll.hasVerticalScroller = height < desired

@@ -25,7 +25,7 @@ import Theme
     @Test func everyRowActsOnceWhereverItIsPressed() {
         var chosen: [MoreMenuAction] = []
         let menu = NoteMenuBuilder(style: style).moreMenu(isPinned: true, selectedPaletteID: nil) { chosen.append($0) }
-        let rows = menu.items.compactMap { $0.view as? MenuRowView }
+        let rows = menu.items.compactMap { $0.view as? PickerMenuRow }
         #expect(rows.count == 10)
         for row in rows {
             row.layoutSubtreeIfNeeded()
