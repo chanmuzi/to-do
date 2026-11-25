@@ -55,11 +55,10 @@ nonisolated extension EditorCommands {
 
     /// 선택이 한 줄 안에 있고 그 줄이 코드가 아닐 때만 그 줄.
     static func inlineLine(_ doc: MarkdownDocument, _ selection: NSRange) -> MarkdownLine? {
-        let index = doc.lineIndex(at: selection.location)
-        let line = doc.lines[index]
-        // 줄 머리(감춘 기호)부터 고른 선택(⇧Home)은 글자가 보이기 시작하는 자리부터로 본다.
-        guard doc.lineIndex(at: NSMaxRange(selection)) == index, !line.kind.isCode,
-              NSMaxRange(selection) >= line.contentStart else { return nil }
+        let line = doc.line(at: selection.location)
+        // AppKit의 문단 선택에는 그 줄의 끝 개행도 들어간다.
+        let end = NSMaxRange(selection)
+        guard !line.kind.isCode, end >= line.contentStart, end <= NSMaxRange(line.fullRange) else { return nil }
         return line
     }
 
@@ -69,7 +68,7 @@ nonisolated extension EditorCommands {
         var start = line.visualEnd(from: max(selection.location, line.contentStart))
         // 백슬래시로 막은 글자는 백슬래시째로 고른다.
         if let escape = line.escape(splitAt: start) { start = escape.range.location }
-        let end = line.visualStart(from: NSMaxRange(selection))
+        let end = line.visualStart(from: min(NSMaxRange(selection), line.end))
         return end > start ? NSRange(location: start, length: end - start) : nil
     }
 

@@ -13,14 +13,15 @@ nonisolated extension EditorCommands {
     /// (선택 없음, 여러 줄, 코드 안, 다른 링크에 걸친 선택).
     static func linkTarget(_ doc: MarkdownDocument, selection: NSRange) -> LinkTarget? {
         guard let line = inlineLine(doc, selection) else { return nil }
+        let visible = visibleSelection(selection, in: line)
+        let label = visible ?? selection
         let isLink: (InlineSpan) -> Bool = { if case .link = $0.kind { true } else { false } }
         if let span = line.markedSpans.last(where: {
-            isLink($0) && ($0.range == selection || ($0.contentRange.location <= selection.location && NSMaxRange(selection) <= NSMaxRange($0.contentRange)))
+            isLink($0) && ($0.range == selection || ($0.contentRange.location <= label.location && NSMaxRange(label) <= NSMaxRange($0.contentRange)))
         }) {
             return .existing(span)
         }
-        guard let visible = visibleSelection(selection, in: line),
-              let outside = outsideCode(visible, in: line, allowsInside: false) else { return nil }
+        guard let visible, let outside = outsideCode(visible, in: line, allowsInside: false) else { return nil }
         // 고른 글자만 링크로 만든다. 글자가 통째로 든 구간은 기호까지 넣고, 한쪽만 걸친 구간은 넓히지 않는다
         // (넣을 때 그 구간을 링크 앞뒤에서 나눈다).
         var lower = outside.location
