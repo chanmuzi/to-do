@@ -7,7 +7,7 @@ struct ScheduleDetail: View {
     @Bindable var model: ReminderEditorModel
     let item: ScheduleItem
     let theme: Theme
-    private enum Field: Hashable { case title, day, start, end, allDay, calendar }
+    private enum Field: Hashable { case title, day, start, end, allDay, calendar, imminentLead }
     @State private var lastFocus: Field = .title
     @FocusState private var focus: Field?
     private var destination: ScheduleDestination? { model.destinationForItem(item) }
@@ -78,6 +78,16 @@ struct ScheduleDetail: View {
                     if let id { model.chooseCalendar(id) }
                 }.disabled(choices.isEmpty).focused($focus, equals: .calendar)
             }
+            if model.showsImminentLead {
+                row("timer") {
+                    Text("임박 표시").foregroundStyle(theme.color(.text2))
+                    Spacer()
+                    ValuePopup(label: "임박 표시", value: item.imminentLeadMinutes?.label ?? model.defaultLeadLabel,
+                               theme: theme, makeMenu: makeLeadMenu) { choice in
+                        model.chooseImminentLead(ImminentLead(rawValue: choice.tag))
+                    }.focused($focus, equals: .imminentLead)
+                }
+            }
             if let line = item.inlineSource?.line ?? item.todo?.line, line >= 0 {
                 theme.color(.line).frame(height: theme.shape(.borderWidth)).padding(.horizontal, theme.component(.scheduleInset))
                     .padding(.vertical, theme.component(.chromePaddingEnd))
@@ -89,6 +99,7 @@ struct ScheduleDetail: View {
             .background(DetailTabOrder { backward in
                 let times: [Field] = model.dateOnly ? [] : (model.hasEnd ? [.start, .end] : [.start])
                 let fields: [Field] = [.title, .day] + times + [.allDay] + (model.calendarChoices(item.kind).isEmpty ? [] : [.calendar])
+                    + (model.showsImminentLead ? [.imminentLead] : [])
                 let current: Field = model.startField?.currentEditor() != nil ? .start
                     : (model.endField?.currentEditor() != nil ? .end : focus ?? lastFocus)
                 let index = fields.firstIndex(of: current) ?? 0
@@ -107,6 +118,25 @@ struct ScheduleDetail: View {
             }
             .onAppear { focus = .title }
             .onChange(of: focus) { _, next in if let next { lastFocus = next } }
+    }
+
+    private func makeLeadMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.minimumWidth = theme.component(.menuWidth)
+        func append(_ lead: ImminentLead?) {
+            let title = lead?.label ?? model.defaultLeadLabel
+            let choice = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            let selected = item.imminentLeadMinutes == lead
+            choice.state = selected ? .on : .off
+            choice.tag = lead?.rawValue ?? 0
+            choice.view = PickerMenuRow(theme: theme, text: title, dot: nil, selected: selected)
+            menu.addItem(choice)
+        }
+        append(nil)
+        menu.addItem(.separator())
+        ImminentLead.allCases.forEach { append($0) }
+        return menu
     }
 
     private var markerColor: Color {

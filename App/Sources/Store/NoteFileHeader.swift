@@ -121,7 +121,11 @@ extension NoteFileCodec {
         case .space: isUnchanged = field.value == (content.spaceID?.rawValue ?? "")
         case .color: isUnchanged = field.value == (content.colorID?.rawValue ?? "")
         case .reminder: isUnchanged = parseDate(field.value) == content.reminder
-        case .schedules: isUnchanged = decodeSchedules(field.value) == content.schedules
+        case .schedules:
+            isUnchanged = decodeSchedules(field.value) == content.schedules
+            if !isUnchanged, let items = content.schedules {
+                return "schedules: " + encodeSchedules(items, preservingUnknownFieldsIn: field.value)
+            }
         case .archived: isUnchanged = Bool(field.value) == content.archived
         case .created: isUnchanged = true
         }

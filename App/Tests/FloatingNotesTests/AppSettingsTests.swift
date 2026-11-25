@@ -3,6 +3,7 @@ import Foundation
 import Models
 import Routing
 import Testing
+import Theme
 @testable import FloatingNotes
 
 /// 메뉴 막대 아이콘을 보일지의 설정과, 아이콘 없이도 같은 기능에 닿는 길(Dock 메뉴, 앱 메뉴).
@@ -173,6 +174,20 @@ import Testing
 }
 
 extension AppSettingsTests {
+    @Test @MainActor func imminentLeadDefaultsRoundTripAndApplyImmediately() throws {
+        for json in ["{}", #"{"imminentLeadMinutes":77}"#, #"{"imminentLeadMinutes":"15"}"#] {
+            #expect(try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8)).imminentLeadMinutes == .thirty)
+        }
+        defer { cleanUp() }
+        let settings = try AppSettingsStore(stateDirectory: directory)
+        var applied: TimeInterval?
+        SettingsApplication.follow(settings, theme: try Theme.bundled(), appearanceOverride: nil,
+            setAppearance: { _ in }, applyDisplay: { display, _ in applied = display.imminentLeadTime }, showMenuIcon: { _ in })
+        #expect(applied == 1800)
+        try settings.update { $0.imminentLeadMinutes = .sixty }
+        #expect(applied == 3600)
+        #expect(try AppSettingsStore(stateDirectory: directory).settings.imminentLeadMinutes == .sixty)
+    }
     @Test func scheduleFormatDefaultsAndRoundTrips() throws {
         #expect(try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8)).scheduleDateFormat == "relative")
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("schedule-format-\(UUID())")

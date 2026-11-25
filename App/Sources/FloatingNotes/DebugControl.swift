@@ -301,6 +301,29 @@ final class DebugControl {
                 }
             }
         case ("reminder-close", _, _): reminderEditor?.close()
+        case ("reminder-lead-menu", let name?, _) where isPassive:
+            guard let root = reminderEditor?.contentView, let parent = root.window,
+                  let button = DebugInputVerification.descendant(in: root, matching: {
+                      $0 is NSButton && $0.accessibilityLabel() == "임박 표시"
+                  }) as? NSButton, let menu = button.menu, let url = output(named: name.rawValue) else { return }
+            verificationMenu = menu
+            // 메뉴 추적 루프에서 실제 부모와 메뉴 창만 기록하고 입력 이벤트 없이 추적을 끝낸다.
+            let capture = Timer(timeInterval: 0.3, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let menu = self.verificationMenu else { return }
+                    defer { menu.cancelTracking() }
+                    guard let popup = menu.items.compactMap({ $0.view?.window }).first,
+                          popup !== parent else { return }
+                    self.write(parent, to: url.deletingPathExtension().appendingPathExtension("parent.png"), audit: false)
+                    self.write(popup, to: url, audit: false)
+                    self.write(json: ["parent": NSStringFromRect(parent.frame), "menu": NSStringFromRect(popup.frame)],
+                                to: url.appendingPathExtension("frames.json"))
+                }
+            }
+            RunLoop.main.add(capture, forMode: .common)
+            button.sendAction(button.action, to: button.target)
+            capture.invalidate()
+            verificationMenu = nil
         case ("reminder-snapshot", let name?, _):
             guard let url = output(named: name.rawValue) else { return }
             write(reminderEditor?.contentView?.window, to: url)

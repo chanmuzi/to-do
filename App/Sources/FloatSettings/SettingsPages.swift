@@ -50,6 +50,7 @@ extension SettingsView {
         card {
             setting("날짜 표시", \.scheduleDateFormat, [("relative", "내일 오후 3:00"), ("absolute", "11월 19일 오후 3:00")])
             setting("시간 형식", \.clockFormat, [("twelveHour", "3:00 PM"), ("koreanMeridiem", "오후 3:00"), ("twentyFourHour", "15:00")])
+            setting("임박 표시", \.imminentLeadMinutes, ImminentLead.allCases.map { ($0, $0.label) })
             ForEach([ScheduleItem.Kind.event, .reminder], id: \.self) { kind in
                 if let menu = model.menus[kind] {
                     let title = kind == .event ? "기본 캘린더" : "미리 알림 목록"

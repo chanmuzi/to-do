@@ -43,10 +43,10 @@ private extension UpcomingRow {
         }
     }
 
-    func detailTime(_ model: LibraryModel) -> String {
+    func presentation(_ model: LibraryModel) -> ReminderPresentation {
         var options = model.displayOptions
         options.reminder = .time
-        return ReminderPresentation(item: item, now: model.index.now, options: options, calendar: model.index.calendar).text ?? ""
+        return ReminderPresentation(item: item, now: model.index.now, options: options, calendar: model.index.calendar)
     }
 
     func color(_ model: LibraryModel) -> Color {
@@ -62,6 +62,7 @@ struct UpcomingButton: View {
 
     var body: some View {
         let selected = model.upcomingID == entry.id
+        let presentation = entry.presentation(model)
         Button {
             model.toggleUpcoming(entry.id)
         } label: {
@@ -74,7 +75,8 @@ struct UpcomingButton: View {
                 Text(entry.sidebarTime(now: model.index.now, calendar: model.index.calendar, clock: model.displayOptions.clock))
                     .lineLimit(1).font(theme.libraryNumberFont)
                     .frame(maxWidth: theme.component(.libraryUpcomingTimeWidth), alignment: .trailing).fixedSize(horizontal: true, vertical: false)
-                    .foregroundStyle(theme.libraryColor(selected ? .text2 : .text3)).layoutPriority(1)
+                    .foregroundStyle(theme.libraryColor(presentation.status == .imminent ? .warn : selected ? .text2 : .text3))
+                    .accessibilityLabel(presentation.accessibilityLabel).layoutPriority(1)
             }.padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
                 .font(theme.font(.body, size: theme.tokens.textStyle(.ui).size))
                 .foregroundStyle(theme.libraryColor(selected ? .text : .text2))
@@ -96,14 +98,16 @@ struct UpcomingDetail: View {
     @State private var height: CGFloat = 0
 
     var body: some View {
+        let presentation = entry.presentation(model)
         let gap = theme.component(.chromePaddingEnd)
         let top = min(max(0, rowMidY - theme.component(.controlHeight)), max(0, availableHeight - height))
         let bubble = UpcomingBubble(tipY: rowMidY - top, radius: theme.shape(.windowRadius), tail: gap)
         let shadow = theme.shadow(.pop).last
         VStack(alignment: .leading, spacing: 0) {
             Text(entry.title).font(theme.font(.title)).lineLimit(1)
-            Text(entry.detailTime(model)).font(theme.libraryNumberFont)
-                .foregroundStyle(theme.libraryColor(.text2)).padding(.top, theme.space(.sp1))
+            Text(presentation.text ?? "").font(theme.libraryNumberFont)
+                .foregroundStyle(theme.libraryColor(presentation.status == .imminent ? .warn : .text2))
+                .accessibilityLabel(presentation.accessibilityLabel).padding(.top, theme.space(.sp1))
             if let destination = entry.destination(model) {
                 HStack(spacing: gap) {
                     Circle().fill(entry.color(model)).frame(width: theme.component(.badgeDot), height: theme.component(.badgeDot))

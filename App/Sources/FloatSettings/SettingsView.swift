@@ -204,7 +204,7 @@ struct SettingsView: View {
             .accessibilityElement(children: .contain).accessibilityLabel(title)
     }
 
-    func setting(_ title: String, _ key: WritableKeyPath<SettingsValues, String>, _ choices: [(String, String)]) -> some View {
+    func setting<Value: Equatable>(_ title: String, _ key: WritableKeyPath<SettingsValues, Value>, _ choices: [(Value, String)]) -> some View {
         segment(title, value: model.values[keyPath: key], choices: choices) { value in model.change { $0[keyPath: key] = value } }
     }
 
