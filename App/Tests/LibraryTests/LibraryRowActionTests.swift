@@ -39,7 +39,7 @@ import Testing
         override var mouseLocationOutsideOfEventStream: NSPoint { point }
     }
 
-    @Test func stationaryPointerTracksReplacementAndKeyboardFocusFollowsPinnedNote() throws {
+    @Test func stationaryPointerTracksReplacementAndKeyboardFocusFollowsPinnedNote() async throws {
         let f = try LibraryInteractionTests.Fixture()
         defer { try? f.close() }
         let one = try f.notes.create(NoteDraft(title: "첫 노트"))
@@ -48,14 +48,14 @@ import Testing
         f.model.select(.all)
         f.model.togglePin(one)
         f.model.togglePin(two)
-        let window = PointerWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500),
+        let window = PointerWindow(contentRect: NSRect(x: -4000, y: -4000, width: 800, height: 500),
                                    styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let root = LibraryHostingView(rootView: LibraryRootView(model: f.model))
         window.contentView = root
+        window.orderFront(nil)
         root.layoutSubtreeIfNeeded()
-        ui.settle()
         let pinned = try #require(f.model.sections.first?.notes)
         #expect(pinned.count == 2)
         let first = try #require(root.libraryNoteRow(pinned[0].id))
@@ -66,7 +66,10 @@ import Testing
         let pointOnPin = NSPoint(x: first.pin.frame.midX, y: first.pin.frame.midY)
         #expect(first.hitTest(first.convert(pointOnPin, to: first.superview)) === first.pin)
         first.pin.performClick(nil)
-        RunLoop.main.run(until: Date().addingTimeInterval(f.model.theme.motion.duration + 0.05))
+        // 핀 동작이 메인 큐에서 새 줄 배치와 포커스 이동을 마친 뒤 확인한다.
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
         root.layoutSubtreeIfNeeded()
         let replacement = try #require(root.libraryNoteRow(pinned[1].id))
         #expect(replacement.visibleRect.contains(replacement.convert(originallyAt, from: nil)))

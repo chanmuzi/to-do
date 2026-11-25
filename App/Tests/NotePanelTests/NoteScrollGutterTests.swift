@@ -38,7 +38,10 @@ import Testing
         controller.editor.text = Array(repeating: "본문", count: 9).joined(separator: "\n")
         let task = controller.heightAnimation
         if fixture.animates {
-            #expect(await fixture.wait { controller.panel.frame.height > initial.height })
+            let first = try #require(controller.heightTransition)
+            let midpoint = controller.heightStartedAt + .seconds(first.duration / 2)
+            #expect(controller.advanceHeightAnimation(at: midpoint))
+            #expect(controller.panel.frame.height > initial.height && controller.panel.frame.height < first.to)
         }
         let displayed = controller.panel.frame.height
         controller.editor.text = Array(repeating: "본문", count: 11).joined(separator: "\n")
@@ -56,7 +59,7 @@ import Testing
         #expect(!controller.root.scrollView.hasVerticalScroller)
     }
 
-    @Test func lastCaretLineStaysVisibleWhileTheWindowGrows() async throws {
+    @Test func lastCaretLineStaysVisibleWhileTheWindowGrows() throws {
         let fixture = try NotePanelFixture()
         let panel = try fixture.makeCoordinator()
         defer { fixture.cleanUp(panel) }
@@ -75,12 +78,20 @@ import Testing
         let glyph = layout.glyphIndexForCharacter(at: end - 1)
         let line = layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
             .offsetBy(dx: text.textContainerOrigin.x, dy: text.textContainerOrigin.y)
-        let settled = await fixture.wait {
+        func expectVisibleCaret() {
             controller.root.layoutSubtreeIfNeeded()
             #expect(scroll.documentVisibleRect.contains(line))
             #expect(!scroll.hasVerticalScroller)
-            return controller.heightTarget == nil
         }
-        #expect(settled)
+        expectVisibleCaret()
+        if fixture.animates {
+            let transition = try #require(controller.heightTransition)
+            let start = controller.heightStartedAt
+            #expect(controller.advanceHeightAnimation(at: start + .seconds(transition.duration / 2)))
+            expectVisibleCaret()
+            #expect(!controller.advanceHeightAnimation(at: start + .seconds(transition.duration)))
+            expectVisibleCaret()
+        }
+        #expect(controller.heightTarget == nil)
     }
 }

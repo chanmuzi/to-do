@@ -37,6 +37,15 @@ final class TopRowView: NSView {
     private let pinButton: IconButton
     private var state: TopRowState?
     private var drawerPhase: CGFloat = 0
+    private struct DrawerTransition {
+        let from: CGFloat
+        let target: CGFloat
+
+        func phase(after fraction: CGFloat) -> CGFloat {
+            target > from ? min(target, from + fraction) : max(target, from - fraction)
+        }
+    }
+    private var drawerTransition: DrawerTransition?
     private var drawerAnimation: Task<Void, Never>?
     private var clockFade: Task<Void, Never>?
     /// 저장 문제 표시의 자리. 표시가 다 사라질 때까지 자리를 지킨다.
@@ -148,6 +157,7 @@ final class TopRowView: NSView {
         if !animated || previous == nil || style.transitionDuration == 0 {
             drawerAnimation?.cancel()
             drawerAnimation = nil
+            drawerTransition = nil
             drawerPhase = target
         } else if previous?.hoverControlsAlpha != target {
             animateDrawer(to: target)
@@ -158,22 +168,31 @@ final class TopRowView: NSView {
 
     private func animateDrawer(to target: CGFloat) {
         drawerAnimation?.cancel()
-        let from = drawerPhase
+        drawerTransition = DrawerTransition(from: drawerPhase, target: target)
         let start = ProcessInfo.processInfo.systemUptime
         let duration = style.transitionDuration
-        let direction: CGFloat = target > from ? 1 : -1
         let interval = 1.0 / Double(max(1, window?.screen?.maximumFramesPerSecond ?? 60))
         drawerAnimation = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 let elapsed = ProcessInfo.processInfo.systemUptime - start
-                drawerPhase = style.reducesMotion ? target : min(1, max(0, from + direction * elapsed / duration))
-                needsLayout = true
-                layoutSubtreeIfNeeded()
-                if drawerPhase == target { return }
+                if !advanceDrawer(by: elapsed / duration) { return }
                 try? await Task.sleep(for: .seconds(interval))
             }
         }
+    }
+
+    /// 이번 전환이 시작된 뒤 지난 시간을 전체 서랍 이동 시간의 비율로 받는다.
+    @discardableResult func advanceDrawer(by elapsedFraction: CGFloat) -> Bool {
+        guard let transition = drawerTransition else { return false }
+        drawerPhase = style.reducesMotion ? transition.target : transition.phase(after: elapsedFraction)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        if drawerPhase == transition.target {
+            drawerTransition = nil
+            return false
+        }
+        return true
     }
 
     /// 저장 문제 표시는 알파로 `dur` 동안 나타나고 사라진다(규칙 8). 사라지는 동안에는 자리를 지킨다.

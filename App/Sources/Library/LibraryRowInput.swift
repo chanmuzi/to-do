@@ -106,8 +106,11 @@ final class LibraryRowInputView: NSView {
         synchronizeHover(at: window?.mouseLocationOutsideOfEventStream)
     }
 
-    func synchronizeHover(at windowPoint: NSPoint?) {
-        pointer = windowPoint.map { convert($0, from: nil) }.flatMap { bounds.contains($0) && visibleRect.contains($0) ? $0 : nil }
+    func synchronizeHover(at windowPoint: NSPoint?, forceUpdate: Bool = false) {
+        let local = windowPoint.map { convert($0, from: nil) }
+            .flatMap { bounds.contains($0) && visibleRect.contains($0) ? $0 : nil }
+        guard local != pointer || forceUpdate else { return }
+        pointer = local
         updateActions()
     }
     override func mouseEntered(with event: NSEvent) { synchronizeHover(at: event.locationInWindow) }
@@ -208,7 +211,7 @@ final class LibraryRowInputView: NSView {
     @objc private func menuClosing() {
         NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: popup)
         popup = nil
-        synchronizeHover(at: window?.mouseLocationOutsideOfEventStream)
+        synchronizeHover(at: window?.mouseLocationOutsideOfEventStream, forceUpdate: true)
     }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

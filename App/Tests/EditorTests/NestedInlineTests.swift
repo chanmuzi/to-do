@@ -108,6 +108,7 @@ import Theme
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.translateBy(x: -rect.minX, y: rect.maxY)
         context.scaleBy(x: 1, y: -1)
+        fragment.drawBackground(at: .zero, in: context)
         fragment.draw(at: .zero, in: context)
         let bitmap = NSBitmapImageRep(cgImage: try #require(context.makeImage()))
         let expected = try #require(h.controller.style.highlightBackground(1).usingColorSpace(.deviceRGB))

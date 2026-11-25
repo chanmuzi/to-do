@@ -1,4 +1,5 @@
 import AppKit
+import Models
 import Testing
 import Theme
 @testable import Editor
@@ -185,8 +186,7 @@ import Theme
         #expect(NSCursor.current == NSCursor.arrow)
     }
 
-    /// 코드 블록의 복사 버튼, 체크박스, 꺾쇠, 링크 위에서는 화살표, 글자 위에서는 I자 커서(규칙 9). 텍스트 뷰가
-    /// 마우스가 움직일 때마다 I자 커서를 넣어도, 누를 수 있는 것 위에서는 화살표로 남는다.
+    /// 버튼은 화살표, 열 수 있는 링크는 손가락, 보통 글자는 I자 커서를 쓴다.
     @Test func clickableOverlaysShowTheArrowCursor() throws {
         let host = try Host("[ ] 할 일\n+ 토글\n\t안\n[링크](https://example.com)\n```\nlet x = 1\n```\n끝")
         let view = host.editor.controller.textView
@@ -204,11 +204,21 @@ import Theme
         #expect(NSCursor.current == NSCursor.arrow)
         #expect(controller.isInteractive(at: CGPoint(x: button.midX, y: button.midY)))
         #expect(controller.hoveredCodeBlock != nil)
-        // 체크박스, 꺾쇠, 링크.
-        for point in [controller.gutterPoint(forLine: 0), controller.gutterPoint(forLine: 1), controller.textPoint(forLine: 3)] {
+        // 체크박스와 꺾쇠는 링크 옆에서도 화살표를 유지한다.
+        for point in [controller.gutterPoint(forLine: 0), controller.gutterPoint(forLine: 1)] {
             try move(to: try #require(point))
             #expect(NSCursor.current == NSCursor.arrow)
         }
+        try move(to: try #require(controller.textPoint(forLine: 3)))
+        #expect(NSCursor.current == NSCursor.pointingHand)
+        let now = Date()
+        let item = ScheduleItem(start: now, inlineSource: InlineScheduleSource(line: 0, text: "[ ] 할 일"))
+        let note = Note(id: .make(), body: host.editor.text, schedules: [item], created: now, modified: now)
+        host.editor.setScheduleMarkers(ScheduleLineMarker.markers(in: note, now: now, options: .init(), calendar: .current))
+        let dot = try #require(controller.scheduleButtons[0])
+        try #require(!dot.isHidden && !dot.frame.isEmpty)
+        try move(to: CGPoint(x: dot.frame.midX, y: dot.frame.midY))
+        #expect(NSCursor.current == NSCursor.arrow)
         // 보통 글자 위는 I자 커서이고, 블록을 떠나 버튼이 사라진 자리도 그렇다.
         try move(to: try #require(controller.textPoint(forLine: 7)))
         #expect(NSCursor.current == NSCursor.iBeam)
