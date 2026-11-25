@@ -627,7 +627,7 @@ import Testing
         #expect(popup.frame.width == 210 && popup.frame.maxX - anchor.maxX == 12 && anchor.minY - popup.frame.maxY == 4)
         let surface = try #require(popup.contentView)
         let workRow = try #require(first(PickerMenuRow.self, in: surface) { $0.accessibilityLabel() == "업무" })
-        #expect(workRow.window === popup && workRow.frame.height == 26 && workRow.frame.width == 200)
+        #expect(workRow.window === popup && workRow.frame.height == 28 && workRow.frame.width == 210)
         let menuRows = try #require(workRow.superview).subviews.compactMap { $0 as? PickerMenuRow }
         for (previous, next) in zip(menuRows, menuRows.dropFirst()) {
             #expect(previous.frame.maxY <= next.frame.minY)

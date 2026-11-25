@@ -89,7 +89,7 @@ import Scheduling
             model.select(item.id)
             let theme = try Theme.bundled()
             try FieldGeometry.verifyHosted(NSHostingView(rootView: ScheduleDetail(model: model, item: item, theme: theme)),
-                                           labels: ["제목", "시작", "끝"])
+                                           labels: ["제목"])
             let state = ScheduleDateSelection(selected: now, now: now, calendar: calendar)
             try FieldGeometry.verifyHosted(NSHostingView(rootView: ScheduleDatePicker(state: state, model: model, theme: theme)),
                                            labels: ["날짜를 입력하세요"])
@@ -156,40 +156,143 @@ import Scheduling
         #expect(saves > 0)
     }
 
-    @Test func titleTabOpensDateAndReturnToTimeKeepsSameEditor() async throws {
-        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("schedule-tab-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = try FileNoteStore(location: .isolated(notesDirectory: root))
-        let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
-        let id = try store.create(NoteDraft(schedules: [item])).id
+    @Test func calendarPopupUsesSharedRowsAndKeepsTheSelectedID() throws {
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            let bridge = FakeCalendarBridge()
+            model.calendarChoices = bridge.writableChoices(for:)
+            model.destination = bridge.destination(for:)
+            let theme = try Theme.bundled()
+            let host = NSHostingView(rootView: ReminderEditorView(model: model, theme: theme, close: {}))
+            let window = NSPanel(contentRect: CGRect(origin: .zero, size: host.fittingSize),
+                                 styleMask: .borderless, backing: .buffered, defer: false)
+            window.contentView = host
+            defer { window.contentView = nil }
+            host.layoutSubtreeIfNeeded()
+            @MainActor func calendarButton(in view: NSView) -> NSButton? {
+                if let button = view as? NSButton, button.accessibilityLabel() == "캘린더" { return button }
+                return view.subviews.lazy.compactMap(calendarButton).first
+            }
+            let menu = try #require(calendarButton(in: host)?.menu)
+            let rows = menu.items.compactMap { $0.view as? PickerMenuRow }
+            #expect(rows.count == 4 && rows.allSatisfy { $0.frame.height == 28 && $0.textFont.pointSize == 13 })
+            #expect(menu.items.first { $0.title == "개인 일정" }?.state == .on)
+            #expect(menu.items.filter(\.isSeparatorItem).allSatisfy { $0.view is MenuSeparatorView })
+            menu.performActionForItem(at: menu.indexOfItem(withTitle: "업무"))
+            #expect(try store.load(id).schedules.first?.pendingCalendarID == "work")
+        }
+    }
+
+    @Test func detailRowCentersMatchTheirLabelsAndAccessories() throws {
         _ = NSApplication.shared
-        let owner = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        let coordinator = ReminderEditorCoordinator(notes: store, theme: try Theme.bundled())
-        coordinator.allowsKeyWindows = false
-        defer { coordinator.close() }
-        try coordinator.show(id, anchor: try #require(owner.contentView))
-        let model = try #require(coordinator.model)
-        model.select(item.id)
-        let window = try #require(coordinator.contentView?.window)
-        try await Task.sleep(for: .milliseconds(80))
-        let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-            characters: "\t", charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48))
-        NSApp.sendEvent(event)
-        try await Task.sleep(for: .milliseconds(80))
-        let panel = try #require(model.pickerWindow)
-        let field = try #require(panel.firstResponder as? NSTextView)
-        let input = try #require(field.delegate as? NSTextField)
-        let handled = input.delegate?.control?(input, textView: field, doCommandBy: #selector(NSResponder.insertTab(_:)))
-        #expect(handled == true)
-        try await Task.sleep(for: .milliseconds(80))
-        #expect(model.datePicker == nil && model.selectedID == item.id)
-        let time = try #require(window.firstResponder as? NSTextView)
-        #expect(model.startField?.currentEditor() === time)
-        NSApp.sendEvent(event)
-        try await Task.sleep(for: .milliseconds(80))
-        let end = try #require(window.firstResponder as? NSTextView)
-        #expect(model.endField?.currentEditor() === end)
+        _ = FontRegistrar.registerBundledFonts()
+        try fixture { model, store, id in
+            let midnight = calendar.startOfDay(for: now)
+            let item = ScheduleItem(start: midnight, end: midnight.addingTimeInterval(3600), title: "정렬",
+                                    todo: .init(line: 0, text: "원문"))
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            let host = NSHostingView(rootView: ReminderEditorView(model: model, theme: try Theme.bundled(), close: {}))
+            let window = NSWindow(contentRect: CGRect(origin: .zero, size: host.fittingSize), styleMask: .borderless,
+                                  backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: .aqua)
+            window.contentView = host
+            defer { window.contentView = nil }
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+            let start = try #require(model.startField)
+            let end = try #require(model.endField)
+            let startRect = start.convert(start.bounds, to: host)
+            let endRect = end.convert(end.bounds, to: host)
+            let range = startRect.union(endRect)
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: range))
+            host.cacheDisplay(in: range, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / range.width
+            let ink = (0..<bitmap.pixelsWide).filter { x in
+                (0..<bitmap.pixelsHigh).contains { y in
+                    guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return false }
+                    return color.alphaComponent * (1 - color.redComponent) > 0.29
+                }
+            }
+            let startEdge = Int((startRect.width * scale).rounded())
+            let endEdge = Int(((endRect.minX - range.minX) * scale).rounded())
+            let lastStart = try #require(ink.last { $0 < startEdge })
+            let separator = ink.filter { $0 >= startEdge && $0 < endEdge }
+            let firstMark = try #require(separator.first)
+            let lastMark = try #require(separator.last)
+            let firstEnd = try #require(ink.first { $0 >= endEdge })
+            let left = CGFloat(firstMark - lastStart - 1) / scale
+            let right = CGFloat(firstEnd - lastMark - 1) / scale
+            let gap = try Theme.bundled().space(.sp2)
+            print("시간 범위 간격", left, right)
+            #expect(left == gap && right == gap)
+            let centers = model.previewCenters
+            print("행 중심", centers)
+            for (icon, label) in [("titleDot", "title"), ("clock", "~"), ("sun.max", "종일"), ("sun.max", "switch"),
+                                  ("calendar", "calendarValue"), ("timer", "임박 표시"), ("timer", "leadValue"),
+                                  ("text.alignleft", "본문 1번째 줄")] {
+                let first = try #require(centers[icon])
+                let second = try #require(centers[label])
+                #expect(abs(first - second) <= 0.5, "\(icon), \(label)")
+            }
+        }
+    }
+
+    @Test func timeFieldsUseNativeSegmentsAndLinkInBothDirections() throws {
+        _ = NSApplication.shared
+        _ = FontRegistrar.registerBundledFonts()
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now, end: now.addingTimeInterval(3600), title: "회의")
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            let theme = try Theme.bundled()
+            let host = NSHostingView(rootView: ReminderEditorView(model: model, theme: theme, close: {}))
+            let size = host.fittingSize
+            let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: .borderless, backing: .buffered, defer: false)
+            window.contentView = host
+            defer { window.contentView = nil }
+            host.layoutSubtreeIfNeeded()
+            let start = try #require(model.startField)
+            let end = try #require(model.endField)
+            #expect(start.nextValidKeyView === end && end.previousValidKeyView === start)
+            #expect(start.previousValidKeyView === start.exit && end.nextValidKeyView === end.exit)
+            #expect(size.width == 280)
+            let title = try #require(FieldGeometry.fields(in: host).first)
+            for field: NSControl in [title, start, end] {
+                let rect = field.convert(field.bounds, to: host)
+                let cap = rect.minY + field.firstBaselineOffsetFromTop - (field.font?.capHeight ?? 0) / 2
+                let center: CGFloat = field === title ? 52 : 82
+                print("상세 정렬", field.accessibilityLabel() ?? "", rect, cap, center)
+                #expect(abs(cap - center) <= 0.5)
+                #expect(host.bounds.contains(rect))
+            }
+            for field in [start, end] {
+                #expect(field.locale?.identifier == ScheduleDateSelection.displayLocale.identifier)
+                #expect(field.locale?.language.languageCode == "ko")
+                #expect(field.datePickerStyle == .textField && field.datePickerElements == .hourMinute)
+                #expect(!field.isBordered && !field.isBezeled && !field.drawsBackground && field.font?.pointSize == 13)
+            }
+            model.showDates()
+            model.tabFromDate(backward: false)
+            #expect(model.datePicker == nil && model.selectedID == item.id)
+            let later = now.addingTimeInterval(1800)
+            start.dateValue = later
+            start.sendAction(start.action, to: start.target)
+            #expect(try store.load(id).schedules.first?.end == later.addingTimeInterval(3600))
+            end.dateValue = now
+            end.sendAction(end.action, to: end.target)
+            #expect(model.error != nil)
+            #expect(try store.load(id).schedules.first?.end == later.addingTimeInterval(3600))
+            end.dateValue = later.addingTimeInterval(7200)
+            end.sendAction(end.action, to: end.target)
+            #expect(model.error == nil)
+            #expect(try store.load(id).schedules.first?.end == end.dateValue)
+        }
     }
 
     @Test func schedulePopoverOutsideClickDismissesWhileInsideClickKeepsDraft() throws {

@@ -1,7 +1,7 @@
 import AppKit
 import Routing
 import Testing
-import Theme
+@testable import Theme
 @testable import NotePanel
 
 /// 더 보기 메뉴에서 아직 이어지지 않은 화면을 여는 항목은 자리를 지킨 채 고를 수 없다(D-034).
@@ -22,12 +22,11 @@ import Theme
             "리마인더 설정", "스페이스 옮기기",
         ])
         let pinned = try #require(menu.item(withTitle: "항상 위에 고정 해제"))
-        let row = try #require(pinned.view)
+        let row = try #require(pinned.view as? PickerMenuRow)
         row.layoutSubtreeIfNeeded()
-        let images = row.subviews.compactMap { $0 as? NSImageView }
         #expect(pinned.state == .off && row.bounds.width == 210 && menu.minimumWidth == 210)
-        #expect(pinned.accessibilityLabel() == pinned.title && images.count == 1)
-        #expect(row.subviews.compactMap { $0 as? NSTextField }.first?.frame.minX == 36)
+        #expect(pinned.accessibilityLabel() == pinned.title && row.dot != nil)
+        #expect(row.titleOriginX == 36)
         // 고를 수 없는 항목은 눌러도 동작이 가지 않고, 고를 수 있는 항목은 간다.
         menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "리마인더 설정" }))
         #expect(chosen.isEmpty)

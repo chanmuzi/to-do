@@ -11,13 +11,13 @@ struct ReminderEditorView: View {
     @State private var completionHoverID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.component(.iconButtonGap)) {
+        VStack(alignment: .leading, spacing: 0) {
             if let item = model.selectedItem {
                 ScheduleDetail(model: model, item: item, theme: theme).id(item.id)
             } else {
-                Text("일정").font(theme.font(.body, size: theme.tokens.textStyle(.micro).size, weight: theme.tokens.textStyle(.selected).weight))
+                Text("일정").font(theme.font(.title))
                     .foregroundStyle(theme.color(.text3)).padding(.horizontal, theme.space(.sp2))
-                    .frame(height: theme.component(.segmentHeight))
+                    .frame(height: theme.shape(.chromeHeight))
                 let items = model.listItems
                 ScrollView {
                     VStack(spacing: 0) {
@@ -28,9 +28,13 @@ struct ReminderEditorView: View {
                 }.frame(height: min(CGFloat(items.count) * theme.component(.scheduleRowHeight), theme.component(.scheduleListMaxHeight)))
             }
             if let error = model.error { Text(error).font(theme.font(.rowSub)).foregroundStyle(theme.color(.warn)) }
-        }.padding(theme.component(.chromePaddingEnd))
+        }.padding(theme.space(.sp1))
             .frame(width: theme.component(model.selectedItem == nil ? .reminderEditorWidth : .detailWidth))
             .fixedSize(horizontal: false, vertical: true)
+            #if DEBUG
+            .coordinateSpace(name: "schedule")
+            .onPreferenceChange(ScheduleCenterMeasurements.self) { model.previewCenters = $0 }
+            #endif
             .background(theme.color(.surface)).foregroundStyle(theme.color(.text)).focusEffectDisabled()
             .onExitCommand { if model.datePicker != nil { model.datePicker = nil } else { close() } }
     }
@@ -39,7 +43,7 @@ struct ReminderEditorView: View {
         let destination = model.destinationForItem(item)
         let title = item.title.isEmpty ? (item.kind == .event ? "일정" : "리마인더") : item.title
         let size = theme.component(.noteTopButtonSize)
-        return HStack(spacing: theme.component(.scheduleInset)) {
+        return HStack(spacing: theme.component(.scheduleInset) - (size - theme.component(.iconLarge)) / 2) {
             if item.kind == .reminder {
                 let hovered = completionHovered(item.id)
                 Button { model.toggleCompleted(item.id) } label: {
@@ -75,7 +79,7 @@ struct ReminderEditorView: View {
                     .contentShape(Rectangle()).background(hoverID == item.id ? theme.color(.hover) : .clear,
                         in: RoundedRectangle(cornerRadius: theme.shape(.controlRadius)))
             }.buttonStyle(.plain).onHover { hoverID = $0 ? item.id : nil }
-        }.padding(.leading, theme.space(.sp2))
+        }.padding(.leading, theme.space(.sp2) - (size - theme.component(.iconLarge)) / 2)
             .animation(theme.motion.animation, value: completionHoverID)
     }
 

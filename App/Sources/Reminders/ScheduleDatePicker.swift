@@ -121,8 +121,10 @@ struct ScheduleDatePicker: View {
                             Text(String(state.calendar.component(.day, from: date)))
                                 .font(theme.font(.rowSub)).monospacedDigit()
                                 .foregroundStyle(theme.color(today ? .warn : date < state.calendar.startOfDay(for: state.now) ? .text3 : .text))
-                                .frame(width: theme.component(.dateCell), height: theme.component(.dateCell))
+                                .frame(width: theme.component(.dateIndicator), height: theme.component(.dateIndicator))
                                 .background(selected ? theme.color(.selected) : .clear, in: Circle())
+                                .frame(width: theme.component(.dateCell), height: theme.component(.dateCell))
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain).focusable(false).frame(maxWidth: .infinity)
                             .accessibilityLabel(state.format(date, "yyyy년 M월 d일 E"))
                     }

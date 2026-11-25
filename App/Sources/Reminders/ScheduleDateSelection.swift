@@ -4,6 +4,8 @@ import Observation
 
 @MainActor @Observable
 public final class ScheduleDateSelection {
+    static let displayLocale = Locale(identifier: "ko_KR")
+
     let calendar: Calendar
     let now: Date
     public private(set) var week: Date
@@ -83,7 +85,7 @@ public final class ScheduleDateSelection {
 
     func format(_ date: Date, _ pattern: String) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.locale = Self.displayLocale
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = pattern

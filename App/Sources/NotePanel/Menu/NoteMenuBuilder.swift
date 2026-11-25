@@ -107,21 +107,22 @@ struct NoteMenuBuilder {
         item.representedObject = target
         item.isEnabled = isEnabled
         item.setAccessibilityLabel(title)
-        item.view = MenuRowView(style: style, title: title, symbolName: symbol, isDimmed: !isEnabled)
+        item.view = PickerMenuRow(theme: style.theme, text: title,
+                                  dot: symbol.flatMap { style.symbol($0, size: .menuIcon) }?.withSymbolConfiguration(
+                                    .init(paletteColors: [style.color(isEnabled ? .text2 : .text3)])),
+                                  selected: false, width: style.theme.component(.noteMenuWidth), command: true)
         return item
     }
 
     /// 구분선. 구분선 항목(`isSeparatorItem`)으로 두되 모습은 불투명 바탕의 `MenuSeparatorView`다.
     private func separator() -> NSMenuItem {
-        let item = NSMenuItem.separator()
-        item.view = MenuSeparatorView(style: style)
-        return item
+        MenuSeparatorView.item(theme: style.theme)
     }
 
     private func info(_ text: String) -> NSMenuItem {
         let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
         item.isEnabled = false
-        item.view = MenuRowView(style: style, title: text, symbolName: nil, isDimmed: true)
+        item.view = PickerMenuRow(theme: style.theme, text: text, dot: nil, selected: false, width: style.theme.component(.noteMenuWidth), command: true)
         return item
     }
 

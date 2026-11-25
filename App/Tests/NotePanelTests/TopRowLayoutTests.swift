@@ -63,6 +63,64 @@ import Theme
         #expect(panel.button(at: dragPoint) == nil)
     }
 
+    @Test func drawerUsesOneShiftForEveryCombinationAndKeepsButtonSizes() {
+        for pinned in [true, false] {
+            for scheduled in [true, false] {
+                let input = TopRowLayout.Input(width: 340, titleWidth: 400, hasSchedules: scheduled, isPinned: pinned, showsProblem: false)
+                let closed = TopRowLayout.drawer(input, metrics: metrics, progress: 0)
+                let open = TopRowLayout.drawer(input, metrics: metrics, progress: 1)
+                let shift = pinned ? closed.pin.minX - open.pin.minX
+                    : scheduled ? closed.clock.minX - open.clock.minX : open.close.maxX - open.pin.maxX
+                #expect(shift == (!pinned && scheduled ? 77 : 55))
+                let middle = TopRowLayout.drawer(input, metrics: metrics, progress: 0.5)
+                for (frame, target) in [(middle.pin, open.pin), (middle.more, open.more), (middle.close, open.close),
+                                        (middle.divider, open.divider), (middle.agent, open.agent)] {
+                    #expect(frame.minX == target.minX + shift / 2 && frame.size == target.size)
+                }
+                if scheduled { #expect(middle.clock.minX == open.clock.minX + shift / 2) }
+            }
+        }
+    }
+
+    @Test func reversalKeepsTheVisiblePositionAndClipsTheTrailingButton() async throws {
+        let theme = try Theme.bundled()
+        let style = PanelStyle(theme: theme)
+        let row = TopRowView(style: style)
+        let panel = NotePanelWindow(contentRect: CGRect(x: 0, y: 0, width: 340, height: metrics.height))
+        panel.allowsKey = false
+        panel.contentView = row
+        defer { panel.contentView = nil }
+        let now = Date()
+        let note = Note(id: NoteID(rawValue: "drawer"), title: "서랍", reminder: now, created: now, modified: now)
+        func apply(_ hovered: Bool, animated: Bool) {
+            row.apply(TopRowState(note: note, isPinned: true, isHovered: hovered, isEditingTitle: false,
+                                  problem: nil, options: .init(), now: now, calendar: .current), animated: animated)
+        }
+        apply(false, animated: false)
+        #expect(row.closeButton.isHidden)
+        let resting = row.closeButton.frame
+        apply(true, animated: true)
+        if style.reducesMotion {
+            #expect(row.closeButton.alphaValue == 1 && row.closeButton.frame != resting)
+            return
+        }
+        // 첫 프레임이 표시되는 즉시 방향을 바꾼다.
+        let deadline = ContinuousClock.now + .seconds(1)
+        while row.closeButton.alphaValue == 0 && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        let visible = row.closeButton.frame
+        let alpha = row.closeButton.alphaValue
+        #expect(alpha > 0 && alpha < 1)
+        #expect(row.clipsToBounds)
+        let outside = row.convert(CGPoint(x: row.bounds.maxX + 1, y: visible.midY), to: nil)
+        #expect(panel.button(at: outside) == nil)
+        apply(false, animated: true)
+        #expect(row.closeButton.frame == visible && row.closeButton.alphaValue == alpha)
+        try await Task.sleep(for: .seconds(theme.motion.duration * 2))
+        #expect(row.closeButton.frame == resting && row.closeButton.isHidden)
+    }
+
     @Test func restingFaceAndPinHaveDistinctSlots() {
         for allows in [true, false] {
             for pinned in [true, false] {

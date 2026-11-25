@@ -289,7 +289,12 @@ final class DebugControl {
             reminderEditor?.model?.reload()
         case ("reminder-audit", let name?, _):
             guard let root = reminderEditor?.contentView, let url = output(named: name.rawValue) else { return }
-            do { try DebugViewAudit.write(root, to: url) } catch { AppLog.warning("예정 화면 검사 실패: \(error)") }
+            do {
+                try DebugViewAudit.write(root, to: url)
+                if let centers = reminderEditor?.model?.previewCenters {
+                    write(json: centers, to: url.appendingPathExtension("centers.json"))
+                }
+            } catch { AppLog.warning("예정 화면 검사 실패: \(error)") }
         case ("reminder-editor", let id?, _): router.route(.openReminderEditor(id))
         case ("reminder-date", let action?, _):
             guard let model = reminderEditor?.model else { return }
@@ -309,10 +314,12 @@ final class DebugControl {
                 }
             }
         case ("reminder-close", _, _): reminderEditor?.close()
-        case ("reminder-lead-menu", let name?, _) where isPassive:
+        case ("reminder-lead-menu", let name?, _) where isPassive,
+             ("reminder-calendar-menu", let name?, _) where isPassive:
+            let menuLabel = words.first == "reminder-calendar-menu" ? "캘린더" : "임박 표시"
             guard let root = reminderEditor?.contentView, let parent = root.window,
                   let button = DebugInputVerification.descendant(in: root, matching: {
-                      $0 is NSButton && $0.accessibilityLabel() == "임박 표시"
+                      $0 is NSButton && $0.accessibilityLabel() == menuLabel
                   }) as? NSButton, let menu = button.menu, let url = output(named: name.rawValue) else { return }
             verificationMenu = menu
             // 메뉴 추적 루프에서 실제 부모와 메뉴 창만 기록하고 입력 이벤트 없이 추적을 끝낸다.
@@ -714,6 +721,12 @@ final class DebugControl {
             }
             NSApplication.shared.deactivate()
             previousApplication = nil
+        case ("drawer-snapshot", let id?, let name?) where isPassive:
+            guard let theme, let window = notePanels.window(for: id), let url = output(named: name) else { return }
+            notePanels.setHoverOverride(true, for: id)
+            DispatchQueue.main.asyncAfter(deadline: .now() + theme.motion.duration / 2) { [weak self, weak window] in
+                self?.write(window, to: url)
+            }
         case ("hover", let id?, let state?):
             notePanels.setHoverOverride(state == "auto" ? nil : state == "on", for: id)
         case ("pin", let id?, let state?): notePanels.setPinned(state == "on", for: id)

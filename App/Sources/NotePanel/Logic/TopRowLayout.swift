@@ -34,6 +34,34 @@ struct TopRowLayout: Hashable {
     var clock: CGRect = .zero
     var pin: CGRect
 
+    /// 펼친 좌표에서 같은 거리만큼 오른쪽으로 물러난다. 상시 보이는 조작은 자기 닫힌 자리로 간다.
+    static func drawer(_ input: Input, metrics: Metrics, progress: CGFloat) -> Self {
+        var resting = input
+        resting.showsControls = false
+        var expanded = input
+        expanded.showsControls = true
+        let closed = Self(resting, metrics: metrics)
+        var result = Self(expanded, metrics: metrics)
+        let shift: CGFloat
+        if !closed.pin.isEmpty { shift = closed.pin.minX - result.pin.minX }
+        else if !closed.clock.isEmpty { shift = closed.clock.minX - result.clock.minX }
+        else { shift = result.close.maxX - result.pin.maxX }
+        func position(_ open: CGRect, from rest: CGRect = .zero) -> CGRect {
+            guard !open.isEmpty else { return .zero }
+            let delta = rest.isEmpty ? shift : rest.minX - open.minX
+            return open.offsetBy(dx: delta * (1 - progress), dy: 0)
+        }
+        result.agent = position(result.agent, from: closed.agent)
+        result.pin = position(result.pin, from: closed.pin)
+        result.clock = position(result.clock, from: closed.clock)
+        result.more = position(result.more)
+        result.divider = position(result.divider)
+        result.close = position(result.close)
+        if let problem = result.problem { result.problem = position(problem, from: closed.problem ?? .zero) }
+        result.title.size.width = closed.title.width + (result.title.width - closed.title.width) * progress
+        return result
+    }
+
     init(_ input: Input, metrics: Metrics) {
         let buttonY = (metrics.height - metrics.iconButton) / 2
         var trailing = input.width - metrics.paddingTrailing

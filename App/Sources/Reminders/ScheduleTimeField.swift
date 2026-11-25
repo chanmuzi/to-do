@@ -2,59 +2,79 @@ import AppKit
 import SwiftUI
 import Theme
 
-/// 시각 칩 하나가 Tab 한 정거장이다. 편집을 끝낼 때 원래 날짜 위에 시각만 얹는다.
+/// 시각 안의 숫자 이동, 구분 기호, 오전/오후 순서는 로캘을 아는 AppKit 셀에 맡긴다.
 struct ScheduleTimeField: NSViewRepresentable {
     let model: ReminderEditorModel
     let isEnd: Bool
     let theme: Theme
+    let leave: (Bool) -> Void
 
-    func makeNSView(context: Context) -> CommandInputField {
-        let field = CommandInputField(theme: theme)
-        field.delegate = context.coordinator
-        field.setAccessibilityLabel(isEnd ? "끝" : "시작")
-        if isEnd { model.endField = field } else { model.startField = field }
-        return field
+    func makeNSView(context: Context) -> ClockPicker {
+        let picker = ClockPicker()
+        picker.datePickerStyle = .textField
+        picker.datePickerElements = .hourMinute
+        picker.isBezeled = false
+        picker.isBordered = false
+        picker.drawsBackground = false
+        picker.focusRingType = .none
+        picker.calendar = model.calendar
+        picker.timeZone = model.calendar.timeZone
+        picker.locale = ScheduleDateSelection.displayLocale
+        picker.target = context.coordinator
+        picker.action = #selector(Coordinator.change(_:))
+        picker.setAccessibilityLabel(isEnd ? "끝" : "시작")
+        if isEnd { model.endField = picker } else { model.startField = picker }
+        return picker
     }
-    func updateNSView(_ field: CommandInputField, context: Context) {
+
+    func updateNSView(_ picker: ClockPicker, context: Context) {
         context.coordinator.parent = self
-        field.apply(font: theme.nsFont(.body), ink: theme.nsColor(.text), placeholderInk: theme.nsColor(.text3))
-        if field.currentEditor() == nil { field.stringValue = displayed }
+        picker.font = theme.nsFont(.body, size: theme.tokens.textStyle(.ui).size)
+        picker.textColor = theme.nsColor(.text)
+        let value = isEnd ? model.end : model.start
+        if picker.dateValue != value { picker.dateValue = value }
+        picker.neighbor = { [weak model] backward in
+            guard let model, model.hasEnd, backward == isEnd else { return nil }
+            return backward ? model.startField : model.endField
+        }
+        picker.exit.leave = leave
     }
-    private var displayed: String {
-        ReminderPresentation.clock(isEnd ? model.end : model.start, format: model.displayOptions.clock, calendar: model.calendar)
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: ClockPicker, context: Context) -> CGSize? {
+        nsView.intrinsicContentSize
     }
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: CommandInputField, context: Context) -> CGSize? {
-        let sample = model.displayOptions.clock == .twentyFourHour ? "23:59" : "오후 12:59"
-        let width = (sample as NSString).size(withAttributes: [.font: theme.nsFont(.body)]).width
-        return CGSize(width: ceil(width) + theme.space(.sp1), height: ceil(nsView.intrinsicContentSize.height))
-    }
+
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    @MainActor final class Coordinator: NSObject, NSTextFieldDelegate {
+    @MainActor final class Coordinator: NSObject {
         var parent: ScheduleTimeField
         init(_ parent: ScheduleTimeField) { self.parent = parent }
+        @objc func change(_ picker: NSDatePicker) {
+            parent.model.changeTime(picker.dateValue, isEnd: parent.isEnd)
+        }
+    }
+}
 
-        func controlTextDidEndEditing(_ notification: Notification) {
-            guard let field = notification.object as? NSTextField else { return }
-            let model = parent.model
-            let input = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard input != parent.displayed else { return }
-            let formatter = DateFormatter()
-            formatter.calendar = model.calendar
-            formatter.timeZone = model.calendar.timeZone
-            for (locale, format) in [("ko_KR", "a h:mm"), ("en_US_POSIX", "h:mm a"), ("en_US_POSIX", "H:mm")] {
-                formatter.locale = Locale(identifier: locale)
-                formatter.dateFormat = format
-                guard let clock = formatter.date(from: input) else { continue }
-                let day = parent.isEnd ? model.end : model.start
-                let parts = model.calendar.dateComponents([.hour, .minute], from: clock)
-                guard let date = model.calendar.date(bySettingHour: parts.hour!, minute: parts.minute!, second: 0, of: day) else { continue }
-                if parent.isEnd { model.end = date }
-                else { model.end = date.addingTimeInterval(model.end.timeIntervalSince(model.start)); model.start = date }
-                model.save()
-                break
-            }
-            field.stringValue = parent.displayed
+/// AppKit이 마지막 세그먼트에서 다음 키 뷰를 찾을 때만 상세 화면의 순서로 돌아간다.
+final class ClockPicker: NSDatePicker {
+    var neighbor: ((Bool) -> NSView?)?
+    let exit = FocusExit()
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if exit.superview == nil { addSubview(exit) }
+    }
+    override var nextValidKeyView: NSView? { neighbor?(false) ?? exit }
+    override var previousValidKeyView: NSView? { neighbor?(true) ?? exit }
+
+    final class FocusExit: NSView {
+        var leave: ((Bool) -> Void)?
+        override var acceptsFirstResponder: Bool { true }
+        override var nextValidKeyView: NSView? { superview }
+        override var previousValidKeyView: NSView? { superview }
+        override func becomeFirstResponder() -> Bool {
+            let backward = window?.keyViewSelectionDirection == .selectingPrevious
+            DispatchQueue.main.async { [weak self] in self?.leave?(backward) }
+            return true
         }
     }
 }
