@@ -22,6 +22,13 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
+    @Test func listRowHeightAndTimeFont() throws {
+        let theme = try Theme.bundled()
+        #expect(theme.component(.scheduleRowHeight) == 42)
+        #expect(theme.nsFont(.scheduleTime).pointSize == 11.5)
+        #expect(theme.nsFont(.scheduleTime).familyName == theme.nsFont(.body).familyName)
+    }
+
     @Test func listKeepsOnlyRemindersCompletedDuringThisPresentation() throws {
         try fixture { model, store, id in
             let item = ScheduleItem(start: now, title: "연결", todo: TodoAnchor(line: 0, text: "연결"))
