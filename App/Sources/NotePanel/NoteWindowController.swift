@@ -42,7 +42,9 @@ final class NoteWindowController: NSObject {
     /// 내용 높이를 따라 이 컨트롤러가 높이를 바꾸는 중이다.
     var isSettingHeight = false
     /// 높이가 움직이는 중이면 그 목표.
-    var heightTarget: CGFloat?
+    var heightTransition: HeightTransition?
+    var heightStartedAt = ContinuousClock.now
+    var heightTarget: CGFloat? { heightTransition?.to }
     var heightAnimation: Task<Void, Never>?
     private var heightChangedDuringLayout = false
 
@@ -288,9 +290,11 @@ final class NoteWindowController: NSObject {
             }
         }
         root.onLayout = { [unowned self] in
-            guard heightChangedDuringLayout else { return }
-            heightChangedDuringLayout = false
-            applyContentHeight(animated: false)
+            if heightChangedDuringLayout {
+                heightChangedDuringLayout = false
+                applyContentHeight(animated: true)
+            }
+            updateBodyScroller()
         }
 
         root.topRow.recognizesDates = coordinator?.recognizesDates ?? true

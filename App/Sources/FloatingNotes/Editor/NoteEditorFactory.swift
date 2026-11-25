@@ -93,7 +93,6 @@ final class NoteEditorFactory {
 
     private var configuration: MarkdownEditorConfiguration {
         var value = MarkdownEditorConfiguration(checkboxStyle: options.checkbox, inlineCodeStyle: options.inlineCode)
-        value.showsScheduleGutter = true
         value.recognizesDates = options.recognizesDates
         return value
     }

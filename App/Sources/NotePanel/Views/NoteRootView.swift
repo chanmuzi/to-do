@@ -16,7 +16,7 @@ final class NoteRootView: NSView {
 
     private let style: PanelStyle
     private let separator = NSView()
-    private let scrollView = NSScrollView()
+    let scrollView = NoteBodyScrollView()
     private var preserveScrollOnLayout = false
 
     func layoutFormatBar(preservingScroll: Bool) {
@@ -43,15 +43,11 @@ final class NoteRootView: NSView {
     }
 
     private func configureScrollView(_ bodyView: NSView) {
-        scrollView.drawsBackground = false
-        scrollView.borderType = .noBorder
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        // 스크롤 막대는 스크롤할 때만 보인다(spec 16). 자리를 차지하지 않아 본문 너비가 변하지 않는다.
-        scrollView.scrollerStyle = .overlay
-        scrollView.autohidesScrollers = true
-        scrollView.contentView.drawsBackground = false
         scrollView.documentView = bodyView
+        for name in [NSText.didChangeNotification, NSTextView.didChangeSelectionNotification] {
+            NotificationCenter.default.addObserver(scrollView, selector: #selector(NoteBodyScrollView.endUserScroll),
+                name: name, object: bodyView)
+        }
     }
 
     /// 상단 줄과 그 아래 선의 높이.
@@ -120,7 +116,9 @@ final class NoteRootView: NSView {
             x: 0, y: chromeHeight, width: bounds.width, height: max(0, bounds.height - chromeHeight - (cornerButtons.showsFormats ? rowHeight : 0))
         )
         placeBody()
-        if !preserveScrollOnLayout, scrollView.frame.height < previousHeight, let text = scrollView.documentView as? NSTextView,
+        let heightChanged = scrollView.frame.height != previousHeight
+        if !preserveScrollOnLayout, heightChanged, (scrollView.fittingHeight || scrollView.frame.height < previousHeight),
+           let text = scrollView.documentView as? NSTextView,
            window?.firstResponder === text, text.selectedRange().length == 0 {
             text.scrollRangeToVisible(text.selectedRange())
         }

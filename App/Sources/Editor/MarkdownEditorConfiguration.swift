@@ -16,7 +16,6 @@ nonisolated public enum InlineCodeStyle: String, Sendable, CaseIterable {
 
 /// 편집기 설정. 색, 글꼴, 치수는 `Theme`에서 온다.
 nonisolated public struct MarkdownEditorConfiguration: Sendable, Equatable {
-    package var showsScheduleGutter = false
     public var paletteID: String?
     public var recognizesDates = true
     public var checkboxStyle: CheckboxStyle

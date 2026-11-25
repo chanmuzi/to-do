@@ -17,7 +17,8 @@ extension EditorController: NSTextContentStorageDelegate {
             source: storage.attributedSubstring(from: range),
             line: line,
             key: keys[index],
-            style: style
+            style: style,
+            scheduleInset: hasScheduleMarker(at: index) ? theme.component(.noteTopButtonSize) : 0
         ))
         if let suggestion = dateSuggestion, index == dateSuggestionLine {
             for local in suggestion.expression.ranges {

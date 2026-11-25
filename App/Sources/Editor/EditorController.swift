@@ -272,7 +272,7 @@ final class EditorController: NSObject {
     private func applyStyleToViews() {
         let padding = theme.docPadding
         textView.textContainerInset = NSSize(
-            width: (padding.leading + padding.trailing + (configuration.showsScheduleGutter ? theme.component(.noteTopButtonSize) : 0)) / 2,
+            width: (padding.leading + padding.trailing) / 2,
             height: (padding.top + padding.bottom) / 2
         )
         textView.containerOrigin = NSPoint(x: padding.leading, y: padding.top)

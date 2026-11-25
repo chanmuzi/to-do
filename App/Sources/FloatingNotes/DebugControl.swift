@@ -811,7 +811,7 @@ final class DebugControl {
         case ("unfold", let id?, let line?): setFolded(false, line: Int(line), in: id)
         case ("note-scroll-end", let id?, _) where isPassive:
             if let scroll = editor(of: id)?.textView.enclosingScrollView {
-                DebugLibraryInput.scrollToEnd(scroll)
+                scroll.scrollToEndOfDocument(nil)
                 scroll.flashScrollers()
             }
         case ("editor", let id?, let name?):
@@ -1125,6 +1125,10 @@ final class DebugControl {
             "documentViewHeight": view.frame.height,
             "documentViewIsFlipped": view.isFlipped,
             "visibleHeight": view.enclosingScrollView?.contentSize.height ?? 0,
+            "windowTop": view.window?.frame.maxY ?? 0,
+            "hasVerticalScroller": view.enclosingScrollView?.hasVerticalScroller ?? false,
+            "scrollerStyle": view.enclosingScrollView?.scrollerStyle == .overlay ? "overlay" : "legacy",
+            "scrollerWidth": view.enclosingScrollView?.verticalScroller?.frame.width ?? 0,
             "scrollViewHeight": view.enclosingScrollView?.frame.height ?? 0,
             "windowHeight": view.window?.frame.height ?? 0,
             "windowContentHeight": view.window?.contentView?.frame.height ?? 0,

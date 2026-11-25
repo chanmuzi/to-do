@@ -47,7 +47,15 @@ final class ScheduleLineButton: NSButton {
 }
 
 extension EditorController {
+    func hasScheduleMarker(at line: Int) -> Bool {
+        guard let button = scheduleButtons[line], document.lines.indices.contains(line) else { return false }
+        return document.string(in: document.lines[line].range) == button.marker.text
+    }
+
     func updateScheduleButtons(_ markers: [Int: ScheduleLineMarker]) {
+        let changed = Set(scheduleButtons.keys).union(markers.keys).filter {
+            scheduleButtons[$0]?.marker.text != markers[$0]?.text && document.lines.indices.contains($0)
+        }
         for line in scheduleButtons.keys where markers[line] == nil {
             scheduleButtons.removeValue(forKey: line)?.removeFromSuperview()
         }
@@ -65,7 +73,12 @@ extension EditorController {
                 scheduleButtons[line] = button
             }
         }
-        layoutScheduleButtons()
+        if changed.isEmpty {
+            layoutScheduleButtons()
+        } else {
+            for line in changed { invalidate(lines: line..<(line + 1)) }
+            reportContentHeight()
+        }
     }
 
     func layoutScheduleButtons() {
@@ -73,8 +86,7 @@ extension EditorController {
         let hidden = FoldState.hiddenLines(document, folded: folded)
         let side = theme.component(.noteTopButtonSize)
         for (line, button) in scheduleButtons {
-            guard document.lines.indices.contains(line), !hidden.contains(line),
-                  document.string(in: document.lines[line].range) == button.marker.text,
+            guard !hidden.contains(line), hasScheduleMarker(at: line),
                   let spot = caretSpot(document.lines[line].start, lineIndex: line) else {
                 button.isHidden = true
                 continue
