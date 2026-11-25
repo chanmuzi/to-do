@@ -65,6 +65,7 @@ import Theme
             #expect(controller.panel.makeFirstResponder(focused ? controller.editor.view : nil))
             for hovered in [false, true] {
                 controller.hoverOverride = hovered
+                controller.root.topRow.advanceDrawer(by: 1)
                 measured.append(measure())
             }
         }
@@ -72,7 +73,7 @@ import Theme
         #expect(measured[0] == measured[2] && measured[1] == measured[3])
         #expect(Set(measured.compactMap(\.first)).count == 1)
         #expect(measured[0] != measured[1])
-        // 호버로 나타나는 것은 보이지 않을 때도 자리를 차지한다.
+        // 펼친 버튼은 모두 같은 크기다.
         #expect(controller.root.topRow.subviews.filter { $0 is IconButton && !$0.isHidden }.allSatisfy {
             $0.frame.width == fixture.theme.component(.noteTopButtonSize)
         })
@@ -86,10 +87,11 @@ import Theme
         let controller = try #require(coordinator.controllers[note.id])
         coordinator.setPinned(false, for: note.id)
 
+        let row = controller.root.topRow
+        let buttons = row.subviews.compactMap { $0 as? IconButton }
         controller.hoverOverride = false
-        let buttons = controller.root.topRow.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden }
-        #expect(Set(buttons.compactMap { $0.accessibilityLabel() }) == ["에이전트 열기", "더 보기", "창 닫기", "항상 위에 고정"])
-        #expect(buttons.allSatisfy { $0.alphaValue == 0 })
+        row.advanceDrawer(by: 1)
+        #expect(buttons.allSatisfy { $0.isHidden && $0.alphaValue == 0 })
         #expect(controller.root.cornerButtons.alphaValue == 0)
 
         controller.root.layoutSubtreeIfNeeded()
@@ -97,17 +99,17 @@ import Theme
 
         controller.hoverOverride = true
         #expect(coordinator.snapshot(of: note.id)?.isHovered == true)
-        // 알파가 실제로 1이 되고(`dur` 동안), 자리와 창 크기는 그대로다.
-        #expect(await fixture.wait {
-            buttons.allSatisfy { $0.alphaValue == 1 } && controller.root.cornerButtons.alphaValue == 0
-        })
+        #expect(await fixture.wait { row.closeButton.alphaValue == 1 })
+        let visible = buttons.filter { !$0.isHidden }
+        #expect(Set(visible.compactMap { $0.accessibilityLabel() }) == ["에이전트 열기", "더 보기", "창 닫기", "항상 위에 고정"])
+        #expect(visible.allSatisfy { $0.alphaValue == 1 })
+        #expect(controller.root.cornerButtons.alphaValue == 0)
         controller.root.layoutSubtreeIfNeeded()
         #expect([controller.root.cornerButtons.frame, controller.panel.frame] == frames)
-        #expect(buttons.allSatisfy { !$0.isHidden })
 
         controller.hoverOverride = false
         #expect(await fixture.wait {
-            buttons.allSatisfy { $0.alphaValue == 0 } && controller.root.cornerButtons.alphaValue == 0
+            buttons.allSatisfy { $0.isHidden && $0.alphaValue == 0 } && controller.root.cornerButtons.alphaValue == 0
         })
     }
 
@@ -705,6 +707,7 @@ import Theme
         try coordinator.open(note.id, focus: false)
         let controller = try #require(coordinator.controllers[note.id])
         controller.hoverOverride = true
+        controller.root.topRow.advanceDrawer(by: 1)
         controller.root.layoutSubtreeIfNeeded()
 
         func descendants(of view: NSView) -> [NSView] {
@@ -739,6 +742,7 @@ import Theme
         let controller = try #require(coordinator.controllers[note.id])
         let topRow = controller.root.topRow
         controller.hoverOverride = true
+        topRow.advanceDrawer(by: 1)
         topRow.layoutSubtreeIfNeeded()
         let buttons = topRow.subviews.compactMap { $0 as? IconButton }
         let indicator = try #require(buttons.first { $0.accessibilityLabel() == "" })
