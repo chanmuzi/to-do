@@ -166,7 +166,7 @@
 
 - 6단계: `component.reminder-editor-w` 320px(설정 팝오버), `component.library-reminder-w` 200px(범위를 담는 예정 열).
 
-- E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 48, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-title, 시간은 font-ui/fs-row-sub/fw-ui를 조합한다(D-088).
+- E2: `reminder-input-h` 36, `schedule-marker-w` 12, `schedule-event-bar-w` 3, `schedule-reminder-circle` 11, `schedule-row-h` 42, `schedule-list-max-h` 240. 구획 이름은 font-body/fs-micro/fw-ui-strong, 예정 입력은 font-body/fs-capture/fw-title, 목록 시간은 font-body/fs-schedule-time/fw-ui와 같은 폭 숫자를 조합한다(D-305).
 
 ### 한 줄 입력칸 토큰 확인 (D-132)
 
