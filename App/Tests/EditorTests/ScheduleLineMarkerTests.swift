@@ -37,11 +37,10 @@ import Theme
         }
     }
 
-    @Test func firstFragmentAndStableGutterPreserveTextSelectionAndHeight() throws {
+    @Test func firstFragmentKeepsItsButtonSelectionAndFolding() throws {
         let text = "+ 묶음\n\t[ ] " + String(repeating: "긴 본문 ", count: 12)
         let harness = try EditorHarness(text, width: 240)
         let editor = harness.editor
-        editor.configuration.showsScheduleGutter = true
         editor.view.layoutSubtreeIfNeeded()
         let source = InlineScheduleSource(line: 1, text: text.components(separatedBy: "\n")[1])
         let item = ScheduleItem(start: now, inlineSource: source)
@@ -56,7 +55,7 @@ import Theme
         let gutter = try #require(controller.gutterPoint(forLine: 1))
         #expect(button.frame.midY == first.y && button.frame.midY == gutter.y)
         #expect(button.frame.size == CGSize(width: 20, height: 20))
-        #expect(controller.textView.textContainerOrigin.x + controller.textContainer.size.width == button.frame.minX)
+        #expect(controller.textView.textContainerOrigin.x + controller.textContainer.size.width == button.frame.maxX)
         #expect(editor.contentHeight > harness.theme.lineHeight(.body) * 3)
         #expect(button.accessibilityRole() == .button)
         #expect(button.accessibilityLabel() == markers(note)[1]?.label)
@@ -64,7 +63,7 @@ import Theme
         editor.onOpenSchedule = { id, _ in opened = id }
         button.openSchedule()
         #expect(opened == item.id)
-        #expect(editor.contentHeight == height && editor.selectedRange == selection)
+        #expect(editor.selectedRange == selection)
         #expect(controller.textView.textStorage?.string == text && editor.text == text)
         editor.foldedLines = [0]
         #expect(button.isHidden)
@@ -72,5 +71,27 @@ import Theme
         #expect(!button.isHidden)
         editor.setScheduleMarkers([:])
         #expect(button.superview == nil && editor.contentHeight == height)
+    }
+
+    @Test func onlyTheMarkedParagraphWrapsEarlierAndRestoresItsWidth() throws {
+        let line = String(repeating: "가", count: 80)
+        let harness = try EditorHarness(line + "\n" + line, width: 240)
+        let controller = harness.controller
+        func firstFragmentLength(_ index: Int) throws -> Int {
+            let base = controller.contentStorage.documentRange.location
+            let start = try #require(controller.contentStorage.location(base, offsetBy: controller.document.lines[index].start))
+            controller.layoutManager.ensureLayout(for: controller.layoutManager.documentRange)
+            let fragment = try #require(controller.layoutManager.textLayoutFragment(for: start)?.textLineFragments.first)
+            return fragment.characterRange.length
+        }
+        let full = try firstFragmentLength(0)
+        let source = InlineScheduleSource(line: 1, text: line)
+        let note = Note(id: .make(), body: harness.editor.text, schedules: [ScheduleItem(start: now, inlineSource: source)],
+                        created: now, modified: now)
+        harness.editor.setScheduleMarkers(markers(note))
+        #expect(try firstFragmentLength(0) == full)
+        #expect(try firstFragmentLength(1) < full)
+        harness.editor.setScheduleMarkers([:])
+        #expect(try firstFragmentLength(1) == full)
     }
 }

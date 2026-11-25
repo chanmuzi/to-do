@@ -7,11 +7,12 @@ nonisolated enum ParagraphStyler {
         source: NSAttributedString,
         line: MarkdownLine,
         key: LineRenderKey,
-        style: EditorStyle
+        style: EditorStyle,
+        scheduleInset: CGFloat = 0
     ) -> NSAttributedString {
         let out = NSMutableAttributedString(attributedString: source)
         guard out.length > 0 else { return out }
-        let builder = Builder(out: out, line: line, key: key, style: style)
+        let builder = Builder(out: out, line: line, key: key, style: style, scheduleInset: scheduleInset)
         if key.isCollapsed {
             builder.collapse()
         } else if key.kind.isCode {
@@ -41,12 +42,14 @@ nonisolated enum ParagraphStyler {
         let line: MarkdownLine
         let key: LineRenderKey
         let style: EditorStyle
+        let scheduleInset: CGFloat
         let decoration: FragmentDecoration
 
-        init(out: NSMutableAttributedString, line: MarkdownLine, key: LineRenderKey, style: EditorStyle) {
+        init(out: NSMutableAttributedString, line: MarkdownLine, key: LineRenderKey, style: EditorStyle, scheduleInset: CGFloat) {
             self.out = out
             self.line = line
             self.key = key
+            self.scheduleInset = scheduleInset
             self.style = style
             self.decoration = FragmentDecoration(style: style)
         }
@@ -131,6 +134,7 @@ nonisolated enum ParagraphStyler {
             paragraph.maximumLineHeight = font.lineHeight
             paragraph.firstLineHeadIndent = textStart
             paragraph.headIndent = textStart
+            paragraph.tailIndent = -scheduleInset
             paragraph.paragraphSpacingBefore = spacing.before
             paragraph.paragraphSpacing = spacing.after
             paragraph.tabStops = tabStops(after: textStart)
@@ -244,7 +248,7 @@ nonisolated enum ParagraphStyler {
             let paragraph = NSMutableParagraphStyle()
             paragraph.firstLineHeadIndent = textStart
             paragraph.headIndent = textStart
-            paragraph.tailIndent = -style.codeBlockPadX
+            paragraph.tailIndent = -(style.codeBlockPadX + scheduleInset)
             paragraph.tabStops = tabStops(after: textStart)
             paragraph.defaultTabInterval = 4 * (" " as NSString).size(withAttributes: [.font: font.font]).width
 

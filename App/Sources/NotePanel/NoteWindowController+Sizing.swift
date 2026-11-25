@@ -39,40 +39,38 @@ extension NoteWindowController: NSWindowDelegate {
             screenHeight: visible?.height ?? .greatestFiniteMagnitude,
             roomBelowTop: visible.map { top - $0.minY } ?? .greatestFiniteMagnitude
         )
-        if let heightTarget {
-            // 이미 그 높이로 가는 중이다.
-            guard target.height != heightTarget else { return }
-        } else {
-            guard target.height != panel.frame.height || target.maxY != panel.frame.maxY else { return }
-        }
-
-        heightAnimation?.cancel()
-        heightAnimation = nil
+        defer { updateBodyScroller() }
+        guard heightTarget != nil || target.height != panel.frame.height || target.maxY != panel.frame.maxY else { return }
         let transition = HeightTransition(
             from: panel.frame.height, to: target.height,
             duration: environment.style.transitionDuration, curve: environment.theme.motion.curve
         )
         if animated, isShown, panel.isVisible, liveResizeTop == nil, !transition.isInstant {
-            heightTarget = target.height
-            heightAnimation = Task { [weak self] in await self?.run(transition) }
+            guard heightTarget != target.height else { return }
+            heightTransition = transition
+            heightStartedAt = .now
+            if heightAnimation == nil {
+                heightAnimation = Task { [weak self] in await self?.runHeightAnimation() }
+            }
         } else {
-            heightTarget = nil
-            setHeight(target.height, top: top)
-            panel.invalidateShadow()
+            cancelHeightAnimation()
+            if panel.frame != target {
+                setHeight(target.height, top: top)
+                panel.invalidateShadow()
+            }
         }
         if isShown { environment.recorder.recordFrame(noteID, frame: target) }
     }
 
     /// 직접 정한 높이를 지킨다. 화면이 바뀌어 한도가 줄었으면 거기에 맞춘다.
     private func applyManualHeight(_ height: CGFloat, top: CGFloat, screenHeight: CGFloat) {
-        heightAnimation?.cancel()
-        heightAnimation = nil
-        heightTarget = nil
+        cancelHeightAnimation()
         let clamped = environment.sizePolicy.manualHeight(height, screenHeight: screenHeight)
         if clamped != panel.frame.height {
             setHeight(clamped, top: top)
             panel.invalidateShadow()
         }
+        updateBodyScroller()
         recordFrameIfSettled()
     }
 
@@ -90,18 +88,30 @@ extension NoteWindowController: NSWindowDelegate {
         (panel.screen ?? NSScreen.main)?.visibleFrame.height ?? .greatestFiniteMagnitude
     }
 
-    private func run(_ transition: HeightTransition) async {
-        let clock = ContinuousClock()
-        let start = clock.now
-        while !Task.isCancelled {
-            let elapsed = (clock.now - start) / .seconds(1)
+    func updateBodyScroller() {
+        root.scrollView.update(contentHeight: contentHeight, fittingHeight: heightTarget != nil)
+    }
+
+    private func cancelHeightAnimation() {
+        heightAnimation?.cancel()
+        heightAnimation = nil
+        heightTransition = nil
+    }
+
+    private func runHeightAnimation() async {
+        while !Task.isCancelled, let transition = heightTransition {
+            let elapsed = environment.style.reducesMotion ? transition.duration
+                : (ContinuousClock.now - heightStartedAt) / .seconds(1)
             setHeight(transition.height(at: elapsed), top: panel.frame.maxY)
-            if elapsed >= transition.duration { break }
+            // 배치 도중 다른 목표가 들어오면 같은 작업의 다음 프레임에서 이어간다.
+            if heightTransition == transition && elapsed >= transition.duration { break }
             try? await Task.sleep(for: Self.frameInterval)
         }
         guard !Task.isCancelled else { return }
-        heightTarget = nil
+        heightTransition = nil
         heightAnimation = nil
+        root.layoutSubtreeIfNeeded()
+        updateBodyScroller()
         panel.invalidateShadow()
         if isShown { environment.recorder.recordFrame(noteID, frame: panel.frame) }
     }
@@ -132,6 +142,8 @@ extension NoteWindowController: NSWindowDelegate {
     func windowWillStartLiveResize(_ notification: Notification) {
         liveResizeTop = panel.frame.maxY
         isDraggingHeight = false
+        cancelHeightAnimation()
+        updateBodyScroller()
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
@@ -164,9 +176,7 @@ extension NoteWindowController: NSWindowDelegate {
             knownHeight = height
             return
         }
-        heightAnimation?.cancel()
-        heightAnimation = nil
-        heightTarget = nil
+        cancelHeightAnimation()
         let clamped = environment.sizePolicy.manualHeight(height, screenHeight: visibleScreenHeight)
         rememberHeight(clamped)
         self.knownHeight = height

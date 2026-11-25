@@ -121,12 +121,12 @@ import Theme
         #expect(initial.height == controller.environment.sizePolicy.defaultHeight)
         #expect(fixture.theme.count(.noteBodyLinesDefault) == 6)
         let lines = (1...12).map(String.init).joined(separator: "\n")
-        try typeText(lines, into: controller)
+        controller.editor.text = lines
         controller.root.layoutSubtreeIfNeeded()
         let scroll = try #require(controller.editor.view.enclosingScrollView)
         #expect(initial == controller.panel.frame)
         #expect(controller.contentHeight > scroll.contentSize.height)
-        #expect(scroll.scrollerStyle == .overlay)
+        #expect(scroll.scrollerStyle == NSScroller.preferredScrollerStyle)
         #expect(try fixture.windowState(for: note.id)?.heightPreference == .followSetting)
         coordinator.displayOptions.heightMode = .fitContent
         let fitted = controller.panel.frame
