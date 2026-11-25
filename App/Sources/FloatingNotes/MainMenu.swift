@@ -50,6 +50,7 @@ enum MainMenu {
                 + standard("오려두기", #selector(NSText.cut(_:)), KeyChord(.x, .command))
                 + standard("복사", #selector(NSText.copy(_:)), KeyChord(.c, .command))
                 + standard("붙여넣기", #selector(NSText.paste(_:)), KeyChord(.v, .command))
+                + standard("블록 복제", MarkdownEditor.duplicateBlockAction, KeyChord(.d, .command))
                 + standard("굵게", MarkdownEditor.toggleBoldAction, KeyChord(.b, .command))
                 + standard("모두 선택", #selector(NSText.selectAll(_:)), KeyChord(.a, .command))
         ))

@@ -9,7 +9,7 @@ extension EditorController {
     /// 커서 자리의 글꼴 상자(텍스트 뷰 좌표). 선택이 있거나 놓을 자리가 없으면 `nil`.
     func caretRect() -> NSRect? {
         let selection = textView.selectedRange()
-        guard selection.length == 0, selection.location <= document.length else { return nil }
+        guard blockSelection == nil, selection.length == 0, selection.location <= document.length else { return nil }
         let location = selection.location
         let index = document.lineIndex(at: location)
         let line = document.lines[index]
@@ -50,7 +50,7 @@ extension EditorController {
 
     /// 그 줄의 기본 글꼴.
     private func lineFont(for line: MarkdownLine, at index: Int) -> EditorStyle.TextFont {
-        switch line.kind {
+        switch document.lines[line.continuationOf ?? index].kind {
         case .heading(let level), .toggleHeading(let level): style.heading(level)
         case .fenceOpen, .fenceClose, .code: style.codeBlock
         default: style.body

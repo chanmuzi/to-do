@@ -17,7 +17,7 @@ nonisolated enum ListStructure {
 
         /// 줄 하나를 읽는다. 빈 줄은 건너뛴다.
         mutating func add(_ line: MarkdownLine, level: Int? = nil) {
-            guard !ListStructure.isBlank(line) else { return }
+            guard line.continuationOf == nil, !ListStructure.isBlank(line) else { return }
             let level = min(level ?? line.level, parents.count - 1)
             parents[level] = line.kind.isParentItem
             for deeper in (level + 1)..<parents.count { parents[deeper] = false }
@@ -44,7 +44,7 @@ nonisolated enum ListStructure {
     static func hasChildren(_ doc: MarkdownDocument, _ index: Int) -> Bool {
         let parent = doc.lines[index]
         guard parent.kind.isParentItem else { return false }
-        for line in doc.lines[(index + 1)...] where !isBlank(line) {
+        for line in doc.lines[(index + 1)...] where line.continuationOf == nil && !isBlank(line) {
             if line.level <= parent.level { return false }
             if line.level == parent.level + 1 { return true }
         }

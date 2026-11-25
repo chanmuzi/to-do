@@ -3,6 +3,7 @@ import Theme
 
 /// 편집기의 텍스트 뷰. 키와 마우스를 받아 `MarkdownEditor`에 넘기는 일만 한다.
 final class EditorTextView: PlainTextInputView {
+    private(set) var selectingWithMouse = false
     weak var editor: EditorController?
     /// 본문 안쪽 여백의 왼쪽 위(위와 아래 여백이 달라 직접 정한다).
     var containerOrigin: NSPoint = .zero
@@ -28,6 +29,7 @@ final class EditorTextView: PlainTextInputView {
                 return true
             }
         }
+        editor?.drawBlockSelection(in: dirtyRect)
         super.draw(dirtyRect)
     }
 
@@ -69,7 +71,9 @@ final class EditorTextView: PlainTextInputView {
         return switch item.action {
         case #selector(undo(_:)): editor?.editorUndoManager.canUndo ?? false
         case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
-        case #selector(toggleMarkdownBold(_:)): isEditable && editor?.isActive == true
+        case #selector(copy(_:)) where editor?.blockSelection != nil: true
+        case #selector(cut(_:)) where editor?.blockSelection != nil: isEditable
+        case #selector(toggleMarkdownBold(_:)), #selector(duplicateMarkdownBlock(_:)): isEditable && editor?.isActive == true
         default: super.validateUserInterfaceItem(item)
         }
     }
@@ -108,7 +112,7 @@ final class EditorTextView: PlainTextInputView {
     override func setFrameSize(_ newSize: NSSize) {
         let widthChanged = newSize.width != frame.width
         super.setFrameSize(newSize)
-        if widthChanged { editor?.widthDidChange() }
+        if widthChanged { editor?.widthDidChange(); window?.invalidateCursorRects(for: self) }
     }
 
     // MARK: 키
@@ -124,6 +128,33 @@ final class EditorTextView: PlainTextInputView {
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        let modifiers = Self.modifiers(of: event)
+        if event.keyCode == EditorShortcuts.Key.returnKey, !hasMarkedText(),
+           modifiers == .shift || modifiers == .control {
+            doCommand(by: #selector(NSResponder.insertLineBreak(_:)))
+            return
+        }
+        // 입력기가 조합을 시작하기 전 한 키를 소비한다.
+        if editor?.blockSelection != nil, modifiers.intersection([.command, .control]).isEmpty,
+           let characters = event.characters, !characters.isEmpty,
+           characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && !(0xF700...0xF8FF).contains($0.value) }) {
+            editor?.clearBlocks()
+            return
+        }
+        super.keyDown(with: event)
+    }
+
+    override func selectAll(_ sender: Any?) {
+        editor?.clearBlocks()
+        super.selectAll(sender)
+    }
+
+    @objc func duplicateMarkdownBlock(_ sender: Any?) {
+        guard editor?.isActive == true else { return }
+        editor?.perform(.duplicate)
     }
 
     @objc func toggleMarkdownBold(_ sender: Any?) {
@@ -165,6 +196,7 @@ final class EditorTextView: PlainTextInputView {
     // 조합 중인 글자는 원문에 들어가지만 `textDidChange`가 오지 않는다. 그 글자까지 저장되고
     // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        if editor?.clearBlocks() == true { return }
         var replacement = replacementRange
         // 조합을 시작하기 전에 자리를 만든다(고른 글자를 기호와 함께 지우고, 정해 둔 서식의 기호를 넣는다).
         // 조합이 시작된 뒤에는 원문을 따로 고치지 않는다.
@@ -188,6 +220,7 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
+        if editor?.clearBlocks() == true { return }
         let text = (string as? NSAttributedString)?.string ?? (string as? String)
         if let text, editor?.separatesCommittedTrigger(text, replacementRange: replacementRange) == true {
             // 기호를 확정한 뒤 Space를 보낸다. 조합이 없는 입력과 조합 중간 변경에는 적용하지 않는다.
@@ -211,7 +244,11 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        if editor?.handleMouseDown(at: convert(event.locationInWindow, from: nil)) == true { return }
+        let wasSelecting = editor?.clearBlocks() == true
+        if !wasSelecting, editor?.handleMouseDown(at: convert(event.locationInWindow, from: nil)) == true { return }
+        selectingWithMouse = true
+        window?.invalidateCursorRects(for: self)
+        defer { selectingWithMouse = false; window?.invalidateCursorRects(for: self) }
         super.mouseDown(with: event)
     }
 
@@ -226,8 +263,9 @@ final class EditorTextView: PlainTextInputView {
             NSCursor.arrow.set()
             return
         }
-        let interactive = editor?.handleMouseMoved(at: convert(event.locationInWindow, from: nil)) == true
-        (interactive ? NSCursor.arrow : NSCursor.iBeam).set()
+        let point = convert(event.locationInWindow, from: nil)
+        _ = editor?.handleMouseMoved(at: point)
+        editor?.pointer(at: point, selectingText: selectingWithMouse).set()
     }
 
     /// 그 자리에서 마우스를 받는 뷰가 이 뷰(또는 그 안의 뷰)인지.
@@ -244,11 +282,12 @@ final class EditorTextView: PlainTextInputView {
             NSCursor.arrow.set()
             return
         }
-        if editor?.isInteractive(at: convert(event.locationInWindow, from: nil)) == true {
-            NSCursor.arrow.set()
-        } else {
-            super.cursorUpdate(with: event)
-        }
+        editor?.pointer(at: convert(event.locationInWindow, from: nil), selectingText: selectingWithMouse).set()
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        editor?.registerLinkCursorRects()
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -256,8 +295,14 @@ final class EditorTextView: PlainTextInputView {
         editor?.handleMouseExited()
     }
 
+    private var cursorViewport = NSRect.null
+
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
+        if cursorViewport != visibleRect {
+            cursorViewport = visibleRect
+            window?.invalidateCursorRects(for: self)
+        }
         guard !trackingAreas.contains(where: { $0.owner === self && $0.userInfo?["editor"] != nil }) else { return }
         addTrackingArea(NSTrackingArea(
             rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
@@ -279,6 +324,7 @@ final class EditorTextView: PlainTextInputView {
     override func cut(_ sender: Any?) {
         guard let editor, isEditable else { return super.cut(sender) }
         guard editor.copySelection(to: .general) else { return }
+        if editor.blockSelection != nil { editor.deleteBlocks(); return }
         insertText("", replacementRange: selectedRange())
     }
 

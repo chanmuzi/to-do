@@ -218,6 +218,51 @@ import DateTime
         #expect(try f.notes.load(note.id).schedules.isEmpty)
     }
 
+    @Test func duplicateKeepsTheOriginalBlockAnchorThroughUndoAndEditing() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let block = "[ ] 첫 줄\\\n둘째 줄"
+        let item = ScheduleItem(start: f.future, todo: TodoAnchor(line: 0, sourceLine: block),
+                                inlineSource: InlineScheduleSource(line: 0, text: block))
+        let note = try f.notes.create(NoteDraft(body: block, schedules: [item]))
+        let copied = block + "\n" + block
+        let insertion = NSRange(location: block.utf16.count, length: 0)
+        try f.notes.update(note.id) { $0.replaceBody(copied, replacing: insertion) }
+        let after = try f.notes.load(note.id)
+        #expect(after.schedules.count == 1 && after.schedules[0].inlineSource == item.inlineSource)
+        #expect(after.schedules[0].todo?.settingCompleted(true, in: copied) == "[x] 첫 줄\\\n둘째 줄\n" + block)
+        try f.notes.update(note.id) {
+            $0.replaceBody(block, replacing: NSRange(location: insertion.location, length: copied.utf16.count - insertion.location))
+        }
+        let restored = try f.notes.load(note.id)
+        #expect(restored.schedules[0].id == item.id && restored.schedules[0].inlineSource == item.inlineSource)
+        try f.notes.update(note.id) { $0.body += " 수정" }
+        #expect(try f.notes.load(note.id).schedules[0].inlineSource?.text == block + " 수정")
+    }
+
+    @Test func quickCaptureDuplicateKeepsItsTodoOnOriginal() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let body = "[ ] 원본"
+        let item = ScheduleItem(start: f.future, todo: TodoAnchor(line: 0, sourceLine: body))
+        let note = try f.notes.create(NoteDraft(body: body, schedules: [item]))
+        let copied = body + "\n" + body
+        try f.notes.update(note.id) { $0.replaceBody(copied, replacing: NSRange(location: body.utf16.count, length: 0)) }
+        let stored = try f.notes.load(note.id).schedules[0]
+        #expect(stored.inlineSource == nil && stored.todo?.settingCompleted(true, in: copied) == "[x] 원본\n[ ] 원본")
+    }
+
+    @Test func legacyPhysicalScheduleLineLoadsAsOneBlock() throws {
+        let f = try Fixture(); defer { f.close() }
+        let first = "[ ] 일\\"
+        let body = first + "\n이어지는 글"
+        let item = ScheduleItem(start: f.future, todo: TodoAnchor(line: 0, sourceLine: first),
+                                inlineSource: InlineScheduleSource(line: 0, text: first))
+        let note = try f.notes.create(NoteDraft(body: body, schedules: [item]))
+        let stored = try f.notes.load(note.id)
+        #expect(stored.body == body && stored.schedules[0].id == item.id)
+        #expect(stored.schedules[0].inlineSource == InlineScheduleSource(line: 0, text: body))
+        #expect(stored.schedules[0].todo?.locate(in: body) == 0)
+    }
+
     private final class Fixture {
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let future = Date(timeIntervalSince1970: 2_000_000_000)

@@ -135,8 +135,8 @@ nonisolated enum ParagraphStyler {
             paragraph.firstLineHeadIndent = textStart
             paragraph.headIndent = textStart
             paragraph.tailIndent = -scheduleInset
-            paragraph.paragraphSpacingBefore = spacing.before
-            paragraph.paragraphSpacing = spacing.after
+            paragraph.paragraphSpacingBefore = key.isContinuation ? 0 : spacing.before
+            paragraph.paragraphSpacing = key.hasHardBreak ? 0 : spacing.after
             paragraph.tabStops = tabStops(after: textStart)
 
             var base: [NSAttributedString.Key: Any] = [
@@ -162,6 +162,8 @@ nonisolated enum ParagraphStyler {
             hide(line.indentRange)
             hide(line.markerRange)
 
+            if line.hasHardBreak { hide(NSRange(location: line.contentEnd, length: 1)) }
+            guard !key.isContinuation else { return }
             decoration.gutterX = left
             switch key.kind {
             case .todo(let done): decoration.gutter = .checkbox(done: done)

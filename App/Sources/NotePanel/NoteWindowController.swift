@@ -277,7 +277,7 @@ final class NoteWindowController: NSObject {
         editor.setTitleFocusAction { [weak self] in self?.root.topRow.beginTitleEditing() }
         editor.onTextChange = { [unowned self] text in
             exchangedBody = text
-            mutate(deferred: true) { $0.body = text }
+            mutate(deferred: true) { note in note.replaceBody(text, replacing: editor.editedRange(from: note.body)) }
             refreshScheduleMarkers()
         }
         editor.onContentHeightChange = { [unowned self] height in

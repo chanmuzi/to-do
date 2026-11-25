@@ -29,8 +29,9 @@ nonisolated package struct MarkdownDocument: Sendable {
     }
 
     package func todoCompletion(on line: MarkdownLine) -> Bool? {
-        guard case .todo(let done) = line.kind,
-              !string(in: line.contentRange).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard case .todo(let done) = line.kind, blockLines(at: lineIndex(at: line.start)).contains(where: {
+            !string(in: lines[$0].contentRange).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) else { return nil }
         return done
     }
 
@@ -51,6 +52,25 @@ nonisolated package struct MarkdownDocument: Sendable {
         var last = lineIndex(at: NSMaxRange(selection))
         if selection.length > 0, last > first, NSMaxRange(selection) == lines[last].start { last -= 1 }
         return first...last
+    }
+
+    package func ownerLines(for selection: NSRange) -> ClosedRange<Int> {
+        let rows = lineRange(for: selection)
+        return (lines[rows.lowerBound].continuationOf ?? rows.lowerBound)...(lines[rows.upperBound].continuationOf ?? rows.upperBound)
+    }
+
+    package func blockLines(at index: Int) -> ClosedRange<Int> {
+        let first = lines[index].continuationOf ?? index
+        return first...lines[index].blockLast
+    }
+
+    package func sourceRange(for rows: ClosedRange<Int>) -> NSRange {
+        let start = lines[rows.lowerBound].start
+        return NSRange(location: start, length: lines[rows.upperBound].end - start)
+    }
+
+    package func blockSource(at index: Int) -> String {
+        string(in: sourceRange(for: blockLines(at: index)))
     }
 
     /// 줄바꿈 글자(없으면 빈 문자열).
@@ -100,6 +120,11 @@ nonisolated package struct MarkdownDocument: Sendable {
                     line.indentLength = min(indent.length, open.indentLength)
                 }
                 line.level = open.level
+            } else if index > 0, lines[index - 1].hasHardBreak {
+                let owner = lines[index - 1].continuationOf ?? (index - 1)
+                line.continuationOf = owner
+                line.indentLength = lines[owner].indentLength
+                line.level = lines[owner].level
             } else if LineClassifier.isFence(units, from: bodyStart, to: line.end) {
                 line.kind = .fenceOpen
                 line.indentLength = indent.length
@@ -111,6 +136,18 @@ nonisolated package struct MarkdownDocument: Sendable {
                 line.markerLength = marker.markerLength
                 line.indentLength = indent.length
                 line.level = min(indent.level, Self.maxLevel)
+            }
+            if !line.kind.isCode {
+                if index + 1 < lines.count, line.end > line.contentStart, units[line.end - 1] == 0x5C {
+                    var start = line.end - 1
+                    while start > line.contentStart, units[start - 1] == 0x5C { start -= 1 }
+                    let next = lines[index + 1]
+                    // 이어지는 줄에서 주인 줄의 들여쓰기만 소모한다. 나머지 공백은 본문이다.
+                    let nextIndent = LineClassifier.indent(units, from: next.start, to: next.end)
+                    line.hasHardBreak = (line.end - start) % 2 == 1
+                        && !LineClassifier.isFence(units, from: next.start + nextIndent.length, to: next.end)
+                        && units[next.start..<next.end].starts(with: units[line.start..<(line.start + line.indentLength)])
+                }
                 line.spans = InlineParser.parse(units, in: line.contentRange)
             }
             lines[index] = line
@@ -122,9 +159,12 @@ nonisolated package struct MarkdownDocument: Sendable {
     }
 
     private mutating func linkStructure() {
+        for index in lines.indices.reversed() {
+            lines[index].blockLast = lines[index].hasHardBreak ? lines[index + 1].blockLast : index
+        }
         for index in lines.indices {
             let level = lines[index].level
-            var end = index + 1
+            var end = blockLines(at: index).upperBound + 1
             var cursor = end
             while cursor < lines.count {
                 let child = lines[cursor]

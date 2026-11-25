@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownSyntax
 import DateTime
 import Models
 import Store
@@ -11,19 +12,19 @@ import Store
 
     public func accept(_ request: InlineDateAcceptance, in id: NoteID) throws -> InlineDateEffect {
         let note = try notes.load(id)
-        let beforeLines = request.previousText.components(separatedBy: "\n")
-        let nextLines = request.nextText.components(separatedBy: "\n")
+        let before = MarkdownDocument(request.previousText)
+        let nextDocument = MarkdownDocument(request.nextText)
         let candidates = note.schedules.filter { !$0.isDeleted }
         let direct = candidates.filter { item in
             guard let source = item.inlineSource else { return false }
             guard let line = request.source.line else { return source.line == nil }
-            return source.line == line && beforeLines.indices.contains(line)
-                && (source.text == beforeLines[line] || source.text == request.source.text)
+            return source.line == line && before.lines.indices.contains(line)
+                && (source.text == before.blockSource(at: line) || source.text == request.source.text)
         }
         let matches = direct.isEmpty ? candidates.filter { item in
             guard let line = request.source.line else { return false }
             if let source = item.inlineSource, source.line != nil {
-                return source.text == request.source.text && nextLines.filter { $0 == source.text }.count == 1
+                return source.text == request.source.text && nextDocument.lines.indices.filter { nextDocument.lines[$0].continuationOf == nil && nextDocument.blockSource(at: $0) == source.text }.count == 1
             }
             // 빠른 캡처의 투두도 기존 D-068의 유일한 글자 연결로 찾는다.
             return request.todo != nil && item.todo?.locate(in: request.nextText) == line
@@ -33,7 +34,7 @@ import Store
         var next = previous ?? request.item
         next.start = request.item.start; next.end = request.item.end; next.isDateOnly = request.item.isDateOnly
         next.inlineSource = request.source; next.todo = request.todo
-        if previous == nil { next.title = request.todo?.text ?? request.source.text }
+        if previous == nil { next.title = NotePreviewText.removingHardBreakMarkers(in: request.todo?.text ?? request.source.text) }
         if let todo = request.todo { next.isCompleted = todo.completed(in: request.nextText) ?? false }
         next.modified = Date(); next.isDeleted = false
         try notes.writeSchedule(next, in: id)
@@ -50,12 +51,12 @@ import Store
     }
 
     /// 본문과 삭제 대기를 한 변경으로 저장한다. 동기화는 이미 허용된 권한만 사용한다.
-    public func removeMissingSources(from previous: String, to text: String, in id: NoteID) throws
+    public func removeMissingSources(from previous: String, to text: String, in id: NoteID, replacing range: NSRange? = nil) throws
         -> (items: [ScheduleItem], effect: InlineDateEffect)? {
         var removed: [ScheduleItem] = []
         try notes.scheduleUpdate(id) { note in
             guard note.body == previous else { return }
-            removed = note.applyEditorBody(text)
+            removed = note.applyEditorBody(text, replacing: range)
         }
         guard !removed.isEmpty else { return nil }
         service.enqueue(id)

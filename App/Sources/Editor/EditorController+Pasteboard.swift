@@ -12,11 +12,19 @@ extension EditorController {
     @discardableResult
     func copySelection(to pasteboard: NSPasteboard) -> Bool {
         let selection = clamped(textView.selectedRange())
-        guard selection.length > 0 else { return false }
-        let export = CopyExport(document, selection: selection)
+        let export: CopyExport
+        if let blocks = blockSelection {
+            let rows = selectedBlockRows(blocks, includingChildren: true)
+            export = CopyExport(source: document.string(in: document.sourceRange(for: rows)))
+        } else {
+            guard selection.length > 0 else { return false }
+            export = CopyExport(document, selection: selection)
+        }
         pasteboard.clearContents()
-        pasteboard.declareTypes([.string, .html, .floatingNotesMarkdown], owner: nil)
-        pasteboard.setString(export.markdown, forType: .string)
+        let markdown = NSPasteboard.PasteboardType("net.daringfireball.markdown")
+        pasteboard.declareTypes([.string, .html, markdown, .floatingNotesMarkdown], owner: nil)
+        pasteboard.setString(blockSelection == nil ? export.markdown : export.source, forType: .string)
+        pasteboard.setString(export.markdown, forType: markdown)
         pasteboard.setString(export.html(highlightColors: highlightCSSColors), forType: .html)
         pasteboard.setString(export.source, forType: .floatingNotesMarkdown)
         return true

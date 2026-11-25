@@ -33,7 +33,7 @@ let package = Package(
         .target(name: "Store", dependencies: ["Models"]),
         .target(name: "Routing", dependencies: ["Models"]),
 
-        .target(name: "Scheduling", dependencies: ["Models", "Store", "DateTime"]),
+        .target(name: "Scheduling", dependencies: ["Models", "MarkdownSyntax", "Store", "DateTime"]),
 
         // MARK: Features (서로 의존하지 않는다)
         .target(

@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownSyntax
 
 /// 앱에서 임박 표시를 시작할 시간. 저장 단위는 분이다.
 public enum ImminentLead: Int, Codable, CaseIterable, Sendable {
@@ -105,6 +106,7 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
 public struct TodoAnchor: Hashable, Codable, Sendable {
     public var line: Int
     public var text: String
+    var usesRecordedLine: Bool?
     public init(line: Int, text: String) { self.line = line; self.text = text }
     public init?(line: Int, sourceLine: String) {
         guard let parts = Self.parts(sourceLine) else { return nil }
@@ -112,15 +114,15 @@ public struct TodoAnchor: Hashable, Codable, Sendable {
     }
 
     public func locate(in body: String) -> Int? {
-        let lines = body.components(separatedBy: "\n")
-        var insideFence = false
-        var matches: [Int] = []
-        for index in lines.indices {
-            let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") { insideFence.toggle(); continue }
-            if !insideFence && Self.parts(lines[index])?.text == text { matches.append(index) }
+        let doc = MarkdownDocument(body)
+        func matches(_ index: Int) -> Bool {
+            let line = doc.lines[index]
+            guard case .todo = line.kind else { return false }
+            return Self.parts(doc.blockSource(at: index))?.text == text
         }
-        return matches.count == 1 ? matches[0] : nil
+        if usesRecordedLine == true, doc.lines.indices.contains(line), matches(line) { return line }
+        let candidates = doc.lines.indices.filter(matches)
+        return candidates.count == 1 ? candidates[0] : nil
     }
     public func completed(in body: String) -> Bool? {
         guard let index = locate(in: body) else { return nil }

@@ -130,6 +130,7 @@ import Theme
         let expected: [String: [EditorAction]] = [
             "투두로 바꾸기": [.toggleTodo],
             "완료 표시, 토글 접기와 펼치기": [.toggleDone],
+            "블록 복제": [.duplicate],
             "줄 위로, 아래로 옮기기": [.moveLineUp, .moveLineDown],
             "접기, 펼치기": [.fold, .unfold],
             "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],
@@ -149,7 +150,7 @@ import Theme
             return result
         }
         // Tab, ⇧Tab은 편집기가 글자 입력 경로에서 받는다(단축키 목록에 없다).
-        let typed: Set<String> = ["들여쓰기 (여러 줄 선택 또는 날짜 제안이 없을 때)", "내어쓰기 / 본문 처음에서 제목으로", "현재 줄 날짜 제안 받기", "날짜 제안만 닫기"]
+        let typed: Set<String> = ["들여쓰기 (여러 줄 선택 또는 날짜 제안이 없을 때)", "내어쓰기 / 본문 처음에서 제목으로", "현재 줄 날짜 제안 받기", "날짜 제안 닫기, 블록 고르기 또는 풀기", "같은 블록 안에서 줄바꿈"]
         let rows = ShortcutTable.standard.entries(in: .editing).filter { !typed.contains($0.action) }
         #expect(ShortcutTable.standard.entries(in: .editing).count == rows.count + typed.count)
         #expect(Set(rows.map(\.action)) == Set(expected.keys))

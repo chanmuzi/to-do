@@ -1,6 +1,18 @@
 import Foundation
 
 nonisolated extension EditorCommands {
+    static func lineBreak(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> TextEdit {
+        let line = doc.line(at: selection.location)
+        if line.kind == .code { return newlineInCode(doc, line: line, selection: selection) }
+        guard !line.kind.isCode else { return newline(doc, selection: selection, folded: folded) }
+        let range = normalized(doc, selection, replacement: "\n")
+        // 홀수 번째 역슬래시가 개행 표지가 되도록, 커서 앞의 리터럴 역슬래시는 이스케이프한다.
+        var start = range.location
+        while start > line.contentStart, doc.units[start - 1] == 0x5C { start -= 1 }
+        let marker = (range.location - start).isMultiple(of: 2) ? "\\" : "\\\\"
+        return insert(doc, marker + "\n" + doc.string(in: line.indentRange), replacing: range)
+    }
+
     /// Return. 목록은 같은 기호로 이어 가고, 빈 항목에서는 기호를 지우거나 한 단계 내어 쓴다.
     /// 서식 구간 한가운데에서 누르면 구간을 줄바꿈 앞에서 닫고 다음 줄에서 다시 연다.
     static func newline(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int> = []) -> TextEdit {
@@ -17,13 +29,16 @@ nonisolated extension EditorCommands {
             selection.length = upper - selection.location
         }
 
+        if let owner = line.continuationOf {
+            let first = doc.lines[owner]
+            var marker = doc.string(in: first.markerRange)
+            if case .todo = first.kind { marker = marker.hasPrefix("[") ? "[ ] " : String(marker.prefix(2)) + "[ ] " }
+            return insert(doc, "\n" + indent + marker, replacing: selection)
+        }
         switch line.kind {
         case .code:
             if isCaret, let exit = leavingCodeBlock(doc, lineIndex: index) { return exit }
-            // 코드의 들여쓰기(커서 앞까지)를 다음 줄로 가져간다.
-            var end = line.start
-            while end < min(line.end, selection.location), doc.units[end] == 0x09 || doc.units[end] == 0x20 { end += 1 }
-            return .insert("\n" + doc.string(in: NSRange(location: line.start, length: end - line.start)), replacing: selection)
+            return newlineInCode(doc, line: line, selection: selection)
 
         case .fenceOpen, .fenceClose:
             // 줄이 없는 블록의 커서 자리: 빈 코드 줄 둘을 만들고 둘째 줄로 간다.
@@ -37,14 +52,14 @@ nonisolated extension EditorCommands {
             return insert(doc, "\n" + (selection.location >= line.contentStart ? indent : ""), replacing: selection)
 
         case .paragraph:
-            if isCaret, line.contentRange.length == 0, line.indentLength > 0 {
+            if isCaret, !line.hasHardBreak, line.contentRange.length == 0, line.indentLength > 0 {
                 return removingLastIndentUnit(doc, line: line)
             }
             return insert(doc, "\n" + indent, replacing: selection)
 
         case .todo, .bullet, .toggle, .toggleHeading, .quote:
             // 빈 항목(빈 인용문 줄 포함)에서는 기호를 지우거나 한 단계 내어 쓴다. 인용문은 `> `로 이어 간다.
-            if isCaret, line.contentRange.length == 0 {
+            if isCaret, !line.hasHardBreak, line.contentRange.length == 0 {
                 if line.indentLength > 0, let edit = outdent(doc, selection: selection, folded: folded) { return edit }
                 return TextEdit(range: line.markerRange, replacement: "", selection: NSRange(location: line.start + line.indentLength, length: 0))
             }
@@ -71,6 +86,13 @@ nonisolated extension EditorCommands {
                 return insert(doc, "\n" + indent + marker, replacing: selection)
             }
         }
+    }
+
+    private static func newlineInCode(_ doc: MarkdownDocument, line: MarkdownLine, selection: NSRange) -> TextEdit {
+        // 코드의 들여쓰기(커서 앞까지)를 다음 줄로 가져간다.
+        var end = line.start
+        while end < min(line.end, selection.location), doc.units[end] == 0x09 || doc.units[end] == 0x20 { end += 1 }
+        return .insert("\n" + doc.string(in: NSRange(location: line.start, length: end - line.start)), replacing: selection)
     }
 
     /// 코드 블록의 빈 마지막 줄에서 Return: 그 빈 줄을 지우고 블록 아래에 새 문단을 연다.

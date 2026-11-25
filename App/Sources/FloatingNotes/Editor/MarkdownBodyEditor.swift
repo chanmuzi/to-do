@@ -80,6 +80,8 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, ScheduleLin
         editor.onFoldChange = { [unowned self] _ in saveFolds() }
     }
 
+    func editedRange(from previous: String) -> NSRange? { editor.editedRange(from: previous) }
+
     var view: NSView { editor.documentView }
 
     var text: String {

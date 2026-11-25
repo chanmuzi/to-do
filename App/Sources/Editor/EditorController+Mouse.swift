@@ -24,6 +24,7 @@ extension EditorController {
 
     func hit(at point: CGPoint) -> Hit? {
         guard let found = fragment(at: point) else { return nil }
+        guard FoldState.foldRoot(of: found.line, in: document, folded: folded) == nil else { return nil }
         let line = document.lines[found.line]
         if let gutter = found.fragment.gutterRect, gutter.contains(found.local) {
             switch line.kind {
@@ -71,7 +72,35 @@ extension EditorController {
         return CGPoint(x: origin.x + frame.minX + bounds.minX + 1, y: origin.y + frame.minY + bounds.midY)
     }
 
-    /// 누를 수 있는 것(체크박스, 꺾쇠, 열 수 있는 링크, 보이는 코드 복사 버튼) 위인지. 그 위에서는 화살표 커서다(규칙 9).
+    func pointer(at point: CGPoint, selectingText: Bool) -> NSCursor {
+        if isOverScheduleButton(point) || isOverCopyButton(point) { return .arrow }
+        switch hit(at: point) {
+        case .link: return blockSelection == nil && !selectingText ? .pointingHand : .iBeam
+        case .checkbox, .chevron: return .arrow
+        case nil: return .iBeam
+        }
+    }
+
+    func registerLinkCursorRects() {
+        guard blockSelection == nil, !textView.selectingWithMouse else { return }
+        let visible = textView.visibleRect
+        let origin = textView.textContainerOrigin
+        let viewport = layoutManager.textViewportLayoutController.viewportRange
+        layoutManager.enumerateTextLayoutFragments(from: viewport?.location, options: [.ensuresLayout]) { fragment in
+            let frame = fragment.layoutFragmentFrame.offsetBy(dx: origin.x, dy: origin.y)
+            guard frame.minY <= visible.maxY else { return false }
+            if frame.maxY >= visible.minY, let paragraph = fragment as? MarkdownLayoutFragment,
+               FoldState.foldRoot(of: paragraph.row, in: self.document, folded: self.folded) == nil {
+                for rect in paragraph.openableLinkRects {
+                    let clipped = rect.offsetBy(dx: frame.minX, dy: frame.minY).intersection(visible)
+                    if !clipped.isEmpty { self.textView.addCursorRect(clipped, cursor: .pointingHand) }
+                }
+            }
+            return true
+        }
+    }
+
+    /// 본문에서 클릭 동작을 처리하는 자리.
     func isInteractive(at point: CGPoint) -> Bool {
         isOverScheduleButton(point) || hit(at: point) != nil || isOverCopyButton(point)
     }
@@ -105,16 +134,17 @@ extension EditorController {
     func toggleFold(line: Int) {
         guard document.lines.indices.contains(line), document.lines[line].kind.isToggle else { return }
         if folded.contains(line) {
-            setFolded(folded.subtracting([line]), notify: true)
+            changeUserFolds(folded.subtracting([line]))
         } else {
             // 커서가 접히는 줄 안에 있으면 토글 제목 끝으로 옮긴다.
             let selection = clamped(textView.selectedRange())
             let title = document.lines[line]
+            let titleEnd = document.lines[document.blockLines(at: line).upperBound].end
             let subtreeEnd = title.subtreeEnd < document.lines.count ? document.lines[title.subtreeEnd].start : document.length + 1
-            if NSMaxRange(selection) > title.end, selection.location < subtreeEnd {
-                setSelection(NSRange(location: title.end, length: 0))
+            if NSMaxRange(selection) > titleEnd, selection.location < subtreeEnd {
+                setSelection(NSRange(location: titleEnd, length: 0))
             }
-            setFolded(folded.union([line]), notify: true)
+            changeUserFolds(folded.union([line]))
         }
     }
 

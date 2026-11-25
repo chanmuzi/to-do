@@ -49,7 +49,7 @@ final class ScheduleLineButton: NSButton {
 extension EditorController {
     func hasScheduleMarker(at line: Int) -> Bool {
         guard let button = scheduleButtons[line], document.lines.indices.contains(line) else { return false }
-        return document.string(in: document.lines[line].range) == button.marker.text
+        return document.blockSource(at: line) == button.marker.text
     }
 
     func updateScheduleButtons(_ markers: [Int: ScheduleLineMarker]) {

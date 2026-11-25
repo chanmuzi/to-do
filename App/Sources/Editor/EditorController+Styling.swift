@@ -20,10 +20,12 @@ extension EditorController: NSTextContentStorageDelegate {
             style: style,
             scheduleInset: hasScheduleMarker(at: index) ? theme.component(.noteTopButtonSize) : 0
         ))
-        if let suggestion = dateSuggestion, index == dateSuggestionLine {
+        if let suggestion = dateSuggestion, let owner = dateSuggestionLine, owner == (line.continuationOf ?? index) {
             for local in suggestion.expression.ranges {
-                let marked = NSRange(location: line.contentStart + local.location - range.location, length: local.length)
-                if NSMaxRange(marked) <= display.length {
+                let match = NSRange(location: document.lines[owner].contentStart + local.location, length: local.length)
+                let part = NSIntersectionRange(match, line.contentRange)
+                if part.length > 0 {
+                    let marked = NSRange(location: part.location - range.location, length: part.length)
                     display.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: style.text], range: marked)
                 }
             }
@@ -39,6 +41,9 @@ extension EditorController: NSTextLayoutManagerDelegate {
         in textElement: NSTextElement
     ) -> NSTextLayoutFragment {
         let fragment = MarkdownLayoutFragment(textElement: textElement, range: textElement.elementRange)
+        fragment.foldDrawing = foldDrawing
+        let offset = contentStorage.offset(from: contentStorage.documentRange.location, to: location)
+        fragment.row = document.lineIndex(at: offset)
         return fragment
     }
 }
@@ -66,7 +71,11 @@ extension EditorController: NSTextStorageDelegate {
         guard editedMask.contains(.editedCharacters) else { return }
         setHoveredCheckbox(nil)
         let old = document
+        stopFoldMotion()
+        // 저장소 편집 중에는 삽입점이나 커서 영역을 다시 배치하지 않는다.
+        blockSelection = nil
         document = MarkdownDocument(textStorage.string)
+        lastBodyEdit = (old.text, NSRange(location: editedRange.location, length: editedRange.length - delta))
         documentVersion += 1
         if isSettingText {
             // 통째로 바꿔 넣은 글: 같은 줄 번호가 여전히 토글인 접힘만 남긴다.
@@ -113,11 +122,13 @@ extension EditorController {
         let stamp = KeyStamp(
             documentVersion: documentVersion,
             folded: folded,
+            animating: Set(foldTransitions.keys),
             hoveredLine: hoveredLink?.line,
             hoveredOffset: hoveredLink?.offset
         )
         if let cache = keysCache, cache.stamp == stamp { return cache.keys }
-        let keys = LinePresentation.keys(for: document, folded: folded, hoveredLink: hoveredLink)
+        let keys = LinePresentation.keys(for: document, folded: folded, hoveredLink: hoveredLink,
+                                         animating: stamp.animating)
         keysCache = (stamp, keys)
         return keys
     }
@@ -144,8 +155,13 @@ extension EditorController {
     private func updateTrailingLineStyle() {
         // 조합 중에는 텍스트 뷰의 속성을 건드리지 않는다. 조합이 끝나면 다시 불린다.
         guard !textView.hasMarkedText() else { return }
-        let trailing = LinePresentation.trailingCodeLine(in: document).map {
+        var trailing = LinePresentation.trailingCodeLine(in: document).map {
             ParagraphStyler.trailingCodeLineStyle(level: $0.level, style: style)
+        }
+        if let last = document.lines.last, last.range.length == 0, last.continuationOf != nil,
+           let key = currentKeys().last {
+            let sample = ParagraphStyler.display(source: NSAttributedString(string: " "), line: last, key: key, style: style)
+            trailing = sample.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
         }
         guard trailing != appliedTrailingStyle else { return }
         appliedTrailingStyle = trailing
