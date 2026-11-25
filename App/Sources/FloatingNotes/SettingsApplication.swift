@@ -39,7 +39,8 @@ enum SettingsApplication {
             var display = NoteDisplayOptions(dateFormat: .init(rawValue: values.scheduleDateFormat) ?? .relative,
                 space: .init(rawValue: values.spaceDisplay) ?? .icon,
                 reminder: .init(rawValue: values.reminderDisplay) ?? .time,
-                clock: .init(rawValue: values.clockFormat) ?? .koreanMeridiem)
+                clock: .init(rawValue: values.clockFormat) ?? .koreanMeridiem,
+                imminentLeadTime: values.imminentLeadMinutes.seconds)
             display.underlineMarkedText = values.markedTextStyle == .underline
             display.showsNoteAgent = values.showsNoteAgent
             if previous?.showsCornerAgent != values.showsCornerAgent { showCornerAgent(values.showsCornerAgent) }

@@ -78,8 +78,12 @@ import Theme
             title: "제목", body: "본문", reminder: Date().addingTimeInterval(3600)
         ))
         defer { fixture.cleanUp(coordinator) }
-        let reminder = try #require(controller.root.topRow.subviews.first { $0 is ReminderBadgeView })
-        let pressable: [NSView] = buttons(in: controller.root).filter { !$0.isHidden } + [reminder]
+        let clock = try #require(controller.reminderAnchor as? IconButton)
+        let pressable = buttons(in: controller.root).filter { !$0.isHidden }
+        #expect(pressable.contains(clock))
+        #expect(clock.toolTip == clock.accessibilityLabel())
+        #expect(clock.accessibilityPerformPress())
+        #expect(fixture.routes == [.openReminderEditor(controller.noteID)])
         for view in pressable {
             for point in grid(in: view) {
                 let hit = controller.panel.button(at: view.convert(point, to: nil))

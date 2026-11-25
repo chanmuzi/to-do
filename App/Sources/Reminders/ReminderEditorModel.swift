@@ -72,6 +72,25 @@ public final class ReminderEditorModel {
         } catch { self.error = error.localizedDescription }
     }
 
+    var showsImminentLead: Bool { selectedItem != nil && !dateOnly }
+
+    var defaultLeadLabel: String {
+        let minutes = Int(displayOptions.imminentLeadTime / 60)
+        return "기본(" + (ImminentLead(rawValue: minutes)?.label ?? "\(minutes)분 전") + ")"
+    }
+
+    func chooseImminentLead(_ value: ImminentLead?) {
+        guard showsImminentLead, let selectedID else { return }
+        do {
+            try notes.update(noteID) { note in
+                guard let index = note.schedules.firstIndex(where: { $0.id == selectedID && !$0.isDeleted && !$0.isDateOnly }) else { return }
+                // 로컬 표시만 바뀌므로 외부 충돌 판정에 쓰는 항목 수정 시각은 유지한다.
+                note.schedules[index].imminentLeadMinutes = value
+            }
+            reload()
+        } catch { self.error = error.localizedDescription }
+    }
+
     public func chooseCalendar(_ id: String) {
         guard let selectedID else { return }
         do {

@@ -1,6 +1,6 @@
 import CoreGraphics
 
-/// 상단 조작은 오른쪽부터 배치하고 남은 너비를 제목과 예정 칩에 쓴다.
+/// 상단 조작은 오른쪽부터 배치하고 남은 너비를 제목에 쓴다.
 struct TopRowLayout: Hashable {
     struct Metrics: Hashable {
         var height: CGFloat
@@ -17,8 +17,7 @@ struct TopRowLayout: Hashable {
         var width: CGFloat
         /// 제목이 다 보이는 너비.
         var titleWidth: CGFloat
-        var reminderWidth: CGFloat?
-        var hasSchedules = true
+        var hasSchedules: Bool
         var showsControls = true
         var allowsAgent = true
         var hasAgentActivity = false
@@ -29,7 +28,6 @@ struct TopRowLayout: Hashable {
     var title: CGRect
     var more: CGRect
     var problem: CGRect?
-    var reminder: CGRect?
     var close: CGRect = .zero
     var divider: CGRect = .zero
     var agent: CGRect = .zero
@@ -51,16 +49,10 @@ struct TopRowLayout: Hashable {
         more = input.showsControls ? takeTrailing(metrics.iconButton, gap: metrics.gap) : .zero
         let showsPin = input.showsControls || input.isPinned
         pin = showsPin ? takeTrailing(metrics.iconButton, gap: input.showsControls ? metrics.buttonGap : 0) : .zero
-        if input.hasSchedules && input.showsControls && input.reminderWidth == nil {
-            clock = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
+        if input.hasSchedules {
+            clock = takeTrailing(metrics.iconButton, gap: showsPin ? metrics.buttonGap : 0)
         }
         let showsAgent = input.allowsAgent && (input.showsControls || input.hasAgentActivity)
-        if let width = input.reminderWidth {
-            let gap = showsPin ? metrics.gap : 0
-            let faceSpace = showsAgent ? metrics.iconButton + metrics.buttonGap : 0
-            let reserved = faceSpace + metrics.paddingLeading + metrics.gap + (input.showsProblem ? metrics.iconButton + metrics.buttonGap : 0)
-            reminder = takeTrailing(min(width, max(0, trailing - reserved - gap)), gap: gap)
-        }
         if showsAgent {
             agent = takeTrailing(metrics.iconButton, gap: metrics.buttonGap)
         }

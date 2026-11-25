@@ -24,7 +24,7 @@ public struct ReminderPresentation: Hashable, Sendable {
         isDateOnly = item.isDateOnly
         status = item.isDateOnly
             ? (calendar.startOfDay(for: item.start) < calendar.startOfDay(for: now) ? .overdue : .scheduled)
-            : Self.status(reminder: item.start, now: now, leadTime: options.imminentLeadTime)
+            : Self.status(reminder: item.start, now: now, leadTime: item.imminentLeadMinutes?.seconds ?? options.imminentLeadTime)
         if options.reminder == .iconOnly { text = nil }
         else if options.reminder == .relative {
             text = item.isDateOnly && calendar.isDate(item.start, inSameDayAs: now)
@@ -97,7 +97,16 @@ public struct ReminderPresentation: Hashable, Sendable {
     public static func nextRefresh(
         reminder: Date, now: Date, options: NoteDisplayOptions, calendar: Calendar
     ) -> Date? {
-        var candidates = [reminder.addingTimeInterval(-options.imminentLeadTime), reminder]
+        nextRefresh(item: ScheduleItem(start: reminder), now: now, options: options, calendar: calendar)
+    }
+
+    public static func nextRefresh(
+        item: ScheduleItem, now: Date, options: NoteDisplayOptions, calendar: Calendar
+    ) -> Date? {
+        if item.isDateOnly { return calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) }
+        let reminder = item.start
+        let leadTime = item.imminentLeadMinutes?.seconds ?? options.imminentLeadTime
+        var candidates = [reminder.addingTimeInterval(-leadTime), reminder]
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) {
             candidates.append(tomorrow)
         }

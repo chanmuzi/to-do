@@ -1,5 +1,20 @@
 import Foundation
 
+/// 앱에서 임박 표시를 시작할 시간. 저장 단위는 분이다.
+public enum ImminentLead: Int, Codable, CaseIterable, Sendable {
+    case ten = 10, fifteen = 15, thirty = 30, sixty = 60
+
+    public var seconds: TimeInterval { TimeInterval(rawValue * 60) }
+    public var label: String { self == .sixty ? "1시간 전" : "\(rawValue)분 전" }
+}
+
+// 새 버전의 분 값이 낯설어도 예정 자체는 읽고 앱 기본값을 따른다.
+private extension KeyedDecodingContainer {
+    func decodeIfPresent(_ type: ImminentLead.Type, forKey key: Key) throws -> ImminentLead? {
+        (try? decode(Int.self, forKey: key)).flatMap(ImminentLead.init(rawValue:))
+    }
+}
+
 /// 노트의 예정. EventKit 객체를 저장하거나 기능 모듈에 노출하지 않는다.
 public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     public enum Kind: String, Codable, Sendable { case reminder, event }
@@ -15,6 +30,7 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     public var start: Date
     public var end: Date?
     public var isDateOnly: Bool
+    public var imminentLeadMinutes: ImminentLead?
     public var isCompleted: Bool
     public var title: String
     public var inlineSource: InlineScheduleSource?
@@ -39,21 +55,25 @@ public struct ScheduleItem: Identifiable, Hashable, Codable, Sendable {
     public var kind: Kind { end == nil ? .reminder : .event }
 
     public init(id: String = UUID().uuidString, start: Date, end: Date? = nil,
-                isDateOnly: Bool = false, isCompleted: Bool = false, title: String = "",
+                isDateOnly: Bool = false, imminentLeadMinutes: ImminentLead? = nil, isCompleted: Bool = false, title: String = "",
                 todo: TodoAnchor? = nil, inlineSource: InlineScheduleSource? = nil, link: Link? = nil, modified: Date = Date(),
                 syncedAt: Date? = nil, syncBaseline: Value? = nil, syncError: String? = nil, isDeleted: Bool = false) {
+        self.imminentLeadMinutes = imminentLeadMinutes
         self.inlineSource = inlineSource
         self.id = id; self.start = start; self.end = end; self.isDateOnly = isDateOnly
         self.isCompleted = isCompleted; self.title = title; self.todo = todo; self.link = link
         self.modified = modified; self.syncedAt = syncedAt; self.syncBaseline = syncBaseline; self.syncError = syncError; self.isDeleted = isDeleted
     }
 
-    private enum CodingKeys: String, CodingKey {
-        case pendingCalendarID, id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case imminentLeadMinutes, pendingCalendarID, id, start, end, isDateOnly, isCompleted, title, todo, inlineSource, link, modified, syncedAt, syncBaseline, syncError, isDeleted
     }
     private enum KindKey: String, CodingKey { case kind }
+    package static let storedFieldNames = Set(CodingKeys.allCases.map(\.stringValue) + [KindKey.kind.stringValue])
+
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(imminentLeadMinutes, forKey: .imminentLeadMinutes)
         try c.encodeIfPresent(pendingCalendarID, forKey: .pendingCalendarID)
         try c.encode(id, forKey: .id); try c.encode(start, forKey: .start); try c.encodeIfPresent(end, forKey: .end)
         try c.encode(isDateOnly, forKey: .isDateOnly); try c.encode(isCompleted, forKey: .isCompleted)

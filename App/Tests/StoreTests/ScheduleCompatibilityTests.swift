@@ -28,10 +28,15 @@ import Models
         let temp = TemporaryStore(); defer { temp.cleanUp() }
         let store = try FileNoteStore(location: temp.location)
         let start = Date(timeIntervalSince1970: 2_000_000_000)
-        let items = [ScheduleItem(start: start, title: "알림"),
+        let items = [ScheduleItem(start: start, imminentLeadMinutes: .fifteen, title: "알림"),
                      ScheduleItem(start: start, end: start.addingTimeInterval(3600), title: "일정")]
         let note = try store.create(NoteDraft(title: "제목", body: "[ ] 원문\n", schedules: items))
         let raw = try String(contentsOf: temp.noteFile(note.id.rawValue), encoding: .utf8)
+        #expect(raw.contains(#""imminentLeadMinutes":15"#))
+        #expect(raw.components(separatedBy: "imminentLeadMinutes").count == 2)
+        let unknown = raw.replacingOccurrences(of: #""imminentLeadMinutes":15"#, with: #""imminentLeadMinutes":99"#)
+        let forward = try #require(NoteFileCodec.decode(unknown).schedules)
+        #expect(forward.count == items.count && forward[0].imminentLeadMinutes == nil)
         var old = LegacyNoteFileCodec.decode(raw)
         #expect(old.title == note.title && old.body == note.body)
         #expect(old.reminder == start)
@@ -40,9 +45,27 @@ import Models
         let rewritten = LegacyNoteFileCodec.encode(old, over: raw)
         let modern = NoteFileCodec.decode(rewritten)
         #expect(modern.schedules == items)
+        #expect(modern.schedules?.last?.imminentLeadMinutes == nil)
         #expect(modern.body == note.body)
         #expect(modern.title == old.title)
     }
+    @Test func changingTheLeadKeepsUnrecognizedScheduleFieldsByID() throws {
+        let temp = TemporaryStore(); defer { temp.cleanUp() }
+        let store = try FileNoteStore(location: temp.location)
+        let item = ScheduleItem(start: Date(), title: "알림")
+        let note = try store.create(NoteDraft(schedules: [item]))
+        let url = temp.noteFile(note.id.rawValue)
+        let original = try String(contentsOf: url, encoding: .utf8)
+        try original.replacingOccurrences(of: "schedules: [{", with: #"schedules: [{"future":{"code":7},"#)
+            .write(to: url, atomically: true, encoding: .utf8)
+        let reopened = try FileNoteStore(location: temp.location)
+        try reopened.update(note.id) { $0.schedules[0].imminentLeadMinutes = .ten }
+        #expect(try String(contentsOf: url, encoding: .utf8).contains(#""future":{"code":7}"#))
+        try reopened.update(note.id) { $0.schedules[0].imminentLeadMinutes = nil }
+        let reset = try String(contentsOf: url, encoding: .utf8)
+        #expect(!reset.contains("imminentLeadMinutes") && reset.contains(#""future":{"code":7}"#))
+    }
+
     @Test func legacyReminderMigratesWithStableIdentityAndPreservesUnknownHeader() throws {
         let temp = TemporaryStore(); defer { temp.cleanUp() }
         let store = try FileNoteStore(location: temp.location)

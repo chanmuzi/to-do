@@ -21,12 +21,12 @@ struct TopRowState: Hashable {
     var titleColor: ColorToken
     /// 호버로 나타나는 조작의 알파. 고정 핀은 평소에도 보인다.
     var hoverControlsAlpha: Double
-    var hasSchedules: Bool
-    var additionalSchedules = 0
-    var reminder: ReminderPresentation?
+    var clockLabel: String?
+    var clockColor: ColorToken
+    var hasSchedules: Bool { clockLabel != nil }
     var pin: Pin
     var problem: NoteProblem?
-    var syncFailure: Bool
+    var problemLabel: String?
 
     init(
         note: Note,
@@ -45,17 +45,22 @@ struct TopRowState: Hashable {
         hoverControlsAlpha = isHovered ? 1 : 0
         var reminderOptions = options
         reminderOptions.reminder = .time
-        hasSchedules = note.schedules.contains { !$0.isCompleted && !$0.isDeleted }
-        let upcoming = note.schedules.filter { $0.isUpcoming(at: now, calendar: calendar) }
-        additionalSchedules = max(0, upcoming.count - 1)
-        reminder = upcoming.min { $0.start < $1.start }.map {
-            ReminderPresentation(item: $0, now: now, options: reminderOptions, calendar: calendar)
+        let active = note.schedules.filter { !$0.isCompleted && !$0.isDeleted }
+        let upcoming = active.filter { $0.isUpcoming(at: now, calendar: calendar) }
+        let syncFailed = note.schedules.contains { $0.syncError != nil }
+        if let first = upcoming.min(by: { $0.start < $1.start }) {
+            var presentation = ReminderPresentation(item: first, now: now, options: reminderOptions, calendar: calendar)
+            presentation.syncFailed = syncFailed
+            clockLabel = presentation.accessibilityLabel + (upcoming.count > 1 ? " +\(upcoming.count - 1)" : "")
+            clockColor = presentation.status == .imminent ? .warn : .text3
+        } else {
+            clockLabel = active.isEmpty ? nil : "이 노트의 일정 \(active.count)건" + (syncFailed ? " 연동 실패, 앱에 저장됨" : "")
+            clockColor = .text3
         }
         pin = isPinned
             ? Pin(symbolName: "pin.fill", alpha: 1, color: isHovered ? .text2 : .text3, isOn: true)
             : Pin(symbolName: "pin", alpha: isHovered ? 1 : 0, color: .text2, isOn: false)
         self.problem = problem
-        syncFailure = note.schedules.contains { $0.syncError != nil }
-        if reminder != nil { reminder?.syncFailed = syncFailure }
+        problemLabel = problem?.accessibilityLabel ?? (active.isEmpty && syncFailed ? "예정 연동 실패" : nil)
     }
 }

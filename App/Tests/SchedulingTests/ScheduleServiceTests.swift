@@ -3,7 +3,7 @@ import Testing
 import Models
 import Store
 import Scheduling
-import Reminders
+@testable import Reminders
 
 @Suite @MainActor struct ScheduleServiceTests {
     private func fixture() throws -> Fixture { try Fixture() }
@@ -66,6 +66,35 @@ import Reminders
         #expect(read.schedules.isEmpty)
         #expect(read.body == "[ ] 원문\n다른 글" && read.title == "노트 제목")
     }
+    @Test func editorImminenceChoiceStaysLocalAndCanFollowTheDefaultAgain() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let item = ScheduleItem(start: future, imminentLeadMinutes: .fifteen)
+        let note = try f.create(NoteDraft(schedules: [item]))
+        await f.service.flush()
+        let editor = try f.editor(note.id)
+        #expect(editor.showsImminentLead && editor.defaultLeadLabel == "기본(30분 전)")
+        editor.displayOptions.imminentLeadTime = 3600
+        #expect(editor.defaultLeadLabel == "기본(1시간 전)")
+        let remote = try #require(f.bridge.items[item.id])
+        #expect(remote.imminentLeadMinutes == nil)
+        let saves = f.bridge.saves, reads = f.bridge.reads
+        editor.chooseImminentLead(.ten)
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.first?.imminentLeadMinutes == .ten)
+        #expect(f.bridge.saves == saves && f.bridge.reads == reads)
+        f.bridge.changeExternally(item.id) { $0.title = "바깥 수정" }
+        await f.service.flush()
+        editor.reload()
+        #expect(editor.selectedItem?.title == "바깥 수정" && editor.selectedItem?.imminentLeadMinutes == .ten)
+        editor.chooseImminentLead(nil)
+        #expect(try f.notes.load(note.id).schedules.first?.imminentLeadMinutes == nil)
+        editor.dateOnly = true
+        #expect(editor.save() && !editor.showsImminentLead)
+        editor.chooseImminentLead(.ten)
+        #expect(try f.notes.load(note.id).schedules.first?.imminentLeadMinutes == nil)
+        await f.service.flush()
+    }
+
     @Test func calendarChangeSurvivesFailureAndMovesOnlySelectedItem() async throws {
         let f = try fixture()
         defer { f.close() }

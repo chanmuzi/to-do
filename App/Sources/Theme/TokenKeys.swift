@@ -148,7 +148,6 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case libraryHeaderFont = "library-header-font"
     case upcomingWidth = "upcoming-detail-w"
     case sectionGap = "section-gap"
-    case badgeDotDrop = "badge-dot-drop"
     case reminderInputHeight = "reminder-input-h"
     case scheduleMarkerWidth = "schedule-marker-w"
     case scheduleEventBarWidth = "schedule-event-bar-w"

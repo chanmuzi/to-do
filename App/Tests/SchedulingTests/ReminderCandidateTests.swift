@@ -22,6 +22,35 @@ import Scheduling
         model.select(nil)
         try run(model, store, note.id)
     }
+    @Test func imminentMenuShowsTheCurrentDefaultAndSavesTheSelectedValue() throws {
+        try fixture { model, store, id in
+            let item = ScheduleItem(start: now)
+            try store.update(id) { $0.schedules = [item] }
+            model.reload()
+            model.select(item.id)
+            model.displayOptions.imminentLeadTime = 3600
+            let host = NSHostingView(rootView: ScheduleDetail(model: model, item: item, theme: try Theme.bundled()))
+            let window = NSPanel(contentRect: CGRect(origin: .zero, size: host.fittingSize), styleMask: .borderless,
+                                 backing: .buffered, defer: false)
+            window.contentView = host
+            defer { window.contentView = nil }
+            host.layoutSubtreeIfNeeded()
+            @MainActor func find(_ view: NSView) -> NSButton? {
+                if let button = view as? NSButton, button.accessibilityLabel() == "임박 표시" { return button }
+                return view.subviews.lazy.compactMap(find).first
+            }
+            let button = try #require(find(host))
+            let menu = try #require(button.menu)
+            #expect(button.title == "기본(1시간 전)")
+            #expect(menu.items.map(\.title) == ["기본(1시간 전)", "", "10분 전", "15분 전", "30분 전", "1시간 전"])
+            #expect(menu.items[1].isSeparatorItem && menu.items[0].state == .on)
+            menu.performActionForItem(at: 3)
+            #expect(try store.load(id).schedules.first?.imminentLeadMinutes == .fifteen)
+            menu.performActionForItem(at: 0)
+            #expect(try store.load(id).schedules.first?.imminentLeadMinutes == nil)
+        }
+    }
+
     @Test func scheduleFieldGeometry() throws {
         _ = FontRegistrar.registerBundledFonts()
         try fixture { model, store, id in

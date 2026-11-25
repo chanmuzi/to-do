@@ -1,4 +1,5 @@
 import Foundation
+import Models
 import Testing
 import Theme
 @testable import NotePanel
@@ -31,14 +32,27 @@ import Theme
         #expect(!shown.isRinging)
     }
 
-    @Test func imminentStartsFifteenMinutesBeforeAndRingsInWarn() {
-        #expect(presentation(date(16, 15), now: date(16, 14, 44)).status == .scheduled)
-        let shown = presentation(date(16, 15), now: date(16, 14, 45))
+    @Test func imminentStartsThirtyMinutesBeforeAndRingsInWarn() {
+        #expect(presentation(date(16, 15), now: date(16, 14, 30).addingTimeInterval(-1)).status == .scheduled)
+        let shown = presentation(date(16, 15), now: date(16, 14, 30))
         #expect(shown.status == .imminent)
         #expect(shown.symbolName == "bell")
         #expect(shown.color == .warn)
         #expect(shown.textStyle == .uiStrong)
         #expect(shown.isRinging)
+    }
+
+    @Test func itemLeadControlsImminenceAndRefreshUntilResetToDefault() {
+        let start = date(16, 15), now = date(16, 14, 35)
+        let options = NotePanelDisplayOptions(imminentLeadTime: 3600)
+        var item = ScheduleItem(start: start, imminentLeadMinutes: .fifteen)
+        func shown() -> ReminderPresentation { ReminderPresentation(item: item, now: now, options: options, calendar: calendar) }
+        func next() -> Date? { ReminderPresentation.nextRefresh(item: item, now: now, options: options, calendar: calendar) }
+        #expect(shown().status == .scheduled && next() == date(16, 14, 45))
+        item.imminentLeadMinutes = nil
+        #expect(shown().status == .imminent && next() == start)
+        item.isDateOnly = true
+        #expect(shown().status == .scheduled && next() == date(17, 0))
     }
 
     @Test func overdueStaysInWarnWithTheClockAndRegularWeight() {
@@ -87,7 +101,7 @@ import Theme
         func next(_ now: Date, _ options: NotePanelDisplayOptions) -> Date? {
             ReminderPresentation.nextRefresh(reminder: reminder, now: now, options: options, calendar: calendar)
         }
-        #expect(next(date(16, 9), options) == date(16, 14, 45))
+        #expect(next(date(16, 9), options) == date(16, 14, 30))
         #expect(next(date(16, 14, 50), options) == reminder)
         #expect(next(date(16, 16), options) == date(17, 0))
         #expect(next(date(15, 9), options) == date(16, 0))

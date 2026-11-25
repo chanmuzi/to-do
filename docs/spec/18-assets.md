@@ -25,8 +25,8 @@
 | `close.svg` | 창 닫기, 닫기 | `xmark` | 13 |
 | `pin-on.svg` | 항상 위에 고정(켜짐) | `pin.fill` | 13 |
 | `pin-off.svg` | 항상 위에 고정(꺼짐) | `pin` | 13 |
-| `clock.svg` | 리마인더(예정, 지남) | `clock` | 12 |
-| `bell.svg` | 리마인더(임박), 리마인더 설정 | `bell` | 12, 14 |
+| `clock.svg` | 노트 상단 시계(모든 상태), 공통 리마인더(예정, 지남) | `clock` | 14, 12 |
+| `bell.svg` | 공통 리마인더(임박), 리마인더 설정 | `bell` | 12, 14 |
 | `briefcase.svg` | 스페이스 예시(회사), 스페이스 옮기기 | `briefcase` | 13, 14 |
 | `house.svg` | 스페이스 예시(개인) | `house` | 13 |
 | `check.svg` | 체크박스, 고른 에이전트, 끝난 도구 내역 | `checkmark` | 9, 13, 11 |

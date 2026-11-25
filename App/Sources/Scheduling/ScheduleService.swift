@@ -28,7 +28,13 @@ public final class ScheduleService {
             guard let self, !writing else { return }
             switch change.kind {
             case .created, .updated:
-                enqueue(change.id)
+                if let previous = known[change.id], let current = try? notes.load(change.id),
+                   previous.body == current.body, previous.schedules != current.schedules,
+                   previous.schedules.map(\.calendarFields) == current.schedules.map(\.calendarFields) {
+                    known[change.id] = current
+                } else {
+                    enqueue(change.id)
+                }
             case .removed:
                 // 휴지통은 외부 일정 삭제 동작이 아니다. 앱 자체 알림만 취소한다.
                 known[change.id]?.schedules.forEach { notifier.cancel($0, noteID: change.id) }
@@ -167,7 +173,7 @@ public final class ScheduleService {
                     continue
                 }
                 if expected.link != nil {
-                    guard let remote = try bridge.fetch(expected) else {
+                    guard let remote = try bridge.fetch(expected.calendarFields) else {
                         notifier.cancel(expected, noteID: id)
                         try replace(expected, with: nil, in: id)
                         continue
@@ -195,7 +201,7 @@ public final class ScheduleService {
                         continue
                     }
                 }
-                var saved = try bridge.save(expected)
+                var saved = try bridge.save(expected.calendarFields)
                 saved.syncedAt = max(Date(), saved.modified)
                 saved.pendingCalendarID = nil
                 saved.syncBaseline = saved.value
@@ -224,7 +230,8 @@ public final class ScheduleService {
         try write(id) { current in
             guard let index = current.schedules.firstIndex(where: { $0.id == expected.id }),
                   current.schedules[index] == expected else { return }
-            if let replacement {
+            if var replacement {
+                replacement.imminentLeadMinutes = expected.imminentLeadMinutes
                 current.schedules[index] = replacement
                 if updateTodo, replacement.kind == .reminder, replacement.isCompleted != expected.isCompleted,
                    let todo = expected.todo { current.body = todo.settingCompleted(replacement.isCompleted, in: current.body) }
@@ -240,5 +247,14 @@ public final class ScheduleService {
         observation?.cancel(); observation = nil
         worker?.cancel(); worker = nil
         bridgeStorage?.stop(); pending.removeAll(); registrations.removeAll()
+    }
+}
+
+private extension ScheduleItem {
+    /// 임박 표시는 노트 파일에만 속한다. 외부 동기화와 변경 감지에는 전달하지 않는다.
+    var calendarFields: ScheduleItem {
+        var item = self
+        item.imminentLeadMinutes = nil
+        return item
     }
 }

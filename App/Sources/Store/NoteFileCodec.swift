@@ -124,6 +124,25 @@ package enum NoteFileCodec {
         return String(decoding: try! encoder.encode(items), as: UTF8.self)
     }
 
+    /// 다른 버전이 붙인 예정 속성은 같은 ID의 항목을 수정해도 보존한다.
+    static func encodeSchedules(_ items: [ScheduleItem], preservingUnknownFieldsIn original: String) -> String {
+        let encoded = encodeSchedules(items)
+        guard let previous = (try? JSONSerialization.jsonObject(with: Data(original.utf8))) as? [[String: Any]] else { return encoded }
+        var extras: [String: [String: Any]] = [:]
+        for row in previous {
+            let unknown = row.filter { !ScheduleItem.storedFieldNames.contains($0.key) }
+            if let id = row["id"] as? String, !unknown.isEmpty { extras[id] = unknown }
+        }
+        guard !extras.isEmpty else { return encoded }
+        // 두 배열 모두 JSON에서 왔으므로 합친 사전도 JSON으로 표현할 수 있다.
+        var rows = try! JSONSerialization.jsonObject(with: Data(encoded.utf8)) as! [[String: Any]]
+        for (index, item) in items.enumerated() {
+            if let fields = extras[item.id] { rows[index].merge(fields) { current, _ in current } }
+        }
+        let data = try! JSONSerialization.data(withJSONObject: rows, options: [.sortedKeys, .withoutEscapingSlashes])
+        return String(decoding: data, as: UTF8.self)
+    }
+
     /// ISO 8601 날짜를 읽는다. 초 아래 자리(`…00.123Z`)와 날짜만 있는 값(`2026-11-17`, UTC 자정)도 받는다.
     static func parseDate(_ value: String) -> Date? {
         if let date = try? Date(value, strategy: .iso8601) { return date }

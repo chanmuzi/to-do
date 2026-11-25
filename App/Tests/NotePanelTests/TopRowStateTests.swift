@@ -61,12 +61,13 @@ import Theme
 
     @Test func reminderHasNoSlotWhenAbsent() {
         let bare = state(note())
-        #expect(bare.reminder == nil)
+        #expect(!bare.hasSchedules && bare.clockLabel == nil)
+        #expect(!state(note(), hovered: true).hasSchedules)
         let reminded = state(note(reminder: now.addingTimeInterval(3600)))
-        #expect(reminded.reminder?.status == .scheduled)
+        #expect(reminded.hasSchedules && reminded.clockColor == .text3)
     }
 
-    @Test func chipCountsOnlyPendingSchedulesAndExpires() {
+    @Test func clockDescribesUpcomingSchedulesThenCountsRemainingPastItems() {
         var sample = note()
         sample.schedules = [
             ScheduleItem(start: now.addingTimeInterval(7200)),
@@ -76,10 +77,36 @@ import Theme
             ScheduleItem(start: now.addingTimeInterval(400), isDeleted: true),
         ]
         let active = state(sample)
-        #expect(active.additionalSchedules == 1)
-        #expect(active.reminder == state(note(reminder: now.addingTimeInterval(3600))).reminder)
+        let first = ReminderPresentation(reminder: now.addingTimeInterval(3600), now: now, options: .init(),
+                                         calendar: Calendar(identifier: .gregorian))
+        #expect(active.clockLabel == first.accessibilityLabel + " +1")
         sample.schedules.removeAll { $0.start > now }
-        #expect(state(sample).reminder == nil)
+        #expect(state(sample).clockLabel == "이 노트의 일정 1건")
+        #expect(state(sample).clockColor == .text3)
+        sample.schedules[0].isCompleted = true
+        #expect(!state(sample).hasSchedules)
+        sample.schedules[0].isCompleted = false
+        sample.schedules[0].isDeleted = true
+        #expect(!state(sample, hovered: true).hasSchedules)
+    }
+
+    @Test func imminentEventUsesWarnAndIncludesTheFullRangeInItsLabel() {
+        var sample = note()
+        sample.schedules = [ScheduleItem(start: now.addingTimeInterval(1800), end: now.addingTimeInterval(5400))]
+        let active = state(sample, options: .init(reminder: .iconOnly))
+        #expect(active.clockColor == .warn)
+        #expect(active.clockLabel?.hasPrefix("일정 ") == true)
+        #expect(active.clockLabel?.contains("~") == true)
+        #expect(active.clockLabel?.hasSuffix("임박") == true)
+    }
+
+    @Test func syncFailureIsAnnouncedOnTheClockOrOnTheSeparateProblemButton() {
+        var sample = note(reminder: now.addingTimeInterval(-60))
+        sample.schedules[0].syncError = "동기화 오류"
+        #expect(state(sample).clockLabel?.contains("연동 실패") == true)
+        #expect(state(sample).problemLabel == nil)
+        sample.schedules[0].isDeleted = true
+        #expect(state(sample).problemLabel == "예정 연동 실패")
     }
 
     @Test func problemIsCarriedThrough() {

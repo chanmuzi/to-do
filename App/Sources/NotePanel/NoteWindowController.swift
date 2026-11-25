@@ -237,9 +237,9 @@ final class NoteWindowController: NSObject {
         reminderRefresh?.cancel()
         reminderRefresh = nil
         let now = Date()
-        guard let reminder = note.schedules.filter({ $0.isUpcoming(at: now) }).map(\.start).min(),
+        guard let item = note.schedules.filter({ $0.isUpcoming(at: now) }).min(by: { $0.start < $1.start }),
               let next = ReminderPresentation.nextRefresh(
-                  reminder: reminder, now: now, options: environment.options(), calendar: .current
+                  item: item, now: now, options: environment.options(), calendar: .current
               )
         else { return }
         let delay = next.timeIntervalSince(now)

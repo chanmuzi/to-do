@@ -1,4 +1,5 @@
 import Foundation
+import Models
 
 /// 상단 줄 표시 방식(spec 5.2). 설정 화면이 생기면 거기서 바꾼다. 기본값은 `tokens.json`의 `display.defaults`와 같다.
 public struct NoteDisplayOptions: Hashable, Sendable {
@@ -36,7 +37,7 @@ public struct NoteDisplayOptions: Hashable, Sendable {
     public var space: SpaceDisplay
     public var reminder: ReminderDisplay
     public var clock: ClockFormat
-    /// 리마인더가 "임박"이 되는 시점(초). 임시 값 15분(spec 20의 3번).
+    /// 시각 지정 리마인더와 일정이 임박해지는 시작 전 시간(초). 기본 30분(D-298).
     public var imminentLeadTime: TimeInterval
 
     public init(
@@ -44,7 +45,7 @@ public struct NoteDisplayOptions: Hashable, Sendable {
         space: SpaceDisplay = .icon,
         reminder: ReminderDisplay = .time,
         clock: ClockFormat = .koreanMeridiem,
-        imminentLeadTime: TimeInterval = 15 * 60
+        imminentLeadTime: TimeInterval = ImminentLead.thirty.seconds
     ) {
         self.dateFormat = dateFormat
         self.space = space

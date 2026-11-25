@@ -62,6 +62,16 @@ final class TitleField: CommandInputField, NSTextFieldDelegate {
         (cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10_000, height: 10_000)).height ?? 0).rounded(.up)
     }
 
+    /// 뒤집힌 상단 줄 좌표에서 숫자와 대문자의 중심을 아이콘 중심에 맞춘다.
+    func place(in slot: NSRect) {
+        setFrameSize(NSSize(width: slot.width, height: idealHeight))
+        let baseline = slot.midY + (font ?? style.theme.nsFont(.title)).capHeight / 2
+        let origin = NSPoint(x: slot.minX, y: baseline - firstBaselineOffsetFromTop)
+        let backing = superview?.convertToBacking(origin) ?? origin
+        let aligned = NSPoint(x: backing.x.rounded(), y: backing.y.rounded())
+        setFrameOrigin(superview?.convertFromBacking(aligned) ?? origin)
+    }
+
     /// 고치는 중에는 글자를 건드리지 않고 색만 맞춘다.
     func show(title: String, color: ColorToken, animated: Bool) {
         let colorChanged = color != colorToken
