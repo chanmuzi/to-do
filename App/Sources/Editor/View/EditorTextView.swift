@@ -17,6 +17,7 @@ final class EditorTextView: PlainTextInputView {
 
     override func layout() {
         super.layout()
+        editor?.layoutScheduleButtons()
         caret?.reposition()
     }
 

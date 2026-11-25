@@ -85,6 +85,11 @@ extension NoteBodyEditing {
     }
 }
 
+@MainActor
+package protocol ScheduleLineDisplaying: AnyObject {
+    func setScheduleMarkers(_ markers: [Int: ScheduleLineMarker])
+}
+
 /// 편집기를 만들 때 넘기는 것.
 public struct NoteBodyEditorContext {
     public let theme: Theme

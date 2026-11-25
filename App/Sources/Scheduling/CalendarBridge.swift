@@ -16,7 +16,7 @@ public protocol CalendarBridge: AnyObject {
     /// nil은 권한을 확인한 뒤 두 식별자로도 찾지 못한 경우뿐이다.
     func fetch(_ item: ScheduleItem) throws -> ScheduleItem?
     func save(_ item: ScheduleItem) throws -> ScheduleItem
-    func remove(_ item: ScheduleItem) throws
+    @discardableResult func remove(_ item: ScheduleItem) throws -> Bool
     func destination(for item: ScheduleItem) -> ScheduleDestination?
     func events(in interval: DateInterval) -> [CalendarEvent]
     func contextItems(_ kind: ScheduleItem.Kind, day: DateInterval) async -> (calendarID: String, items: [CalendarEvent])?
@@ -79,6 +79,7 @@ public final class FakeCalendarBridge: CalendarBridge {
     public var failure: CalendarBridgeError?
     public private(set) var authorizationRequests: [ScheduleItem.Kind] = []
     public private(set) var authorizationPromptAttempts: [ScheduleItem.Kind] = []
+    private var issuedIDs: Set<String> = []
     public private(set) var saves = 0
     public private(set) var reads = 0
     public private(set) var eventRangeReads = 0
@@ -142,8 +143,9 @@ public final class FakeCalendarBridge: CalendarBridge {
             throw CalendarBridgeError.readOnly
         }
         var saved = item
-        let externalID = item.link?.externalID ?? item.id
-        saved.link = .init(localID: item.link?.localID ?? "fake-" + item.id, externalID: externalID, kind: item.kind)
+        let externalID = item.link?.externalID ?? (issuedIDs.contains(item.id) ? UUID().uuidString : item.id)
+        issuedIDs.insert(externalID)
+        saved.link = .init(localID: item.link?.localID ?? "fake-" + externalID, externalID: externalID, kind: item.kind)
         if let id = saved.link?.localID, item.pendingCalendarID != nil || item.link == nil || item.link?.kind != item.kind {
             linkedDestinations[id] = destination(for: item)
         }
@@ -153,10 +155,12 @@ public final class FakeCalendarBridge: CalendarBridge {
         saves += 1
         return saved
     }
-    public func remove(_ item: ScheduleItem) throws {
+    @discardableResult public func remove(_ item: ScheduleItem) throws -> Bool {
         if let failure { throw failure }
-        guard access(for: item.kind) == .available else { throw CalendarBridgeError.denied }
-        items[item.link?.externalID ?? item.id] = nil
+        guard access(for: item.link?.kind ?? item.kind) == .available else { throw CalendarBridgeError.denied }
+        let id = item.link?.externalID ?? item.id
+        issuedIDs.insert(id)
+        return items.removeValue(forKey: id) != nil
     }
     public func changeExternally(_ id: String, _ mutate: (inout ScheduleItem) -> Void) {
         guard var item = items[id] else { return }

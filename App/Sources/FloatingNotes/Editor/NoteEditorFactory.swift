@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Editor
 import Models
 import NotePanel
@@ -49,6 +49,7 @@ final class NoteEditorFactory {
         }
     }
 
+    var onOpenSchedule: ((NoteID, String?, NSView) -> Void)?
     var onDeleteScheduleLines: ((NoteID, String, String, UUID) throws -> InlineDateEffect?)?
     var onAcceptDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
@@ -71,6 +72,7 @@ final class NoteEditorFactory {
             editor: MarkdownEditor(theme: context.theme, configuration: configuration),
             noteID: context.noteID, folds: folds
         )
+        adapter.editor.onOpenSchedule = { [weak self] id, anchor in self?.onOpenSchedule?(context.noteID, id, anchor) }
         adapter.editor.onAcceptDate = { [weak self] request in
             guard let accept = self?.onAcceptDate else { throw CocoaError(.featureUnsupported) }
             return try accept(context.noteID, request)
@@ -91,6 +93,7 @@ final class NoteEditorFactory {
 
     private var configuration: MarkdownEditorConfiguration {
         var value = MarkdownEditorConfiguration(checkboxStyle: options.checkbox, inlineCodeStyle: options.inlineCode)
+        value.showsScheduleGutter = true
         value.recognizesDates = options.recognizesDates
         return value
     }

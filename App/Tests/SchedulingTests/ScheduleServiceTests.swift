@@ -467,3 +467,104 @@ extension ScheduleServiceTests {
         #expect(f.notifier.pending.isEmpty)
     }
 }
+
+extension ScheduleServiceTests {
+    @Test func trashRestoresUpcomingLinksWithFreshIDsAndSkipsPast() async throws {
+        let f = try fixture(); defer { f.close() }
+        let past = ScheduleItem(start: .distantPast)
+        let first = ScheduleItem(start: future)
+        let second = ScheduleItem(start: future, end: future.addingTimeInterval(3600))
+        let done = ScheduleItem(start: future, isCompleted: true)
+        let note = try f.notes.create(NoteDraft(body: "원문", schedules: [past, first, second, done]))
+        await f.service.flush()
+        let before = try f.notes.load(note.id).schedules
+        try f.notes.moveToTrash(note.id)
+        #expect(f.service.removedFromTrashMove(note.id) == [.reminder, .reminder, .event])
+        #expect(f.bridge.items.count == 1 && f.bridge.items[done.id] != nil)
+        try f.notes.restoreFromTrash(note.id)
+        await f.service.flush()
+        let restored = try f.notes.load(note.id)
+        #expect(restored.body == "원문" && restored.schedules.map(\.id) == before.map(\.id))
+        #expect(restored.schedules[0].link == nil)
+        for index in 1...2 {
+            let link = try #require(restored.schedules[index].link)
+            #expect(link.externalID != before[index].link?.externalID && link.localID != before[index].link?.localID)
+            #expect(link.externalID.flatMap { f.bridge.items[$0] } != nil)
+        }
+        f.service.refreshLinked()
+        await f.service.flush()
+        #expect(f.bridge.items.count == 3 && f.bridge.authorizationPromptAttempts.isEmpty)
+        #expect(f.notifier.permissionRequests == 0)
+    }
+
+    @Test func trashRetrySurvivesRestartAndRestoreBeforeRetryAvoidsDuplicates() async throws {
+        let f = try fixture(); defer { f.close() }
+        let note = try f.notes.create(NoteDraft(schedules: [ScheduleItem(start: future)]))
+        await f.service.flush()
+        f.bridge.failure = .readOnly
+        try f.notes.moveToTrash(note.id)
+        let pending = try #require(try f.notes.listTrash().notes.first?.schedules.first)
+        #expect(pending.link != nil && pending.syncError != nil && f.service.removedFromTrashMove(note.id).isEmpty)
+        f.bridge.failure = nil
+        try f.notes.restoreFromTrash(note.id)
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.first?.link == pending.link)
+        #expect(f.bridge.items.count == 1)
+        f.bridge.isAllowed = false
+        try f.notes.moveToTrash(note.id)
+        f.service.stop()
+        f.bridge.isAllowed = true
+        f.service = ScheduleService(notes: f.notes, notifier: f.notifier, makeBridge: { f.bridge })
+        try f.service.start()
+        #expect(f.bridge.items.isEmpty)
+        try f.notes.restoreFromTrash(note.id)
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.first?.link != pending.link)
+        #expect(f.bridge.items.count == 1 && f.bridge.authorizationPromptAttempts.isEmpty)
+    }
+
+    @Test func trashCancelsAndRestoreReschedulesLocalNotificationWithoutPrompt() async throws {
+        let f = try fixture(); defer { f.close() }
+        f.bridge.failure = .readOnly
+        let item = ScheduleItem(start: future)
+        let note = try f.notes.create(NoteDraft(schedules: [item]))
+        await f.service.flush()
+        #expect(f.notifier.pending[item.id] != nil)
+        try f.notes.moveToTrash(note.id)
+        #expect(f.notifier.pending.isEmpty && f.service.removedFromTrashMove(note.id).isEmpty)
+        f.bridge.isAllowed = false
+        try f.notes.restoreFromTrash(note.id)
+        await f.service.flush()
+        #expect(f.notifier.pending[item.id] != nil)
+        f.bridge.failure = nil
+        f.bridge.isAllowed = true
+        await f.service.flush()
+        #expect(f.notifier.pending.isEmpty && f.bridge.items.count == 1)
+        #expect(f.notifier.permissionRequests == 0 && f.bridge.authorizationPromptAttempts.isEmpty)
+    }
+}
+
+extension ScheduleServiceTests {
+    @Test func restoreOlderTrashFileSkipsPastAndCompletedAndResumesLocalAlarm() async throws {
+        let f = try fixture(); defer { f.close() }
+        f.bridge.isAllowed = false
+        let past = ScheduleItem(start: .distantPast)
+        let done = ScheduleItem(start: future, isCompleted: true)
+        let next = ScheduleItem(start: future)
+        let note = try f.notes.create(NoteDraft(schedules: [past, done, next]))
+        await f.service.flush()
+        // 과거 버전은 별도 표시 없이 원본 파일을 그대로 휴지통으로 옮겼다.
+        let location = f.notes.location
+        let filename = note.id.rawValue + ".md"
+        try FileManager.default.moveItem(at: location.notesDirectory.appendingPathComponent(filename),
+                                         to: location.trashDirectory.appendingPathComponent(filename))
+        try f.notes.refresh()
+        try f.notes.restoreFromTrash(note.id)
+        await f.service.flush()
+        #expect(Set(f.notifier.pending.keys) == [next.id])
+        f.bridge.isAllowed = true
+        await f.service.flush()
+        #expect(Set(f.bridge.items.keys) == [next.id])
+        #expect(f.notifier.pending.isEmpty && f.bridge.authorizationPromptAttempts.isEmpty)
+    }
+}

@@ -213,9 +213,11 @@ public final class EventKitBridge: CalendarBridge {
         if let event = value as? EKEvent { try store.remove(event, span: .thisEvent, commit: true) }
         else if let reminder = value as? EKReminder { try store.remove(reminder, commit: true) }
     }
-    public func remove(_ item: ScheduleItem) throws {
-        let store = try authorizedStore(item.kind)
-        if let value = try find(item, in: store) { try removeValue(value, in: store) }
+    @discardableResult public func remove(_ item: ScheduleItem) throws -> Bool {
+        let store = try authorizedStore(item.link?.kind ?? item.kind)
+        guard let value = try find(item, in: store) else { return false }
+        try removeValue(value, in: store)
+        return true
     }
     public func stop() {
         if let observer { NotificationCenter.default.removeObserver(observer) }

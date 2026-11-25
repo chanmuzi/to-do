@@ -251,10 +251,39 @@ public final class FileNoteStore: NoteStoring {
         guard files.noteExists(id, in: location.notesDirectory) else { throw StoreError.noteNotFound(id) }
         // 미뤄 둔 변경을 먼저 쓴다. 못 쓰면 옮기지 않는다(휴지통의 노트가 옛 내용이 되지 않게).
         if pending[id] != nil { try commit(id) }
-        try files.moveToTrash(id)
+        let file = try files.read(id, in: location.notesDirectory)
+        var content = NoteFileCodec.decode(file.text)
+        let marked = file.note.schedules.map { item in
+            var item = item
+            if item.link != nil && !item.isCompleted && !item.isDeleted {
+                item.trashState = .pendingRemoval
+            }
+            return item
+        }
+        let changed = marked != file.note.schedules
+        if changed {
+            content.schedules = marked
+            try files.write(NoteFileCodec.encode(content, over: file.text), id)
+        }
+        do { try files.moveToTrash(id) }
+        catch {
+            if changed { try files.write(file.text, id) }
+            throw error
+        }
         known[id] = nil
         snapshot[id] = nil
-        emit(StoreChange(id: id, kind: .removed, origin: .local))
+        emit(StoreChange(id: id, kind: .removed, origin: .local, trashedSchedules: marked))
+    }
+
+    public func updateTrashSchedules(_ id: NoteID, _ change: (inout [ScheduleItem]) -> Void) throws {
+        let directory = location.trashDirectory
+        let file = try files.read(id, in: directory)
+        var items = file.note.schedules
+        change(&items)
+        guard items != file.note.schedules else { return }
+        var content = NoteFileCodec.decode(file.text)
+        content.schedules = items
+        try files.write(NoteFileCodec.encode(content, over: file.text), id, in: directory)
     }
 
     public func delete(_ id: NoteID) throws {
@@ -277,6 +306,13 @@ public final class FileNoteStore: NoteStoring {
         guard files.noteExists(id, in: location.trashDirectory) else { throw StoreError.noteNotFound(id) }
         guard !files.itemExists(id, in: location.notesDirectory) else {
             throw StoreError.noteAlreadyExists(id)
+        }
+        // 이전 버전이 휴지통에 넣은 파일에도 같은 복원 규칙을 적용한다.
+        try updateTrashSchedules(id) { items in
+            for index in items.indices where items[index].link == nil && items[index].trashState == nil
+                && !items[index].isDeleted && !items[index].id.hasPrefix("legacy-") {
+                items[index].trashState = .local
+            }
         }
         try files.restoreFromTrash(id)
         let file = try files.read(id, in: location.notesDirectory)

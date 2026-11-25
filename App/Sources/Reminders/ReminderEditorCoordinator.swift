@@ -22,12 +22,12 @@ public final class ReminderEditorCoordinator: NSObject, NSPopoverDelegate {
     public var onSave: (@MainActor (NoteID, String, Bool) -> Void)?
     public private(set) var contentView: NSView?
     public init(notes: any NoteStoring, theme: Theme) { self.notes = notes; self.theme = theme }
-    public func show(_ id: NoteID, anchor: NSView) throws {
+    public func show(_ id: NoteID, anchor: NSView, selectedID: String? = nil) throws {
         dismiss(restoringFocus: false)
         let model = try ReminderEditorModel(noteID: id, notes: notes)
         guard !model.listItems.isEmpty else { return }
         model.onSave = onSave
-        model.select(nil)
+        model.select(selectedID.flatMap { id in model.listItems.contains { $0.id == id } ? id : nil })
         model.displayOptions = displayOptions
         model.calendarChoices = calendarChoices
         model.destination = destination
@@ -49,7 +49,10 @@ public final class ReminderEditorCoordinator: NSObject, NSPopoverDelegate {
             panel.isFloatingPanel = true
             panel.hidesOnDeactivate = false
             if let window = anchor.window {
-                panel.setFrameOrigin(NSPoint(x: window.frame.minX, y: window.frame.minY - size.height))
+                let rect = window.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+                let visible = window.screen?.visibleFrame ?? window.frame
+                panel.setFrameOrigin(NSPoint(x: max(visible.minX, min(rect.midX - size.width / 2, visible.maxX - size.width)),
+                                             y: rect.minY - size.height >= visible.minY ? rect.minY - size.height : rect.maxY))
             }
             panel.orderFrontRegardless()
             preview = panel

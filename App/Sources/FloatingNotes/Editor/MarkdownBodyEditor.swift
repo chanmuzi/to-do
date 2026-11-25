@@ -2,6 +2,7 @@ import AppKit
 import Editor
 import Models
 import NotePanel
+import Theme
 
 /// `MarkdownEditor`(Editor 모듈)를 노트 창의 본문 자리(`NoteBodyEditing`)에 맞춘 어댑터.
 /// 두 기능 모듈은 서로를 모르고, App이 이것으로 잇는다.
@@ -14,7 +15,11 @@ import NotePanel
 ///   버린다. 접힘이나 글이 바뀔 때마다 적는다. 떠 있는 동안 밖에서 본문이 바뀌면 줄 번호를 새 본문에 맞춰 옮긴다.
 /// - 덧붙이기: 이 편집기가 아닌 쪽이 끝에 붙인 글은 `appendFromOutside`로 받아 커서, 접힘, 되돌리기 기록,
 ///   조합 중인 글자를 그대로 둔다.
-final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting {
+final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, ScheduleLineDisplaying {
+    func setScheduleMarkers(_ markers: [Int: ScheduleLineMarker]) {
+        editor.setScheduleMarkers(markers)
+    }
+
     var isEditingBody: Bool { editor.isEditingBody }
     var activeFormats: Set<NoteFormat> {
         let state = editor.formattingState

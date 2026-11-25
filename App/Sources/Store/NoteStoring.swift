@@ -45,6 +45,8 @@ public protocol NoteStoring: AnyObject {
     /// 미뤄 둔 변경을 먼저 쓰고 휴지통으로 옮긴다. 그 쓰기가 실패하면 옮기지 않고 던진다.
     /// 휴지통에 같은 이름의 파일이 있으면 그 옛 파일을 `<id>-2.md`처럼 옆으로 옮겨 둘 다 남긴다.
     func moveToTrash(_ id: NoteID) throws
+    /// 휴지통 파일에 외부 삭제의 성공 또는 재시도 상태만 기록한다.
+    func updateTrashSchedules(_ id: NoteID, _ change: (inout [ScheduleItem]) -> Void) throws
     /// 휴지통의 노트. 최근에 고친 것이 앞.
     func listTrash() throws -> NoteListing
     @discardableResult func restoreFromTrash(_ id: NoteID) throws -> Note

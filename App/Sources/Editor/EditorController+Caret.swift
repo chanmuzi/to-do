@@ -78,7 +78,7 @@ extension EditorController {
     }
 
     /// 커서가 놓이는 줄 조각의 영역과 그 안의 가로 자리(텍스트 컨테이너 좌표).
-    private func caretSpot(_ location: Int, lineIndex index: Int) -> (x: CGFloat, line: CGRect)? {
+    func caretSpot(_ location: Int, lineIndex index: Int) -> (x: CGFloat, line: CGRect)? {
         let line = document.lines[index]
         let base = contentStorage.documentRange.location
         if line.fullRange.length > 0,

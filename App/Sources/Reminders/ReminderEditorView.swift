@@ -64,7 +64,7 @@ struct ReminderEditorView: View {
                             .strikethrough(item.isCompleted)
                             .foregroundStyle(theme.color(item.isCompleted ? .text3 : .text))
                         Text(model.presentation(item).text ?? "")
-                            .font(theme.font(.scheduleTime)).foregroundStyle(theme.color(.text2))
+                            .font(theme.font(.scheduleTime).monospacedDigit()).foregroundStyle(theme.color(.text2))
                     }.lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     if let destination {
                         Text(destination.name).font(theme.font(.librarySection))

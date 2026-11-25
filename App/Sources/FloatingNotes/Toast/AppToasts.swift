@@ -15,6 +15,12 @@ final class AppToasts {
     static let trashKind = "trash"
     static let captureKind = "capture"
     static let trashMessage = "휴지통으로 보냈습니다"
+    static func trashMessage(removed: [ScheduleItem.Kind]) -> String {
+        guard let first = removed.first else { return trashMessage }
+        let name = removed.allSatisfy { $0 == first } ? (first == .event ? "일정" : "리마인더") : "예정"
+        return "\(trashMessage). \(name) \(removed.count)개도 지웠습니다"
+    }
+    var removedExternalItems: (NoteID) -> [ScheduleItem.Kind] = { _ in [] }
     static let undoTitle = "되돌리기"
     static let openTitle = "열기"
     static let todayNoteName = "오늘 노트"
@@ -37,9 +43,9 @@ final class AppToasts {
         self.notePanels = notePanels
         self.notes = notes
         self.router = router
-        notePanels.onMovedToTrash = { [unowned self] _, screen, frame in
+        notePanels.onMovedToTrash = { [unowned self] id, screen, frame in
             presenter.show(
-                .init(kind: Self.trashKind, message: Self.trashMessage, actionTitle: Self.undoTitle), on: screen, noteFrame: frame
+                .init(kind: Self.trashKind, message: Self.trashMessage(removed: removedExternalItems(id)), actionTitle: Self.undoTitle), on: screen, noteFrame: frame
             ) { [unowned self] in
                 // 그사이 되돌릴 수 없게 됐으면 아무것도 하지 않는다(알림도 이미 거둬졌어야 한다).
                 if self.notePanels.canUndoTrash { undoTrash() }
