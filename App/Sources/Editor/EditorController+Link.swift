@@ -12,7 +12,7 @@ extension EditorController {
     var linkSelectionHelp: String {
         let selection = textView.selectedRange()
         if selection.length == 0 { return "링크로 만들 본문 글자를 먼저 선택하세요." }
-        if document.lineIndex(at: selection.location) != document.lineIndex(at: NSMaxRange(selection)) {
+        if NSMaxRange(selection) > NSMaxRange(document.line(at: selection.location).fullRange) {
             return "한 줄 안에서 링크로 만들 글자를 선택하세요."
         }
         return "코드나 기존 링크의 경계를 걸치지 않게 글자를 선택하세요."
