@@ -82,9 +82,10 @@ import Theme
         }
     }
 
-    @Test func reversalKeepsTheVisiblePositionAndClipsTheTrailingButton() async throws {
+    @Test(arguments: [false, true])
+    func reversalKeepsTheVisiblePositionAndClipsTheTrailingButton(reducesMotion: Bool) throws {
         let theme = try Theme.bundled()
-        let style = PanelStyle(theme: theme)
+        let style = PanelStyle(theme: theme, reduceMotionOverride: reducesMotion)
         let row = TopRowView(style: style)
         let panel = NotePanelWindow(contentRect: CGRect(x: 0, y: 0, width: 340, height: metrics.height))
         panel.allowsKey = false
@@ -100,24 +101,32 @@ import Theme
         #expect(row.closeButton.isHidden)
         let resting = row.closeButton.frame
         apply(true, animated: true)
-        if style.reducesMotion {
+        if reducesMotion {
             #expect(row.closeButton.alphaValue == 1 && row.closeButton.frame != resting)
+            apply(false, animated: true)
+            #expect(row.closeButton.isHidden && row.closeButton.frame == resting)
             return
         }
-        // 첫 프레임이 표시되는 즉시 방향을 바꾼다.
-        let deadline = ContinuousClock.now + .seconds(1)
-        while row.closeButton.alphaValue == 0 && ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(2))
-        }
+        #expect(row.advanceDrawer(by: 0.3))
         let visible = row.closeButton.frame
         let alpha = row.closeButton.alphaValue
-        #expect(alpha > 0 && alpha < 1)
+        #expect(abs(alpha - theme.motion.curve.progress(at: 0.3)) < 0.000001)
+        #expect(!row.closeButton.isHidden && visible.minX < resting.minX)
         #expect(row.clipsToBounds)
-        let outside = row.convert(CGPoint(x: row.bounds.maxX + 1, y: visible.midY), to: nil)
-        #expect(panel.button(at: outside) == nil)
+        let clippedEdge = row.bounds.maxX
+        try #require(visible.minX < clippedEdge && visible.maxX > clippedEdge)
+        let inside = CGPoint(x: (visible.minX + clippedEdge) / 2, y: visible.midY)
+        let outside = CGPoint(x: (visible.maxX + clippedEdge) / 2, y: visible.midY)
+        #expect(panel.button(at: row.convert(inside, to: nil)) === row.closeButton)
+        #expect(panel.button(at: row.convert(outside, to: nil)) == nil)
         apply(false, animated: true)
+        #expect(row.advanceDrawer(by: 0))
         #expect(row.closeButton.frame == visible && row.closeButton.alphaValue == alpha)
-        try await Task.sleep(for: .seconds(theme.motion.duration * 2))
+        #expect(row.advanceDrawer(by: 0.1))
+        #expect(row.closeButton.frame.minX > visible.minX)
+        #expect(abs(row.closeButton.alphaValue - theme.motion.curve.progress(at: 0.2)) < 0.000001)
+        #expect(!row.advanceDrawer(by: 0.3))
+        #expect(row.closeButton.alphaValue == 0)
         #expect(row.closeButton.frame == resting && row.closeButton.isHidden)
     }
 

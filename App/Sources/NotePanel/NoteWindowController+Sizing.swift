@@ -99,21 +99,25 @@ extension NoteWindowController: NSWindowDelegate {
     }
 
     private func runHeightAnimation() async {
-        while !Task.isCancelled, let transition = heightTransition {
-            let elapsed = environment.style.reducesMotion ? transition.duration
-                : (ContinuousClock.now - heightStartedAt) / .seconds(1)
-            setHeight(transition.height(at: elapsed), top: panel.frame.maxY)
-            // 배치 도중 다른 목표가 들어오면 같은 작업의 다음 프레임에서 이어간다.
-            if heightTransition == transition && elapsed >= transition.duration { break }
+        while !Task.isCancelled, advanceHeightAnimation(at: .now) {
             try? await Task.sleep(for: Self.frameInterval)
         }
-        guard !Task.isCancelled else { return }
+    }
+
+    @discardableResult func advanceHeightAnimation(at instant: ContinuousClock.Instant) -> Bool {
+        guard let transition = heightTransition else { return false }
+        let elapsed = environment.style.reducesMotion ? transition.duration
+            : (instant - heightStartedAt) / .seconds(1)
+        setHeight(transition.height(at: elapsed), top: panel.frame.maxY)
+        // 배치 도중 다른 목표가 들어오면 같은 작업의 다음 프레임에서 이어간다.
+        guard heightTransition == transition, elapsed >= transition.duration else { return true }
         heightTransition = nil
         heightAnimation = nil
         root.layoutSubtreeIfNeeded()
         updateBodyScroller()
         panel.invalidateShadow()
         if isShown { environment.recorder.recordFrame(noteID, frame: panel.frame) }
+        return false
     }
 
     /// 높이를 다시 그리는 간격. 화면 주사율보다 촘촘해도 창은 화면이 그릴 때만 그려진다.

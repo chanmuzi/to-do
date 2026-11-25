@@ -6,7 +6,8 @@ struct PanelStyle {
     let theme: Theme
 
     private var increasesContrast: Bool { NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast }
-    var reducesMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    var reduceMotionOverride: Bool?
+    var reducesMotion: Bool { reduceMotionOverride ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     /// "대비 증가"가 켜져 있으면 `text-3`를 `text-2`로, `line`을 `outline`으로 바꾼다.
     func color(_ token: ColorToken) -> NSColor {
