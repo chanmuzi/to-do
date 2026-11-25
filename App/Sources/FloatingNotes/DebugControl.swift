@@ -273,6 +273,10 @@ final class DebugControl {
         case ("reminder-select", let value?, _): reminderEditor?.model?.select(value.rawValue == "new" ? nil : value.rawValue)
         case ("reminder-candidate", let value?, _): if let index = Int(value.rawValue) { reminderEditor?.model?.candidateIndex = index }
         case ("reminder-submit", _, _): reminderEditor?.model?.submitCandidate()
+        case ("schedule-dot-hover", let id?, let line?) where isPassive,
+             ("schedule-dot-open", let id?, let line?) where isPassive:
+            guard let index = Int(line) else { return }
+            editor(of: id)?.previewScheduleButton(line: index, open: words.first == "schedule-dot-open")
         case ("reminder-completion-hover", let value?, _) where isPassive:
             reminderEditor?.model?.previewCompletionHoverID = value.rawValue == "off" ? nil : value.rawValue
         case ("remove-body-line", let id?, let value?) where isPassive:
@@ -1097,6 +1101,10 @@ final class DebugControl {
         view.window?.contentView?.layoutSubtreeIfNeeded()
         write(json: [
             "text": editor.text,
+            "scheduleDots": editor.scheduleButtonFrames.sorted { $0.key < $1.key }.map { line, rect in
+                ["line": line, "x": rect.midX, "y": rect.midY, "width": rect.width,
+                 "firstLineY": editor.textPoint(forLine: line)?.y as Any] as [String: Any]
+            },
             "selectionFrames": editor.selectionFrames.map(NSStringFromRect),
             "dateSuggestionHelp": editor.textView.accessibilityHelp() ?? "",
             "selectedRange": NSStringFromRange(editor.selectedRange),

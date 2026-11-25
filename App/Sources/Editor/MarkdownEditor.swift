@@ -100,6 +100,26 @@ public final class MarkdownEditor {
         set { controller.onFocusTitle = newValue }
     }
 
+    package func setScheduleMarkers(_ markers: [Int: ScheduleLineMarker]) {
+        controller.updateScheduleButtons(markers)
+    }
+
+    package var onOpenSchedule: ((String?, NSView) -> Void)? {
+        get { controller.onOpenSchedule }
+        set { controller.onOpenSchedule = newValue }
+    }
+
+    #if DEBUG
+    package func previewScheduleButton(line: Int, open: Bool) {
+        guard let button = controller.scheduleButtons[line], !button.isHidden else { return }
+        if open { button.openSchedule() } else { button.hovered = true }
+    }
+
+    package var scheduleButtonFrames: [Int: CGRect] {
+        controller.scheduleButtons.filter { !$0.value.isHidden }.mapValues(\.frame)
+    }
+    #endif
+
     public func scheduleRemoved(fromBodyLine line: Int) {
         controller.scheduleRemoved(fromBodyLine: line)
     }

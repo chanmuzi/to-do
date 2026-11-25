@@ -189,6 +189,7 @@ final class NoteWindowController: NSObject {
     // MARK: - 상단 줄
 
     func refreshChrome(animated: Bool) {
+        refreshScheduleMarkers()
         let state = TopRowState(
             note: note,
             isPinned: isPinned,
@@ -211,6 +212,12 @@ final class NoteWindowController: NSObject {
         root.background.setPalette(note.colorID?.rawValue, animated: animated)
         panel.title = state.title
         scheduleReminderRefresh()
+    }
+
+    private func refreshScheduleMarkers() {
+        (editor as? any ScheduleLineDisplaying)?.setScheduleMarkers(
+            ScheduleLineMarker.markers(in: note, now: Date(), options: environment.options(), calendar: .current)
+        )
     }
 
     func refreshFormatBar(animated: Bool = false, focusChanged: Bool = false) {
@@ -237,11 +244,10 @@ final class NoteWindowController: NSObject {
         reminderRefresh?.cancel()
         reminderRefresh = nil
         let now = Date()
-        guard let item = note.schedules.filter({ $0.isUpcoming(at: now) }).min(by: { $0.start < $1.start }),
-              let next = ReminderPresentation.nextRefresh(
-                  item: item, now: now, options: environment.options(), calendar: .current
-              )
-        else { return }
+        let next = note.schedules.filter { $0.isUpcoming(at: now) }.compactMap {
+            ReminderPresentation.nextRefresh(item: $0, now: now, options: environment.options(), calendar: .current)
+        }.min()
+        guard let next else { return }
         let delay = next.timeIntervalSince(now)
         reminderRefresh = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
@@ -270,6 +276,7 @@ final class NoteWindowController: NSObject {
         editor.onTextChange = { [unowned self] text in
             exchangedBody = text
             mutate(deferred: true) { $0.body = text }
+            refreshScheduleMarkers()
         }
         editor.onContentHeightChange = { [unowned self] height in
             contentHeight = height

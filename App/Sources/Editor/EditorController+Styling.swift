@@ -192,6 +192,7 @@ extension EditorController {
     func reportContentHeight() {
         guard textContainer.size.width > 0 else { return }
         let height = measureContentHeight()
+        layoutScheduleButtons()
         guard abs(height - lastContentHeight) > 0.5 else { return }
         lastContentHeight = height
         onContentHeightChange?(height)

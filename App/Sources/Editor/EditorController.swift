@@ -42,6 +42,8 @@ final class EditorController: NSObject {
     let editorUndoManager = EditorUndoManager()
     let checkboxHover = CheckboxHover()
     var hoveredCheckbox: Int?
+    var scheduleButtons: [Int: ScheduleLineButton] = [:]
+    var onOpenSchedule: ((String?, NSView) -> Void)?
     let copyButton = CodeCopyButton()
     let linkField: LinkField
     var dateSuggestion: InlineDateProposal?
@@ -270,7 +272,7 @@ final class EditorController: NSObject {
     private func applyStyleToViews() {
         let padding = theme.docPadding
         textView.textContainerInset = NSSize(
-            width: (padding.leading + padding.trailing) / 2,
+            width: (padding.leading + padding.trailing + (configuration.showsScheduleGutter ? theme.component(.noteTopButtonSize) : 0)) / 2,
             height: (padding.top + padding.bottom) / 2
         )
         textView.containerOrigin = NSPoint(x: padding.leading, y: padding.top)
@@ -278,6 +280,7 @@ final class EditorController: NSObject {
         textView.textColor = style.text
         setInputParagraph(style.bodyParagraph)
         textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.selected)]
+        scheduleButtons.values.forEach { $0.needsDisplay = true }
         copyButton.apply(theme: theme, tint: style.text3)
         linkField.apply(theme: theme, style: style)
     }
