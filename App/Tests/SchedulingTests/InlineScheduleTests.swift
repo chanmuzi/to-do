@@ -134,6 +134,70 @@ import DateTime
         #expect(try f.notes.load(note.id).schedules[0].inlineSource?.line == 1)
     }
 
+    @Test func editorDeletionRestoresMultipleLineKindsAndFreshExternalLinks() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let lines = ["[ ] 확인", "- 글머리표", "일반 줄", "남길 줄"]
+        let body = lines.joined(separator: "\n")
+        let items = lines.prefix(3).enumerated().map { line, text in
+            ScheduleItem(start: f.future, end: line == 2 ? f.future.addingTimeInterval(3600) : nil,
+                         title: text, todo: TodoAnchor(line: line, sourceLine: text),
+                         inlineSource: InlineScheduleSource(line: line, text: text))
+        }
+        let title = ScheduleItem(start: f.future, inlineSource: InlineScheduleSource(line: nil, text: "제목"))
+        var linked = items
+        for index in linked.indices {
+            let oldID = "old-" + linked[index].id
+            linked[index].link = .init(localID: oldID, externalID: oldID, kind: linked[index].kind)
+            f.bridge.items[oldID] = linked[index]
+        }
+        let note = try f.notes.create(NoteDraft(title: "제목", body: body, schedules: linked + [title]))
+        await f.service.flush()
+        let deletion = try #require(try f.writer.removeMissingSources(from: body, to: "남길 줄", in: note.id))
+        #expect(deletion.items.map(\.id) == items.map(\.id))
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.map(\.id) == [title.id])
+        #expect(f.bridge.items.count == 1)
+        try deletion.effect.undo()
+        try f.notes.scheduleUpdate(note.id) { $0.body = body }
+        await f.service.flush()
+        let restored = try f.notes.load(note.id)
+        for item in items {
+            let copy = try #require(restored.schedules.first { $0.id == item.id })
+            let newID = try #require(copy.link?.externalID)
+            #expect(newID != "old-" + item.id && f.bridge.items[newID] != nil)
+            #expect(copy.inlineSource == item.inlineSource && copy.todo == item.todo)
+        }
+        try deletion.effect.redo()
+        try f.notes.scheduleUpdate(note.id) { $0.body = "남길 줄" }
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.map(\.id) == [title.id])
+        #expect(f.bridge.authorizationPromptAttempts.isEmpty)
+    }
+
+    @Test func ambiguousAndOutsideEditsOnlyDetachAndPasteDoesNotRestore() async throws {
+        let f = try Fixture(); defer { f.close() }
+        let item = ScheduleItem(start: f.future, inlineSource: InlineScheduleSource(line: 0, text: "회의"))
+        let note = try f.notes.create(NoteDraft(body: "회의\n회의", schedules: [item]))
+        #expect(try f.writer.removeMissingSources(from: "회의\n회의", to: "회의", in: note.id) == nil)
+        #expect(try f.notes.load(note.id).schedules.first?.inlineSource == nil)
+        try f.notes.update(note.id) { $0.body = "회의\n아래"; $0.schedules = [item] }
+        try f.notes.update(note.id) { $0.body = "아래" }
+        #expect(try f.notes.load(note.id).schedules.first?.isDeleted == false)
+        #expect(try f.writer.removeMissingSources(from: "회의\n아래", to: "아래", in: note.id) == nil)
+        try f.notes.update(note.id) { $0.body = "회의"; $0.schedules = [item] }
+        await f.service.flush()
+        f.bridge.failure = .readOnly
+        _ = try #require(try f.writer.removeMissingSources(from: "회의", to: "", in: note.id))
+        await f.service.flush()
+        let pending = try #require(f.notes.load(note.id).schedules.first)
+        #expect(pending.isDeleted && pending.link != nil && pending.syncError != nil)
+        try f.notes.update(note.id) { $0.body = "회의" }
+        f.bridge.failure = nil
+        f.service.refreshLinked()
+        await f.service.flush()
+        #expect(try f.notes.load(note.id).schedules.isEmpty)
+    }
+
     private final class Fixture {
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["TMPDIR"] ?? NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let future = Date(timeIntervalSince1970: 2_000_000_000)

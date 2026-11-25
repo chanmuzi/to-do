@@ -54,6 +54,7 @@ final class EditorController: NSObject {
     var dateCalendar = Calendar.current
     var onFormattingChange: (() -> Void)?
     var onFocusTitle: (() -> Void)?
+    var onDeleteScheduleLines: ((String, String, UUID) throws -> InlineDateEffect?)?
     var onAcceptDate: ((InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
     var dateEffects: [UUID: InlineDateEffect] = [:]

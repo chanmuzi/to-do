@@ -6,6 +6,7 @@ import Theme
 extension EditorController {
     func pruneDateEffects() {
         let ids = Set((history.undoStack + history.redoStack + (history.open.map { [$0] } ?? [])).compactMap(\.dateEffect))
+        for (id, effect) in dateEffects where !ids.contains(id) { effect.onUndoUnavailable?() }
         dateEffects = dateEffects.filter { ids.contains($0.key) }
     }
 

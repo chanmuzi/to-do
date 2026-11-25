@@ -25,7 +25,7 @@ public final class ReminderEditorCoordinator: NSObject, NSPopoverDelegate {
     public func show(_ id: NoteID, anchor: NSView) throws {
         dismiss(restoringFocus: false)
         let model = try ReminderEditorModel(noteID: id, notes: notes)
-        guard model.items.contains(where: { !$0.isCompleted }) else { return }
+        guard !model.listItems.isEmpty else { return }
         model.onSave = onSave
         model.select(nil)
         model.displayOptions = displayOptions
@@ -163,11 +163,11 @@ public final class ReminderEditorCoordinator: NSObject, NSPopoverDelegate {
 
     private func trackSize(_ model: ReminderEditorModel) {
         withObservationTracking {
-            _ = model.items; _ = model.selectedID; _ = model.error
+            _ = model.listItems; _ = model.selectedID; _ = model.error
         } onChange: { [weak self, weak model] in
             DispatchQueue.main.async {
                 guard let self, let model, self.model === model, let view = self.contentView else { return }
-                guard model.items.contains(where: { !$0.isCompleted }) else { self.close(); return }
+                guard !model.listItems.isEmpty else { self.close(); return }
                 let size = view.fittingSize
                 self.popover?.contentSize = size
                 self.preview?.setContentSize(size)

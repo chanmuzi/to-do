@@ -76,6 +76,7 @@ public struct InlineDateAcceptance: Sendable {
 @MainActor public final class InlineDateEffect {
     public let undo: () throws -> Void
     public let redo: () throws -> Void
+    package var onUndoUnavailable: (() -> Void)?
     public init(undo: @escaping () throws -> Void, redo: @escaping () throws -> Void) {
         self.undo = undo; self.redo = redo
     }

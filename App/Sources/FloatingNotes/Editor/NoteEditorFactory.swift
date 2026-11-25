@@ -49,6 +49,7 @@ final class NoteEditorFactory {
         }
     }
 
+    var onDeleteScheduleLines: ((NoteID, String, String, UUID) throws -> InlineDateEffect?)?
     var onAcceptDate: ((NoteID, InlineDateAcceptance) throws -> InlineDateEffect)?
     var onDateError: (Error) -> Void = { _ in }
     private let folds: NoteFoldStore
@@ -73,6 +74,9 @@ final class NoteEditorFactory {
         adapter.editor.onAcceptDate = { [weak self] request in
             guard let accept = self?.onAcceptDate else { throw CocoaError(.featureUnsupported) }
             return try accept(context.noteID, request)
+        }
+        adapter.editor.onDeleteScheduleLines = { [weak self] previous, next, token in
+            try self?.onDeleteScheduleLines?(context.noteID, previous, next, token)
         }
         adapter.editor.onDateError = { [weak self] error in self?.onDateError(error) }
         editors = editors.filter { $0.value.editor != nil }

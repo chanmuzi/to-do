@@ -273,6 +273,10 @@ final class DebugControl {
         case ("reminder-select", let value?, _): reminderEditor?.model?.select(value.rawValue == "new" ? nil : value.rawValue)
         case ("reminder-candidate", let value?, _): if let index = Int(value.rawValue) { reminderEditor?.model?.candidateIndex = index }
         case ("reminder-submit", _, _): reminderEditor?.model?.submitCandidate()
+        case ("reminder-completion-hover", let value?, _) where isPassive:
+            reminderEditor?.model?.previewCompletionHoverID = value.rawValue == "off" ? nil : value.rawValue
+        case ("remove-body-line", let id?, let value?) where isPassive:
+            if let index = Int(value) { editors.editor(for: id)?.editor.removeBodyLineForVerification(index) }
         case ("reminder-toggle", let value?, _): reminderEditor?.model?.toggleCompleted(value.rawValue)
         case ("fake-save-failure", let mode?, _) where isPassive:
             fakeCalendar?.failure = mode.rawValue == "on" ? .readOnly : nil
@@ -1213,6 +1217,7 @@ final class DebugControl {
             [
                 "id": window.noteID.rawValue,
                 "frame": [window.frame.minX, window.frame.minY, window.frame.width, window.frame.height],
+                "clockVisible": notePanels.reminderAnchor(for: window.noteID).map { !$0.isHidden && $0.alphaValue > 0 } ?? false,
                 "pinned": window.isPinned,
                 "level": window.level,
                 "visible": window.isVisible,

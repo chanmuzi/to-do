@@ -49,14 +49,51 @@ import Store
         })
     }
 
+    /// 본문과 삭제 대기를 한 변경으로 저장한다. 동기화는 이미 허용된 권한만 사용한다.
+    public func removeMissingSources(from previous: String, to text: String, in id: NoteID) throws
+        -> (items: [ScheduleItem], effect: InlineDateEffect)? {
+        var removed: [ScheduleItem] = []
+        try notes.scheduleUpdate(id) { note in
+            guard note.body == previous else { return }
+            removed = note.applyEditorBody(text)
+        }
+        guard !removed.isEmpty else { return nil }
+        service.enqueue(id)
+        let items = removed
+        let effect = InlineDateEffect(undo: { [self] in
+            try notes.scheduleUpdate(id) { note in
+                for item in items {
+                    let index = note.schedules.firstIndex { $0.id == item.id }
+                    let restored = restoredItem(item, latest: index.map { note.schedules[$0] })
+                    if let index { note.schedules[index] = restored }
+                    else { note.schedules.append(restored) }
+                }
+            }
+            for item in items { service.register(id, itemID: item.id, requestPermission: false) }
+        }, redo: { [self] in
+            let ids = Set(items.map(\.id))
+            try notes.scheduleUpdate(id) { note in
+                for index in note.schedules.indices where ids.contains(note.schedules[index].id) {
+                    note.schedules[index].markDeleted()
+                }
+            }
+            service.enqueue(id)
+        })
+        return (items, effect)
+    }
+
     private func restore(_ item: ScheduleItem, in id: NoteID) throws {
         let latest = try notes.load(id).schedules.first { $0.id == item.id }
+        try notes.writeSchedule(restoredItem(item, latest: latest), in: id)
+    }
+
+    private func restoredItem(_ item: ScheduleItem, latest: ScheduleItem?) -> ScheduleItem {
         var restored = item
         // 삭제가 이미 끝났다면 옛 외부 ID를 되살리지 않는다. 아직 대기 중이면 같은 항목을 살린다.
         restored.link = latest?.link; restored.syncedAt = latest?.syncedAt
         restored.syncBaseline = latest?.syncBaseline; restored.syncError = nil
         restored.modified = Date(); restored.isDeleted = false
-        try notes.writeSchedule(restored, in: id)
+        return restored
     }
     private func remove(_ itemID: String, in id: NoteID) throws {
         try notes.removeSchedule(itemID, in: id)

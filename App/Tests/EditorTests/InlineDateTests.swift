@@ -223,6 +223,55 @@ import Models
             #expect(h.replayMismatches.isEmpty)
         }
     }
+    @Test func scheduleLineDeletionReplaysTextAndEffectOnce() throws {
+        let h = try EditorHarness("체크 줄\n유지")
+        var calls = 0
+        var removed = false
+        var token: UUID?
+        h.editor.onDeleteScheduleLines = { old, new, id in
+            #expect(old == "체크 줄\n유지" && new == "유지")
+            calls += 1
+            removed = true
+            token = id
+            return InlineDateEffect(undo: { removed = false }, redo: { removed = true })
+        }
+        h.step { h.controller.apply(.insert("", replacing: h.document.lines[0].fullRange)) }
+        #expect(removed && h.editor.text == "유지")
+        let id = try #require(token)
+        h.editor.undoScheduleDeletion(id)
+        #expect(!removed && h.editor.text == "체크 줄\n유지")
+        h.redo()
+        #expect(removed && h.editor.text == "유지")
+        h.editor.applyOutsideChange(to: "유지\n다른 글")
+        h.undo()
+        #expect(!removed && h.editor.text == "체크 줄\n유지\n다른 글")
+        #expect(calls == 1)
+    }
+
+    @Test func laterEditEndsToastUndoWithoutUndoingOtherText() throws {
+        let h = try EditorHarness("한 줄\n아래")
+        var token: UUID?
+        var ended = false
+        var removed = false
+        h.editor.onDeleteScheduleLines = { _, _, id in
+            token = id
+            removed = true
+            let effect = InlineDateEffect(undo: { removed = false }, redo: { removed = true })
+            effect.onUndoUnavailable = { ended = true }
+            return effect
+        }
+        h.step { h.controller.apply(.insert("", replacing: h.document.lines[0].fullRange)) }
+        let id = try #require(token)
+        h.step { h.controller.apply(.insert("!", replacing: NSRange(location: h.document.length, length: 0))) }
+        #expect(ended)
+        h.editor.undoScheduleDeletion(id)
+        #expect(removed && h.editor.text == "아래!")
+        h.undo()
+        #expect(removed && h.editor.text == "아래")
+        h.undo()
+        #expect(!removed && h.editor.text == "한 줄\n아래")
+    }
+
     private final class Effects {
         var count = 0
         var requests: [InlineDateAcceptance] = []
