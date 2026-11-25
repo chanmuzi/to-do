@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Editor
 
@@ -95,6 +95,33 @@ import Testing
         #expect(forwardDelete("가|[글](https://a.example)") == "가|")
     }
 
+    @Test(arguments: ["- [x] |완료", "- [ ] |할 일", "- |항목", "## |제목", "  - |하위", "|본문"])
+    func forwardDeleteOnBlankParagraphKeepsNextLine(_ next: String) {
+        let original = Scenario(next).text
+        #expect(forwardDelete("|\n" + original) == next)
+        #expect(forwardDelete("위\n \t |\n" + original) == "위\n" + next)
+    }
+
+    @Test func forwardDeleteOnLastBlankOrEmptyListItem() {
+        let last = Scenario("앞\n  |")
+        #expect(EditorCommands.deleteForward(last.doc, selection: last.selection) == .passThrough)
+        #expect(forwardDelete("- [ ] |\n- [x] 완료") == "- [ ] |완료")
+    }
+
+    @MainActor @Test func forwardDeleteAboveFoldedToggleKeepsChildrenHidden() throws {
+        let h = try EditorHarness.at("|\n+ 접힌 줄\n\t- 하위\n다음")
+        h.editor.foldedLines = [1]
+        h.press(NSResponder.forwardDelete)
+        #expect(h.marked == "+ |접힌 줄\n\t- 하위\n다음")
+        #expect(h.editor.foldedLines == [0])
+        #expect(FoldState.hiddenLines(h.document, folded: h.editor.foldedLines) == [1])
+    }
+
+    @Test func backspaceBelowBlankParagraphRemovesListMarkerFirst() {
+        #expect(backspace("\n- [x] |완료") == "\n|완료")
+        #expect(backspace("\n  - |하위") == "\n  |하위")
+    }
+
     @Test func backspaceAtTheVisualStartOfAParagraphJoinsTheLineNotTheMarker() {
         // 문단이 서식 구간으로 시작하면 커서 앞에는 감춘 여는 기호가 있다. 기호가 아니라 줄바꿈을 지운다.
         #expect(backspace("앞\n**|굵게**") == "앞**|굵게**")
@@ -182,6 +209,8 @@ import Testing
         #expect(forwardDelete("앞|\n```\ncode\n```") == .ignore)
         // 블록 바로 위의 빈 줄은 지울 수 있다.
         #expect(applied("|\n```\ncode\n```", forwardDelete("|\n```\ncode\n```")) == "```\n|code\n```")
+        let emptyFence = "|\n```\n```\n뒤"
+        #expect(applied(emptyFence, forwardDelete(emptyFence)) == "|\n뒤")
     }
 
     @Test func arrowsOutOfABlockAtTheEdgeOfTheDocumentMakeAParagraph() {

@@ -123,6 +123,26 @@ import DateTime
         await f.service.flush()
         #expect(try f.notes.load(note.id).body == "윗줄\n[x] 바뀐 회의")
     }
+    @Test func deletingBlankLineAboveScheduledTodoMovesBothAnchorsUp() throws {
+        let f = try Fixture(); defer { f.close() }
+        let line = "- [x] 완료"
+        let body = "\n" + line
+        let item = ScheduleItem(start: f.future, isCompleted: true,
+                                todo: TodoAnchor(line: 1, sourceLine: line),
+                                inlineSource: InlineScheduleSource(line: 1, text: line))
+        let note = try f.notes.create(NoteDraft(body: body, schedules: [item]))
+
+        let deletion = try f.writer.removeMissingSources(from: body, to: line, in: note.id)
+        let saved = try f.notes.load(note.id)
+        #expect(deletion == nil)
+        #expect(saved.body == line)
+        #expect(saved.schedules.map(\.id) == [item.id])
+        let moved = try #require(saved.schedules.first)
+        #expect(moved.inlineSource == InlineScheduleSource(line: 0, text: line))
+        #expect(moved.todo == TodoAnchor(line: 0, text: "완료"))
+        #expect(moved.isCompleted && !moved.isDeleted)
+    }
+
     @Test func expressionOnlyLineCanBecomeEmptyWithoutBindingAnotherBlank() async throws {
         let f = try Fixture(); defer { f.close() }
         let note = try f.notes.create(NoteDraft(body: "\n내일\n"))
