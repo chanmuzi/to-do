@@ -42,6 +42,10 @@ enum DebugViewAudit {
                 row["font"] = field.font?.fontName ?? ""
                 row["fontSize"] = field.font?.pointSize ?? 0
             }
+            if let control = view as? NSControl, let font = control.font {
+                row["capHeight"] = font.capHeight
+                row["firstBaselineFromTop"] = control.firstBaselineOffsetFromTop
+            }
             if let image = view as? NSImageView {
                 row["imageSize"] = NSStringFromSize(image.image?.size ?? .zero)
             }

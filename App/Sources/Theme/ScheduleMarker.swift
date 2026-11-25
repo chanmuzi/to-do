@@ -23,12 +23,12 @@ package struct ScheduleMarker: View {
     package var body: some View {
         ZStack {
             if item.kind == .event {
-                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(tall ? .detailRow : .scheduleReminderCircle))
+                Rectangle().fill(color).frame(width: theme.component(.scheduleEventBarWidth), height: theme.component(tall ? .scheduleBarHeight : .scheduleReminderCircle))
             } else {
                 Circle().strokeBorder(highlighted ? theme.color(.text) : color, lineWidth: theme.shape(.borderWidth))
                     .background(Circle().fill(item.isCompleted ? color : .clear))
                     .frame(width: theme.component(.scheduleReminderCircle), height: theme.component(.scheduleReminderCircle))
             }
-        }.frame(width: theme.component(.scheduleMarkerWidth), height: tall ? theme.component(.detailRow) : theme.lineHeight(.body))
+        }.frame(width: theme.component(.scheduleMarkerWidth), height: tall ? theme.component(.scheduleBarHeight) : theme.lineHeight(.body))
     }
 }
