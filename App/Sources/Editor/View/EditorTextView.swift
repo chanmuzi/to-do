@@ -238,14 +238,21 @@ final class EditorTextView: PlainTextInputView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    var topWindowNumber: (NSPoint) -> Int = { NSWindow.windowNumber(at: $0, belowWindowWithWindowNumber: 0) }
+
+    private func isTopWindow(for event: NSEvent) -> Bool {
+        guard let window else { return false }
+        return topWindowNumber(window.convertPoint(toScreen: event.locationInWindow)) == window.windowNumber
+    }
+
     override func mouseEntered(with event: NSEvent) {
+        guard isTopWindow(for: event) else { editor?.handleMouseExited(); return }
         super.mouseEntered(with: event)
         updatePointer(for: event)
     }
 
     override func mouseDown(with event: NSEvent) {
-        let wasSelecting = editor?.clearBlocks() == true
-        if !wasSelecting, editor?.handleMouseDown(at: convert(event.locationInWindow, from: nil)) == true { return }
+        if editor?.handleMouseDown(at: convert(event.locationInWindow, from: nil)) == true { return }
         selectingWithMouse = true
         window?.invalidateCursorRects(for: self)
         defer { selectingWithMouse = false; window?.invalidateCursorRects(for: self) }
@@ -253,6 +260,7 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func mouseMoved(with event: NSEvent) {
+        guard isTopWindow(for: event) else { editor?.handleMouseExited(); return }
         super.mouseMoved(with: event)
         updatePointer(for: event)
     }
@@ -278,6 +286,7 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
+        guard isTopWindow(for: event) else { return }
         guard isHitView(for: event) else {
             NSCursor.arrow.set()
             return
@@ -291,6 +300,7 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func mouseExited(with event: NSEvent) {
+        if isTopWindow(for: event), NSCursor.current == .pointingHand { NSCursor.arrow.set() }
         super.mouseExited(with: event)
         editor?.handleMouseExited()
     }
