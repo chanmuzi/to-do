@@ -173,6 +173,28 @@ import Testing
         #expect(!ActivationFocusPolicy.waitsForLatePress(window: .none))
     }
 
+    @Test func regularAppReturnRechecksVisibilityAndRespectsFocusIntent() {
+        var history = ActivationHistory()
+        history.activated(.regular)
+        for left in [false, true] {
+            var policy = ActivationFocusPolicy()
+            policy.launchFinished(at: 0)
+            _ = policy.decide(at: 0)
+            policy.didResignActive()
+            let initial = policy.decide(at: 10, history: history, previousLeftScreen: false, window: .floatWindow)
+            #expect(initial.reason == .showLibrary)
+            #expect(policy.finishPassiveReturn(history, previousLeftScreen: false, allowsAnimationWait: true) == nil)
+            #expect(policy.finishPassiveReturn(history, previousLeftScreen: left, allowsAnimationWait: false) == (left ? .appLeft : .showLibrary))
+            #expect(policy.decide(at: 11).reason == (left ? .appLeft : .showLibrary))
+        }
+        let state = ActivationDecision(launching: false, pendingAge: nil)
+        #expect(state.reason(history: history, previousLeftScreen: true, window: .floatWindow) == .appLeft)
+        #expect(state.reason(history: history, previousLeftScreen: true, explicitTarget: true) == .explicitTarget)
+        #expect(state.reason(history: history, previousLeftScreen: true, carbonWindow: true) == .carbonWindow)
+        #expect(state.reason(history: history, previousLeftScreen: true, window: .floatWindow, mouseAge: 0) == .pointer)
+        #expect(ActivationDecision(launching: false, pendingAge: 0).reason(history: history, previousLeftScreen: true) == .localPress)
+    }
+
     @Test func helperReturnDependsOnEveryAppSinceResigning() {
         typealias Kind = ActivationHistory.AppKind
         let cases: [([Kind], ActivationDecision.Reason)] = [

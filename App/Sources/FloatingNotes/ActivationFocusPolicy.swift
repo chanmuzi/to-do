@@ -41,6 +41,16 @@ struct ActivationFocusPolicy {
         activeReason = .localPress
     }
 
+    /// 최소화 중인 창은 첫 검사에도 남을 수 있다. 두 번째 검사까지 창이 남으면 일반 앱 전환이다.
+    mutating func finishPassiveReturn(_ history: ActivationHistory, previousLeftScreen: Bool,
+                                      allowsAnimationWait: Bool) -> ActivationDecision.Reason? {
+        if allowsAnimationWait, history.previous == .regular, !previousLeftScreen { return nil }
+        let reason = ActivationDecision(launching: false, pendingAge: nil)
+            .reason(history: hasResignedActive ? history : .init(), previousLeftScreen: previousLeftScreen)
+        if reason == .appLeft { activeReason = reason }
+        return reason
+    }
+
     enum CarbonTarget: String { case noEvent, otherEvent, unspecified, clickedWindow }
 
     /// 알림이 어느 이벤트 안에서 왔는지와 창 인자의 유무를 구별해 기록한다.
@@ -55,7 +65,7 @@ struct ActivationFocusPolicy {
     }
 
     mutating func decide(at time: TimeInterval, explicitTarget: Bool = false,
-                         history: ActivationHistory = .init(), carbon: CarbonTarget = .noEvent, appKit: CarbonTarget = .noEvent,
+                         history: ActivationHistory = .init(), previousLeftScreen: Bool = false, carbon: CarbonTarget = .noEvent, appKit: CarbonTarget = .noEvent,
                          window: ActivationDecision.WindowKind = .none, mouseAge: TimeInterval = .infinity,
                          keyAge: TimeInterval = .infinity) -> (reason: ActivationDecision.Reason, pendingAge: TimeInterval?, reused: Bool) {
         let launching = launchFinishedAt.map { !hasSeenActivation && time - $0 < Self.launchGrace } ?? true
@@ -66,10 +76,10 @@ struct ActivationFocusPolicy {
         if let activeReason { return (activeReason, age, true) }
 
         let evidence = ActivationDecision(launching: launching, pendingAge: recentPress ? age : nil)
-        let reason = evidence.reason(history: hasResignedActive ? history : .init(), explicitTarget: explicitTarget, carbonWindow: carbon == .clickedWindow || appKit == .clickedWindow,
+        let reason = evidence.reason(history: hasResignedActive ? history : .init(), previousLeftScreen: previousLeftScreen, explicitTarget: explicitTarget, carbonWindow: carbon == .clickedWindow || appKit == .clickedWindow,
                                      window: window, mouseAge: mouseAge, keyAge: keyAge)
         let reused = reason == .localPress && pressAlreadyUsed
-        if reason != .showLibrary {
+        if reason != .showLibrary && reason != .appLeft {
             activeReason = reason
             if recentPress { pressAlreadyUsed = true }
         }
@@ -96,13 +106,13 @@ struct ActivationHistory {
 
 struct ActivationDecision {
     enum WindowKind: String { case none, external, library, floatWindow }
-    enum Reason: String { case launch, explicitTarget, carbonWindow, localPress, pointer, helperReturn, showLibrary }
+    enum Reason: String { case launch, explicitTarget, carbonWindow, localPress, pointer, helperReturn, appLeft, showLibrary }
 
     let launching: Bool
     let pendingAge: TimeInterval?
 
     /// 시스템 조회, 이벤트 전달 순서, 창 조작과 독립적인 판단이다.
-    func reason(history: ActivationHistory = .init(), explicitTarget: Bool = false, carbonWindow: Bool = false,
+    func reason(history: ActivationHistory = .init(), previousLeftScreen: Bool = false, explicitTarget: Bool = false, carbonWindow: Bool = false,
                 window: WindowKind = .none, mouseAge: TimeInterval = .infinity,
                 keyAge: TimeInterval = .infinity) -> Reason {
         if launching { return .launch }
@@ -112,6 +122,7 @@ struct ActivationDecision {
         if let pendingAge, recent.contains(pendingAge), pendingAge <= keyAge { return .localPress }
         // 직전 클릭 뒤 키를 눌러 앱을 전환한 경우 포인터는 우연히 노트 위에 있을 수 있다.
         if window == .floatWindow, recent.contains(mouseAge), mouseAge <= keyAge { return .pointer }
+        if history.previous == .regular && previousLeftScreen { return .appLeft }
         if history.returnedFromHelper { return .helperReturn }
         return .showLibrary
     }
