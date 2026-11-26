@@ -74,10 +74,12 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, NoteInkForm
         self.editor = editor
         self.noteID = noteID
         self.folds = folds
-        editor.onTextChange = { [unowned self] in
+        editor.onTextChange = { [unowned self] text in
             // 접힌 줄의 글이 바뀌었을 수 있다(토글 줄을 고침). 적어 둔 글이 낡으면 다시 열 때 접힘을 잃는다.
-            saveFolds()
-            onTextChange?($0)
+            EditorTrace.measure("host.onTextChange") {
+                saveFolds()
+                onTextChange?(text)
+            }
         }
         editor.onContentHeightChange = { [unowned self] in onContentHeightChange?($0) }
         editor.onFoldChange = { [unowned self] _ in saveFolds() }

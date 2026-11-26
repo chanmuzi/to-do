@@ -56,10 +56,10 @@ extension EditorController {
 
     private func gutterLayout(forLine line: Int) -> (glyph: FragmentDecoration.Gutter, box: CGRect, lineHeight: CGFloat)? {
         guard document.lines.indices.contains(line) else { return nil }
-        layoutManager.ensureLayout(for: layoutManager.documentRange)
         guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[line].start),
-              let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment,
-              let decoration = fragment.decoration, let glyph = decoration.gutter, let gutter = fragment.gutterRect else { return nil }
+              let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment else { return nil }
+        ensureLayout(for: fragment.rangeInElement)
+        guard let decoration = fragment.decoration, let glyph = decoration.gutter, let gutter = fragment.gutterRect else { return nil }
         let box: CGRect
         if case .chevron = glyph {
             box = decoration.chevronBox(in: gutter)
@@ -74,10 +74,10 @@ extension EditorController {
     /// 그 줄 글자 영역 안의 한 점(첫 줄 조각의 가운데 높이, 글자 시작 바로 뒤). 텍스트 뷰 좌표.
     func textPoint(forLine line: Int) -> CGPoint? {
         guard document.lines.indices.contains(line) else { return nil }
-        layoutManager.ensureLayout(for: layoutManager.documentRange)
         guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[line].start),
-              let fragment = layoutManager.textLayoutFragment(for: location),
-              let first = fragment.textLineFragments.first else { return nil }
+              let fragment = layoutManager.textLayoutFragment(for: location) else { return nil }
+        ensureLayout(for: fragment.rangeInElement)
+        guard let first = fragment.textLineFragments.first else { return nil }
         let origin = textView.textContainerOrigin
         let frame = fragment.layoutFragmentFrame
         let bounds = first.typographicBounds

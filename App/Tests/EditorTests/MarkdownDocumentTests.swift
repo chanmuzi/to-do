@@ -3,6 +3,33 @@ import Testing
 @testable import Editor
 
 @Suite struct MarkdownDocumentTests {
+    @Test func incrementalEditsMatchFullParsingAtBlockBoundaries() {
+        let sources = [
+            "# 제목\n+ 부모\n\t- **자식**\n\t[x] 글 <!-- 파랑 바탕 -->\n끝\n",
+            "위\n\t+ 토글\\\n\t이어짐\n\t\t안쪽\n\n뒤",
+            "앞\\\n```\n\\\n```\n끝",
+            "위\r\n중간\r아래\u{2029}끝",
+            "앞\n구분\n---\n==한글=={파랑}\n끝",
+        ]
+        let replacements = ["", "새", "📝", "\n", "\r", "\\", "```", "\t", " <!-- 노랑 바탕 -->", "\n  새 줄"]
+        for source in sources {
+            let old = MarkdownDocument(source)
+            for start in 0...old.length {
+                for length in Set([0, min(1, old.length - start), min(4, old.length - start)]) {
+                    let range = NSRange(location: start, length: length)
+                    for replacement in replacements {
+                        let text = (source as NSString).replacingCharacters(in: range, with: replacement)
+                        let inserted = replacement.utf16.count
+                        let edited = NSRange(location: start, length: inserted)
+                        let result = MarkdownDocument(updating: old, text: text, editedRange: edited, delta: inserted - length)
+                        let full = MarkdownDocument(text)
+                        #expect(result.lines == full.lines && result.units == full.units && result.text == text)
+                    }
+                }
+            }
+        }
+    }
+
     @Test func keepsSourceTextExactly() {
         let source = "# 제목\r\n[ ] 할 일\n\t- 하위\n\n```\ncode\n```\n끝"
         let doc = MarkdownDocument(source)

@@ -43,6 +43,13 @@ nonisolated struct TextEdit: Equatable, Sendable {
         )
     }
 
+    func offsettingRanges(by offset: Int) -> Self {
+        var copy = self
+        copy.range.location += offset
+        copy.selection.location += offset
+        return copy
+    }
+
     func applied(to text: String) -> String {
         (text as NSString).replacingCharacters(in: range, with: replacement)
     }

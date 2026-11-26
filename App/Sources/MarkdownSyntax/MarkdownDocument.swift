@@ -13,13 +13,63 @@ nonisolated package struct MarkdownDocument: Sendable {
 
     package var length: Int { units.count }
 
+    @TaskLocal package static var observeParse: (@Sendable (Int) -> Void)?
+
     package init(_ text: String) {
         self.text = text
         self.units = Array(text.utf16)
         self.lines = []
+        Self.observeParse?(units.count)
         splitLines()
         classifyLines()
         linkStructure()
+    }
+
+    /// 줄의 종류, 들여쓰기, 빈 줄 여부까지 같은 편집은 블록 경계를 그대로 쓴다.
+    /// 원문의 UTF-16 위치만 달라진 뒷줄은 인라인 서식을 다시 읽지 않는다.
+    package init(updating old: Self, text: String, editedRange: NSRange, delta: Int) {
+        let first = old.lineIndex(at: editedRange.location)
+        let last = old.lineIndex(at: NSMaxRange(editedRange) - delta)
+        let rows = first...last
+        let start = old.lines[first].start
+        let end = old.lines[last].end
+        let previous = first > 0 ? old.lines[first - 1] : nil
+        // 앞줄 끝의 역슬래시는 새 들여쓰기나 울타리에 따라 이어짐이 바뀔 수 있다.
+        guard rows.count < old.lines.count, NSMaxRange(editedRange) - delta <= end,
+              previous.map({ $0.end > $0.start && old.units[$0.end - 1] == 0x5C }) != true,
+              !old.lines[rows].contains(where: { $0.kind.isCode || $0.hasHardBreak || $0.continuationOf != nil })
+        else { self.init(text); return }
+
+        let source = text as NSString
+        let localRange = NSRange(location: start, length: end - start + delta)
+        let local = Self(source.substring(with: localRange))
+        // 마지막 줄이 새로 이어질 수 있거나 CRLF 경계가 달라질 수 있으면 전체에서 판정한다.
+        guard local.lines.count == rows.count, local.units.last != 0x5C,
+              !local.units.contains(0x0D),
+              previous.map({ $0.fullRange.length == $0.range.length + 1 && old.units[$0.end] == 0x0D }) != true,
+              zip(old.lines[rows], local.lines).allSatisfy({ before, after in
+                  before.kind == after.kind && before.level == after.level &&
+                      before.isBlankParagraph == after.isBlankParagraph && !after.hasHardBreak && after.continuationOf == nil
+              })
+        else { self.init(text); return }
+
+        self.init(text: text, units: Array(text.utf16), lines: old.lines)
+        for (index, var line) in zip(rows, local.lines) {
+            line.shiftSourceRanges(by: start)
+            line.blockLast = index
+            line.subtreeEnd = old.lines[index].subtreeEnd
+            if index == last { line.fullRange.length += old.lines[last].fullRange.length - old.lines[last].range.length }
+            lines[index] = line
+        }
+        if delta != 0 {
+            for index in (last + 1)..<lines.count { lines[index].shiftSourceRanges(by: delta) }
+        }
+    }
+
+    private init(text: String, units: [unichar], lines: [MarkdownLine]) {
+        self.text = text
+        self.units = units
+        self.lines = lines
     }
 
     package func string(in range: NSRange) -> String {

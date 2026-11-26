@@ -79,7 +79,7 @@ extension EditorController {
         if line.fullRange.length > 0,
            let start = contentStorage.location(base, offsetBy: line.start),
            let fragment = layoutManager.textLayoutFragment(for: start) {
-            layoutManager.ensureLayout(for: fragment.rangeInElement)
+            ensureLayout(for: fragment.rangeInElement)
             let offset = location - line.start
             let lines = fragment.textLineFragments.filter { $0.characterRange.length > 0 }
             // 줄이 넘어간 경계에서는 커서가 온 쪽을 따른다(End로 왔으면 윗줄의 끝, 그 밖에는 아랫줄의 앞).

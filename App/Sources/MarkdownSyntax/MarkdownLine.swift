@@ -79,6 +79,18 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     /// 코드 블록에 속하면 그 블록의 줄 번호 범위(``` 줄 포함).
     package var codeBlock: ClosedRange<Int>?
 
+    /// 편집 앞뒤 줄 수가 같으면 문서 좌표만 옮기고 기존의 구문 분석을 재사용한다.
+    mutating func shiftSourceRanges(by offset: Int) {
+        guard offset != 0 else { return }
+        range.location += offset
+        fullRange.location += offset
+        inkComment?.location += offset
+        for index in spans.indices {
+            spans[index].range.location += offset
+            spans[index].contentRange.location += offset
+        }
+    }
+
     package var start: Int { range.location }
     package var end: Int { NSMaxRange(range) }
     package var isBlankParagraph: Bool { continuationOf == nil && !hasHardBreak && kind == .paragraph && contentRange.length == 0 }

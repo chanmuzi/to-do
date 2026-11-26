@@ -78,6 +78,22 @@ nonisolated extension EditorCommands {
         return !(unreadableMarkers(doc, shaped, existing: true)?.markers.isEmpty ?? true)
     }
 
+    /// 바뀐 줄의 인라인 기호를 검증할 문맥. 이어짐 판정에 필요한 다음 줄까지 포함한다.
+    /// 앞줄의 울타리나 강제 줄바꿈에 의존할 수 있으면 원문 전체에서 판정한다.
+    static func inlineContext(after edit: TextEdit, in doc: MarkdownDocument) -> (document: MarkdownDocument, origin: Int) {
+        let first = doc.lineIndex(at: edit.range.location)
+        let last = doc.lineIndex(at: NSMaxRange(edit.range))
+        let line = doc.lines[first]
+        let previous = first > 0 ? doc.lines[first - 1] : nil
+        if line.kind.isCode || line.continuationOf != nil ||
+            previous.map({ $0.end > $0.start && doc.units[$0.end - 1] == 0x5C }) == true {
+            return (MarkdownDocument(edit.applied(to: doc.text)), 0)
+        }
+        let end = min(last + 1, doc.lines.count - 1)
+        let source = doc.string(in: doc.sourceRange(for: first...end))
+        return (MarkdownDocument(edit.offsettingRanges(by: -line.start).applied(to: source)), line.start)
+    }
+
     /// 편집에 닿지 않은 감춘 기호가 편집 뒤에 글자로 드러나는지. 어느 길로 들어온 편집이든 본다: 구간 안의 글이
     /// 바뀌어 그 구간이 읽히지 않게 되는 경우(영문자 뒤에서 연 한 낱말짜리 구간에 낱말을 더함)도 여기서 걸린다.
     /// 그런 편집은 넣지 않는다. 코드 블록이 되는 줄의 기호는 글자로 보이는 것이 맞다.
@@ -95,9 +111,9 @@ nonisolated extension EditorCommands {
         }
         guard !hidden.isEmpty else { return false }
         let delta = edit.replacement.utf16.count - edit.range.length
-        let result = MarkdownDocument(edit.applied(to: doc.text))
+        let (result, origin) = inlineContext(after: edit, in: doc)
         return hidden.contains { position in
-            let moved = position < edit.range.location ? position : position + delta
+            let moved = (position < edit.range.location ? position : position + delta) - origin
             let line = result.line(at: moved)
             guard !line.kind.isCode, moved >= line.contentStart else { return false }
             return !line.markers.contains { NSLocationInRange(moved, $0.range) }

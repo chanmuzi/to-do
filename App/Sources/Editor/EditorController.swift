@@ -55,6 +55,7 @@ final class EditorController: NSObject {
     var dismissedDateDocument: MarkdownDocument?
     var dateNow: () -> Date = { Date() }
     var dateCalendar = Calendar.current
+    var isBatchingFormattingChange = false
     var onFormattingChange: (() -> Void)?
     var onFocusTitle: (() -> Void)?
     var onDeleteScheduleLines: ((String, String, UUID) throws -> InlineDateEffect?)?
@@ -75,6 +76,7 @@ final class EditorController: NSObject {
     var foldState = FoldState()
     var folded: Set<Int> { foldState.closed }
     /// 화면에 입혀 둔 줄별 모양. 다음 모양과 견주어 달라진 줄만 다시 입힌다.
+    var appliedStamp: KeyStamp?
     var appliedKeys: [LineRenderKey] = []
     var isApplyingEdit = false
     var isSettingText = false
@@ -91,6 +93,10 @@ final class EditorController: NSObject {
     var isRestyling = false
     var hoveredLink: (line: Int, offset: Int)?
     var hoveredCodeBlock: ClosedRange<Int>?
+    var measuredParagraphHeights: [CGFloat] = []
+    var measuredTextHeight: CGFloat = 0
+    var heightLayoutWidth: CGFloat?
+    var pendingHeightRange: NSRange?
     var lastContentHeight: CGFloat = -1
     var observers: [NSObjectProtocol] = []
     /// 창이 키 창이 아니어도 편집 중인 것으로 본다: 편집 단축키를 받는다(확인용).
@@ -311,7 +317,7 @@ final class EditorController: NSObject {
     private func observeEnvironment() {
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: Self.inkChanged, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.onFormattingChange?() }
+            MainActor.assumeIsolated { self?.reportFormattingChange() }
         })
         observers.append(center.addObserver(forName: Theme.didChangeNotification, object: theme, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadStyle() }
@@ -408,6 +414,8 @@ final class EditorController: NSObject {
 
     /// 접힘을 바꾸고 화면에 입힌다. 알리지는 않는다.
     func applyFolds(_ newValue: FoldState) {
+        let interval = EditorTrace.begin("applyFolds")
+        defer { EditorTrace.end("applyFolds", interval) }
         let sanitized = newValue.sanitized(in: document)
         guard sanitized != foldState else { return }
         if let hoveredGutterLine, folded.symmetricDifference(sanitized.closed) != [hoveredGutterLine] {

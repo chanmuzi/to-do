@@ -410,6 +410,33 @@ import Theme
         #expect(h.heights.last == padding.top + padding.bottom + line * 2)
     }
 
+    @Test func longDocumentReportsExactHeightAfterWrappingAndFolding() throws {
+        let wrapped = String(repeating: "길게 감기는 본문 ", count: 12)
+        let blocks = (0..<150).map { _ in "# 제목\n+ 토글\n\t" + wrapped }
+        let h = try EditorHarness(blocks.joined(separator: "\n") + "\n", width: 220)
+        let editor = h.controller
+        func checkHeight() {
+            let reported = editor.lastContentHeight
+            editor.layoutManager.ensureLayout(for: editor.layoutManager.documentRange)
+            var bottom: CGFloat = 0
+            editor.layoutManager.enumerateTextLayoutFragments(from: editor.layoutManager.documentRange.endLocation,
+                                                               options: [.reverse, .ensuresLayout]) { fragment in
+                bottom = fragment.layoutFragmentFrame.maxY
+                return false
+            }
+            let padding = h.theme.docPadding
+            #expect(reported == ceil(bottom) + padding.top + padding.bottom)
+        }
+        checkHeight()
+        editor.toggleFold(line: 1)
+        checkHeight()
+        h.caret(atEndOfLine: 227)
+        h.type("가")
+        checkHeight()
+        editor.toggleFold(line: 1)
+        checkHeight()
+    }
+
     @Test func emptyNoteIsOneLineTall() throws {
         let h = try EditorHarness("")
         let padding = h.theme.docPadding

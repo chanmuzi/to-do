@@ -28,6 +28,22 @@ import Testing
         #expect(!h.editor.undoManager.canUndo)
     }
 
+    @Test func synchronousFoldObserverDoesNotConsumeTheFade() throws {
+        let h = try EditorHarness("+ 토글\n\t자식\n뒤")
+        var now = 1.0
+        h.controller.foldAnimationsEnabled = { true }
+        h.controller.foldClock = { now }
+        let duration = h.theme.motion.duration
+        h.editor.onFoldChange = { _ in now += duration }
+        defer { h.controller.stopFoldMotion() }
+        h.controller.toggleFold(line: 0)
+        #expect(h.controller.advanceFoldMotion())
+        #expect(h.controller.foldDrawing.opacity(at: 1) == 1)
+        now += h.theme.motion.duration
+        #expect(!h.controller.advanceFoldMotion())
+        #expect(h.controller.currentKeys()[1].isCollapsed)
+    }
+
     @Test func reducedMotionCollapsesSynchronouslyInBothModes() throws {
         let h = try EditorHarness("+ ## 제목\n\t자식")
         h.controller.foldAnimationsEnabled = { false }
