@@ -2,12 +2,13 @@ import Foundation
 
 /// 노트와 독립적으로 보관하는 대화 한 건. 첫 요청을 보내기 전에는 초안이다.
 public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
     public let formatVersion: Int
     public let id: UUID
     public let createdAt: Date
     public var updatedAt: Date
-    public var targets: [NoteID]
+    public let origin: NoteID?
+    public var context: [AgentContextItem]
     public var barRequestID: UUID?
     public var customName: String?
     public var seenAt: Date?
@@ -16,9 +17,11 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     public struct Queued: Identifiable, Codable, Equatable, Sendable {
         public let id: UUID
         public let text: String
+        public var context: [AgentContextItem]?
         public let order: Int64?
         public var heldAfterFailure: Bool?
-        package init(text: String, id: UUID = UUID(), order: Int64? = nil, held: Bool? = nil) {
+        package init(text: String, id: UUID = UUID(), order: Int64? = nil, held: Bool? = nil, context: [AgentContextItem]? = nil) {
+            self.context = context
             self.id = id
             self.text = text
             self.order = order
@@ -38,7 +41,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, id, name, createdAt, updatedAt, targets, draft, messages, requests, queued, seenAt, customName, barRequestID
+        case formatVersion, id, name, createdAt, updatedAt, targets, origin, context, draft, messages, requests, queued, seenAt, customName, barRequestID
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -51,7 +54,8 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         try c.encode(name, forKey: .name)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)
-        try c.encode(targets, forKey: .targets)
+        try c.encodeIfPresent(origin, forKey: .origin)
+        try c.encode(context, forKey: .context)
         try c.encode(queued, forKey: .queued)
         try c.encode(draft, forKey: .draft)
         try c.encode(messages, forKey: .messages)
@@ -66,7 +70,7 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         requests[index].stopReason = .shutdown
         let request = requests[index]
         if !queued.contains(where: { $0.id == request.id }) {
-            queued.insert(Queued(text: request.userText, id: request.id, order: 0), at: 0)
+            queued.insert(Queued(text: request.userText, id: request.id, order: 0, context: request.context), at: 0)
         }
     }
 
@@ -75,11 +79,16 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
     }
 
     public init(targets: [NoteID], now: Date = Date()) {
+        self.init(origin: targets.first, context: targets.map(AgentContextItem.note), now: now)
+    }
+
+    public init(origin: NoteID?, context: [AgentContextItem], now: Date = Date()) {
         formatVersion = Self.currentVersion
         id = UUID()
         createdAt = now
         updatedAt = now
-        self.targets = targets
+        self.origin = origin
+        self.context = context
         draft = ""
         messages = []
         requests = []
@@ -87,8 +96,8 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        formatVersion = try c.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
-        guard formatVersion == Self.currentVersion else {
+        let version = try c.decodeIfPresent(Int.self, forKey: .formatVersion) ?? 1
+        guard (1...Self.currentVersion).contains(version) else {
             throw DecodingError.dataCorruptedError(forKey: .formatVersion, in: c,
                                                    debugDescription: "지원하지 않는 대화 형식입니다")
         }
@@ -98,7 +107,15 @@ public struct AgentConversation: Identifiable, Codable, Equatable, Sendable {
         seenAt = try c.decodeIfPresent(Date.self, forKey: .seenAt)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
-        targets = try c.decodeIfPresent([NoteID].self, forKey: .targets) ?? []
+        formatVersion = Self.currentVersion
+        if version == 1 {
+            let targets = try c.decodeIfPresent([NoteID].self, forKey: .targets) ?? []
+            origin = targets.first
+            context = targets.map(AgentContextItem.note)
+        } else {
+            origin = try c.decodeIfPresent(NoteID.self, forKey: .origin)
+            context = try c.decode([AgentContextItem].self, forKey: .context)
+        }
         draft = try c.decodeIfPresent(String.self, forKey: .draft) ?? ""
         queued = try c.decodeIfPresent([Queued].self, forKey: .queued) ?? []
         messages = try c.decodeIfPresent([Message].self, forKey: .messages) ?? []
@@ -141,6 +158,7 @@ public struct AgentRequest: Identifiable, Codable, Equatable, Sendable {
     public var failedThroughOrder: Int64?
     public var stopReason: StopReason?
     public var stoppedAttempts: [StoppedAttempt]?
+    public var context: [AgentContextItem]?
     public var runID: UUID
     public var engine: String
     public var effort: String?

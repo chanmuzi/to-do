@@ -1,3 +1,5 @@
+import SwiftUI
+import Reminders
 @testable import Agent
 import AppKit
 @_spi(Verification) import Capture
@@ -484,5 +486,166 @@ extension AgentButtonClickTests {
         #expect(!fx.capture.isVisible)
         fx.router.openReply(id, proposal: nil)
         #expect(agent.window(id: id) === window)
+    }
+}
+
+extension AgentButtonClickTests {
+    @Test func contextControlsKeepOriginAndDispatchPickerKeys() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let origin = try fx.open("회의록")
+        let space = try fx.spaces.create(name: "업무")
+        let other = try fx.notes.create(.init(title: "계획", spaceID: space.id))
+        let agent = AgentWindowCoordinator(store: .init(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        let catalog = AgentContextCatalog(notes: try fx.notes.list().notes, spaces: [space])
+        agent.contextControls.catalog = { catalog }
+        agent.titleForNote = { catalog.notes[$0]?.title }
+        var opened: [NoteID] = []
+        agent.openNote = { opened.append($0) }
+        fx.router.agent = agent
+        fx.router.route(.openAgentWindow(origin))
+        let draft = try agent.record(for: origin)
+        let window = try #require(agent.window(for: origin))
+        defer { window.close() }
+        func press(_ label: String) async throws {
+            try await Task.sleep(for: .milliseconds(120))
+            let button = try #require(buttons(in: window)[label])
+            #expect(button.accessibilityPerformPress?() == true)
+        }
+        draft.previewContextHover = .note(origin)
+        try await press("회의록 빼기")
+        #expect(draft.conversation.context.isEmpty && draft.conversation.origin == origin)
+        try await press("시작 노트 회의록 열기")
+        #expect(opened == [origin])
+        try await press("컨텍스트 추가")
+        let panel = try #require(draft.contextPanel)
+        #expect(panel.isVisible && panel.parent === window && !panel.canBecomeKey)
+        #expect(panel.handleKey(125, modifiers: []) && panel.model.selection == .item(.view(.today)))
+        #expect(panel.handleKey(126, modifiers: []) && panel.model.selection == .item(.view(.pinned)))
+        #expect(panel.handleKey(36, modifiers: .command) && draft.conversation.context == [.view(.pinned)])
+        #expect(panel.handleKey(36, modifiers: .command) && draft.conversation.context.isEmpty)
+        panel.model.query = "업무"
+        #expect(panel.handleKey(124, modifiers: []) && panel.model.space == space.id)
+        #expect(panel.handleKey(36, modifiers: .command) && draft.conversation.context == [.note(other.id)])
+        #expect(panel.handleKey(123, modifiers: []) && panel.model.space == nil)
+        #expect(panel.handleKey(36, modifiers: []) && draft.contextPanel == nil)
+        #expect(agent.window(for: other.id) == nil && agent.window(for: origin) === window)
+        #expect(try agent.record(for: other.id) !== draft)
+        try await press("컨텍스트 추가")
+        #expect(draft.contextPanel?.handleKey(53, modifiers: []) == true && draft.contextPanel == nil)
+    }
+}
+
+extension AgentButtonClickTests {
+    @Test func contextRowsWrapAndPickerActionsUseTheirOwnRow() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: .init(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        let origin = try fx.open("회의록")
+        let space = try fx.spaces.create(name: "업무")
+        let note = try fx.notes.create(.init(title: "다음 일정", spaceID: space.id))
+        let catalog = AgentContextCatalog(notes: try fx.notes.list().notes, spaces: [space])
+        agent.contextControls.catalog = { catalog }
+        agent.contextControls.datePicker = { select, cancel in
+            AnyView(ContextDatePicker(theme: fx.theme, select: select, cancel: cancel))
+        }
+        agent.titleForNote = { catalog.notes[$0]?.title }
+        fx.router.agent = agent
+        fx.router.route(.openAgentWindow(origin))
+        let window = try #require(agent.window(for: origin))
+        defer { window.close() }
+        let draft = try agent.record(for: origin)
+        func settle() async throws { try await Task.sleep(for: .milliseconds(100)); window.contentView?.layoutSubtreeIfNeeded() }
+        func press(_ name: String, in host: NSWindow) throws {
+            let button = try #require(buttons(in: host)[name], "\(name)")
+            #expect(button.accessibilityPerformPress?() == true)
+        }
+        try await settle()
+        let anchor = try #require(draft.contextAnchor)
+        let before = anchor.convert(anchor.bounds, to: nil)
+        #expect(before.width == fx.theme.component(.iconButton))
+        draft.change { $0.context = [.note(origin), .space(space.id), .period(.thisWeek)] }
+        try await settle()
+        let three = anchor.convert(anchor.bounds, to: nil)
+        #expect(abs(three.midY - before.midY) < 1)
+        draft.previewContextHover = .space(space.id)
+        try await settle()
+        #expect(anchor.convert(anchor.bounds, to: nil).midX > three.midX)
+        draft.change { $0.context += [.period(.lastSevenDays), .note(note.id), .view(.pinned)] }
+        try await settle()
+        #expect(anchor.convert(anchor.bounds, to: nil).midY < three.midY)
+        try press("컨텍스트 추가", in: window)
+        try await settle()
+        let picker = try #require(draft.contextPanel)
+        try press("업무 노트 보기", in: picker)
+        #expect(picker.model.space == space.id)
+        try await settle()
+        try press("다음 일정", in: picker)
+        #expect(!draft.conversation.context.contains(.note(note.id)) && picker.isVisible)
+        picker.model.back()
+        try await settle()
+        try press("날짜 고르기…", in: picker)
+        try await settle()
+        let label = DateFormatter()
+        label.locale = Locale(identifier: "ko_KR")
+        label.calendar = .current
+        label.dateFormat = "yyyy년 M월 d일 E"
+        try press(label.string(from: Date()), in: picker)
+        #expect(draft.conversation.context.contains(.period(.day(.init(Date())))))
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: window)
+        #expect(!picker.isVisible && draft.contextPanel == nil)
+    }
+}
+
+extension AgentButtonClickTests {
+    @Test func contextChipAndAddButtonShareEachRowCenter() async throws {
+        let fx = try WiringFixture()
+        defer { fx.cleanUp() }
+        let release = TestAccessibility.enableForTest()
+        defer { release() }
+        let agent = AgentWindowCoordinator(store: .init(location: fx.location), theme: fx.theme) { Issue.record("\($0)") }
+        agent.allowsKeyWindows = false
+        let origin = try fx.open(String(repeating: "줄 전체를 채우는 노트 ", count: 8))
+        let catalog = AgentContextCatalog(notes: try fx.notes.list().notes)
+        agent.contextControls.catalog = { catalog }
+        fx.router.agent = agent
+        fx.router.route(.openAgentWindow(origin))
+        let window = try #require(agent.window(for: origin))
+        defer { window.close() }
+        let draft = try agent.record(for: origin)
+        let chip = AgentContextItem.view(.pinned)
+        draft.previewContextHover = chip
+
+        func frame(_ label: String) throws -> CGRect {
+            let button = try #require(buttons(in: window)[label])
+            return try #require(button.accessibilityFrame?())
+        }
+        func addFrame(_ items: [AgentContextItem]) async throws -> CGRect {
+            draft.change { $0.context = items }
+            try await Task.sleep(for: .milliseconds(100))
+            return try frame("컨텍스트 추가")
+        }
+
+        func checkRow(_ items: [AgentContextItem]) async throws -> CGRect {
+            let add = try await addFrame(items)
+            // 빼기 버튼은 칩의 20pt 높이 전체를 차지한다.
+            let chipFrame = try frame("고정됨 빼기")
+            #expect(chipFrame.height == fx.theme.component(.agentFaceLarge))
+            #expect(add.height == fx.theme.component(.iconButton))
+            #expect(abs(chipFrame.midY - add.midY) <= 0.5)
+            return add
+        }
+        let empty = try await addFrame([])
+        let first = try await checkRow([chip])
+        #expect(empty.width > first.width)
+        #expect(abs(empty.midY - first.midY) <= 0.5)
+        let second = try await checkRow([.note(origin), chip])
+        #expect(first.midY - second.midY >= fx.theme.component(.agentFaceLarge))
     }
 }

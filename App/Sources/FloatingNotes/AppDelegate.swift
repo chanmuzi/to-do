@@ -1,4 +1,6 @@
 import AppKit
+import SwiftUI
+import SpaceIcons
 import Agent
 import AgentRunner
 import Models
@@ -610,6 +612,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         execution.scheduleContext = { [weak schedules] now, calendar in
             await schedules?.todayContext(now: now, calendar: calendar) ?? TodayScheduleContext()
         }
+        execution.resolveContext = { items, now, calendar in
+            let listing = try environment.notes.list()
+            if let failure = listing.failures.first { throw failure.error }
+            let index = LibraryIndex(notes: listing.notes, windows: environment.windowStates.all, now: now, calendar: calendar)
+            return AgentPromptContext.resolve(items, index: index, spaces: environment.spaces.spaces)
+        }
         execution.supportedEfforts = settingsWindow?.model.supportedEfforts
         execution.noteContext = {
             AgentNoteContext(windows: Dictionary(uniqueKeysWithValues: environment.windowStates.all.map {
@@ -662,13 +670,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agent.sendAll = coordinator.sendAll
         agent.sendNow = coordinator.sendNow
         agent.openNote = { [weak router] id in router?.route(.openNote(id)) }
-        agent.titleForNote = { (try? environment.notes.load($0))?.title }
-        agent.chooseTarget = { [weak panels, weak router] draft in
-            panels?.toggleBrowse(anchor: nil)
-            panels?.browse.pickTarget = { id in
-                if !draft.conversation.targets.contains(id) { draft.change { $0.targets.append(id) } }
-                router?.showAgent(draft, source: "target")
+        if let library {
+            let model = library.model
+            agent.contextControls.catalog = {
+                AgentContextCatalog(notes: model.index.notes, spaces: model.spaceList, windows: model.index.windows)
             }
+            agent.titleForNote = { id in model.index.notes.first { $0.id == id }?.title }
+            agent.contextControls.openLibrary = { [weak library] selection in
+                library?.bringForward()
+                library?.model.select(selection)
+            }
+        }
+        agent.contextControls.spaceIcon = { space, size in
+            AnyView(SpaceIconView(icon: space.icon, directory: environment.spaces.imageDirectory, theme: environment.theme, size: size))
+        }
+        agent.contextControls.datePicker = { select, cancel in
+            AnyView(ContextDatePicker(theme: environment.theme, select: select, cancel: cancel))
         }
         if let model = settingsWindow?.model {
             panels.capture.modelPicker = { model.inlinePicker(theme: environment.theme, visible: true) }

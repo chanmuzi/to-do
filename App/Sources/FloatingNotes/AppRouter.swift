@@ -84,7 +84,7 @@ final class AppRouter: Routing {
     }
 
     func showAgent(_ draft: AgentDraft, source: String, screen: NSScreen? = nil, reuseForBar: Bool = false) {
-        guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.targets.first, preferredScreen: screen)
+        guard !draft.deleted, !draft.deleting, let agent, let anchor = notePanels?.agentWindowAnchor(for: draft.conversation.origin, preferredScreen: screen)
             ?? notePanels?.agentWindowAnchor(for: nil) else { return }
         let wasRouting = isRouting
         isRouting = true

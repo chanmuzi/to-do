@@ -37,7 +37,12 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     package var retry: (AgentDraft, UUID) -> Void = { _, _ in }
     package var openProposal: (UUID) -> Void = { _ in }
     package var openNote: (NoteID) -> Void = { _ in }
-    package var chooseTarget: (AgentDraft) -> Void = { _ in }
+    package var contextControls = AgentContextControls()
+
+    func chooseContext(_ draft: AgentDraft) {
+        if let panel = draft.contextPanel { panel.close(); return }
+        draft.contextPanel = AgentContextPanel(draft: draft, controls: contextControls, theme: theme, allowsKey: allowsKeyWindows)
+    }
     package var titleForNote: (NoteID) -> String? = { _ in nil }
     package var stopBeforeDelete: (AgentDraft) async throws -> Void = { _ in }
 
@@ -87,7 +92,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     package func preferred(for note: NoteID) -> AgentDraft? {
-        let candidates = catalog.records.values.filter { $0.conversation.targets.contains(note) }.sorted {
+        let candidates = catalog.records.values.filter { $0.conversation.origin == note }.sorted {
             ($0.conversation.updatedAt, $0.conversation.id.uuidString) > ($1.conversation.updatedAt, $1.conversation.id.uuidString)
         }
         return candidates.first { $0.conversation.requests.last?.status == .running }
@@ -96,14 +101,14 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
 
     package func record(for note: NoteID?) throws -> AgentDraft {
         try restore()
-        let targets = note.map { [$0] } ?? []
-        if let existing = catalog.records.values.filter({ $0.conversation.targets.first == targets.first })
+        let context = note.map { [AgentContextItem.note($0)] } ?? []
+        if let existing = catalog.records.values.filter({ $0.conversation.origin == note })
             .max(by: { $0.conversation.updatedAt < $1.conversation.updatedAt }) { return existing }
-        return newRecord(targets: targets)
+        return newRecord(origin: note, context: context)
     }
 
-    package func newRecord(targets: [NoteID] = []) -> AgentDraft {
-        let record = AgentDraft(AgentConversation(targets: targets), store: store)
+    package func newRecord(origin: NoteID? = nil, context: [AgentContextItem] = []) -> AgentDraft {
+        let record = AgentDraft(AgentConversation(origin: origin, context: context), store: store)
         catalog.records[record.conversation.id] = record
         return record
     }
@@ -135,6 +140,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
             let candidate = lastPresentedPanel ?? sessions.values.first(where: { $0.panel.isVisible })?.panel
             let reusable = reuseForBar ? candidate : nil
             if let reusable, let old = sessions.first(where: { $0.value.panel === reusable }), old.value.draft.writeError == nil {
+                old.value.draft.contextPanel?.close()
                 sessions.removeValue(forKey: old.key)
                 panel = reusable
                 opening = reusable.frame
@@ -169,7 +175,7 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                        },
                                        newChat: { [weak self, weak panel] in
                                            guard let self else { return }
-                                           present(newRecord(targets: draft.conversation.targets), "new")
+                                           present(newRecord(origin: draft.conversation.origin, context: draft.conversation.context), "new")
                                            panel?.close()
                                        },
                                        delete: { [weak self] in
@@ -182,7 +188,8 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
                                        sendAll: { [weak self] in self?.sendAll(draft) },
                                        retry: { [weak self] in self?.retry(draft, $0) },
                                        sendNow: { [weak self] in self?.sendNow(draft, $0) },
-                                       openProposal: openProposal, openNote: openNote, chooseTarget: { [weak self] in self?.chooseTarget(draft) },
+                                       openProposal: openProposal, openNote: openNote, contextControls: contextControls,
+                                       chooseTarget: { [weak self] in self?.chooseContext(draft) },
                                        titleForNote: titleForNote, fit: { [weak panel, weak self, theme] height in
                 guard let panel, self?.sessions[id]?.panel === panel else { return }
                 let screen = panel.screen?.visibleFrame ?? visible
@@ -234,9 +241,29 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     #if DEBUG
+    package func contextState(for note: NoteID) -> [String: Any]? {
+        guard let session = sessions.values.first(where: { $0.draft.conversation.origin == note }) else { return nil }
+        let draft = session.draft
+        let picker = draft.contextPanel?.model
+        return ["origin": draft.conversation.origin?.rawValue ?? "", "count": draft.conversation.context.count,
+                "hover": draft.previewContextHover != nil, "picker": picker != nil, "space": picker?.space?.rawValue ?? "",
+                "checked": picker?.choices.filter { row in
+                    if case .item(let item) = row { return draft.conversation.context.contains(item) }
+                    return false
+                }.count ?? 0]
+    }
+
     package func performForVerification(_ action: String, for note: NoteID) {
-        guard let draft = sessions.values.first(where: { $0.draft.conversation.targets.first == note })?.draft else { return }
+        guard let draft = sessions.values.first(where: { $0.draft.conversation.origin == note })?.draft else { return }
         switch action {
+        case "context-hover": draft.previewContextHover = draft.conversation.context.dropFirst().first
+        case "context-open": draft.previewContextHover = nil; chooseContext(draft)
+        case "context-remove-week": draft.toggleContext(.period(.thisWeek))
+        case "context-space":
+            if let panel = draft.contextPanel, let id = panel.model.catalog.orderedSpaces.first?.id { panel.model.enter(id) }
+        case "context-clear":
+            draft.contextPanel?.close()
+            draft.change { $0.context.removeAll() }
         case "history": draft.showsHistory.toggle()
         case "send": send(draft)
         case "retry": if let id = draft.conversation.requests.last?.id { retry(draft, id) }
@@ -256,8 +283,8 @@ public final class AgentWindowCoordinator: NSObject, NSWindowDelegate {
         }
     }
     package func window(id: UUID) -> NSWindow? { sessions[id]?.panel }
-    public func window(for note: NoteID) -> NSWindow? { sessions.values.first { $0.draft.conversation.targets.first == note }?.panel }
-    public func setDraft(_ text: String, for note: NoteID) { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.update(text) }
-    public func draft(for note: NoteID) -> String? { sessions.values.first { $0.draft.conversation.targets.first == note }?.draft.conversation.draft }
+    public func window(for note: NoteID) -> NSWindow? { sessions.values.first { $0.draft.conversation.origin == note }?.panel }
+    public func setDraft(_ text: String, for note: NoteID) { sessions.values.first { $0.draft.conversation.origin == note }?.draft.update(text) }
+    public func draft(for note: NoteID) -> String? { sessions.values.first { $0.draft.conversation.origin == note }?.draft.conversation.draft }
     #endif
 }
