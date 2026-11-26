@@ -32,6 +32,12 @@ nonisolated final class FragmentDecoration: NSObject {
     var divider = false
     var chevronSize: CGFloat
     var gutterWidth: CGFloat { style.gutter + chevronSize - style.metrics.chevronSize }
+    /// 꺾쇠 그림의 캔버스. 제목 꺾쇠가 커지면 왼쪽 끝은 유지하고 가운데가 이동한다.
+    func chevronBox(in gutter: CGRect) -> CGRect {
+        CGRect(x: gutter.minX + (style.checkSize - style.metrics.chevronSize) / 2,
+               y: gutter.midY - chevronSize / 2, width: chevronSize, height: chevronSize)
+    }
+
     /// 코드 블록 상자. 첫 줄이면 위 모서리를, 마지막 줄이면 아래 모서리를 둥글게 닫는다.
     var codeBox: (top: Bool, bottom: Bool)?
     var codeBoxX: CGFloat = 0

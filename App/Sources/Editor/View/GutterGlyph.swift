@@ -14,7 +14,7 @@ nonisolated enum GutterGlyph {
         case .bullet(let shape):
             drawBullet(shape, in: gutter, style: style, context: context)
         case .chevron(let open):
-            drawChevron(openness: openness ?? (open ? 1 : 0), size: decoration.chevronSize, in: gutter, style: style, context: context)
+            drawChevron(openness: openness ?? (open ? 1 : 0), box: decoration.chevronBox(in: gutter), style: style, context: context)
         }
     }
 
@@ -79,18 +79,16 @@ nonisolated enum GutterGlyph {
         }
     }
 
-    private static func drawChevron(openness: Double, size: CGFloat, in gutter: CGRect, style: EditorStyle, context: CGContext) {
+    private static func drawChevron(openness: Double, box: CGRect, style: EditorStyle, context: CGContext) {
         // 24 단위 캔버스의 꺾쇠. 접힘은 오른쪽(M9.5 6 l6 6 -6 6), 펼침은 아래.
         let points = [CGPoint(x: 9.5, y: 6), CGPoint(x: 15.5, y: 12), CGPoint(x: 9.5, y: 18)]
-        // 꺾쇠는 체크박스와 같은 크기의 자리 가운데에 놓인다.
-        let origin = CGPoint(x: gutter.minX + (style.checkSize - style.metrics.chevronSize) / 2, y: gutter.midY - size / 2)
         context.saveGState()
         defer { context.restoreGState() }
-        let center = CGPoint(x: origin.x + size / 2, y: gutter.midY)
+        let center = CGPoint(x: box.midX, y: box.midY)
         context.translateBy(x: center.x, y: center.y)
         context.rotate(by: openness * .pi / 2)
         context.translateBy(x: -center.x, y: -center.y)
-        strokePolyline(points, scale: size / 24, origin: origin, width: style.metrics.chevronStroke, color: style.text2, context: context)
+        strokePolyline(points, scale: box.width / 24, origin: box.origin, width: style.metrics.chevronStroke, color: style.text2, context: context)
     }
 
     private static func strokePolyline(

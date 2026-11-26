@@ -106,6 +106,14 @@ final class EditorTextView: PlainTextInputView {
         return body()
     }
 
+    override func viewWillMove(toSuperview newSuperview: NSView?) {
+        if superview !== newSuperview, let editor {
+            editor.setHoveredGutter(nil)
+            editor.gutterHover.removeFromSuperview()
+        }
+        super.viewWillMove(toSuperview: newSuperview)
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         editor?.windowDidChange()
@@ -214,6 +222,7 @@ final class EditorTextView: PlainTextInputView {
     // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         if editor?.dismissBlocks() == true { return }
+        editor?.setHoveredGutter(nil)
         var replacement = replacementRange
         // 조합을 시작하기 전에 자리를 만든다(고른 글자를 기호와 함께 지우고, 정해 둔 서식의 기호를 넣는다).
         // 조합이 시작된 뒤에는 원문을 따로 고치지 않는다.
@@ -328,6 +337,7 @@ final class EditorTextView: PlainTextInputView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if cursorViewport != visibleRect {
+            if cursorViewport.origin != visibleRect.origin { editor?.setHoveredGutter(nil) }
             cursorViewport = visibleRect
             window?.invalidateCursorRects(for: self)
         }

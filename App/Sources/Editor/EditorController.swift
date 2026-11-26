@@ -41,8 +41,8 @@ final class EditorController: NSObject {
     let textView: EditorTextView
     let scrollView = NSScrollView()
     let editorUndoManager = EditorUndoManager()
-    let checkboxHover = CheckboxHover()
-    var hoveredCheckbox: Int?
+    let gutterHover = GutterHover()
+    var hoveredGutterLine: Int?
     var scheduleButtons: [Int: ScheduleLineButton] = [:]
     var onOpenSchedule: ((String?, NSView) -> Void)?
     let copyButton = CodeCopyButton()
@@ -263,10 +263,9 @@ final class EditorController: NSObject {
         scrollView.scrollerStyle = .overlay
 
         copyButton.onPress = { [weak self] in self?.copyHoveredCodeBlock() }
-        checkboxHover.wantsLayer = true
-        checkboxHover.alphaValue = 0
-        checkboxHover.setAccessibilityElement(false)
-        textView.addSubview(checkboxHover)
+        gutterHover.wantsLayer = true
+        gutterHover.alphaValue = 0
+        gutterHover.setAccessibilityElement(false)
         textView.addSubview(copyButton)
         linkField.isHidden = true
         linkField.onCommit = { [weak self] in self?.commitLink($0) }
@@ -345,6 +344,7 @@ final class EditorController: NSObject {
 
     /// 테마나 설정이 바뀌면 모양 값을 다시 풀고 모든 줄을 다시 입힌다.
     func reloadStyle() {
+        setHoveredGutter(nil)
         style = EditorStyle(theme: theme, configuration: configuration, increaseContrast: Self.increaseContrast)
         applyStyleToViews()
         appliedTrailingStyle = nil
@@ -391,7 +391,7 @@ final class EditorController: NSObject {
         selectionVersion = documentVersion
         textView.setSelectedRange(clamped(selection))
         resolveDividerCaret()
-        setHoveredCheckbox(nil)
+        setHoveredGutter(nil)
         hoveredLink = nil
         setHoveredCodeBlock(nil)
         restyleAll()
@@ -408,6 +408,9 @@ final class EditorController: NSObject {
     func applyFolds(_ newValue: Set<Int>) {
         let sanitized = FoldState.sanitized(newValue, in: document)
         guard sanitized != folded else { return }
+        if let hoveredGutterLine, folded.symmetricDifference(sanitized) != [hoveredGutterLine] {
+            setHoveredGutter(nil)
+        }
         folded = sanitized
         textView.window?.invalidateCursorRects(for: textView)
         refreshStyling()

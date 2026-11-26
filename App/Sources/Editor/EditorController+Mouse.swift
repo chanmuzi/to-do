@@ -48,17 +48,25 @@ extension EditorController {
 
     /// 그 줄 왼쪽 칸 그림(체크박스, 꺾쇠)의 가운데. 텍스트 뷰 좌표.
     func gutterPoint(forLine line: Int) -> CGPoint? {
+        guard let layout = gutterLayout(forLine: line) else { return nil }
+        return CGPoint(x: layout.box.midX, y: layout.box.midY)
+    }
+
+    private func gutterLayout(forLine line: Int) -> (glyph: FragmentDecoration.Gutter, box: CGRect, lineHeight: CGFloat)? {
         guard document.lines.indices.contains(line) else { return nil }
         layoutManager.ensureLayout(for: layoutManager.documentRange)
         guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: document.lines[line].start),
               let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment,
-              let gutter = fragment.gutterRect else { return nil }
+              let decoration = fragment.decoration, let glyph = decoration.gutter, let gutter = fragment.gutterRect else { return nil }
+        let box: CGRect
+        if case .chevron = glyph {
+            box = decoration.chevronBox(in: gutter)
+        } else {
+            box = CGRect(x: gutter.minX, y: gutter.midY - style.checkSize / 2, width: style.checkSize, height: style.checkSize)
+        }
         let origin = textView.textContainerOrigin
         let frame = fragment.layoutFragmentFrame
-        return CGPoint(
-            x: origin.x + frame.minX + gutter.minX + style.checkSize / 2,
-            y: origin.y + frame.minY + gutter.midY
-        )
+        return (glyph, box.offsetBy(dx: origin.x + frame.minX, dy: origin.y + frame.minY), gutter.height)
     }
 
     /// 그 줄 글자 영역 안의 한 점(첫 줄 조각의 가운데 높이, 글자 시작 바로 뒤). 텍스트 뷰 좌표.
@@ -128,11 +136,12 @@ extension EditorController {
             return false
         case .checkbox(let line):
             guard !textView.hasMarkedText() else { return true }
-            setHoveredCheckbox(nil)
+            setHoveredGutter(nil)
             apply(EditorCommands.toggleDone(document, lines: line...line, selection: clamped(textView.selectedRange())))
-            setHoveredCheckbox(line)
+            setHoveredGutter(line)
         case .chevron(let line):
             toggleFold(line: line)
+            setHoveredGutter(line)
         case .link(_, _, let url):
             if let onOpenLink { onOpenLink(url) } else { NSWorkspace.shared.open(url) }
         }
@@ -159,7 +168,10 @@ extension EditorController {
     /// - Returns: 누를 수 있는 것(복사 버튼 포함) 위면 `true`(화살표 커서).
     func handleMouseMoved(at point: CGPoint) -> Bool {
         let hit = hit(at: point)
-        if case .checkbox(let line) = hit { setHoveredCheckbox(line) } else { setHoveredCheckbox(nil) }
+        switch hit {
+        case .checkbox(let line), .chevron(let line): setHoveredGutter(line)
+        default: setHoveredGutter(nil)
+        }
         var link: (line: Int, offset: Int)?
         if case .link(let line, let offset, _) = hit { link = (line, offset) }
         if link?.line != hoveredLink?.line || link?.offset != hoveredLink?.offset {
@@ -174,18 +186,25 @@ extension EditorController {
         return hit != nil || isOverCopyButton(point) || isOverScheduleButton(point)
     }
 
-    func setHoveredCheckbox(_ line: Int?) {
-        guard line != hoveredCheckbox else { return }
-        hoveredCheckbox = line
-        if let line, document.lines.indices.contains(line), case .todo(let done) = document.lines[line].kind {
-            checkboxHover.update(center: gutterPoint(forLine: line), done: done, style: style, theme: theme)
-        } else {
-            checkboxHover.update(center: nil, done: false, style: style, theme: theme)
+    func setHoveredGutter(_ line: Int?) {
+        let target = blockSelection == nil && !textView.hasMarkedText() ? line : nil
+        guard target != hoveredGutterLine else { return }
+        if let target, let layout = gutterLayout(forLine: target) {
+            switch layout.glyph {
+            case .checkbox, .chevron:
+                hoveredGutterLine = target
+                gutterHover.show(glyph: layout.glyph, box: layout.box, lineHeight: layout.lineHeight,
+                                 in: textView, style: style, theme: theme)
+                return
+            case .bullet: break
+            }
         }
+        hoveredGutterLine = nil
+        gutterHover.setVisible(false, theme: theme)
     }
 
     func handleMouseExited() {
-        setHoveredCheckbox(nil)
+        setHoveredGutter(nil)
         if hoveredLink != nil {
             hoveredLink = nil
             refreshStyling()
