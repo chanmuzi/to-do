@@ -1,4 +1,5 @@
 import AppKit
+import Editor
 import Models
 import NotePanel
 import Routing
@@ -98,17 +99,34 @@ final class AppCommandDispatcher: NSObject, NSMenuItemValidation {
         perform(command)
     }
 
-    /// 앱 메뉴가 열릴 때 항목마다 불린다. "노트 모두 숨기기"는 숨긴 중이면 "노트 모두 보이기"가 된다.
-    /// 여는 화면이 아직 이어지지 않은 동작(`AppCommand.isConnected`)의 항목은 고를 수 없게 흐려 둔다(D-034).
+    private var formatResponder: (any EditorFormatResponder)? {
+        guard let note = notePanels.keyNoteID else { return nil }
+        return notePanels.window(for: note)?.firstResponder as? any EditorFormatResponder
+    }
+
+    @objc func performFormat(_ item: NSMenuItem) {
+        guard let action = item.representedObject as? EditorAction,
+              let responder = formatResponder, responder.canPerformFormat(action) else { return }
+        responder.performFormat(action)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        let name = menuItem.representedObject as? String
-        if name == AppCommand.toggleNotesHidden.rawValue {
-            menuItem.title = notePanels.areNotesHidden ? StatusMenuModel.showAllTitle : StatusMenuModel.hideAllTitle
+        if let action = menuItem.representedObject as? EditorAction {
+            return formatResponder?.canPerformFormat(action) == true
         }
-        // 키만 듣는 숨은 짝 항목은 그대로 둔다(그 키가 다른 곳으로 흘러가지 않게 받아서 기록한다).
-        guard !menuItem.isHidden else { return true }
-        if name == AppCommand.openAgentWindow.rawValue { return notePanels.keyNoteID != nil }
-        return name.flatMap(AppCommand.init(rawValue:))?.isConnected ?? true
+        guard let name = menuItem.representedObject as? String, let command = AppCommand(rawValue: name) else { return true }
+        switch command {
+        case .toggleNotesHidden:
+            menuItem.title = notePanels.areNotesHidden ? StatusMenuModel.showAllTitle : StatusMenuModel.hideAllTitle
+        case .togglePin:
+            let snapshot = notePanels.keyNoteID.flatMap(notePanels.snapshot(of:))
+            menuItem.title = snapshot?.isPinned == true ? "항상 위에 고정 해제" : "항상 위에 고정"
+            return snapshot != nil
+        case .editTitle, .setReminder, .moveToSpace, .moreMenu, .openAgentWindow:
+            return notePanels.keyNoteID != nil && command.isConnected
+        default: break
+        }
+        return command.isConnected
     }
 
     /// ⌘Z. 방금 노트를 휴지통으로 보냈으면 그 노트와 창을 되살리고(spec 5.3), 아니면 글의 실행 취소로 넘긴다.

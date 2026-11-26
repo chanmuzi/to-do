@@ -755,6 +755,13 @@ final class DebugControl {
             guard let url = output(named: name) else { return }
             let number = notePanels.snapshot(of: id)?.windowNumber
             write(NSApplication.shared.windows.first { $0.windowNumber == number }, to: url)
+        case ("menu-dump", let name?, _):
+            guard let url = output(named: name.rawValue), let menu = NSApp.mainMenu else { return }
+            write(json: [
+                "keyNote": notePanels.keyNoteID?.rawValue ?? "",
+                "firstResponder": NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "",
+                "menus": menu.items.compactMap(\.submenu).map(menuState),
+            ], to: url)
         case ("dump", _, _):
             guard let url = output(named: String(command.dropFirst("dump ".count))) else { return }
             dump(to: url)
@@ -1247,7 +1254,24 @@ final class DebugControl {
         }
     }
 
-    /// 앱 메뉴에서 보이는 항목 가운데 단축키가 적힌 것(규칙 4: 없어야 한다).
+    private func menuState(_ menu: NSMenu) -> [String: Any] {
+        menu.update()
+        return [
+            "title": menu.title,
+            "items": menu.items.map { item -> [String: Any] in
+                var row: [String: Any] = [
+                    "title": item.title, "isSeparator": item.isSeparatorItem,
+                    "keyEquivalent": item.keyEquivalent, "modifiers": ShortcutModifiers(eventFlags: item.keyEquivalentModifierMask).labels,
+                    "modifierMask": item.keyEquivalentModifierMask.rawValue,
+                    "isEnabled": item.isEnabled, "isHidden": item.isHidden,
+                ]
+                if let submenu = item.submenu { row["submenu"] = menuState(submenu) }
+                return row
+            },
+        ]
+    }
+
+    /// 규칙 4에 따라 상단 앱 메뉴에서 단축키를 표시하는 항목.
     private var visibleMainMenuKeyEquivalents: [String] {
         func visit(_ menu: NSMenu) -> [String] {
             // 메뉴를 열 때처럼 먼저 고치게 한다.

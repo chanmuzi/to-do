@@ -73,23 +73,32 @@ import Testing
     }
 
     @Test func mainMenuFollowsTheDesktopScreenOrder() {
-        let appName = AppDelegate.displayName
-        #expect(appName == "Float")
-        let menu = MainMenu.make(appName: appName, table: .standard, dispatcher: fixture.commands)
-        #expect(menu.items.map(\.title) == ["Float", "파일", "편집", "서식", "보기", "창", "도움말"])
-        func visible(_ title: String) -> [String] {
-            menu.items.first { $0.title == title }?.submenu?.items
-                .filter { !$0.isHidden && !$0.isSeparatorItem }.map(\.title) ?? []
+        defer { fixture.cleanUp() }
+        let menu = MainMenu.make(appName: AppDelegate.displayName, table: .standard, dispatcher: fixture.commands)
+        let expected: [(String, [String])] = [
+            ("Float", ["Float에 관하여", "-", "설정... ⌘,", "-", "Float 종료 ⌘Q"]),
+            ("파일", ["새 노트 ⌘N", "빠른 캡처 ⌃⌥N", "-", "노트 찾기 ⌘P", "라이브러리 ⌃⌥L", "에이전트에게 요청 ⌃⌥A", "-", "창 닫기 ⌘W"]),
+            ("편집", ["실행 취소 ⌘Z", "다시 실행 ⇧⌘Z", "-", "오려두기 ⌘X", "복사 ⌘C", "붙여넣기 ⌘V", "안에 붙여넣기 ⌥⌘V",
+                    "블록 복제 ⌘D", "모두 선택 ⌘A", "-", "노트 안에서 찾기 ⌘F", "전체 검색 ⇧⌘F"]),
+            ("서식", ["굵게 ⌘B", "취소선 ⇧⌘X", "밑줄 ⌘U", "인라인 코드 ⌘E", "마지막 색 걸기 ⇧⌘H", "링크 추가 ⌘L", "-",
+                    "제목 1 ⌥⌘1", "제목 2 ⌥⌘2", "제목 3 ⌥⌘3", "투두로 바꾸기 ⇧⌘9", "코드 블록 ⌥⌘C", "-",
+                    "완료 표시, 접기와 펼치기 ⌘↩", "줄 위로 옮기기 ⌃⌘↑", "줄 아래로 옮기기 ⌃⌘↓"]),
+            ("노트", ["제목 고치기 ⇧⌘T", "항상 위에 고정 ⇧⌘P", "리마인더 설정 ⌘R", "스페이스 옮기기 ⇧⌘M", "-", "더 보기 메뉴 ⌘K"]),
+            ("보기", ["노트 모두 숨기기 ⌃⌥H", "-", "본문 확대 ⌘+", "본문 축소 ⌘−", "본문 기본 크기 ⌘0"]),
+            ("창", ["다음 노트로 ⌘`"]),
+            ("도움말", ["단축키 ⌘/"]),
+        ]
+        #expect(menu.items.map(\.title) == expected.map { $0.0 })
+        let symbols = ["\r": "↩", "\u{F700}": "↑", "\u{F701}": "↓", "-": "−"]
+        for (title, rows) in expected {
+            let actual = menu.item(withTitle: title)?.submenu?.items.filter { !$0.isHidden }.map { item in
+                if item.isSeparatorItem { return "-" }
+                if item.keyEquivalent.isEmpty { return item.title }
+                let modifiers = ShortcutModifiers(eventFlags: item.keyEquivalentModifierMask).labels.joined()
+                return item.title + " " + modifiers + (symbols[item.keyEquivalent] ?? item.keyEquivalent.uppercased())
+            }
+            #expect(actual == rows, "\(title)")
         }
-        #expect(visible("Float") == ["Float에 관하여", "설정...", "Float 종료"])
-        #expect(visible("편집").contains("굵게"))
-        #expect(visible("서식") == ["밑줄", "링크 추가"])
-        #expect(visible("보기") == ["노트 모두 숨기기", "본문 확대", "본문 축소", "본문 기본 크기"])
-        #expect(visible("창") == ["다음 노트로"])
-        #expect(visible("도움말") == ["단축키"])
-        // 규칙 4: 보이는 항목에는 단축키가 적혀 있지 않다.
-        let all = menu.items.compactMap(\.submenu).flatMap(\.items).filter { !$0.isHidden }
-        #expect(all.allSatisfy { $0.keyEquivalent.isEmpty })
     }
 }
 

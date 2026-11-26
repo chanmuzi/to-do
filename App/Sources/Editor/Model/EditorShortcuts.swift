@@ -1,13 +1,9 @@
+import AppKit
+
 /// 편집 단축키(spec 13의 "편집" 표). 자판 배열과 입력 소스(한글)에 상관없이 같게 동작하도록
 /// 글자가 아니라 키 자리(가상 키 코드)로 견준다.
-nonisolated enum EditorShortcuts {
-    struct Modifiers: OptionSet, Hashable, Sendable {
-        let rawValue: Int
-        static let command = Modifiers(rawValue: 1)
-        static let shift = Modifiers(rawValue: 2)
-        static let option = Modifiers(rawValue: 4)
-        static let control = Modifiers(rawValue: 8)
-    }
+nonisolated package enum EditorShortcuts {
+    typealias Modifiers = NSEvent.ModifierFlags
 
     enum Key {
         static let one: UInt16 = 18
@@ -35,6 +31,12 @@ nonisolated enum EditorShortcuts {
         let modifiers: Modifiers
         let keyCode: UInt16
         let action: EditorAction
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(keyCode)
+            hasher.combine(modifiers.rawValue)
+            hasher.combine(action)
+        }
     }
 
     /// 편집기가 `performKeyEquivalent`에서 받는 키 전부. Tab, ⇧Tab은 여기 없다(글자 입력 경로에서 처리한다).
@@ -59,6 +61,10 @@ nonisolated enum EditorShortcuts {
         Binding(modifiers: [.command, .option], keyCode: Key.c, action: .codeBlock),
         Binding(modifiers: [.command], keyCode: Key.l, action: .link),
     ]
+
+    package static func binding(for action: EditorAction) -> (keyCode: UInt16, flags: NSEvent.ModifierFlags)? {
+        bindings.first { $0.action == action }.map { ($0.keyCode, $0.modifiers) }
+    }
 
     static func action(keyCode: UInt16, modifiers: Modifiers) -> EditorAction? {
         bindings.first { $0.keyCode == keyCode && $0.modifiers == modifiers }?.action

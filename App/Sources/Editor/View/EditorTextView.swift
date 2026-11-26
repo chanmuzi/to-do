@@ -75,8 +75,7 @@ final class EditorTextView: PlainTextInputView {
         case #selector(copy(_:)) where editor?.blockSelection != nil: true
         case #selector(cut(_:)) where editor?.blockSelection != nil: isEditable
         case #selector(pasteInsideBlock(_:)): isEditable && editor?.blockSelection != nil && !hasMarkedText()
-        case #selector(toggleMarkdownUnderline(_:)): isEditable && editor?.isActive == true && !hasMarkedText()
-        case #selector(toggleMarkdownBold(_:)), #selector(duplicateMarkdownBlock(_:)): isEditable && editor?.isActive == true
+        case #selector(duplicateMarkdownBlock(_:)): isEditable && editor?.isActive == true
         default: super.validateUserInterfaceItem(item)
         }
     }
@@ -166,16 +165,6 @@ final class EditorTextView: PlainTextInputView {
         editor?.paste(from: .general, inside: true)
     }
 
-    @objc func toggleMarkdownUnderline(_ sender: Any?) {
-        guard editor?.isActive == true else { return }
-        editor?.perform(.underline)
-    }
-
-    @objc func toggleMarkdownBold(_ sender: Any?) {
-        guard editor?.isActive == true else { return }
-        editor?.perform(.bold)
-    }
-
     override func accessibilityValueDescription() -> String? {
         editor?.selectedInk?.label ?? super.accessibilityValueDescription()
     }
@@ -208,13 +197,7 @@ final class EditorTextView: PlainTextInputView {
     }
 
     private static func modifiers(of event: NSEvent) -> EditorShortcuts.Modifiers {
-        let flags = event.modifierFlags
-        var result: EditorShortcuts.Modifiers = []
-        if flags.contains(.command) { result.insert(.command) }
-        if flags.contains(.shift) { result.insert(.shift) }
-        if flags.contains(.option) { result.insert(.option) }
-        if flags.contains(.control) { result.insert(.control) }
-        return result
+        event.modifierFlags.intersection([.command, .shift, .option, .control])
     }
 
     // MARK: 한글 조합
