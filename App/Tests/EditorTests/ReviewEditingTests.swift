@@ -59,7 +59,7 @@ import Testing
         let k = try EditorHarness.at("==가|나==")
         k.key(Key.b, "b", .command)
         k.paste("1\n2")
-        #expect(k.editor.text == "==가==**1**\n**2**==나==")
+        #expect(k.editor.text == "==가=={노랑}**1**\n**2**==나==")
     }
 
     @Test func blockTriggerDropsThePendingFormat() throws {

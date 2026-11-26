@@ -374,13 +374,13 @@ private typealias Key = EditorShortcuts.Key
         #expect(h.marked == "~~취소~~ `code|`")
         #expect(h.key(Key.e, "e", .command))
         h.type(" ")
-        // 형광펜은 누를 때마다 다음 색, 다섯 번째에 꺼진다.
-        for _ in 0..<3 { #expect(h.key(Key.h, "H", [.command, .shift])) }
+        // ⇧⌘H는 마지막 색(처음은 노랑 바탕)을 켜고, 다시 누르면 끈다(D-008 대체).
+        #expect(h.key(Key.h, "H", [.command, .shift]))
         h.type("색")
-        #expect(h.marked == "~~취소~~ `code` ==색|=={3}")
-        for _ in 0..<2 { #expect(h.key(Key.h, "H", [.command, .shift])) }
+        #expect(h.marked == "~~취소~~ `code` ==색|=={노랑}")
+        #expect(h.key(Key.h, "H", [.command, .shift]))
         h.type("밖")
-        #expect(h.marked == "~~취소~~ `code` ==색=={3}밖|")
+        #expect(h.marked == "~~취소~~ `code` ==색=={노랑}밖|")
     }
 
     @Test func togglingTwiceOrMovingAwayCancelsThePendingFormat() throws {
@@ -416,13 +416,13 @@ private typealias Key = EditorShortcuts.Key
         h.key(Key.x, "X", [.command, .shift])
         #expect(h.marked == "가 **~~|나다|~~** 라")
         var seen: [String] = []
-        for _ in 0..<5 {
+        // ⇧⌘H는 마지막 색을 걸고, 이미 그 색이면 벗긴다.
+        for _ in 0..<4 {
             h.key(Key.h, "H", [.command, .shift])
             seen.append(h.editor.text)
         }
         #expect(seen == [
-            "가 **~~==나다==~~** 라", "가 **~~==나다=={2}~~** 라", "가 **~~==나다=={3}~~** 라",
-            "가 **~~==나다=={4}~~** 라", "가 **~~나다~~** 라",
+            "가 **~~==나다=={노랑}~~** 라", "가 **~~나다~~** 라", "가 **~~==나다=={노랑}~~** 라", "가 **~~나다~~** 라",
         ])
         // 굵게를 벗길 때 안쪽 구간(취소선)은 기호째로 남는다.
         h.key(Key.b, "b", .command)
