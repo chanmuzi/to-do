@@ -150,8 +150,8 @@ nonisolated package struct MarkdownDocument: Sendable {
                 fence = (index, indent.length, line.level)
             } else {
                 let marker = LineClassifier.classify(units, from: bodyStart, to: bodyEnd)
-                line.kind = marker.kind
-                line.markerLength = marker.markerLength
+                line.kind = marker.kind == .divider && line.inkComment != nil ? .paragraph : marker.kind
+                line.markerLength = line.kind == .paragraph ? 0 : marker.markerLength
                 line.indentLength = indent.length
                 line.level = min(indent.level, Self.maxLevel)
             }
@@ -185,7 +185,7 @@ nonisolated package struct MarkdownDocument: Sendable {
             let level = lines[index].level
             var end = blockLines(at: index).upperBound + 1
             var cursor = end
-            while cursor < lines.count {
+            while lines[index].kind != .divider, cursor < lines.count {
                 let child = lines[cursor]
                 cursor += 1
                 // 토글 안쪽의 빈 구분 줄은 다음 자식과 함께 접고, 마지막 자식 뒤의 빈 줄은 밖에 둔다.

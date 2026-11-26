@@ -390,6 +390,7 @@ final class EditorController: NSObject {
         isSettingText = false
         selectionVersion = documentVersion
         textView.setSelectedRange(clamped(selection))
+        resolveDividerCaret()
         setHoveredCheckbox(nil)
         hoveredLink = nil
         setHoveredCodeBlock(nil)

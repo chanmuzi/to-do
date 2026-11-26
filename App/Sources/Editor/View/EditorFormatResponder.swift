@@ -32,7 +32,7 @@ extension EditorController {
             switch action {
             case .highlight:
                 return (blocks.pastedRoots ?? Array(blocks.rows)).contains {
-                    !hidden.contains($0) && document.lines[$0].continuationOf == nil && !document.lines[$0].kind.isCode
+                    !hidden.contains($0) && document.lines[$0].continuationOf == nil && !document.lines[$0].kind.isCode && document.lines[$0].kind != .divider
                 }
             case .toggleDone:
                 return rows.contains { row in

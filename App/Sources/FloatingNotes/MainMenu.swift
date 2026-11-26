@@ -52,6 +52,7 @@ enum MainMenu {
             keyed("붙여넣기", #selector(NSText.paste(_:)), KeyChord(.v, .command)),
             keyed("안에 붙여넣기", MarkdownEditor.pasteInsideAction, KeyChord(.v, [.option, .command])),
             keyed("블록 복제", MarkdownEditor.duplicateBlockAction, KeyChord(.d, .command)),
+            keyed("구분선 넣기", MarkdownEditor.insertDividerAction, nil),
             keyed("모두 선택", #selector(NSText.selectAll(_:)), KeyChord(.a, .command)), .separator(),
             command("노트 안에서 찾기", .findInNote), command("전체 검색", .searchAll),
         ])

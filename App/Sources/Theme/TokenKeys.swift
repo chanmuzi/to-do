@@ -213,7 +213,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case caretWidth = "caret-w"
     /// 인용문(spec 6): 왼쪽 막대의 너비, 블록 왼쪽 끝에서 글자까지의 거리.
     case quoteBarWidth = "quote-bar-w"
-    case quotePadding = "quote-pad"
+    case quoteBarInset = "quote-bar-inset"
+    case editorDividerHeight = "editor-divider-h"
     /// 인라인 코드 상자(spec 6): 좌우 안쪽 여백, 바깥 간격, 높이, 줄 가운데에서 아래로 내리는 양,
     /// 글자 기준선을 올리는 양.
     case codePaddingX = "code-pad-x"

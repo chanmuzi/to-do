@@ -123,6 +123,20 @@ import DateTime
         await f.service.flush()
         #expect(try f.notes.load(note.id).body == "윗줄\n[x] 바뀐 회의")
     }
+    @Test func returnAtStartKeepsCompletedScheduledTodo() throws {
+        let line = "- [x] 보고서 제출"
+        let item = ScheduleItem(start: Date(), isCompleted: true, todo: TodoAnchor(line: 0, sourceLine: line),
+                                inlineSource: InlineScheduleSource(line: 0, text: line))
+        let f = try Fixture(); defer { f.close() }
+        var note = try f.notes.create(NoteDraft(body: line, schedules: [item]))
+        let removed = note.applyEditorBody("- [ ] \n" + line, replacing: NSRange(location: 0, length: 0))
+        #expect(removed.isEmpty)
+        #expect(note.schedules.first?.id == item.id)
+        #expect(note.schedules.first?.inlineSource == InlineScheduleSource(line: 1, text: line))
+        #expect(note.schedules.first?.todo?.line == 1)
+        #expect(note.schedules.first?.isCompleted == true)
+    }
+
     @Test func deletingBlankLineAboveScheduledTodoMovesBothAnchorsUp() throws {
         let f = try Fixture(); defer { f.close() }
         let line = "- [x] 완료"

@@ -19,6 +19,7 @@ nonisolated extension EditorCommands {
     private static let closers: Set<Character> = ["*", "~", "=", "`", ")"]
 
     static func conversion(_ doc: MarkdownDocument, typing text: String, at position: Int) -> Conversion? {
+        if text == "-", let divider = dividerConversion(doc, at: position) { return divider }
         guard text.count == 1, let character = text.first, closers.contains(character) else { return nil }
         let line = doc.line(at: position)
         guard !line.kind.isCode, position >= line.contentStart else { return nil }
@@ -63,6 +64,16 @@ nonisolated extension EditorCommands {
             selection: NSRange(location: start + span.range.length, length: 0)
         )
         return Conversion(literal: literal, formatted: formatted)
+    }
+
+    static func dividerConversion(_ doc: MarkdownDocument, at position: Int) -> Conversion? {
+        let line = doc.line(at: position)
+        guard line.kind == .paragraph, line.continuationOf == nil, position == line.end,
+              doc.string(in: line.contentRange) == "--" else { return nil }
+        let literal = TextEdit.insert("\\-", replacing: NSRange(location: position, length: 0))
+        let suffix = "-\n" + doc.string(in: line.indentRange)
+        return Conversion(literal: literal,
+                          formatted: .insert(suffix, replacing: NSRange(location: position, length: 2)))
     }
 
     private static func isLink(_ kind: InlineSpan.Kind) -> Bool {

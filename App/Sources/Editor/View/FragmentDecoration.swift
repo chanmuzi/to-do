@@ -26,6 +26,10 @@ nonisolated final class FragmentDecoration: NSObject {
     var gutterX: CGFloat = 0
     /// 인용문 줄. 왼쪽(`gutterX`)에 세로 막대를 그린다. 이어지는 인용문 줄의 막대는 하나로 이어진다.
     var quoteBar = false
+    var coversTrailingQuote = false
+    var startsQuote = false
+    var endsQuote = false
+    var divider = false
     var chevronSize: CGFloat
     var gutterWidth: CGFloat { style.gutter + chevronSize - style.metrics.chevronSize }
     /// 코드 블록 상자. 첫 줄이면 위 모서리를, 마지막 줄이면 아래 모서리를 둥글게 닫는다.

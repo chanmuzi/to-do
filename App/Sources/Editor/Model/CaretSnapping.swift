@@ -109,6 +109,19 @@ nonisolated enum CaretSnapping {
         }
 
         let line = doc.lines[index]
+        if line.kind == .divider {
+            for step in [forward ? 1 : -1, forward ? -1 : 1] {
+                var row = index + step
+                while doc.lines.indices.contains(row) {
+                    let next = doc.lines[row]
+                    if next.kind != .divider, FoldState.foldRoot(of: row, in: doc, folded: folded) == nil {
+                        return step > 0 ? next.caretStart : next.contentEnd
+                    }
+                    row += step
+                }
+            }
+            return line.end
+        }
         if let comment = line.inkComment, position > comment.location {
             if forward, old.length == 0, old.location == comment.location, position == comment.location + 1, index + 1 < doc.lines.count {
                 return doc.lines[index + 1].caretStart

@@ -75,6 +75,7 @@ final class EditorTextView: PlainTextInputView {
         case #selector(copy(_:)) where editor?.blockSelection != nil: true
         case #selector(cut(_:)) where editor?.blockSelection != nil: isEditable
         case #selector(pasteInsideBlock(_:)): isEditable && editor?.blockSelection != nil && !hasMarkedText()
+        case #selector(insertMarkdownDivider(_:)): isEditable && editor?.isActive == true && !hasMarkedText()
         case #selector(duplicateMarkdownBlock(_:)): isEditable && editor?.isActive == true
         default: super.validateUserInterfaceItem(item)
         }
@@ -144,7 +145,7 @@ final class EditorTextView: PlainTextInputView {
         if editor?.blockSelection != nil, modifiers.intersection([.command, .control]).isEmpty,
            let characters = event.characters, !characters.isEmpty,
            characters.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) && !(0xF700...0xF8FF).contains($0.value) }) {
-            editor?.clearBlocks()
+            _ = editor?.dismissBlocks()
             return
         }
         super.keyDown(with: event)
@@ -153,6 +154,11 @@ final class EditorTextView: PlainTextInputView {
     override func selectAll(_ sender: Any?) {
         editor?.clearBlocks()
         super.selectAll(sender)
+    }
+
+    @objc func insertMarkdownDivider(_ sender: Any?) {
+        guard isEditable, editor?.isActive == true, !hasMarkedText() else { return }
+        editor?.insertDivider()
     }
 
     @objc func duplicateMarkdownBlock(_ sender: Any?) {
@@ -166,7 +172,9 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func accessibilityValueDescription() -> String? {
-        editor?.selectedInk?.label ?? super.accessibilityValueDescription()
+        if let editor, let selection = editor.blockSelection, selection.rows.count == 1,
+           editor.document.lines[selection.focus].kind == .divider { return "구분선" }
+        return editor?.selectedInk?.label ?? super.accessibilityValueDescription()
     }
 
     @objc func editMarkdownLink(_ sender: Any?) {
@@ -205,7 +213,7 @@ final class EditorTextView: PlainTextInputView {
     // 조합 중인 글자는 원문에 들어가지만 `textDidChange`가 오지 않는다. 그 글자까지 저장되고
     // 조합 중에 줄이 넘어가도 창 높이가 따라가도록 곧바로 알린다.
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
-        if editor?.clearBlocks() == true { return }
+        if editor?.dismissBlocks() == true { return }
         var replacement = replacementRange
         // 조합을 시작하기 전에 자리를 만든다(고른 글자를 기호와 함께 지우고, 정해 둔 서식의 기호를 넣는다).
         // 조합이 시작된 뒤에는 원문을 따로 고치지 않는다.
@@ -229,13 +237,14 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
-        if editor?.clearBlocks() == true { return }
+        if editor?.dismissBlocks() == true { return }
         let text = (string as? NSAttributedString)?.string ?? (string as? String)
         if let text, editor?.separatesCommittedTrigger(text, replacementRange: replacementRange) == true {
             // 기호를 확정한 뒤 Space를 보낸다. 조합이 없는 입력과 조합 중간 변경에는 적용하지 않는다.
             super.insertText(String(text.dropLast()), replacementRange: replacementRange)
             editor?.compositionDidChange()
-            super.insertText(" ", replacementRange: NSRange(location: NSNotFound, length: 0))
+            if text.hasSuffix("-") { editor?.splitUndoRecord() }
+            super.insertText(String(text.suffix(1)), replacementRange: NSRange(location: NSNotFound, length: 0))
         } else {
             super.insertText(string, replacementRange: replacementRange)
         }

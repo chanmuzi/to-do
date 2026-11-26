@@ -103,6 +103,12 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
         drawQuoteBar(decoration, in: context)
+        if decoration.divider {
+            let thickness = decoration.style.borderWidth
+            context.setFillColor(decoration.style.line.cgColor)
+            context.fill(CGRect(x: decoration.gutterX - layoutFragmentFrame.minX, y: (ownHeight - thickness) / 2,
+                                width: containerWidth - decoration.gutterX, height: thickness))
+        }
         context.restoreGState()
 
         // TextKit은 고정한 줄 높이의 남는 공간을 모두 글자 위에 둔다. 글자가 줄의 세로 가운데에 오도록
@@ -146,9 +152,15 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     private func drawQuoteBar(_ decoration: FragmentDecoration, in context: CGContext) {
         guard decoration.quoteBar else { return }
         let style = decoration.style
-        context.setFillColor(style.text3.cgColor)
-        let x = decoration.gutterX - layoutFragmentFrame.minX
-        context.fill(CGRect(x: x, y: 0, width: style.quoteBarWidth, height: ownHeight))
+        context.setFillColor(style.text.cgColor)
+        let center = decoration.gutterX + style.metrics.bulletInset + style.metrics.bulletDot / 2
+        let top = decoration.startsQuote ? style.quoteBarInset : 0
+        let bottom = decoration.endsQuote ? style.quoteBarInset : 0
+        let height = decoration.coversTrailingQuote ? layoutFragmentFrame.height : ownHeight
+        let rect = CGRect(x: center - style.quoteBarWidth / 2 - layoutFragmentFrame.minX, y: top,
+                          width: style.quoteBarWidth, height: max(0, height - top - bottom))
+        context.addPath(BoxPath.fill(rect, radius: style.quoteBarWidth / 2, top: decoration.startsQuote, bottom: decoration.endsQuote))
+        context.fillPath()
     }
 
     /// 코드 블록 상자에서 이 문단이 차지하는 부분. 조각 좌표.

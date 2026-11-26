@@ -3,6 +3,7 @@ import AppKit
 extension EditorController {
     /// 마우스 아래에 있는 누를 수 있는 것.
     enum Hit: Equatable {
+        case divider(line: Int)
         case checkbox(line: Int)
         case chevron(line: Int)
         /// 열 수 있는 주소(`LinkPolicy`)의 링크.
@@ -26,6 +27,7 @@ extension EditorController {
         guard let found = fragment(at: point) else { return nil }
         guard FoldState.foldRoot(of: found.line, in: document, folded: folded) == nil else { return nil }
         let line = document.lines[found.line]
+        if line.kind == .divider, found.local.y < found.fragment.ownHeight { return .divider(line: found.line) }
         if let gutter = found.fragment.gutterRect, gutter.contains(found.local) {
             switch line.kind {
             case .todo: return .checkbox(line: found.line)
@@ -76,7 +78,7 @@ extension EditorController {
         if isOverScheduleButton(point) || isOverCopyButton(point) { return .arrow }
         switch hit(at: point) {
         case .link: return selectingText ? .iBeam : .pointingHand
-        case .checkbox, .chevron: return .arrow
+        case .divider, .checkbox, .chevron: return .arrow
         case nil: return .iBeam
         }
     }
@@ -119,10 +121,11 @@ extension EditorController {
         let target = hit(at: point)
         let wasSelecting = clearBlocks()
         guard let hit = target else { return false }
-        if wasSelecting {
-            guard case .link = hit else { return false }
-        }
         switch hit {
+        case .divider(let row):
+            showBlocks(BlockSelection(anchor: row, focus: row))
+        case .checkbox where wasSelecting, .chevron where wasSelecting:
+            return false
         case .checkbox(let line):
             guard !textView.hasMarkedText() else { return true }
             setHoveredCheckbox(nil)

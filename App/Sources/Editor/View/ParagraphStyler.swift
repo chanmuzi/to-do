@@ -121,17 +121,17 @@ nonisolated enum ParagraphStyler {
             }
             let isDone = key.kind == .todo(done: true)
             let isQuote = key.kind == .quote
-            // 인용문의 글자는 `text-2`다. 서식(형광펜, 코드)의 글자색은 그 위에 입힌다.
-            let baseColor = key.ink.flatMap { $0.foreground ? style.ink($0, done: isDone) : nil } ?? (isDone ? style.text3 : isQuote ? style.text2 : style.text)
+            let baseColor = key.ink.flatMap { $0.foreground ? style.ink($0, done: isDone) : nil } ?? (isDone ? style.text3 : style.text)
 
             let left = CGFloat(key.level) * style.indent
             if case .toggleHeading = key.kind {
                 decoration.chevronSize = font.font.pointSize * style.metrics.headingChevronScale
             }
-            let textStart = left + (key.kind.isListItem ? decoration.gutterWidth : isQuote ? style.quotePadding : 0)
+            let textStart = left + (key.kind.isListItem ? decoration.gutterWidth : isQuote ? style.gutter : 0)
             let paragraph = NSMutableParagraphStyle()
-            paragraph.minimumLineHeight = font.lineHeight
-            paragraph.maximumLineHeight = font.lineHeight
+            let height = key.kind == .divider ? style.dividerHeight : font.lineHeight
+            paragraph.minimumLineHeight = height
+            paragraph.maximumLineHeight = height
             paragraph.firstLineHeadIndent = textStart
             paragraph.headIndent = textStart
             paragraph.tailIndent = -scheduleInset
@@ -174,13 +174,19 @@ nonisolated enum ParagraphStyler {
 
             if let comment = line.inkComment { hide(comment) }
             if line.hasHardBreak { hide(NSRange(location: line.contentEnd, length: 1)) }
-            guard !key.isContinuation else { return }
             decoration.gutterX = left
+            decoration.quoteBar = isQuote
+            decoration.coversTrailingQuote = key.coversTrailingQuote
+            decoration.startsQuote = key.startsQuote
+            decoration.endsQuote = key.endsQuote
+            guard !key.isContinuation else { return }
             switch key.kind {
             case .todo(let done): decoration.gutter = .checkbox(done: done)
             case .bullet: decoration.gutter = .bullet(key.level % 3)
             case .toggle, .toggleHeading: decoration.gutter = .chevron(open: !key.isFolded)
-            case .quote: decoration.quoteBar = true
+            case .divider:
+                decoration.divider = true
+                out.addAttribute(.accessibilityCustomText, value: ["구분선"], range: local(line.markerRange))
             default: break
             }
         }

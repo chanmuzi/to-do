@@ -27,7 +27,7 @@ import Testing
             fragment.draw(at: CGPoint(x: fragment.layoutFragmentFrame.minX, y: 0), in: context)
             let pixels = try #require(context.data).assumingMemoryBound(to: UInt8.self)
             let decoration = try #require(fragment.decoration)
-            let margin = index == 3 ? Int(h.theme.component(.quoteBarWidth)) : Int(decoration.gutterX)
+            let margin = index == 3 ? Int(h.controller.style.gutter) : Int(decoration.gutterX)
             let ink = (0..<height).contains { y in (0..<margin).contains { x in pixels[y * context.bytesPerRow + x] < 250 } }
             #expect(ink == (index == 3))
         }
