@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarIcon: MenuBarIconSwitch<StatusItemController>?
     private var requestedWindowActivation = false
     private var activationFocus = ActivationFocusPolicy()
+    private var activationHistory = ActivationHistory()
+    private var noteBeforeResigning: NoteID?
+    private var noteToRestore: NoteID?
     private var hotKeys: GlobalHotKeys?
     private var pointerPresses: PointerPressMonitor?
     /// 늦게 오는 누름을 기다리는 동안 미뤄 둔 라이브러리 올리기.
@@ -51,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let application = NSApplication.shared
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(workspaceDidActivate(_:)),
+                                                         name: NSWorkspace.didActivateApplicationNotification, object: nil)
         do {
             if let appearance = options.appearance {
                 application.appearance = appearance.nsAppearance
@@ -281,6 +286,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func workspaceDidActivate(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        switch app.activationPolicy {
+        case .regular: activationHistory.activated(.regular)
+        case .accessory: activationHistory.activated(.accessory)
+        case .prohibited: activationHistory.activated(.prohibited)
+        @unknown default: activationHistory.activated(.none)
+        }
+    }
+
+    func applicationWillResignActive(_ notification: Notification) {
+        noteBeforeResigning = notePanels?.keyNoteID
+    }
+
     func applicationWillBecomeActive(_ notification: Notification) {
         let carbon = ActivationFocusPolicy.carbonTarget(GetCurrentEvent())
         let appKit = ActivationFocusPolicy.carbonTarget(NSApp.currentEvent?.eventRef.map { EventRef($0) })
@@ -290,27 +310,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let routing = router?.isRouting == true
         let modal = NSApp.modalWindow != nil
         let quick = quickPanels?.isAnyVisible == true
+        let history = activationHistory
+        activationHistory = ActivationHistory()
         let decision = activationFocus.decide(at: ProcessInfo.processInfo.systemUptime, explicitTarget: requested || routing || modal || quick,
-                                              carbon: carbon, appKit: appKit, window: pointer.window,
+                                              history: history, carbon: carbon, appKit: appKit, window: pointer.window,
                                               mouseAge: pointer.mouseAge, keyAge: pointer.keyAge)
         let pending = decision.pendingAge.map { String(format: "%.3f", $0) } ?? "none"
         let message = "requested=\(requested) routing=\(routing) modal=\(modal) quick=\(quick)"
             + " carbon=\(carbon.rawValue) appKitEvent=\(appKit.rawValue) pendingAge=\(pending) window=\(pointer.window.rawValue)"
             + String(format: " mouseAge=%.3f keyAge=%.3f", pointer.mouseAge, pointer.keyAge)
-            + " decision=\(decision.reason.rawValue) reused=\(decision.reused)"
+            + " previous=\(history.previous.rawValue) decision=\(decision.reason.rawValue) reused=\(decision.reused)"
         activationLog.notice("\(message, privacy: .public)")
-        guard decision.reason == .showLibrary else { return }
-        guard ActivationFocusPolicy.waitsForLatePress(window: pointer.window) else {
-            library?.bringForward()
-            return
-        }
-        // 누른 채로 활성화됐으면 그 창을 누른 것이다.
-        if NSEvent.pressedMouseButtons & 1 != 0 {
+        guard decision.reason == .showLibrary || (decision.reason == .helperReturn && !decision.reused) else { return }
+        pendingLibraryRaise?.cancel()
+        pendingLibraryRaise = nil
+        let waitsForPress = ActivationFocusPolicy.waitsForLatePress(window: pointer.window)
+        if waitsForPress, NSEvent.pressedMouseButtons & 1 != 0 {
             activationFocus.adoptLatePress()
             activationLog.notice("late-press decision=localPress source=buttonDown")
             return
         }
-        pendingLibraryRaise?.cancel()
+        if decision.reason == .helperReturn {
+            noteToRestore = noteBeforeResigning
+            return
+        }
+        guard waitsForPress else {
+            library?.bringForward()
+            return
+        }
         let raise = DispatchWorkItem { [weak self] in
             guard let self else { return }
             pendingLibraryRaise = nil
@@ -334,11 +361,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidResignActive(_ notification: Notification) {
         pendingLibraryRaise?.cancel()
         pendingLibraryRaise = nil
+        noteToRestore = nil
         activationFocus.didResignActive()
     }
 
     /// 다른 프로그램이 제자리에서 고친 파일도 앞으로 올 때 다시 읽는다.
     func applicationDidBecomeActive(_ notification: Notification) {
+        if let note = noteToRestore {
+            noteToRestore = nil
+            notePanels?.returnKey(to: note)
+        }
         refreshSettingsCalendars()
         do {
             try environment?.notes.refresh()
@@ -395,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         schedules?.stop()
         reminderEditor?.close()
     }
@@ -405,6 +438,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Dock, Spotlight의 재열기는 라이브러리 한 창만 대상으로 한다.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        noteBeforeResigning = nil
+        noteToRestore = nil
         activationLog.notice("reopen decision=showLibrary")
         library?.bringForward()
         return false

@@ -182,22 +182,49 @@ extension EditorController {
         showBlocks(BlockSelection(anchor: visible(selection.anchor), focus: visible(selection.focus)))
     }
 
-    func drawBlockSelection(in dirty: NSRect) {
-        guard let selection = blockSelection else { return }
+    /// 줄바꿈과 문단 간격까지 배치한 칸을 쓴다. 문서 끝의 빈 줄은 앞 문단과 다른 칸이다.
+    private func blockLineFrame(at row: Int) -> CGRect? {
+        let line = document.lines[row]
+        if line.fullRange.length == 0 { return caretSpot(line.start, lineIndex: row)?.line }
+        guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: line.start),
+              let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment else { return nil }
+        layoutManager.ensureLayout(for: fragment.rangeInElement)
+        var frame = fragment.layoutFragmentFrame
+        frame.size.height = fragment.ownHeight
+        return frame
+    }
+
+    func blockSelectionRects() -> [CGRect] {
+        guard let selection = blockSelection else { return [] }
         let hidden = FoldState.hiddenLines(document, folded: folded)
         let origin = textView.textContainerOrigin
+        let gap = theme.space(.sp1)
+        var rects: [CGRect] = []
+        var row = selection.rows.lowerBound
+        while row <= selection.rows.upperBound {
+            let first = row
+            let line = document.lines[first]
+            let end = max(block(at: first).upperBound + 1, line.subtreeEnd)
+            row = end
+            let rows = first..<end
+            guard !hidden.contains(first), let last = rows.last(where: { !hidden.contains($0) }),
+                  let top = blockLineFrame(at: first)?.minY,
+                  let bottom = blockLineFrame(at: last)?.maxY else { continue }
+            let hasMarker = scheduleButtons.keys.contains { rows.contains($0) && !hidden.contains($0) && hasScheduleMarker(at: $0) }
+            let right = textContainer.size.width - (hasMarker ? theme.component(.noteTopButtonSize) : 0)
+            let left = CGFloat(line.level) * style.indent - gap
+            rects.append(CGRect(x: origin.x + left, y: origin.y + top + gap / 2,
+                                width: max(0, right - left), height: max(0, bottom - top - gap)))
+        }
+        return rects
+    }
+
+    func drawBlockSelection(in dirty: NSRect) {
+        guard blockSelection != nil else { return }
         theme.nsColor(.selected).setFill()
         let radius = theme.shape(.chipRadius)
-        for row in selection.rows where !hidden.contains(row) && block(at: row).lowerBound == row {
-            let rows = block(at: row)
-            let first = document.lines[row]
-            let last = document.lines[rows.upperBound]
-            guard let top = caretSpot(first.caretStart, lineIndex: row)?.line.minY,
-                  let bottom = caretSpot(last.contentEnd, lineIndex: rows.upperBound)?.line.maxY else { continue }
-            let indent = CGFloat(first.level) * style.indent
-            let rect = NSRect(x: origin.x + indent, y: origin.y + top,
-                              width: max(0, textContainer.size.width - indent), height: bottom - top)
-            if rect.intersects(dirty) { NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill() }
+        for rect in blockSelectionRects() where rect.intersects(dirty) {
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
         }
     }
 }

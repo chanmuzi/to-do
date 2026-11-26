@@ -131,7 +131,7 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
     /// 이 문단이 세로로 차지하는 높이. 문서 끝의 빈 줄 조각(이 조각에 붙어 놓인다)은 넣지 않는다.
     /// 넣으면 인용문 막대가 그 빈 줄까지 이어져 보인다.
-    private var ownHeight: CGFloat {
+    var ownHeight: CGFloat {
         let lines = textLineFragments
         guard lines.count > 1, let last = lines.last, last.characterRange.length == 0 else { return layoutFragmentFrame.height }
         return min(layoutFragmentFrame.height, last.typographicBounds.minY)

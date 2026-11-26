@@ -1,9 +1,66 @@
 import AppKit
 import DateTime
+import Models
+import Theme
 import Testing
 @testable import Editor
 
 @MainActor @Suite struct BlockSelectionTests {
+    private func rowFrame(_ h: EditorHarness, _ row: Int) throws -> CGRect {
+        let controller = h.controller
+        controller.layoutManager.ensureLayout(for: controller.layoutManager.documentRange)
+        let location = try #require(controller.contentStorage.location(controller.contentStorage.documentRange.location,
+                                                                       offsetBy: h.document.lines[row].start))
+        let fragment = try #require(controller.layoutManager.textLayoutFragment(for: location))
+        return fragment.layoutFragmentFrame.offsetBy(dx: h.view.textContainerOrigin.x, dy: h.view.textContainerOrigin.y)
+    }
+
+    @Test func parentSelectionCoversVisibleChildrenOnce() throws {
+        let h = try EditorHarness("+ ### [기획](https://example.com)\n\t- 첫째\n\t- 둘째\n- 다음")
+        h.caret(atEndOfLine: 0)
+        h.controller.selectBlocks()
+        let parent = try #require(h.controller.blockSelectionRects().first)
+        let gap = h.theme.space(.sp1)
+        let first = try rowFrame(h, 0), last = try rowFrame(h, 2)
+        #expect(parent.minY == first.minY + gap / 2)
+        #expect(parent.maxY == last.maxY - gap / 2)
+        #expect(parent.minX == h.view.textContainerOrigin.x - gap)
+        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)), times: 2)
+        #expect(h.controller.blockSelectionRects() == [parent])
+        h.controller.blockSelection = BlockSelection(anchor: 2, focus: 1)
+        let children = h.controller.blockSelectionRects()
+        try #require(children.count == 2)
+        #expect(children.allSatisfy { $0.minX == parent.minX + h.controller.style.indent })
+        #expect(children[1].minY - children[0].maxY == gap)
+    }
+
+    @Test func mixedSiblingsShareOneGapAndReserveOnlyTheMarkedBlocksMargin() throws {
+        let h = try EditorHarness("앞\n+ ### 제목\n- 항목\n문단")
+        let now = Date()
+        let item = ScheduleItem(start: now, inlineSource: .init(line: 2, text: "- 항목"))
+        let note = Note(id: .make(), body: h.editor.text, schedules: [item], created: now, modified: now)
+        h.editor.setScheduleMarkers(ScheduleLineMarker.markers(in: note, now: now, options: .init(), calendar: .current))
+        h.controller.blockSelection = BlockSelection(anchor: 1, focus: 3)
+        let rects = h.controller.blockSelectionRects()
+        try #require(rects.count == 3)
+        #expect(rects[1].minY - rects[0].maxY == h.theme.space(.sp1))
+        #expect(rects[2].minY - rects[1].maxY == h.theme.space(.sp1))
+        #expect(rects[0].maxX == rects[2].maxX)
+        #expect(rects[0].maxX - rects[1].maxX == h.theme.component(.noteTopButtonSize))
+    }
+
+    @Test func foldedToggleSelectionStopsAtItsOwnRow() throws {
+        let h = try EditorHarness("+ ### 제목\n\t- 숨긴 자식\n다음")
+        h.editor.foldedLines = [0]
+        h.controller.selectBlocks()
+        let rects = h.controller.blockSelectionRects()
+        try #require(rects.count == 1)
+        let frame = try rowFrame(h, 0)
+        let inset = h.theme.space(.sp1) / 2
+        #expect(rects[0].minY == frame.minY + inset)
+        #expect(rects[0].maxY == frame.maxY - inset)
+    }
+
     @Test func navigationExtendsAndShrinksAcrossVisibleBlocks() throws {
         let h = try EditorHarness("- 첫 줄\\\n둘째\n+ 접음\n\t안쪽\n끝")
         h.editor.foldedLines = [2]

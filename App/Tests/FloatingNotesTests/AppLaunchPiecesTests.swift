@@ -173,6 +173,35 @@ import Testing
         #expect(!ActivationFocusPolicy.waitsForLatePress(window: .none))
     }
 
+    @Test func helperReturnDependsOnEveryAppSinceResigning() {
+        typealias Kind = ActivationHistory.AppKind
+        let cases: [([Kind], ActivationDecision.Reason)] = [
+            ([.accessory], .helperReturn), ([.prohibited], .helperReturn), ([.regular], .showLibrary),
+            ([.accessory, .regular], .showLibrary), ([.regular, .accessory], .showLibrary), ([], .showLibrary)
+        ]
+        for (apps, expected) in cases {
+            var policy = ActivationFocusPolicy()
+            policy.launchFinished(at: 0)
+            _ = policy.decide(at: 0)
+            policy.didResignActive()
+            var history = ActivationHistory()
+            for app in apps { history.activated(app) }
+            let result = policy.decide(at: 10, history: history, window: .floatWindow, mouseAge: 2.245, keyAge: 3.745)
+            #expect(result.reason == expected)
+            #expect(history.previous == (apps.last ?? .none))
+        }
+    }
+
+    @Test func explicitTargetsAndWindowClicksTakePriorityOverHelperReturn() {
+        var history = ActivationHistory()
+        history.activated(.accessory)
+        let state = ActivationDecision(launching: false, pendingAge: nil)
+        #expect(state.reason(history: history, explicitTarget: true) == .explicitTarget)
+        #expect(state.reason(history: history, carbonWindow: true) == .carbonWindow)
+        #expect(state.reason(history: history, window: .floatWindow, mouseAge: 0) == .pointer)
+        #expect(ActivationDecision(launching: false, pendingAge: 0).reason(history: history) == .localPress)
+    }
+
     @Test func pointerActivationDecisions() {
         typealias Window = ActivationDecision.WindowKind
         typealias Reason = ActivationDecision.Reason
