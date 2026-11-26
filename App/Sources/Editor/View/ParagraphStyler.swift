@@ -225,11 +225,10 @@ nonisolated enum ParagraphStyler {
                 out.addAttribute(.markdownHighlight, value: InlineBackground(
                     kind: .highlight(number), color: color,
                     padX: style.metrics.highlightPadX,
-                    height: min(lineFont.lineHeight, lineFont.glyphHeight + style.metrics.highlightPadY * 2),
-                    leadShift: style.metrics.highlightPadX / 2
+                    height: min(lineFont.lineHeight, lineFont.glyphHeight + style.metrics.highlightPadY * 2)
                 ), range: content)
-                marker(span.openMarker, kernAfter: style.metrics.highlightPadX)
-                marker(span.closeMarker, kernAfter: style.metrics.highlightPadX)
+                marker(span.openMarker)
+                marker(span.closeMarker)
 
             case .code:
                 // 글자는 줄 글꼴에 맞춘 고정폭, 상자는 높이를 정해 두고 글자 위아래가 같게 놓는다.

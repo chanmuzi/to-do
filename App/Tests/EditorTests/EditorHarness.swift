@@ -18,8 +18,8 @@ final class EditorHarness {
     private(set) var replayMismatches: [String] = []
     var expectsReplayMismatch = false
 
-    init(_ text: String = "", width: CGFloat = 340, checkbox: CheckboxStyle = .box) throws {
-        theme = try Theme.bundled()
+    init(_ text: String = "", width: CGFloat = 340, checkbox: CheckboxStyle = .box, appearance: ThemeAppearance = .light) throws {
+        theme = try Theme.bundled(appearance: appearance)
         editor = MarkdownEditor(theme: theme, configuration: MarkdownEditorConfiguration(checkboxStyle: checkbox))
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: width, height: 400),
