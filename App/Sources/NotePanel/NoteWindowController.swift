@@ -207,7 +207,8 @@ final class NoteWindowController: NSObject {
         root.topRow.apply(state, animated: animated)
         root.topRow.underlineMarkedText = environment.options().underlineMarkedText
         if let textView = editor.view as? NSTextView {
-            TextInputPolicy.applyNoteStyle(to: textView, theme: environment.theme, underline: environment.options().underlineMarkedText)
+            TextInputPolicy.applyNoteStyle(to: textView, theme: environment.theme,
+                                           underline: environment.options().underlineMarkedText, selection: .editorSelection)
         }
         refreshFormatBar(animated: animated)
         editor.setNotePalette(note.colorID?.rawValue)

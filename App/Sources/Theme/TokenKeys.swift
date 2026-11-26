@@ -13,6 +13,7 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case surface3 = "surface-3"
     case connectFill = "connect-fill"
     case selected
+    case editorSelection = "editor-selection"
     case rowTitle = "row-title"
     case hover
     case text
