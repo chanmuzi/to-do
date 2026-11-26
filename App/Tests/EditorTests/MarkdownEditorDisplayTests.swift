@@ -135,6 +135,28 @@ import Theme
         #expect(try h.fontSize(line: 0, at: spans[2].closeMarker).allSatisfy { $0 == hidden })
     }
 
+    @Test func wrappedHighlightFadesAndRestoresWhenToggled() throws {
+        let h = try EditorHarness("- [ ] ==긴 체크박스에서 줄바꿈 뒤에도 색을 유지하는 글을 확인합니다=={4}", width: 155)
+        h.caret(atEndOfLine: 0)
+        for done in [false, true, false] {
+            if case .todo(let value) = h.document.lines[0].kind, value != done { h.perform(.toggleDone) }
+            let manager = h.controller.layoutManager
+            manager.ensureLayout(for: manager.documentRange)
+            let fragment = try #require(manager.textLayoutFragment(for: manager.documentRange.location) as? MarkdownLayoutFragment)
+            let shown = try #require((fragment.textElement as? NSTextParagraph)?.attributedString)
+            var range = NSRange()
+            let bg = try #require(shown.attribute(.markdownHighlight, at: (shown.string as NSString).range(of: "긴").location,
+                                                  effectiveRange: &range) as? InlineBackground)
+            let normal = h.controller.style.highlightBackground(4).alphaComponent
+            #expect(abs(bg.color.alphaComponent - normal * (done ? h.theme.ratio(.doneFade) : 1)) < 0.001)
+            let boxes = fragment.backgroundRects(for: range, background: bg)
+            #expect(boxes.count > 1)
+            for (box, line) in zip(boxes.dropFirst(), fragment.textLineFragments.dropFirst()) {
+                #expect(box.minX >= line.typographicBounds.minX)
+            }
+        }
+    }
+
     @Test func doneTodoIsDimmedAndStruck() throws {
         let h = try EditorHarness("[x] 끝낸 **일**")
         let shown = try h.display(line: 0)
