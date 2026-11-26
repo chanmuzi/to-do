@@ -1,10 +1,14 @@
+import DateTime
 import AppKit
 import SwiftUI
 import Theme
 
 struct ScheduleDatePicker: View {
     @Bindable var state: ScheduleDateSelection
-    let model: ReminderEditorModel
+    let select: (Date) -> Void
+    let apply: (DateTimeExpression) -> Void
+    let cancel: () -> Void
+    let tab: ((Bool) -> Void)?
     let theme: Theme
     @FocusState private var gridFocused: Bool
     private let quick = [("오늘", "sun.max"), ("내일", "arrow.right"), ("다음 주", "calendar")]
@@ -13,16 +17,16 @@ struct ScheduleDatePicker: View {
         VStack(alignment: .leading, spacing: 0) {
             if !state.choosingMonth {
                 CommandTextField(text: $state.input, theme: theme, placeholder: "날짜를 입력하세요",
-                                 submit: confirm, cancel: { model.datePicker = nil }, move: { delta in
+                                 submit: confirm, cancel: cancel, move: { delta in
                     if let index = state.quickIndex {
                         state.quickIndex = min(2, max(0, index + delta))
                         state.input = ""
                     } else { state.moveDay(delta * 7) }
-                }, moveDay: state.moveDay, tab: model.tabFromDate)
+                }, moveDay: state.moveDay, tab: tab)
                 .padding(.horizontal, theme.space(.sp2)).frame(height: theme.component(.rowHeight))
                 rule.padding(.bottom, theme.component(.iconButtonGap))
                 ForEach(quick.indices, id: \.self) { index in
-                    Button { model.changeDay(state.quickDay(index)) } label: {
+                    Button { select(state.quickDay(index)) } label: {
                         HStack(spacing: theme.space(.sp2)) {
                             glyph(quick[index].1)
                             Text(quick[index].0)
@@ -51,7 +55,7 @@ struct ScheduleDatePicker: View {
                 .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return]) { press in
                     if press.key == .return {
                         if state.choosingMonth { state.showMonth(state.month) }
-                        else { model.changeDay(state.cursor) }
+                        else { select(state.cursor) }
                         return .handled
                     }
                     let offset: Int
@@ -71,14 +75,14 @@ struct ScheduleDatePicker: View {
             .foregroundStyle(theme.color(.text)).padding(theme.component(.chromePaddingEnd))
             .frame(width: theme.component(.datePickerWidth)).fixedSize(horizontal: false, vertical: true)
             .background(theme.color(.surface), in: RoundedRectangle(cornerRadius: theme.component(.pickerRadius)))
-            .focusEffectDisabled().onExitCommand { model.datePicker = nil }
+            .focusEffectDisabled().onExitCommand(perform: cancel)
     }
 
     private func confirm() {
         if !state.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            if let parsed = state.parse() { model.applyExpression(parsed) }
-        } else if let quick = state.quickIndex { model.changeDay(state.quickDay(quick)) }
-        else { model.changeDay(state.cursor) }
+            if let parsed = state.parse() { apply(parsed) }
+        } else if let quick = state.quickIndex { select(state.quickDay(quick)) }
+        else { select(state.cursor) }
     }
 
     private var rule: some View { theme.color(.line).frame(height: theme.shape(.borderWidth)) }
@@ -117,7 +121,7 @@ struct ScheduleDatePicker: View {
                         let date = state.day(row * 7 + col, from: state.week)
                         let today = state.calendar.isDate(date, inSameDayAs: state.now)
                         let selected = state.calendar.isDate(date, inSameDayAs: state.cursor)
-                        Button { model.changeDay(date) } label: {
+                        Button { select(date) } label: {
                             Text(String(state.calendar.component(.day, from: date)))
                                 .font(theme.font(.rowSub)).monospacedDigit()
                                 .foregroundStyle(theme.color(today ? .warn : date < state.calendar.startOfDay(for: state.now) ? .text3 : .text))
@@ -174,5 +178,32 @@ private struct WeekScroll: NSViewRepresentable {
         }
         func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
         isolated deinit { stop() }
+    }
+}
+
+extension ScheduleDatePicker {
+    init(state: ScheduleDateSelection, model: ReminderEditorModel, theme: Theme) {
+        self.init(state: state, select: model.changeDay, apply: model.applyExpression,
+                  cancel: { model.datePicker = nil }, tab: model.tabFromDate, theme: theme)
+    }
+}
+
+/// 일정 편집의 날짜 선택기를 하루 선택에도 사용한다.
+package struct ContextDatePicker: View {
+    @State private var state: ScheduleDateSelection
+    let theme: Theme
+    let select: (Date) -> Void
+    let cancel: () -> Void
+
+    package init(theme: Theme, select: @escaping (Date) -> Void, cancel: @escaping () -> Void) {
+        let now = Date()
+        _state = State(initialValue: ScheduleDateSelection(selected: now, now: now, calendar: .current))
+        self.theme = theme
+        self.select = select
+        self.cancel = cancel
+    }
+
+    package var body: some View {
+        ScheduleDatePicker(state: state, select: select, apply: { select($0.start) }, cancel: cancel, tab: nil, theme: theme)
     }
 }

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Models
 import Observation
 import Store
@@ -27,9 +27,19 @@ import Store
     package var evidenceRequest: UUID?
     package func revealRequest(_ id: UUID) { showsHistory = false; evidenceRequest = id }
     var showsHistory = false
+    @ObservationIgnored weak var contextAnchor: NSView?
+    weak var contextPanel: AgentContextPanel?
+    func toggleContext(_ item: AgentContextItem) {
+        change { value in
+            if value.context.contains(item) { value.context.removeAll { $0 == item } }
+            else { value.context.append(item) }
+        }
+    }
+
     var expanded: Set<UUID> = []
     var hovered: UUID?
     #if DEBUG
+    var previewContextHover: AgentContextItem?
     var previewProgressHover: String?
     @ObservationIgnored package var progressFrames: [String: CGRect] = [:]
     var measuresProgress = false

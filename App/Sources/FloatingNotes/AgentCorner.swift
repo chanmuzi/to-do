@@ -55,7 +55,7 @@ final class AgentCorner: NSObject {
         preferredID = preferred?.id
         var faces: [NoteID: AgentFaceState] = [:]
         for conversation in active {
-            for note in conversation.targets where faces[note] == nil { faces[note] = face(conversation) }
+            if let note = conversation.origin, faces[note] == nil { faces[note] = face(conversation) }
         }
         if notes?.agentFaces != faces { notes?.agentFaces = faces }
         let next = preferred.map(face) ?? .idle

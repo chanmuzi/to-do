@@ -590,6 +590,8 @@ final class DebugControl {
             guard parts.count == 2, let url = output(named: parts[1]) else { return }
             let host = parts[0] == "library" ? library?.window : agent?.window(id: uuid)
             if let host { writePopup(of: host, to: url) }
+        case ("agent-context-state", let note?, let name?) where isPassive:
+            if let state = agent?.contextState(for: note), let url = output(named: name) { write(json: state, to: url) }
         case ("agent-width", let note?, let width?) where isPassive:
             guard let window = agent?.window(for: note), let width = Double(width),
                   (window.minSize.width...window.maxSize.width).contains(width) else { return }
@@ -620,7 +622,7 @@ final class DebugControl {
             guard let agent, agent.history.isEmpty else { return }
             // 격리 실행에서만 명시적인 확인 대기를 가진 저장 자료를 만든다.
             for daysAgo in [1, 0] {
-                let draft = agent.newRecord(targets: daysAgo == 0 ? [note] : [])
+                let draft = agent.newRecord(origin: daysAgo == 0 ? note : nil, context: daysAgo == 0 ? [.note(note)] : [])
                 var request = AgentRequest(id: UUID(), text: daysAgo == 0 ? "회의 일정 확인" : "주간 노트 정리",
                                            engine: "fixture", model: nil)
                 request.status = daysAgo == 0 ? .awaitingAnswer : .completed
@@ -691,6 +693,9 @@ final class DebugControl {
                     self.write($0, to: url.deletingPathExtension().appendingPathExtension("parent.png"), audit: false)
                 }
             }
+        case ("agent-context-snapshot", let id?, let name?) where isPassive:
+            guard let window = agent?.window(for: id), let url = output(named: name) else { return }
+            writeContextWindows(window, to: url)
         case ("agent-snapshot", let id?, let name?) where isPassive:
             guard let url = output(named: name) else { return }
             write(agent?.window(for: id), to: url)
@@ -962,6 +967,33 @@ final class DebugControl {
         write(child, to: url)
         write(json: ["x": child.frame.minX - host.frame.minX, "y": host.frame.maxY - child.frame.maxY,
                      "width": child.frame.width, "height": child.frame.height], to: url.appendingPathExtension("frame"))
+    }
+
+    /// 자기 창과 자식 팝오버만 창 좌표대로 합친다. 화면 입력이나 호버 감사는 실행하지 않는다.
+    private func writeContextWindows(_ window: NSWindow, to url: URL) {
+        let windows = [window] + (window.childWindows ?? []).filter(\.isVisible)
+        let rect = windows.reduce(CGRect.null) { $0.union($1.frame) }
+        let result = NSImage(size: rect.size)
+        result.lockFocus()
+        for part in windows {
+            guard let view = part.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                result.unlockFocus()
+                AppLog.warning("컨텍스트 창을 그릴 수 없습니다")
+                return
+            }
+            view.layoutSubtreeIfNeeded()
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            let image = NSImage(size: view.bounds.size)
+            image.addRepresentation(bitmap)
+            image.draw(in: part.frame.offsetBy(dx: -rect.minX, dy: -rect.minY), from: .zero,
+                       operation: .sourceOver, fraction: 1)
+        }
+        result.unlockFocus()
+        do {
+            guard let tiff = result.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+                  let png = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
+            try png.write(to: url, options: .atomic)
+        } catch { AppLog.warning(error.localizedDescription) }
     }
 
     private func write(_ window: NSWindow?, to url: URL, audit: Bool = true) {

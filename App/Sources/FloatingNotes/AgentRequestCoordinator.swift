@@ -78,7 +78,8 @@ final class AgentRequestCoordinator {
         prune()
         if task == nil && order.isEmpty { paused = false; failedQueue = false; draft.queueHeld = false }
         lastOrder += 1
-        let item = AgentConversation.Queued(text: text, order: lastOrder, held: failedQueue && (paused || draft.queueHeld) ? true : nil)
+        let item = AgentConversation.Queued(text: text, order: lastOrder, held: failedQueue && (paused || draft.queueHeld) ? true : nil,
+                                            context: draft.conversation.context)
         if paused { draft.queueHeld = true }
         guard draft.change({
             if fromBar { $0.barRequestID = item.id }
@@ -133,6 +134,7 @@ final class AgentRequestCoordinator {
               previous.status == .failed else { return }
         let selection = choice()
         var request = AgentRequest(id: id, text: previous.userText, engine: selection.provider.rawValue, model: selection.model, effort: selection.effort)
+        request.context = previous.context ?? draft.conversation.context
         request.stoppedAttempts = previous.stoppedAttempts
         guard draft.change({ value in
             if let index = value.requests.firstIndex(where: { $0.id == id }) { value.requests[index] = request }
@@ -182,6 +184,7 @@ final class AgentRequestCoordinator {
         let draft = entry.draft
         guard let item = draft.conversation.queued.first(where: { $0.id == entry.id }) else { advance(); return }
         var request = AgentRequest(id: item.id, text: item.text, engine: selection.provider.rawValue, model: selection.model, effort: selection.effort)
+        request.context = item.context ?? draft.conversation.context
         guard draft.change({ value in
             value.queued.removeAll { $0.id == item.id }
             for index in value.requests.indices where value.requests[index].status == .awaitingAnswer {
@@ -272,7 +275,7 @@ final class AgentRequestCoordinator {
         let completed = result.flatMap { answer in
             Result {
                 try Task.checkCancellation()
-                final.proposals = try inbox?.proposals(for: request, source: draft.conversation.targets.first) ?? []
+                final.proposals = try inbox?.proposals(for: request, source: draft.conversation.origin) ?? []
                 return answer
             }
         }

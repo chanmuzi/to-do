@@ -22,7 +22,10 @@ struct AgentWindowView: View {
     let sendNow: (UUID) -> Void
     var openProposal: (UUID) -> Void = { _ in }
     let openNote: (NoteID) -> Void
+    var contextControls = AgentContextControls()
     let chooseTarget: () -> Void
+    @State private var contextHeight: CGFloat = 0
+    @State private var originHovered = false
     let titleForNote: (NoteID) -> String?
     let fit: (CGFloat) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -42,22 +45,9 @@ struct AgentWindowView: View {
             if draft.showsHistory {
                 ConversationHistoryList(theme: theme, conversations: history(), selection: $selection, open: openHistory)
             } else {
-                if !draft.conversation.targets.isEmpty {
-                    HStack(spacing: theme.space(.sp1)) {
-                        ForEach(draft.conversation.targets, id: \.self) { id in
-                            HStack(spacing: theme.component(.agentChipGap)) {
-                                Image(nsImage: AgentWindowGlyph.note.image(theme: theme)).renderingMode(.template)
-                                    .foregroundStyle(theme.color(.text2))
-                                Text(titleForNote(id) ?? title).lineLimit(1)
-                            }
-                            .font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
-                            .padding(.horizontal, theme.component(.agentChipInset))
-                            .frame(height: theme.component(.agentFaceLarge))
-                            .background(theme.color(.surface2), in: RoundedRectangle(cornerRadius: theme.shape(.chipRadius)))
-                        }
-                        control("대상 추가", .plus, action: chooseTarget)
-                    }.padding(.leading, theme.component(.agentHeaderInset)).padding(.top, theme.space(.sp2))
-                }
+                AgentContextStrip(draft: draft, theme: theme, controls: contextControls, openNote: openNote, choose: chooseTarget)
+                    .padding(.horizontal, theme.component(.agentHeaderInset)).padding(.top, theme.space(.sp2))
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contextHeight = $0 }
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: theme.component(.agentInputInset)) {
@@ -200,9 +190,8 @@ struct AgentWindowView: View {
     }
     private var queueLimit: CGFloat { theme.component(.scheduleListMaxHeight) }
     private var requiredHeight: CGFloat {
-        let targetHeight = draft.conversation.targets.isEmpty ? 0 : theme.component(.iconButton) + theme.space(.sp2)
         let heldHeight = draft.queueHeld && !draft.conversation.queued.isEmpty ? headerHeight : 0
-        return conversationHeight + heldHeight + targetHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
+        return conversationHeight + heldHeight + contextHeight + theme.shape(.chromeHeight) * 2 + theme.space(.sp3)
             + max(0, min(queueHeight, queueLimit) + theme.component(.agentRowInset)) + theme.component(.agentEdgeIdle) * 2
     }
 
@@ -224,6 +213,17 @@ struct AgentWindowView: View {
                 .frame(height: theme.lineHeight(.title))
             } else {
                 Text(draft.showsHistory ? "지난 대화" : !draft.conversation.hasSubmitted ? "에이전트" : draft.conversation.name).lineLimit(1).font(theme.font(.title)).foregroundStyle(theme.color(.text))
+                    .layoutPriority(1)
+                if !draft.showsHistory, let id = draft.conversation.origin, let noteTitle = titleForNote(id) {
+                    let name = noteTitle.isEmpty ? "제목 없음" : noteTitle
+                    Button { openNote(id) } label: {
+                        Text(name).lineLimit(1).font(theme.font(.body, size: theme.tokens.textStyle(.micro).size))
+                            .foregroundStyle(theme.color(originHovered ? .text : .text3))
+                            .underline(originHovered, color: theme.color(.text3))
+                    }.buttonStyle(.plain).onHover { originHovered = $0 }
+                        .padding(.leading, theme.space(.sp2) - theme.component(.iconButtonGap))
+                        .accessibilityLabel("시작 노트 \(name) 열기")
+                }
             }
             Spacer(minLength: 0)
             control("지난 대화", .clock) { draft.showsHistory.toggle() }

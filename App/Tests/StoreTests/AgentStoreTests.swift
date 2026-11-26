@@ -42,7 +42,7 @@ import Testing
         let folder = location.stateDirectory.appending(path: "agent/conversations")
         let legacy = UUID()
         try Data(#"{"id":"\#(legacy)","createdAt":0}"#.utf8).write(to: folder.appending(path: legacy.uuidString + ".json"))
-        let invalid = [Data("{".utf8), Data(#"{"formatVersion":2}"#.utf8)]
+        let invalid = [Data("{".utf8), Data(#"{"formatVersion":3}"#.utf8)]
         let paths = invalid.map { _ in folder.appending(path: UUID().uuidString + ".json") }
         for (url, data) in zip(paths, invalid) { try data.write(to: url) }
         let read = try store.loadConversations { warnings.append($0) }

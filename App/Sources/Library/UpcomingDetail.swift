@@ -101,8 +101,6 @@ struct UpcomingDetail: View {
         let presentation = entry.presentation(model)
         let gap = theme.component(.chromePaddingEnd)
         let top = min(max(0, rowMidY - theme.component(.controlHeight)), max(0, availableHeight - height))
-        let bubble = UpcomingBubble(tipY: rowMidY - top, radius: theme.shape(.windowRadius), tail: gap)
-        let shadow = theme.shadow(.pop).last
         VStack(alignment: .leading, spacing: 0) {
             Text(entry.title).font(theme.font(.title)).lineLimit(1)
             Text(presentation.text ?? "").font(theme.libraryNumberFont)
@@ -139,28 +137,12 @@ struct UpcomingDetail: View {
         }.padding(.horizontal, theme.space(.sp3)).padding(.top, theme.component(.scheduleInset))
             .padding(.bottom, gap).frame(width: theme.component(.upcomingWidth))
             .background {
-                bubble.fill(theme.color(.surface))
-                    .shadow(color: shadow?.color.color ?? .clear, radius: (shadow?.blur ?? 0) / 2, y: shadow?.y ?? 0)
-                bubble.stroke(theme.libraryColor(.line), lineWidth: theme.shape(.borderWidth))
+                AttachedBubble(theme: theme, edge: .leading, tip: rowMidY - top,
+                               radius: theme.shape(.windowRadius), outline: theme.libraryColor(.line))
             }
             .background(UpcomingBoundsView(model: model, isSource: false))
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
             .offset(y: top)
-    }
-}
-
-private nonisolated struct UpcomingBubble: Shape {
-    let tipY: CGFloat
-    let radius: CGFloat
-    let tail: CGFloat
-    func path(in rect: CGRect) -> Path {
-        let y = min(max(tipY, radius + tail), rect.height - radius - tail)
-        var pointer = Path()
-        pointer.move(to: CGPoint(x: rect.minX, y: y - tail))
-        pointer.addLine(to: CGPoint(x: rect.minX - tail, y: y))
-        pointer.addLine(to: CGPoint(x: rect.minX, y: y + tail))
-        pointer.closeSubpath()
-        return Path(roundedRect: rect, cornerRadius: radius).union(pointer)
     }
 }
 
