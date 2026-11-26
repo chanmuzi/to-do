@@ -49,6 +49,11 @@ extension EditorController {
         guard let selection = blockSelection else { return }
         let hidden = FoldState.hiddenLines(document, folded: folded)
         var row = selection.focus + direction
+        if extending, selection.focus >= selection.anchor {
+            // 고정된 앵커 아래에서는 마지막 상자 안의 어느 줄에 포커스를 두어도 선택이 같다.
+            let last = lastSelectedGroup(selection)
+            row = direction > 0 ? last.upperBound + 1 : last.lowerBound - 1
+        }
         while document.lines.indices.contains(row) {
             if !hidden.contains(row), block(at: row).lowerBound == row {
                 showBlocks(BlockSelection(anchor: extending ? selection.anchor : row, focus: row))
@@ -58,14 +63,22 @@ extension EditorController {
         }
     }
 
-    /// 복제, 삭제, 잘라내기는 선택 항목 아래에 있는 모든 자식까지 포함한다.
-    func selectedBlockRows(_ selection: BlockSelection, includingChildren: Bool) -> ClosedRange<Int> {
-        let last = selection.rows.upperBound
-        var end = block(at: last).upperBound
-        if includingChildren {
-            for row in selection.rows { end = max(end, document.lines[row].subtreeEnd - 1) }
+    private func blockGroup(at row: Int) -> ClosedRange<Int> {
+        row...max(block(at: row).upperBound, document.lines[row].subtreeEnd - 1)
+    }
+
+    private func lastSelectedGroup(_ selection: BlockSelection) -> ClosedRange<Int> {
+        let rows = selection.rows
+        var group = blockGroup(at: rows.lowerBound)
+        while group.upperBound < rows.upperBound {
+            group = blockGroup(at: group.upperBound + 1)
         }
-        return selection.rows.lowerBound...end
+        return group
+    }
+
+    func selectedBlockRows(_ selection: BlockSelection, includingChildren: Bool) -> ClosedRange<Int> {
+        let end = includingChildren ? lastSelectedGroup(selection) : block(at: selection.rows.upperBound)
+        return selection.rows.lowerBound...end.upperBound
     }
 
     func duplicateBlocks() {
@@ -127,8 +140,8 @@ extension EditorController {
 
     func editSelectedBlocks(_ action: EditorAction) -> Bool {
         guard let selection = blockSelection else { return false }
-        let moving = action == .moveLineUp || action == .moveLineDown
-        let rows = selectedBlockRows(selection, includingChildren: moving)
+        let includeChildren = action == .moveLineUp || action == .moveLineDown || action == .indent || action == .outdent
+        let rows = selectedBlockRows(selection, includingChildren: includeChildren)
         let range = document.sourceRange(for: rows)
         var edit: TextEdit?
         switch action {
@@ -203,7 +216,7 @@ extension EditorController {
         var rects: [CGRect] = []
         var row = selection.rows.lowerBound
         while row <= selection.rows.upperBound {
-            let end = max(block(at: row).upperBound + 1, document.lines[row].subtreeEnd)
+            let end = blockGroup(at: row).upperBound + 1
             if let rect = blockRect(row..<end, hidden: hidden) { rects.append(rect) }
             row = end
         }
@@ -217,8 +230,8 @@ extension EditorController {
         let hasMarker = scheduleButtons.keys.contains { rows.contains($0) && !hidden.contains($0) && hasScheduleMarker(at: $0) }
         let right = textContainer.size.width - (hasMarker ? theme.component(.noteTopButtonSize) : 0)
         let origin = textView.textContainerOrigin
-        let gap = theme.space(.sp1)
-        let left = CGFloat(document.lines[first].level) * style.indent - gap
+        let gap = theme.component(.editorBlockGap)
+        let left = CGFloat(document.lines[first].level) * style.indent - theme.component(.editorBlockPadX)
         return CGRect(x: origin.x + left, y: origin.y + top + gap / 2,
                       width: max(0, right - left), height: max(0, bottom - top - gap))
     }
