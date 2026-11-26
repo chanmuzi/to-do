@@ -1,0 +1,32 @@
+<title>링크 모양 시안</title>
+<div class="wrap">
+<header class="item"><h1>링크 모양 시안</h1>
+<p class="lead">무엇을 정하는지 두세 문장. 지금 앱이 어떤지, 왜 바꾸는지. 카드를 눌러 고르고 맨 아래에서 답을 복사해 대화에 붙여 넣어 주세요.</p>
+<div class="bar"><label class="chk"><input type="checkbox" id="dark"> 노트 그림을 다크로</label></div></header>
+
+<section><h2>절 제목(정하는 주제)</h2>
+<p class="lead">이 절의 배경. 바뀌는 값이 여럿이면 아래처럼 값 표를 먼저 둔다.</p>
+<div class="tblwrap"><table class="tbl"><thead><tr><th>항목</th><th>지금</th><th>새 값</th><th>근거</th></tr></thead>
+<tbody><tr><td>링크 글자</td><td class="old">text</td><td>text-2</td><td>사용자 메모</td></tr></tbody></table></div>
+<div class="item"><h3>1. 항목 제목</h3><div id="g1"></div>
+<label class="memo" for="memo1">메모<textarea id="memo1"></textarea></label></div>
+</section>
+
+<section><h2>참고한 것</h2><ul class="ref"><li>본 것과 따른 것.</li></ul></section>
+
+<div class="copyrow"><span class="prog" id="prog" role="status" aria-live="polite"></span><button type="button" class="btn" id="copy">답 복사</button><textarea class="ans" id="ans" readonly rows="4" aria-label="복사할 답"></textarea><span class="cst" id="cst" role="status" aria-live="polite"></span></div>
+</div>
+<script>
+(function(){
+  var K=FloatKit;
+  function dark(){return document.getElementById('dark').checked;}
+  var Q1=[
+    {id:'A0',name:'A0. 지금',desc:'지금 앱과 같은 모습.',draw:function(){return K.note([{k:'todo',html:'회의록 <span class="lk">루시 1on1</span> 정리'}],{title:'일간 To-do',dark:dark()});}},
+    {id:'A1',name:'A1. 바꾼 모습',rec:true,desc:'무엇이 어떻게 다른지, 근거.',draw:function(){return K.note([{k:'todo',html:'회의록 <span class="lk" style="color:var(--n-text2)">루시 1on1</span> 정리'}],{title:'일간 To-do',dark:dark()});}}
+  ];
+  function render(){K.picks('g1',1,Q1);}
+  document.getElementById('dark').addEventListener('change',render);
+  render();
+  K.answers({key:'float-template-1',items:[{n:1,title:'항목 제목',labels:{A0:'A0. 지금',A1:'A1. 바꾼 모습'}}]});
+})();
+</script>
