@@ -40,7 +40,11 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
     /// 문단 안 글자 구간이 차지하는 사각형들(줄마다 하나). 조각 좌표.
     func rects(for range: NSRange) -> [CGRect] {
-        contentLines.compactMap { line in
+        lineRects(for: range).map(\.rect)
+    }
+
+    private func lineRects(for range: NSRange) -> [(rect: CGRect, wrappedStart: CGFloat?)] {
+        contentLines.enumerated().compactMap { index, line in
             let lineRange = line.characterRange
             let part = NSIntersectionRange(range, lineRange)
             guard part.length > 0 else { return nil }
@@ -48,7 +52,8 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
             let x0 = line.locationForCharacter(at: part.location).x
             let x1 = line.locationForCharacter(at: NSMaxRange(part)).x
             let end = x1 > x0 ? x1 : bounds.width
-            return CGRect(x: bounds.minX + x0, y: bounds.minY, width: end - x0, height: bounds.height)
+            let rect = CGRect(x: bounds.minX + x0, y: bounds.minY, width: end - x0, height: bounds.height)
+            return (rect, index == 0 ? nil : bounds.minX)
         }
     }
 
@@ -176,28 +181,29 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         for key in [NSAttributedString.Key.markdownHighlight, .markdownCodeBox] {
             string.enumerateAttribute(key, in: full) { value, range, _ in
                 guard let background = value as? InlineBackground else { return }
-                for (index, rect) in rects(for: range).enumerated() {
-                    let lead = index == 0 ? background.leadShift : 0
-                    let box = CGRect(
-                        x: rect.minX + lead - background.padX,
-                        y: rect.midY - background.height / 2 + background.drop,
-                        width: rect.width - lead + background.padX * 2,
-                        height: background.height
-                    )
+                for box in backgroundRects(for: range, background: background) {
                     let radius: CGFloat
                     switch background.kind {
-                    case .highlight(let number):
-                        radius = style.highlightRadius
-                        context.setFillColor(style.highlightBackground(number).cgColor)
-                    case .code:
-                        radius = style.codeRadius
-                        context.setFillColor(style.codeBackground.cgColor)
+                    case .highlight: radius = style.highlightRadius
+                    case .code: radius = style.codeRadius
                     }
+                    context.setFillColor(background.color.cgColor)
                     let corner = min(radius, box.height / 2, box.width / 2)
                     context.addPath(CGPath(roundedRect: box, cornerWidth: corner, cornerHeight: corner, transform: nil))
                     context.fillPath()
                 }
             }
+        }
+    }
+
+    func backgroundRects(for range: NSRange, background: InlineBackground) -> [CGRect] {
+        lineRects(for: range).enumerated().map { index, line in
+            let rect = line.rect
+            let lead = index == 0 ? background.leadShift : 0
+            var left = rect.minX + lead - background.padX
+            if case .highlight = background.kind, let start = line.wrappedStart { left = max(left, start) }
+            return CGRect(x: left, y: rect.midY - background.height / 2 + background.drop,
+                          width: rect.maxX + background.padX - left, height: background.height)
         }
     }
 

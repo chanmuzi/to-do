@@ -194,8 +194,9 @@ nonisolated enum ParagraphStyler {
 
             case .highlight(let number):
                 if !isDone { out.addAttribute(.foregroundColor, value: style.highlightForeground(number), range: content) }
+                let color = style.highlightBackground(number)
                 out.addAttribute(.markdownHighlight, value: InlineBackground(
-                    kind: .highlight(number),
+                    kind: .highlight(number), color: isDone ? color.withAlphaComponent(color.alphaComponent * style.doneFade) : color,
                     padX: style.metrics.highlightPadX,
                     height: min(lineFont.lineHeight, lineFont.glyphHeight + style.metrics.highlightPadY * 2),
                     leadShift: style.metrics.highlightPadX / 2
@@ -214,7 +215,7 @@ nonisolated enum ParagraphStyler {
                 out.removeAttribute(.kern, range: content)
                 let room = style.codePadX + style.codeGap
                 out.addAttribute(.markdownCodeBox, value: InlineBackground(
-                    kind: .code,
+                    kind: .code, color: style.codeBackground,
                     padX: style.codePadX,
                     height: style.codeHeight(in: lineFont),
                     drop: style.codeDrop,
@@ -231,7 +232,13 @@ nonisolated enum ParagraphStyler {
                     .markdownLink: url,
                 ]
                 if !isDone { attributes[.foregroundColor] = style.link }
-                out.addAttributes(attributes, range: content)
+                let string = out.string as NSString
+                let letters = CharacterSet.whitespacesAndNewlines.inverted
+                let first = string.rangeOfCharacter(from: letters, options: [], range: content)
+                if first.location != NSNotFound {
+                    let last = string.rangeOfCharacter(from: letters, options: .backwards, range: content)
+                    out.addAttributes(attributes, range: NSUnionRange(first, last))
+                }
                 marker(span.openMarker)
                 marker(span.closeMarker)
 

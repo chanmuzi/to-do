@@ -37,7 +37,7 @@ extension EditorController {
         if let link = found.fragment.link(at: found.local), let url = LinkPolicy.openableURL(link.url) {
             // 링크 구간의 시작(기호 포함)을 줄 안 위치로 적어 둔다.
             let span = line.spans.first { span in
-                if case .link = span.kind { span.contentRange.location - line.start == link.location } else { false }
+                if case .link = span.kind { NSLocationInRange(line.start + link.location, span.contentRange) } else { false }
             }
             return .link(line: found.line, offset: (span?.range.location ?? line.start + link.location) - line.start, url: url)
         }
@@ -75,14 +75,14 @@ extension EditorController {
     func pointer(at point: CGPoint, selectingText: Bool) -> NSCursor {
         if isOverScheduleButton(point) || isOverCopyButton(point) { return .arrow }
         switch hit(at: point) {
-        case .link: return blockSelection == nil && !selectingText ? .pointingHand : .iBeam
+        case .link: return selectingText ? .iBeam : .pointingHand
         case .checkbox, .chevron: return .arrow
         case nil: return .iBeam
         }
     }
 
     func registerLinkCursorRects() {
-        guard blockSelection == nil, !textView.selectingWithMouse else { return }
+        guard !textView.selectingWithMouse else { return }
         let visible = textView.visibleRect
         let origin = textView.textContainerOrigin
         let viewport = layoutManager.textViewportLayoutController.viewportRange
@@ -116,7 +116,12 @@ extension EditorController {
 
     /// - Returns: 눌린 것을 처리했으면 `true`(텍스트 뷰는 커서를 옮기지 않는다).
     func handleMouseDown(at point: CGPoint) -> Bool {
-        guard let hit = hit(at: point) else { return false }
+        let target = hit(at: point)
+        let wasSelecting = clearBlocks()
+        guard let hit = target else { return false }
+        if wasSelecting {
+            guard case .link = hit else { return false }
+        }
         switch hit {
         case .checkbox(let line):
             guard !textView.hasMarkedText() else { return true }

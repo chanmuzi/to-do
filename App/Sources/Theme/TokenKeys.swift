@@ -361,6 +361,7 @@ public enum ComponentToken: String, CaseIterable, Sendable {
 
 /// 치수가 아니라 비율로 적는 구성 요소 값(`component` 구역, `%` 표기).
 public enum RatioToken: String, CaseIterable, Sendable {
+    case doneFade = "done-fade"
     case disabledIconOpacity = "value-menu-disabled-icon-opacity"
     /// 노트 창 높이 한도: 화면 높이에서 차지할 수 있는 몫(spec 5.6, 임시 값).
     case noteMaxScreenHeight = "note-h-max-screen"

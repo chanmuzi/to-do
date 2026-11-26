@@ -82,7 +82,7 @@ import Testing
     }
 
     @Test func multipleLinesTakeTabEvenAfterAnActiveDateSuggestion() throws {
-        let h = try EditorHarness("+ 제목\n[ ] ==내일 3시==\n[ ] 다음")
+        let h = try EditorHarness("+ 제목\n[ ] 회의 ==내일 3시==\n[ ] 다음")
         h.editor.onAcceptDate = { _ in
             Issue.record("여러 줄 선택에서 날짜를 수락했습니다")
             return InlineDateEffect(undo: {}, redo: {})
@@ -93,7 +93,7 @@ import Testing
         let start = h.document.lines[1].contentStart
         h.place(at: start, length: h.document.length - start)
         h.press(NSResponder.tab)
-        #expect(h.editor.text == "+ 제목\n\t[ ] ==내일 3시==\n\t[ ] 다음")
+        #expect(h.editor.text == "+ 제목\n\t[ ] 회의 ==내일 3시==\n\t[ ] 다음")
     }
 
     @Test func doneSkipsEmptyTogglesAndOnlyChecksTodosInMixedSelections() throws {

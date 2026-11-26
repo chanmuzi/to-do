@@ -29,6 +29,7 @@ import Theme
             root.addSubview(scrollView)
             root.addSubview(overlay)
             window.contentView = root
+            editor.controller.textView.topWindowNumber = { [weak window] _ in window?.windowNumber ?? 0 }
             editor.text = text
         }
 
@@ -38,6 +39,19 @@ import Theme
                 windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0
             ))
         }
+    }
+
+    @Test func coveredLinkDoesNotClaimTheCursor() throws {
+        let host = try Host("[링크](https://example.com)")
+        let view = host.editor.controller.textView
+        let point = try #require(host.editor.controller.textPoint(forLine: 0))
+        let event = try host.mouseMoved(atWindowPoint: view.convert(point, to: nil))
+        view.topWindowNumber = { _ in -2 }
+        NSCursor.arrow.set()
+        view.mouseEntered(with: event)
+        view.mouseMoved(with: event)
+        #expect(NSCursor.current == .arrow)
+        #expect(host.editor.controller.hoveredLink == nil)
     }
 
     @Test func firstBodyPressAndCursorTrackingUseTheEditor() throws {

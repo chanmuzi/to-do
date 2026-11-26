@@ -8,7 +8,7 @@ public struct InlineDateProposal: Equatable, Sendable {
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.expression == rhs.expression }
 
     public static func find(in text: String, caret: Int, now: Date, calendar: Calendar,
-                            excluding: [NSRange] = []) -> Self? {
+                            excluding: [NSRange] = [], hiddenMarkers: [NSRange] = []) -> Self? {
         let source = text as NSString
         guard caret >= 0, caret <= source.length else { return nil }
         var units = Array(text.utf16)
@@ -21,6 +21,13 @@ public struct InlineDateProposal: Equatable, Sendable {
         guard let expression = DateTimeParser.firstExpression(in: masked, now: now, calendar: calendar),
               !expression.ranges.contains(where: { range in excluding.contains { NSIntersectionRange(range, $0).length > 0 } })
         else { return nil }
+        // 코드와 링크도 제목으로 남을 수 있다. 실제로 감춰진 기호와 날짜만 빼고 본다.
+        let remaining = NSMutableString(string: text)
+        for range in hiddenMarkers + expression.ranges {
+            let safe = NSIntersectionRange(range, NSRange(location: 0, length: source.length))
+            if safe.length > 0 { remaining.replaceCharacters(in: safe, with: String(repeating: " ", count: safe.length)) }
+        }
+        guard !(remaining as String).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let start = expression.isDateOnly ? calendar.startOfDay(for: expression.start) : expression.start
         guard expression.isDateOnly ? start >= calendar.startOfDay(for: now)
                 : start > now && !expression.assumptions.contains(.past) else { return nil }

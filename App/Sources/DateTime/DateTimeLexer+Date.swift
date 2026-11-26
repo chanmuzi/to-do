@@ -104,6 +104,15 @@ nonisolated extension DateTimeLexer {
             time.zone = match.string(6)
             return piece(.dateTime(spec, time))
         },
+        // 두 자리 연도는 2000년대이며 괄호 요일까지 한 조각이다.
+        Rule(#"(?<![\p{L}\p{N}.])(\d{2})\.(\d{2})\.(\d{2})(?!\d|\.\d)"#
+            + #"(?: ?\(([월화수목금토일]|"# + englishWeekdayPattern + #")\))?"#, caseInsensitive: true) { match in
+            guard let year = match.int(1), let month = match.int(2), let day = match.int(3) else { return nil }
+            let weekday = match.string(4).flatMap {
+                weekdays.firstIndex(of: $0) ?? englishWeekdays.firstIndex(of: String($0.lowercased().prefix(3)))
+            }
+            return date(.shortYearDate(year: 2000 + year, month: month, day: day, weekday: weekday))
+        },
         // 2026-11-20, 2026.11.20, 2026/11/20
         Rule(#"(?<![\d\-./A-Za-z])(\d{4})[-./](\d{1,2})[-./](\d{1,2})(?!\d)(?![-/.]\d)"#) { match in
             monthDay(match.int(2), match.int(3), year: match.int(1).map(DateSpec.Year.exact)).map { date($0) }

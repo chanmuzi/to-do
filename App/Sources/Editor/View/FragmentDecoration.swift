@@ -51,6 +51,7 @@ nonisolated final class InlineBackground: NSObject {
         case code
     }
 
+    let color: NSColor
     let kind: Kind
     /// 글자 구간 좌우로 넓히는 폭.
     let padX: CGFloat
@@ -62,7 +63,8 @@ nonisolated final class InlineBackground: NSObject {
     /// (`locationForCharacter(at:)`)에 절반만 잡혀서, 그대로 두면 왼쪽 여백이 그만큼 넓어진다.
     let leadShift: CGFloat
 
-    init(kind: Kind, padX: CGFloat, height: CGFloat, drop: CGFloat = 0, leadShift: CGFloat = 0) {
+    init(kind: Kind, color: NSColor, padX: CGFloat, height: CGFloat, drop: CGFloat = 0, leadShift: CGFloat = 0) {
+        self.color = color
         self.kind = kind
         self.padX = padX
         self.height = height

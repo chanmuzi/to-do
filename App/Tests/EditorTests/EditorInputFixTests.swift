@@ -440,8 +440,14 @@ extension LinkSchemeTests {
         #expect(h.controller.pointer(at: point, selectingText: false) == .pointingHand)
         #expect(try linkRects(2).isEmpty)
         h.controller.selectBlocks()
-        #expect(h.controller.pointer(at: point, selectingText: false) == .iBeam)
-        h.controller.clearBlocks()
+        #expect(h.controller.pointer(at: point, selectingText: false) == .pointingHand)
+        #expect(h.controller.pointer(at: point, selectingText: true) == .iBeam)
+        var opened: [URL] = []
+        h.editor.onOpenLink = { opened.append($0) }
+        #expect(h.view.acceptsFirstMouse(for: nil))
+        #expect(h.controller.handleMouseDown(at: point))
+        #expect(h.controller.blockSelection == nil)
+        #expect(opened.map(\.absoluteString) == ["https://example.com"])
         h.editor.text = "일반 본문\n새 줄"
         #expect(h.controller.pointer(at: point, selectingText: false) != .pointingHand)
     }

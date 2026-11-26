@@ -48,6 +48,7 @@ nonisolated struct EditorStyle {
     let codeForeground: NSColor
     /// 인라인 코드 글자(설정에 따라 강조색 또는 `codeForeground`).
     let inlineCodeForeground: NSColor
+    let doneFade: CGFloat
     let highlightBackgrounds: [NSColor]
     let highlightForegrounds: [NSColor]
 
@@ -112,6 +113,7 @@ nonisolated struct EditorStyle {
         codeBlockBackground = color(.codeBlockBackground)
         codeForeground = color(.codeForeground)
         inlineCodeForeground = color(configuration.inlineCodeStyle == .accent ? .codeAccent : .codeForeground)
+        doneFade = theme.ratio(.doneFade)
         highlightBackgrounds = HighlightColor.allCases.map { color($0.background) }
         highlightForegrounds = HighlightColor.allCases.map { color($0.foreground) }
 

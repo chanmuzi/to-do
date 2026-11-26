@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var requestedWindowActivation = false
     private var activationFocus = ActivationFocusPolicy()
     private var activationHistory = ActivationHistory()
+    private var previousRegularApp: NSRunningApplication?
     private var noteBeforeResigning: NoteID?
     private var noteToRestore: NoteID?
     private var hotKeys: GlobalHotKeys?
@@ -67,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             let router = AppRouter()
             router.activateApp = { [weak self] in
+                self?.cancelPendingActivation()
                 guard !application.isActive else { return }
                 self?.requestedWindowActivation = true
                 if !NSRunningApplication.current.activate(options: []) {
@@ -257,13 +259,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 began: { [unowned quickPanels] in quickPanels.pointerPressBegan() },
                 ended: { [unowned quickPanels] in quickPanels.pointerPressEnded() },
                 inactiveWindowPress: { [weak self] window, time in
-                    guard window !== self?.library?.window else { return }
+                    guard window !== self?.library?.window || self?.previousRegularApp != nil else { return }
                     self?.activationFocus.windowPressedWhileInactive(at: time)
                 },
-                windowPress: { [weak self] window in
-                    guard let self, window !== self.library?.window else { return }
-                    self.latePressArrived()
-                }
+                windowPress: { [weak self] _ in self?.latePressArrived() }
             )
             let shortcuts = ShortcutTable.standard
             application.mainMenu = MainMenu.make(
@@ -289,6 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func workspaceDidActivate(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        previousRegularApp = app.activationPolicy == .regular ? app : nil
         switch app.activationPolicy {
         case .regular: activationHistory.activated(.regular)
         case .accessory: activationHistory.activated(.accessory)
@@ -311,19 +311,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let modal = NSApp.modalWindow != nil
         let quick = quickPanels?.isAnyVisible == true
         let history = activationHistory
+        let previousApp = previousRegularApp
+        let left = Self.hasLeftScreen(previousApp)
+        previousRegularApp = nil
         activationHistory = ActivationHistory()
         let decision = activationFocus.decide(at: ProcessInfo.processInfo.systemUptime, explicitTarget: requested || routing || modal || quick,
-                                              history: history, carbon: carbon, appKit: appKit, window: pointer.window,
+                                              history: history, previousLeftScreen: left, carbon: carbon, appKit: appKit, window: pointer.window,
                                               mouseAge: pointer.mouseAge, keyAge: pointer.keyAge)
         let pending = decision.pendingAge.map { String(format: "%.3f", $0) } ?? "none"
         let message = "requested=\(requested) routing=\(routing) modal=\(modal) quick=\(quick)"
             + " carbon=\(carbon.rawValue) appKitEvent=\(appKit.rawValue) pendingAge=\(pending) window=\(pointer.window.rawValue)"
             + String(format: " mouseAge=%.3f keyAge=%.3f", pointer.mouseAge, pointer.keyAge)
-            + " previous=\(history.previous.rawValue) decision=\(decision.reason.rawValue) reused=\(decision.reused)"
+            + " previous=\(history.previous.rawValue) left=\(left) decision=\(decision.reason.rawValue) reused=\(decision.reused)"
         activationLog.notice("\(message, privacy: .public)")
-        guard decision.reason == .showLibrary || (decision.reason == .helperReturn && !decision.reused) else { return }
-        pendingLibraryRaise?.cancel()
-        pendingLibraryRaise = nil
+        if decision.reused { return }
+        switch decision.reason {
+        case .showLibrary, .appLeft, .helperReturn:
+            // 같은 활성화 알림이 반복되어도 이미 기다리는 앱의 상태를 잃지 않는다.
+            if pendingLibraryRaise != nil { return }
+        default:
+            cancelPendingActivation()
+            return
+        }
         let waitsForPress = ActivationFocusPolicy.waitsForLatePress(window: pointer.window)
         if waitsForPress, NSEvent.pressedMouseButtons & 1 != 0 {
             activationFocus.adoptLatePress()
@@ -334,22 +343,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             noteToRestore = noteBeforeResigning
             return
         }
-        guard waitsForPress else {
+        guard waitsForPress || previousApp != nil else {
             library?.bringForward()
             return
         }
+        scheduleActivationCheck(history, previousApp: previousApp, allowsAnimationWait: true)
+    }
+
+    private func scheduleActivationCheck(_ history: ActivationHistory, previousApp: NSRunningApplication?, allowsAnimationWait: Bool) {
         let raise = DispatchWorkItem { [weak self] in
             guard let self else { return }
             pendingLibraryRaise = nil
             guard NSApp.isActive else { return }
-            activationLog.notice("late-press decision=showLibrary source=timeout")
-            library?.bringForward()
+            let left = Self.hasLeftScreen(previousApp)
+            guard let reason = activationFocus.finishPassiveReturn(history, previousLeftScreen: left, allowsAnimationWait: allowsAnimationWait) else {
+                scheduleActivationCheck(history, previousApp: previousApp, allowsAnimationWait: false)
+                return
+            }
+            activationLog.notice("late-press decision=\(reason.rawValue, privacy: .public) left=\(left) source=timeout")
+            if reason == .appLeft {
+                if let noteBeforeResigning { notePanels?.returnKey(to: noteBeforeResigning) }
+            } else {
+                library?.bringForward()
+            }
         }
         pendingLibraryRaise = raise
         DispatchQueue.main.asyncAfter(deadline: .now() + ActivationFocusPolicy.latePressWait, execute: raise)
     }
 
-    /// 활성화 알림 뒤에 Float 창(라이브러리 밖)의 누름이 전달됐다. 기다리던 라이브러리 올리기를 거둔다.
+    private static func hasLeftScreen(_ app: NSRunningApplication?) -> Bool {
+        guard let app else { return false }
+        if app.isHidden || app.isTerminated { return true }
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return false }
+        return !windows.contains {
+            ($0[kCGWindowOwnerPID as String] as? pid_t) == app.processIdentifier &&
+                ($0[kCGWindowLayer as String] as? Int) == 0
+        }
+    }
+
+    private func cancelPendingActivation() {
+        pendingLibraryRaise?.cancel()
+        pendingLibraryRaise = nil
+        noteToRestore = nil
+    }
+
+    /// 활성화 알림 뒤에 Float 창의 누름이 전달됐다. 기다리던 라이브러리 올리기를 거둔다.
     private func latePressArrived() {
         guard let raise = pendingLibraryRaise else { return }
         raise.cancel()
@@ -359,9 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidResignActive(_ notification: Notification) {
-        pendingLibraryRaise?.cancel()
-        pendingLibraryRaise = nil
-        noteToRestore = nil
+        cancelPendingActivation()
         activationFocus.didResignActive()
     }
 
@@ -439,7 +476,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Dock, Spotlight의 재열기는 라이브러리 한 창만 대상으로 한다.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         noteBeforeResigning = nil
-        noteToRestore = nil
+        cancelPendingActivation()
         activationLog.notice("reopen decision=showLibrary")
         library?.bringForward()
         return false

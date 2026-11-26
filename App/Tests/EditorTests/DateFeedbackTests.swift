@@ -50,7 +50,7 @@ import DateTime
 
     @Test func explicitPastAndBareClock() throws {
         #expect(InlineDateProposal.find(in: "오늘 오후 1시", caret: "오늘 오후 1시".utf16.count, now: now(14), calendar: calendar) == nil)
-        let source = "오후 1시"
+        let source = "오후 1시 회의"
         let proposal = try #require(InlineDateProposal.find(in: source, caret: source.utf16.count, now: now(14), calendar: calendar))
         #expect(calendar.component(.day, from: proposal.item.start) == 19)
     }

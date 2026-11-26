@@ -126,6 +126,8 @@ nonisolated enum DateSpec: Hashable, Sendable {
     case offsetMonths(Int)
     /// 요일. `weekday`는 일요일이 0.
     case weekday(Int, WeekScope)
+    /// 두 자리 연도로 적은 절대 날짜와 확인할 요일(일요일 0).
+    case shortYearDate(year: Int, month: Int, day: Int, weekday: Int?)
     /// 월과 일. 해를 적지 않았으면 오늘이거나 다가오는 그날.
     case monthDay(month: Int, day: Int, year: Year?, loose: Bool)
     /// 이번 달에서 몇 달 뒤의 며칠(`다음 달 20일`, `이번 달 15일`). 지났어도 그날이다.
