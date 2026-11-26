@@ -7,7 +7,7 @@ import AppKit
 /// - 앱 메뉴(`MainMenu`)의 항목은 AppKit이 글자(`menuKeyEquivalent`)로 견준다. 글자가 맞지 않으면
 ///   (`KeyCodeMenu`) 키 자리로 한 번 더 찾으므로, 이벤트에 한글 자모가 실려 와도 같은 자리의 키가 듣는다.
 nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
-    case a, b, c, d, e, f, h, j, k, l, m, n, p, q, r, t, v, w, x, z
+    case a, b, c, d, e, f, h, j, k, l, m, n, p, q, r, t, u, v, w, x, z
     case one, two, three, nine, zero, equals, minus
     case comma, slash, backtick, leftBracket, rightBracket
     case returnKey, tab, space, escape, up, down
@@ -31,6 +31,7 @@ nonisolated enum ShortcutKey: String, Hashable, Sendable, CaseIterable {
         case .q: 12
         case .r: 15
         case .t: 17
+        case .u: 32
         case .v: 9
         case .w: 13
         case .x: 7

@@ -38,7 +38,6 @@ nonisolated struct EditorStyle {
     let text3: NSColor
     let surface: NSColor
     let accent: NSColor
-    let link: NSColor
     let line: NSColor
     let surface2: NSColor
     /// 인라인 코드 바탕, 코드 블록 바탕. 테두리는 없다.
@@ -49,8 +48,7 @@ nonisolated struct EditorStyle {
     /// 인라인 코드 글자(설정에 따라 강조색 또는 `codeForeground`).
     let inlineCodeForeground: NSColor
     let doneFade: CGFloat
-    let highlightBackgrounds: [NSColor]
-    let highlightForegrounds: [NSColor]
+    private let inkColors: [InkColor: NSColor]
 
     let gutter: CGFloat
     let indent: CGFloat
@@ -106,7 +104,6 @@ nonisolated struct EditorStyle {
         comment = noteInk(increaseContrast ? .text2 : .text3, on: .codeBlockBackground)
         surface = color(.surface)
         accent = color(.accent)
-        link = color(.link)
         line = color(.line)
         surface2 = color(.surface2)
         codeBackground = color(.codeBackground)
@@ -114,8 +111,7 @@ nonisolated struct EditorStyle {
         codeForeground = color(.codeForeground)
         inlineCodeForeground = color(configuration.inlineCodeStyle == .accent ? .codeAccent : .codeForeground)
         doneFade = theme.ratio(.doneFade)
-        highlightBackgrounds = HighlightColor.allCases.map { color($0.background) }
-        highlightForegrounds = HighlightColor.allCases.map { color($0.foreground) }
+        inkColors = Dictionary(uniqueKeysWithValues: InkColor.palette.map { ($0, color($0.token)) })
 
         checkboxStyle = configuration.checkboxStyle
         gutter = checkboxStyle == .bracket ? metrics.bracketGutter : theme.component(.gutter)
@@ -151,6 +147,9 @@ nonisolated struct EditorStyle {
     }
 
     func heading(_ level: Int) -> TextFont { headings[min(max(level, 1), 3) - 1] }
-    func highlightBackground(_ number: Int) -> NSColor { highlightBackgrounds[min(max(number, 1), 4) - 1] }
-    func highlightForeground(_ number: Int) -> NSColor { highlightForegrounds[min(max(number, 1), 4) - 1] }
+    func ink(_ ink: InkColor, done: Bool = false) -> NSColor {
+        let color = inkColors[ink]!
+        return done ? color.withAlphaComponent(color.alphaComponent * doneFade) : color
+    }
+
 }

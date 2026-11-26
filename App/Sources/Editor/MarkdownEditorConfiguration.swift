@@ -41,8 +41,10 @@ nonisolated public enum EditorAction: Sendable, Hashable {
     case unfold
     case heading(Int)
     case bold
+    case pasteInside
+    case underline
     case strikethrough
-    /// 형광펜. 다시 부르면 다음 색으로 넘어간다.
+    /// 마지막으로 고른 색을 걸거나 벗긴다.
     case highlight
     case inlineCode
     case codeBlock

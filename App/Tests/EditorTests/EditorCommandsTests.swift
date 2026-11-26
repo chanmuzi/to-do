@@ -90,7 +90,7 @@ import Testing
     @Test func returnInsideAFormattedRunSplitsTheRun() {
         // 구간은 줄을 넘지 못한다. 줄바꿈 앞에서 닫고 다음 줄에서 다시 연다.
         #expect(newline("**굵|게**") == "**굵**\n**|게**")
-        #expect(newline("- ==형|광=={3}") == "- ==형=={3}\n- ==|광=={3}")
+        #expect(newline("- ==형|광=={3}") == "- ==형=={빨강}\n- ==|광=={3}")
         #expect(newline("[글|자](https://a.example)") == "[글](https://a.example)\n[|자](https://a.example)")
         #expect(newline("**~~가|나~~**") == "**~~가~~**\n**~~|나~~**")
         // 구간의 끝이나 앞에서는 나눌 것이 없다. 빈 구간을 남기지 않는다.
@@ -253,7 +253,7 @@ import Testing
 
     private func highlight(_ marked: String) -> String? {
         let s = Scenario(marked)
-        return s.applying(EditorCommands.cycleHighlight(s.doc, selection: s.selection))
+        return s.applying(EditorCommands.setInk(s.doc, selection: s.selection, color: InkColor(.yellow), toggle: true))
     }
 
     @Test func wrapsAndUnwrapsTheSelection() {
@@ -306,26 +306,15 @@ import Testing
         #expect(wrap("```\n|코드|\n```", .bold) == nil)
     }
 
-    @Test func highlightCyclesThroughFourColorsThenClears() {
-        var text = "가 |형광| 나"
-        var seen: [String] = []
-        for _ in 0..<5 {
-            text = highlight(text)!
-            seen.append(text)
-        }
-        #expect(seen == [
-            "가 ==|형광|== 나",
-            "가 ==|형광|=={2} 나",
-            "가 ==|형광|=={3} 나",
-            "가 ==|형광|=={4} 나",
-            "가 |형광| 나",
-        ])
+    @Test func applyingLastColorTwiceClearsIt() {
+        #expect(highlight("가 |형광| 나") == "가 ==|형광|=={노랑} 나")
+        #expect(highlight("가 ==|형광|=={노랑} 나") == "가 |형광| 나")
     }
 
     @Test func highlightChangesOnlyTheSelectedPart() {
-        #expect(highlight("==가|나|다==") == "==가====|나|=={2}==다==")
-        #expect(highlight("==가|나|다=={4}") == "==가=={4}|나|==다=={4}")
-        #expect(highlight("가|나==다|라=={3}") == "가==|나다라|==")
+        #expect(highlight("==가|나|다==") == "==가=={노랑}|나|==다=={노랑}")
+        #expect(highlight("==가|나|다=={4}") == "==가=={파랑}==|나|=={노랑}==다=={파랑}")
+        #expect(highlight("가|나==다|라=={3}") == "가==|나다|=={노랑}==라=={빨강}")
     }
 }
 
@@ -408,6 +397,8 @@ import Testing
             ([.command, .option], Key.one, .heading(1)),
             ([.command, .option], Key.two, .heading(2)),
             ([.command, .option], Key.three, .heading(3)),
+            ([.command, .option], Key.v, .pasteInside),
+            ([.command], Key.u, .underline),
             ([.command], Key.b, .bold),
             ([.command, .shift], Key.x, .strikethrough),
             ([.command, .shift], Key.h, .highlight),

@@ -27,10 +27,10 @@ import Testing
         h.step { #expect(h.view.performKeyEquivalent(with: try! keyEvent(h, code: Key.b, characters: "b", modifiers: .command))) }
         #expect(h.editor.text == "**글자**")
         h.step { #expect(h.view.performKeyEquivalent(with: try! keyEvent(h, code: Key.h, characters: "H", modifiers: [.command, .shift]))) }
-        #expect(h.editor.text == "**==글자==**")
+        #expect(h.editor.text == "**==글자=={노랑}**")
         h.step { #expect(h.view.performKeyEquivalent(with: try! keyEvent(h, code: Key.nine, characters: "(", modifiers: [.command, .shift]))) }
         h.step { #expect(h.view.performKeyEquivalent(with: try! keyEvent(h, code: Key.returnKey, characters: "\r", modifiers: .command))) }
-        #expect(h.editor.text == "[x] **==글자==**")
+        #expect(h.editor.text == "[x] **==글자=={노랑}**")
     }
 
     @Test func koreanInputSourceDoesNotChangeTheShortcut() throws {
@@ -45,7 +45,7 @@ import Testing
         typealias Key = EditorShortcuts.Key
         let shortcuts: [(UInt16, String, NSEvent.ModifierFlags, String)] = [
             (Key.x, "X", [.shift, .command], "~~글자~~"),
-            (Key.h, "H", [.shift, .command], "==글자=="),
+            (Key.h, "H", [.shift, .command], "==글자=={노랑}"),
             (Key.e, "e", .command, "`글자`"),
             (Key.c, "c", [.option, .command], "```\n글자\n```"),
             (Key.one, "1", [.option, .command], "# 글자"),

@@ -69,7 +69,9 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     package var continuationOf: Int?
     var blockLast = 0
     package var hasHardBreak = false
-    package var contentEnd: Int { end - (hasHardBreak ? 1 : 0) }
+    package var blockInk: InkColor?
+    package var inkComment: NSRange?
+    package var contentEnd: Int { (inkComment?.location ?? end) - (hasHardBreak ? 1 : 0) }
     package var spans: [InlineSpan] = []
     /// 이 줄의 하위 줄이 끝나는 줄 번호(그 줄은 포함하지 않음).
     package var subtreeEnd = 0

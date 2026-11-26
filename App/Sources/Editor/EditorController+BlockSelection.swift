@@ -5,9 +5,11 @@ struct BlockSelection: Equatable {
     var anchor: Int
     var focus: Int
 
+    var pastedRoots: [Int]?
+
     var rows: ClosedRange<Int> { min(anchor, focus)...max(anchor, focus) }
 
-    func shifted(by count: Int) -> Self { Self(anchor: anchor + count, focus: focus + count) }
+    func shifted(by count: Int) -> Self { Self(anchor: anchor + count, focus: focus + count, pastedRoots: pastedRoots?.map { $0 + count }) }
 }
 
 extension EditorController {
@@ -21,7 +23,7 @@ extension EditorController {
                                   focus: block(at: rows.upperBound).lowerBound))
     }
 
-    private func showBlocks(_ selection: BlockSelection) {
+    func showBlocks(_ selection: BlockSelection) {
         blockSelection = selection
         let row = selection.focus
         let visible = document.lines[row].codeBlock?.first { document.lines[$0].kind == .code } ?? row
@@ -141,6 +143,7 @@ extension EditorController {
                 changeUserFolds(next)
             }
             return true
+        case .pasteInside: paste(from: .general, inside: true); return true
         case .duplicate: duplicateBlocks(); return true
         case .indent: edit = EditorCommands.indent(document, selection: range, folded: folded)
         case .outdent: edit = EditorCommands.outdent(document, selection: range, folded: folded)
@@ -197,26 +200,44 @@ extension EditorController {
     func blockSelectionRects() -> [CGRect] {
         guard let selection = blockSelection else { return [] }
         let hidden = FoldState.hiddenLines(document, folded: folded)
-        let origin = textView.textContainerOrigin
-        let gap = theme.space(.sp1)
         var rects: [CGRect] = []
         var row = selection.rows.lowerBound
         while row <= selection.rows.upperBound {
-            let first = row
-            let line = document.lines[first]
-            let end = max(block(at: first).upperBound + 1, line.subtreeEnd)
+            let end = max(block(at: row).upperBound + 1, document.lines[row].subtreeEnd)
+            if let rect = blockRect(row..<end, hidden: hidden) { rects.append(rect) }
             row = end
-            let rows = first..<end
-            guard !hidden.contains(first), let last = rows.last(where: { !hidden.contains($0) }),
-                  let top = blockLineFrame(at: first)?.minY,
-                  let bottom = blockLineFrame(at: last)?.maxY else { continue }
-            let hasMarker = scheduleButtons.keys.contains { rows.contains($0) && !hidden.contains($0) && hasScheduleMarker(at: $0) }
-            let right = textContainer.size.width - (hasMarker ? theme.component(.noteTopButtonSize) : 0)
-            let left = CGFloat(line.level) * style.indent - gap
-            rects.append(CGRect(x: origin.x + left, y: origin.y + top + gap / 2,
-                                width: max(0, right - left), height: max(0, bottom - top - gap)))
         }
         return rects
+    }
+
+    private func blockRect(_ rows: Range<Int>, hidden: Set<Int>) -> CGRect? {
+        let first = rows.lowerBound
+        guard !hidden.contains(first), let last = rows.last(where: { !hidden.contains($0) }),
+              let top = blockLineFrame(at: first)?.minY, let bottom = blockLineFrame(at: last)?.maxY else { return nil }
+        let hasMarker = scheduleButtons.keys.contains { rows.contains($0) && !hidden.contains($0) && hasScheduleMarker(at: $0) }
+        let right = textContainer.size.width - (hasMarker ? theme.component(.noteTopButtonSize) : 0)
+        let origin = textView.textContainerOrigin
+        let gap = theme.space(.sp1)
+        let left = CGFloat(document.lines[first].level) * style.indent - gap
+        return CGRect(x: origin.x + left, y: origin.y + top + gap / 2,
+                      width: max(0, right - left), height: max(0, bottom - top - gap))
+    }
+
+    func drawBlockColors(in dirty: NSRect) {
+        let hidden = FoldState.hiddenLines(document, folded: folded)
+        let radius = theme.shape(.chipRadius)
+        let viewport = layoutManager.textViewportLayoutController.viewportRange ?? contentStorage.documentRange
+        let base = contentStorage.documentRange.location
+        let first = document.lineIndex(at: contentStorage.offset(from: base, to: viewport.location))
+        let last = document.lineIndex(at: contentStorage.offset(from: base, to: viewport.endLocation))
+        for row in first...document.blockLines(at: last).upperBound {
+            let line = document.lines[row]
+            guard let ink = line.blockInk, !ink.foreground else { continue }
+            let rows = document.blockLines(at: row)
+            guard let rect = blockRect(rows.lowerBound..<(rows.upperBound + 1), hidden: hidden), dirty.intersects(rect) else { continue }
+            style.ink(ink, done: document.lines[rows.lowerBound].kind == .todo(done: true)).setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        }
     }
 
     func drawBlockSelection(in dirty: NSRect) {

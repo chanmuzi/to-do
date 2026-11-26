@@ -23,7 +23,7 @@ extension EditorController {
         pasteboard.clearContents()
         let markdown = NSPasteboard.PasteboardType("net.daringfireball.markdown")
         pasteboard.declareTypes([.string, .html, markdown, .floatingNotesMarkdown], owner: nil)
-        pasteboard.setString(blockSelection == nil ? export.markdown : export.source, forType: .string)
+        pasteboard.setString(export.markdown, forType: .string)
         pasteboard.setString(export.markdown, forType: markdown)
         pasteboard.setString(export.html(highlightColors: highlightCSSColors), forType: .html)
         pasteboard.setString(export.source, forType: .floatingNotesMarkdown)
@@ -32,15 +32,40 @@ extension EditorController {
 
     /// 붙여 넣는다. 이 앱에서 복사한 것이면 원문 조각을, 아니면 글자를 그대로 넣는다.
     /// 줄바꿈은 `\n`으로 맞춘다.
-    func paste(from pasteboard: NSPasteboard) {
+    func paste(from pasteboard: NSPasteboard, inside: Bool = false) {
         guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string)
                 ?? pasteboard.string(forType: .URL),
               !text.isEmpty else { return }
+        pasteSource(LineEndings.normalized(text), inside: inside)
+    }
+
+    func pasteSource(_ text: String, inside: Bool = false) {
+        guard !text.isEmpty, textView.isEditable else { return }
+        if let blocks = blockSelection, !textView.hasMarkedText() {
+            let end = selectedBlockRows(blocks, includingChildren: true).upperBound
+            let plan = EditorCommands.blockPaste(document, text: text, target: blocks.rows.upperBound, belowRow: end,
+                                                 inside: inside, folded: folded)
+            if let plan, let first = plan.roots.first, let last = plan.roots.last {
+                splitUndoRecord()
+                let version = documentVersion
+                apply(plan.edit)
+                if version != documentVersion { showBlocks(BlockSelection(anchor: first, focus: last, pastedRoots: plan.roots)) }
+                closeUndoRecord()
+            }
+            return
+        }
+        guard !inside else { return }
         guard !textView.hasMarkedText() else {
-            textView.insertText(LineEndings.normalized(text), replacementRange: textView.selectedRange())
+            textView.insertText(text, replacementRange: textView.selectedRange())
             return
         }
         let selection = clamped(textView.selectedRange())
+        if let plan = EditorCommands.pasteAtParentEnd(document, text: text, selection: selection, folded: folded) {
+            var edit = plan.edit
+            edit.selection.location = edit.range.location + edit.replacement.utf16.count
+            apply(edit)
+            return
+        }
         let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if selection.length > 0, !address.contains(where: \.isWhitespace), LinkPolicy.openableURL(address) != nil {
             let line = document.line(at: selection.location)
@@ -56,15 +81,15 @@ extension EditorController {
                 return
             }
         }
-        let prepared = EditorCommands.preparedForPaste(document, LineEndings.normalized(text), replacing: selection, runEnd: continuingRunEnd)
+        let prepared = EditorCommands.preparedForPaste(document, text, replacing: selection, runEnd: continuingRunEnd)
         guard !prepared.isEmpty else { return }
         textView.insertText(prepared, replacementRange: selection)
     }
 
-    /// 다른 앱에 붙였을 때의 형광펜 바탕색. 받는 쪽 바탕을 알 수 없으므로 라이트 값을 쓴다.
+    /// 다른 앱에 붙일 HTML의 글자색과 바탕색. 받는 쪽 바탕을 알 수 없으므로 라이트 값을 쓴다.
     var highlightCSSColors: [Int: String] {
-        Dictionary(uniqueKeysWithValues: HighlightColor.allCases.map { color in
-            (color.rawValue, Self.css(theme.tokens.color(color.background, .light)))
+        Dictionary(uniqueKeysWithValues: InkColor.palette.map { color in
+            (color.id, Self.css(theme.tokens.color(color.token, .light)))
         })
     }
 

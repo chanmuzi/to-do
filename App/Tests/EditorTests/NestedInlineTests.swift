@@ -15,7 +15,7 @@ import Theme
         let shortcuts: [(UInt16, String, NSEvent.ModifierFlags, String)] = [
             (Key.b, "b", .command, "**글자**"),
             (Key.x, "X", [.shift, .command], "~~글자~~"),
-            (Key.h, "H", [.shift, .command], "==글자=="),
+            (Key.h, "H", [.shift, .command], "==글자=={노랑}"),
             (Key.e, "e", .command, "`글자`"),
             (Key.l, "l", .command, "[글자](https://example.com)"),
         ]
@@ -45,7 +45,7 @@ import Theme
     func paragraphSelection(_ prefix: String) throws {
         let suffix = "\n- [ ] 다음"
         let formats: [(EditorAction, String)] = [
-            (.bold, "**아래 글자**"), (.strikethrough, "~~아래 글자~~"), (.highlight, "==아래 글자=="),
+            (.bold, "**아래 글자**"), (.strikethrough, "~~아래 글자~~"), (.highlight, "==아래 글자=={노랑}"),
             (.inlineCode, "`아래 글자`"), (.link, "[아래 글자](https://example.com)"),
         ]
         for (action, expected) in formats {
@@ -111,7 +111,7 @@ import Theme
         fragment.drawBackground(at: .zero, in: context)
         fragment.draw(at: .zero, in: context)
         let bitmap = NSBitmapImageRep(cgImage: try #require(context.makeImage()))
-        let expected = try #require(h.controller.style.highlightBackground(1).usingColorSpace(.deviceRGB))
+        let expected = try #require(h.controller.style.ink(InkColor(.yellow)).usingColorSpace(.deviceRGB))
         let hasBackground = (0..<bitmap.pixelsHigh).contains { y in
             (0..<bitmap.pixelsWide).contains { x in
                 guard let pixel = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return false }

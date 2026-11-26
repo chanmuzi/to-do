@@ -109,6 +109,12 @@ nonisolated enum CaretSnapping {
         }
 
         let line = doc.lines[index]
+        if let comment = line.inkComment, position > comment.location {
+            if forward, old.length == 0, old.location == comment.location, position == comment.location + 1, index + 1 < doc.lines.count {
+                return doc.lines[index + 1].caretStart
+            }
+            return comment.location
+        }
         if line.hasHardBreak, position == line.end {
             return forward && old.location == line.contentEnd ? doc.lines[index + 1].caretStart : line.contentEnd
         }
@@ -194,6 +200,8 @@ nonisolated enum CaretSnapping {
                 return title.end
             }
             let line = doc.lines[index]
+            if let comment = line.inkComment, position > comment.location,
+               !(new.location == 0 && NSMaxRange(new) == doc.length) { return comment.location }
             guard position > line.start, position < line.caretStart else { return position }
             return movedBack ? line.start : line.caretStart
         }

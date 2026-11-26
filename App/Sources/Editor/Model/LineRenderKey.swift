@@ -5,6 +5,7 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
     var isContinuation = false
     var hasHardBreak = false
+    var ink: InkColor?
     var level: Int
     /// 접힌 토글 안의 줄. 높이 없이 감춘다.
     var isCollapsed = false
@@ -37,6 +38,7 @@ nonisolated enum LinePresentation {
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
             var key = LineRenderKey(kind: doc.lines[line.continuationOf ?? index].kind, isContinuation: line.continuationOf != nil, hasHardBreak: line.hasHardBreak, level: line.level)
+            key.ink = doc.blockColor(at: index)
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)
             key.isFirst = index == 0

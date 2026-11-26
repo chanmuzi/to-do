@@ -309,6 +309,9 @@ final class EditorController: NSObject {
 
     private func observeEnvironment() {
         let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: Self.inkChanged, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.onFormattingChange?() }
+        })
         observers.append(center.addObserver(forName: Theme.didChangeNotification, object: theme, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.reloadStyle() }
         })

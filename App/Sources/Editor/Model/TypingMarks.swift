@@ -6,17 +6,19 @@ nonisolated struct TypingMarks: Equatable, Sendable {
     /// 커서 자리의 서식과 다르게 정한 것만 값이 있다.
     var bold: Bool?
     var strike: Bool?
+    var underline: Bool?
     var code: Bool?
-    /// 형광펜 색 번호. 0은 형광펜 없음.
+    /// 다음 입력의 InkColor 식별자. 0은 색을 벗긴다.
     var highlight: Int?
 
-    var isEmpty: Bool { bold == nil && strike == nil && code == nil && highlight == nil }
+    var isEmpty: Bool { bold == nil && strike == nil && underline == nil && code == nil && highlight == nil }
 
     subscript(wrap: EditorCommands.Wrap) -> Bool? {
         get {
             switch wrap {
             case .bold: bold
             case .strike: strike
+            case .underline: underline
             case .code: code
             }
         }
@@ -24,6 +26,7 @@ nonisolated struct TypingMarks: Equatable, Sendable {
             switch wrap {
             case .bold: bold = newValue
             case .strike: strike = newValue
+            case .underline: underline = newValue
             case .code: code = newValue
             }
         }
@@ -76,8 +79,7 @@ nonisolated extension EditorCommands {
         return .marks(marks)
     }
 
-    /// 형광펜을 커서 자리에서 돌린다: 없음, 노랑, 회색, 로즈, 블루, 다시 없음.
-    static func cycleTypingHighlight(_ doc: MarkdownDocument, caret: Int, marks: TypingMarks) -> TypingToggle {
+    static func typingInk(_ doc: MarkdownDocument, caret: Int, marks: TypingMarks, color: InkColor?, toggle: Bool) -> TypingToggle {
         let line = doc.line(at: caret)
         guard !line.kind.isCode, caret >= line.contentStart, line.marker(enclosing: caret) == nil else { return .unavailable }
         let containing = line.spansContaining(caret)
@@ -86,7 +88,7 @@ nonisolated extension EditorCommands {
             if case .highlight(let number) = span.kind { number } else { nil }
         }.first ?? 0
         let current = marks.highlight ?? base
-        let next = current >= 4 ? 0 : current + 1
+        let next = toggle && color?.id == current ? 0 : color?.id ?? 0
         var marks = marks
         marks.highlight = next == base ? nil : next
         return .marks(marks)
@@ -180,6 +182,7 @@ nonisolated extension EditorCommands {
             switch span.kind {
             case .bold: marks.bold == false
             case .strike: marks.strike == false
+            case .underline: marks.underline == false
             case .code: marks.code == false
             case .highlight(let number): marks.highlight != nil && marks.highlight != number
             case .link, .escape: false
@@ -193,7 +196,7 @@ nonisolated extension EditorCommands {
                 place.location = outer.range.location
                 remaining = line.spansContaining(place.location)
             } else if containing.first == outer {
-                place.exitClose = doc.string(in: outer.closeMarker)
+                place.exitClose = doc.closingSyntax(for: outer)
                 place.exitOpen = doc.string(in: outer.openMarker)
                 remaining.removeFirst()
             } else {
@@ -204,13 +207,13 @@ nonisolated extension EditorCommands {
         // 켜는 서식: 새 구간을 연다. 인라인 코드 안에는 열지 않는다.
         if !remaining.contains(where: { $0.kind == .code }) {
             func has(_ matches: (InlineSpan.Kind) -> Bool) -> Bool { remaining.contains { matches($0.kind) } }
-            if let number = marks.highlight, number > 0, !has({ $0 == .highlight(number) }) {
+            if let number = marks.highlight, let color = InkColor.byID[number], !has({ $0 == .highlight(number) }) {
                 place.opens.append("==")
-                place.closes.insert(highlightClose(number), at: 0)
+                place.closes.insert("=={" + color.suffix + "}", at: 0)
             }
-            for wrap in [Wrap.bold, .strike, .code] where marks[wrap] == true && !has(wrap.matches) {
+            for wrap in [Wrap.bold, .strike, .underline, .code] where marks[wrap] == true && !has(wrap.matches) {
                 place.opens.append(wrap.marker)
-                place.closes.insert(wrap.marker, at: 0)
+                place.closes.insert(wrap.close, at: 0)
             }
         }
         guard !place.before.isEmpty || !place.after.isEmpty || place.location != caret else { return nil }

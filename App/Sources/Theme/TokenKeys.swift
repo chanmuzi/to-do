@@ -30,14 +30,24 @@ public enum ColorToken: String, CaseIterable, Sendable {
     case accent
     case onAccent = "on-accent"
     case warn
-    case highlight1Background = "hl-1-bg"
-    case highlight1Foreground = "hl-1-fg"
-    case highlight2Background = "hl-2-bg"
-    case highlight2Foreground = "hl-2-fg"
-    case highlight3Background = "hl-3-bg"
-    case highlight3Foreground = "hl-3-fg"
-    case highlight4Background = "hl-4-bg"
-    case highlight4Foreground = "hl-4-fg"
+    case inkGrayFG = "ink-gray-fg"
+    case inkGrayBG = "ink-gray-bg"
+    case inkBrownFG = "ink-brown-fg"
+    case inkBrownBG = "ink-brown-bg"
+    case inkOrangeFG = "ink-orange-fg"
+    case inkOrangeBG = "ink-orange-bg"
+    case inkYellowFG = "ink-yellow-fg"
+    case inkYellowBG = "ink-yellow-bg"
+    case inkGreenFG = "ink-green-fg"
+    case inkGreenBG = "ink-green-bg"
+    case inkBlueFG = "ink-blue-fg"
+    case inkBlueBG = "ink-blue-bg"
+    case inkPurpleFG = "ink-purple-fg"
+    case inkPurpleBG = "ink-purple-bg"
+    case inkPinkFG = "ink-pink-fg"
+    case inkPinkBG = "ink-pink-bg"
+    case inkRedFG = "ink-red-fg"
+    case inkRedBG = "ink-red-bg"
     /// 인라인 코드 바탕, 코드 블록 바탕. 테두리는 없다(D-035).
     case codeBackground = "code-bg"
     case codeBlockBackground = "codeblock-bg"
@@ -46,17 +56,6 @@ public enum ColorToken: String, CaseIterable, Sendable {
     /// 인라인 코드 글자의 강조색("accent", 기본). 규칙 1의 예외다(D-035).
     case codeAccent = "code-accent"
     case link
-}
-
-/// 형광펜 색. 번호는 저장 문법의 `==글자=={n}`과 같다(D-008). 1이 기본(노랑).
-public enum HighlightColor: Int, CaseIterable, Sendable {
-    case yellow = 1
-    case gray = 2
-    case rose = 3
-    case blue = 4
-
-    public var background: ColorToken { ColorToken(rawValue: "hl-\(rawValue)-bg")! }
-    public var foreground: ColorToken { ColorToken(rawValue: "hl-\(rawValue)-fg")! }
 }
 
 public enum ShadowToken: String, CaseIterable, Sendable {

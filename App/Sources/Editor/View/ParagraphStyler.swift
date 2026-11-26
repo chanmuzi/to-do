@@ -122,7 +122,7 @@ nonisolated enum ParagraphStyler {
             let isDone = key.kind == .todo(done: true)
             let isQuote = key.kind == .quote
             // 인용문의 글자는 `text-2`다. 서식(형광펜, 코드)의 글자색은 그 위에 입힌다.
-            let baseColor = isDone ? style.text3 : isQuote ? style.text2 : style.text
+            let baseColor = key.ink.flatMap { $0.foreground ? style.ink($0, done: isDone) : nil } ?? (isDone ? style.text3 : isQuote ? style.text2 : style.text)
 
             let left = CGFloat(key.level) * style.indent
             if case .toggleHeading = key.kind {
@@ -157,11 +157,22 @@ nonisolated enum ParagraphStyler {
 
             let isHeading = key.kind.headingLevel != nil
             for span in line.spans { apply(span, lineFont: font, isHeading: isHeading, isDone: isDone) }
+            // 중첩된 글자색보다 링크 잉크가 우선한다. 감춘 기호와 가장자리 공백에는 링크 속성이 없다.
+            for span in line.spans {
+                guard case .link = span.kind else { continue }
+                let hovered = key.hoveredLink == span.range.location - line.start
+                out.enumerateAttribute(.markdownLink, in: local(span.contentRange)) { link, range, _ in
+                    guard link != nil else { return }
+                    out.addAttributes([.foregroundColor: hovered ? style.text : style.text2,
+                                       .underlineColor: hovered ? style.text2 : style.text3], range: range)
+                }
+            }
 
             // 줄 머리(들여쓰기, 목록 기호, 제목의 `#`)는 늘 감춘다.
             hide(line.indentRange)
             hide(line.markerRange)
 
+            if let comment = line.inkComment { hide(comment) }
             if line.hasHardBreak { hide(NSRange(location: line.contentEnd, length: 1)) }
             guard !key.isContinuation else { return }
             decoration.gutterX = left
@@ -187,16 +198,32 @@ nonisolated enum ParagraphStyler {
                     .strikethroughStyle: NSUnderlineStyle.single.rawValue,
                     .strikethroughColor: isDone ? style.text3 : style.text2,
                 ]
-                if !isDone { attributes[.foregroundColor] = style.text2 }
+                let colored = key.ink?.foreground == true || line.spans.contains {
+                    guard case .highlight(let id) = $0.kind, InkColor.byID[id]?.foreground == true else { return false }
+                    return $0.contains(span.contentRange)
+                }
+                if !isDone && !colored { attributes[.foregroundColor] = style.text2 }
                 out.addAttributes(attributes, range: content)
                 marker(span.openMarker)
                 marker(span.closeMarker)
 
+            case .underline:
+                out.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: content)
+                marker(span.openMarker)
+                marker(span.closeMarker)
+
             case .highlight(let number):
-                if !isDone { out.addAttribute(.foregroundColor, value: style.highlightForeground(number), range: content) }
-                let color = style.highlightBackground(number)
+                guard let ink = InkColor.byID[number] else { return }
+                let color = style.ink(ink, done: isDone)
+                out.addAttribute(.accessibilityCustomText, value: [ink.label], range: content)
+                if ink.foreground {
+                    out.addAttribute(.foregroundColor, value: color, range: content)
+                    marker(span.openMarker)
+                    marker(span.closeMarker)
+                    return
+                }
                 out.addAttribute(.markdownHighlight, value: InlineBackground(
-                    kind: .highlight(number), color: isDone ? color.withAlphaComponent(color.alphaComponent * style.doneFade) : color,
+                    kind: .highlight(number), color: color,
                     padX: style.metrics.highlightPadX,
                     height: min(lineFont.lineHeight, lineFont.glyphHeight + style.metrics.highlightPadY * 2),
                     leadShift: style.metrics.highlightPadX / 2
@@ -210,7 +237,7 @@ nonisolated enum ParagraphStyler {
                     .font: style.inlineCode(in: lineFont),
                     .baselineOffset: style.codeRise,
                 ]
-                if !isDone { attributes[.foregroundColor] = style.inlineCodeForeground }
+                attributes[.foregroundColor] = isDone ? style.text3 : style.inlineCodeForeground
                 out.addAttributes(attributes, range: content)
                 out.removeAttribute(.kern, range: content)
                 let room = style.codePadX + style.codeGap
@@ -225,13 +252,10 @@ nonisolated enum ParagraphStyler {
                 marker(span.closeMarker, kernAfter: room)
 
             case .link(let url):
-                let isHovered = key.hoveredLink == span.range.location - line.start
-                var attributes: [NSAttributedString.Key: Any] = [
+                let attributes: [NSAttributedString.Key: Any] = [
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .underlineColor: isHovered ? style.text : style.text3,
                     .markdownLink: url,
                 ]
-                if !isDone { attributes[.foregroundColor] = style.link }
                 let string = out.string as NSString
                 let letters = CharacterSet.whitespacesAndNewlines.inverted
                 let first = string.rangeOfCharacter(from: letters, options: [], range: content)

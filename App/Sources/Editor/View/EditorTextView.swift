@@ -17,6 +17,7 @@ final class EditorTextView: PlainTextInputView {
     override var shouldDrawInsertionPoint: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
+        editor?.drawBlockColors(in: dirtyRect)
         if let manager = textLayoutManager, let context = NSGraphicsContext.current?.cgContext {
             let origin = textContainerOrigin
             let start = manager.textViewportLayoutController.viewportRange?.location
@@ -73,6 +74,8 @@ final class EditorTextView: PlainTextInputView {
         case #selector(redo(_:)): editor?.editorUndoManager.canRedo ?? false
         case #selector(copy(_:)) where editor?.blockSelection != nil: true
         case #selector(cut(_:)) where editor?.blockSelection != nil: isEditable
+        case #selector(pasteInsideBlock(_:)): isEditable && editor?.blockSelection != nil && !hasMarkedText()
+        case #selector(toggleMarkdownUnderline(_:)): isEditable && editor?.isActive == true && !hasMarkedText()
         case #selector(toggleMarkdownBold(_:)), #selector(duplicateMarkdownBlock(_:)): isEditable && editor?.isActive == true
         default: super.validateUserInterfaceItem(item)
         }
@@ -123,6 +126,7 @@ final class EditorTextView: PlainTextInputView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if editor?.isActive == true,
            let action = EditorShortcuts.action(keyCode: event.keyCode, modifiers: Self.modifiers(of: event)),
+           action != .pasteInside || editor?.blockSelection != nil,
            action == .bold || !hasMarkedText() {
             editor?.perform(action)
             return true
@@ -157,9 +161,23 @@ final class EditorTextView: PlainTextInputView {
         editor?.perform(.duplicate)
     }
 
+    @objc func pasteInsideBlock(_ sender: Any?) {
+        guard isEditable, editor?.blockSelection != nil else { return }
+        editor?.paste(from: .general, inside: true)
+    }
+
+    @objc func toggleMarkdownUnderline(_ sender: Any?) {
+        guard editor?.isActive == true else { return }
+        editor?.perform(.underline)
+    }
+
     @objc func toggleMarkdownBold(_ sender: Any?) {
         guard editor?.isActive == true else { return }
         editor?.perform(.bold)
+    }
+
+    override func accessibilityValueDescription() -> String? {
+        editor?.selectedInk?.label ?? super.accessibilityValueDescription()
     }
 
     @objc func editMarkdownLink(_ sender: Any?) {
@@ -168,9 +186,13 @@ final class EditorTextView: PlainTextInputView {
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        let blocks = editor?.blockSelection
+        let selection = selectedRange()
         window?.makeFirstResponder(self)
         let menu = super.menu(for: event)?.copy() as? NSMenu ?? NSMenu()
-        if let editor, case .link(let line, let offset, _) = editor.hit(at: convert(event.locationInWindow, from: nil)),
+        if let blocks { editor?.showBlocks(blocks) }
+        else if selection.length > 0 { setSelectedRange(selection) }
+        if let editor, blocks == nil, selection.length == 0, case .link(let line, let offset, _) = editor.hit(at: convert(event.locationInWindow, from: nil)),
            let span = editor.document.lines[line].markedSpans.first(where: { $0.range.location == editor.document.lines[line].start + offset }) {
             setSelectedRange(span.contentRange)
         }
@@ -178,6 +200,10 @@ final class EditorTextView: PlainTextInputView {
         let item = menu.addItem(withTitle: "링크 추가", action: #selector(editMarkdownLink(_:)), keyEquivalent: "")
         item.target = self
         item.isEnabled = validateUserInterfaceItem(item)
+        if let editor {
+            let ink = menu.addItem(withTitle: "색", action: nil, keyEquivalent: "")
+            ink.submenu = editor.inkMenu()
+        }
         return menu
     }
 

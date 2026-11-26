@@ -113,5 +113,11 @@ public protocol NoteBodyFormatting: AnyObject {
     func applyFormat(_ format: NoteFormat)
 }
 
+@MainActor
+package protocol NoteInkFormatting: AnyObject {
+    var lastInkToken: ColorToken { get }
+    func inkMenu() -> NSMenu
+}
+
 /// 노트 창 하나에 편집기 하나를 만든다. App이 넘긴다.
 public typealias NoteBodyEditorFactory = @MainActor (NoteBodyEditorContext) -> any NoteBodyEditing

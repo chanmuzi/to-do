@@ -78,7 +78,7 @@ nonisolated package extension MarkdownLine {
 
     /// 글자가 끝나는 자리인지: 줄 끝이거나, 줄 끝까지 감춘 닫는 기호만 있다.
     func isVisualEnd(_ position: Int) -> Bool {
-        position <= end && visualEnd(from: position) == end
+        position <= contentEnd && visualEnd(from: position) == (inkComment?.location ?? end)
     }
 
     /// 그 위치를 안에 둔 구간들(구간의 글자 맨 앞과 맨 끝도 안이다). 안쪽 것부터.
@@ -104,6 +104,11 @@ nonisolated package extension MarkdownLine {
 }
 
 nonisolated package extension MarkdownDocument {
+    func closingSyntax(for span: InlineSpan) -> String {
+        if case .highlight(let id) = span.kind, let color = InkColor.byID[id] { return "=={" + color.suffix + "}" }
+        return string(in: span.closeMarker)
+    }
+
     func line(at location: Int) -> MarkdownLine {
         lines[lineIndex(at: location)]
     }

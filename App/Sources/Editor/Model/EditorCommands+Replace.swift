@@ -11,6 +11,23 @@ nonisolated extension EditorCommands {
     /// - 줄바꿈이 든 글을 구간 안에 넣으면 구간을 줄바꿈 앞에서 닫고 뒤에서 다시 연다
     ///   (구간은 줄을 넘지 못한다).
     static func replacing(_ doc: MarkdownDocument, _ range: NSRange, with text: String) -> TextEdit? {
+        let edit = replacingInline(doc, range, with: text)
+        // 선택 삭제로 두 블록을 합칠 때도 앞쪽에서 남긴 글의 블록 색을 유지한다.
+        let first = doc.lineIndex(at: range.location)
+        let last = doc.lineIndex(at: NSMaxRange(range))
+        guard first != last, !text.contains("\n"), range.location > doc.lines[first].start,
+              doc.blockLines(at: first) != doc.blockLines(at: last),
+              !doc.lines[first].kind.isCode, !doc.lines[last].kind.isCode,
+              doc.blockColor(at: first) != doc.blockColor(at: last) else { return edit }
+        let join = edit ?? .insert(text, replacing: range)
+        let middle = MarkdownDocument(join.applied(to: doc.text))
+        let owner = middle.lineIndex(at: join.selection.location)
+        guard var ink = setBlockInk(middle, owners: [owner], color: doc.blockColor(at: first), toggle: false) else { return join }
+        ink.selection = join.selection
+        return compose(join, then: ink, middle: middle)
+    }
+
+    private static func replacingInline(_ doc: MarkdownDocument, _ range: NSRange, with text: String) -> TextEdit? {
         let isMultiline = text.contains("\n")
         guard range.length > 0 || isMultiline else { return nil }
         var lower = range.location
@@ -54,7 +71,7 @@ nonisolated extension EditorCommands {
             where isWithin(span.contentRange) && span.kind != .escape {
                 split.insert(span)
                 let open = doc.string(in: span.openMarker)
-                let close = doc.string(in: span.closeMarker)
+                let close = doc.closingSyntax(for: span)
                 let leftIsEmpty = lower == span.contentRange.location
                 let rightIsEmpty = upper == NSMaxRange(span.contentRange)
                 if leftIsEmpty {

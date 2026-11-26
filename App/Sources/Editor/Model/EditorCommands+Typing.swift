@@ -71,7 +71,7 @@ nonisolated extension EditorCommands {
 
     private static func sameFormat(_ a: InlineSpan.Kind, _ b: InlineSpan.Kind) -> Bool {
         switch (a, b) {
-        case (.bold, .bold), (.strike, .strike), (.code, .code), (.highlight, .highlight), (.link, .link): true
+        case (.bold, .bold), (.strike, .strike), (.underline, .underline), (.code, .code), (.highlight, .highlight), (.link, .link): true
         default: false
         }
     }
@@ -181,6 +181,9 @@ nonisolated extension EditorCommands {
                 }
                 return String(utf16CodeUnits: units, count: units.count)
             }.joined(separator: "\n")
+        }
+        if result.contains("\n"), selection.length == 0 {
+            result = rebasedLines(MarkdownDocument(result), depth: line.level, atCaret: true).joined(separator: "\n")
         }
         guard hasFence else { return result }
         if hasUnterminatedFence(fragment) {

@@ -16,6 +16,11 @@ nonisolated extension EditorCommands {
     /// Return. 목록은 같은 기호로 이어 가고, 빈 항목에서는 기호를 지우거나 한 단계 내어 쓴다.
     /// 서식 구간 한가운데에서 누르면 구간을 줄바꿈 앞에서 닫고 다음 줄에서 다시 연다.
     static func newline(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int> = []) -> TextEdit {
+        let edit = splitLine(doc, selection: selection, folded: folded)
+        return keepingInkOnSplit(doc, selection: selection, edit: edit)
+    }
+
+    private static func splitLine(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> TextEdit {
         let index = doc.lineIndex(at: selection.location)
         let line = doc.lines[index]
         let indent = doc.string(in: line.indentRange)
@@ -25,7 +30,7 @@ nonisolated extension EditorCommands {
         if !line.kind.isCode, selection.location >= line.contentStart {
             let endLine = doc.line(at: NSMaxRange(selection))
             var upper = NSMaxRange(selection)
-            while upper < endLine.end, doc.units[upper] == 0x20 || doc.units[upper] == 0x09 { upper += 1 }
+            while upper < endLine.contentEnd, doc.units[upper] == 0x20 || doc.units[upper] == 0x09 { upper += 1 }
             selection.length = upper - selection.location
         }
 
