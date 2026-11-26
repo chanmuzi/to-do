@@ -24,6 +24,7 @@ extension EditorController {
     }
 
     func showBlocks(_ selection: BlockSelection) {
+        setHoveredGutter(nil)
         blockSelection = selection
         let row = selection.focus
         let visible = document.lines[row].codeBlock?.first { document.lines[$0].kind == .code } ?? row

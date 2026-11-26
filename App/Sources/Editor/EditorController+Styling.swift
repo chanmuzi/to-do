@@ -69,7 +69,7 @@ extension EditorController: NSTextStorageDelegate {
     ) {
         // 글자가 바뀌면 문단을 다시 만들기 전에 곧바로 다시 푼다(문단을 만들 때 이 값을 쓴다).
         guard editedMask.contains(.editedCharacters) else { return }
-        setHoveredCheckbox(nil)
+        setHoveredGutter(nil)
         let old = document
         stopFoldMotion()
         // 저장소 편집 중에는 삽입점이나 커서 영역을 다시 배치하지 않는다.
@@ -229,6 +229,7 @@ extension EditorController {
     }
 
     func widthDidChange() {
+        setHoveredGutter(nil)
         updateDateSuggestion()
         layoutCopyButton()
         layoutLinkField()

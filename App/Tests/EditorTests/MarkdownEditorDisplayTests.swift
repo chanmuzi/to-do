@@ -64,13 +64,61 @@ import Theme
         for line in 0...1 {
             let point = try #require(controller.gutterPoint(forLine: line))
             #expect(controller.handleMouseMoved(at: point))
-            #expect(controller.hoveredCheckbox == line)
-            #expect(controller.checkboxHover.frame.width == h.theme.component(.checkSize) + h.theme.space(.sp1) * 2)
+            #expect(controller.hoveredGutterLine == line)
+            #expect(controller.gutterHover.frame.width == h.theme.component(.checkSize) + h.theme.space(.sp1) * 2)
             let text = try #require(controller.textPoint(forLine: line))
             #expect(!controller.handleMouseMoved(at: text))
-            #expect(controller.hoveredCheckbox == nil)
+            #expect(controller.hoveredGutterLine == nil)
         }
         #expect(h.editor.text == "[ ] 열린 일\n[x] 끝낸 일")
+    }
+
+    @Test func chevronHoverFramesCenterOnTheGlyphAndFitTheFirstLine() throws {
+        let h = try EditorHarness("+ 본문 토글\n\t+ ## 제목 토글")
+        let controller = h.controller
+        for padding in [h.theme.space(.sp1), h.theme.space(.sp4)] {
+            try h.theme.setOverrides(ThemeOverrides(values: ["space.sp-1": "\(padding)px"]))
+            for (line, role) in [(0, TextStyle.body), (1, .h2)] {
+                let style = controller.style
+                let size = line == 0 ? style.metrics.chevronSize : style.heading(2).font.pointSize * style.metrics.headingChevronScale
+                let left = h.view.textContainerOrigin.x + CGFloat(line) * style.indent
+                let text = try #require(controller.textPoint(forLine: line))
+                let center = CGPoint(x: left + (style.checkSize - style.metrics.chevronSize + size) / 2, y: text.y)
+                #expect(controller.handleMouseMoved(at: center))
+                let hover = controller.gutterHover
+                let rect = h.view.convert(hover.bounds, from: hover)
+                let side = min(size + padding * 2, h.theme.lineHeight(role))
+                #expect(rect == CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side))
+                #expect(hover.alphaValue == 1)
+                #expect(hover.superview === h.view.superview)
+            }
+        }
+    }
+
+    @Test func chevronHoverStaysThroughFoldingAndHidesDuringBlockSelection() throws {
+        let h = try EditorHarness("+ 본문\n\t자식\n+ ## 제목\n\t자식")
+        let controller = h.controller
+        for row in [0, 2] {
+            let point = try #require(controller.gutterPoint(forLine: row))
+            #expect(controller.handleMouseMoved(at: point))
+            let frame = controller.gutterHover.frame
+            for folded in [true, false] {
+                #expect(controller.handleMouseDown(at: point))
+                #expect(controller.folded.contains(row) == folded)
+                #expect(controller.hoveredGutterLine == row)
+                #expect(controller.gutterHover.frame == frame)
+                #expect(controller.gutterHover.alphaValue == 1)
+            }
+            controller.showBlocks(BlockSelection(anchor: row, focus: row))
+            #expect(controller.hoveredGutterLine == nil)
+            #expect(controller.gutterHover.alphaValue == 0)
+            #expect(controller.handleMouseMoved(at: point))
+            #expect(controller.hoveredGutterLine == nil)
+            #expect(controller.clearBlocks())
+            #expect(controller.handleMouseMoved(at: point))
+            controller.handleMouseExited()
+            #expect(controller.gutterHover.alphaValue == 0)
+        }
     }
 
     @Test func gutterGlyphsPerKindAndLevel() throws {
