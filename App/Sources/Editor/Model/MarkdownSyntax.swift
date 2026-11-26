@@ -7,3 +7,5 @@ typealias InlineParser = MarkdownSyntax.InlineParser
 typealias InlineMarker = MarkdownSyntax.InlineMarker
 typealias LineClassifier = MarkdownSyntax.LineClassifier
 typealias LineKind = MarkdownSyntax.LineKind
+
+typealias InkColor = MarkdownSyntax.InkColor

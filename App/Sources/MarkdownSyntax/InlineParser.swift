@@ -96,6 +96,25 @@ nonisolated package enum InlineParser {
                 i = close + 1
                 continue
             }
+            if c == 0x3C, u[i..<end].starts(with: "<u>".utf16) {
+                var stop = i + 3
+                while stop < end {
+                    if u[stop] == backtick, let close = codeClose(u, from: stop, to: end) {
+                        stop = close + 1
+                    } else if u[stop..<end].starts(with: "</u>".utf16) {
+                        break
+                    } else {
+                        stop += 1
+                    }
+                }
+                if stop > i + 3, stop < end {
+                    let content = NSRange(location: i + 3, length: stop - i - 3)
+                    spans.append(InlineSpan(kind: .underline, range: NSRange(location: i, length: stop + 4 - i), contentRange: content))
+                    scan(u, from: i + 3, to: stop, lineStart: lineStart, into: &spans)
+                    i = stop + 4
+                    continue
+                }
+            }
             if c == star || c == tilde || c == equals, i + 1 < end, u[i + 1] == c,
                let close = pairClose(c, in: u, from: i, to: end) {
                 var spanEnd = close + 2
@@ -104,11 +123,17 @@ nonisolated package enum InlineParser {
                 case star: kind = .bold
                 case tilde: kind = .strike
                 default:
-                    if let number = highlightSuffix(u, at: spanEnd, to: end) {
-                        kind = .highlight(number)
-                        spanEnd += 3
+                    if spanEnd < end, u[spanEnd] == leftBrace,
+                       let stop = index(of: rightBrace, in: u, from: spanEnd + 1, to: end) {
+                        let suffix = String(decoding: u[(spanEnd + 1)..<stop], as: UTF16.self)
+                        guard let color = InkColor.bySuffix[suffix] else {
+                            i = stop + 1
+                            continue
+                        }
+                        kind = .highlight(color.id)
+                        spanEnd = stop + 1
                     } else {
-                        kind = .highlight(1)
+                        kind = .highlight(InkColor(.yellow).id)
                     }
                 }
                 // 영문자나 숫자 바로 뒤의 여는 기호는 글자일 수 있다(`a==b`, `2**3`). 구간으로 읽는 것은 닫는 기호
@@ -183,13 +208,6 @@ nonisolated package enum InlineParser {
             i += 1
         }
         return nil
-    }
-
-    /// `{2}`~`{4}`(와 `{1}`)를 읽는다.
-    private static func highlightSuffix(_ u: [unichar], at i: Int, to end: Int) -> Int? {
-        guard i + 2 < end, u[i] == leftBrace, u[i + 2] == rightBrace else { return nil }
-        let digit = Int(u[i + 1]) - 0x30
-        return (1...4).contains(digit) ? digit : nil
     }
 
     /// 글자와 숫자만으로 된 글인지(한글 등 다른 문자의 글자도 글자다). 공백, 문장 부호, 연산 기호가 없다.

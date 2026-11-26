@@ -68,6 +68,15 @@ import Theme
 
 /// 더 보기 메뉴의 줄, 색 줄, 구분선은 불투명한 `surface` 바탕이다(흰 노트, 색 노트 위에서도 글자가 바래지 않게).
 @Suite @MainActor struct MenuSurfaceTests {
+    @Test func formatBarOffersLastInkAndPalette() throws {
+        let bar = CornerButtonsView(style: PanelStyle(theme: try Theme.bundled()))
+        bar.apply(visible: true, active: [.highlight])
+        let labels = bar.subviews.compactMap { $0.accessibilityLabel() }
+        #expect(labels.contains("색 고르기"))
+        #expect(labels.contains("마지막 색 걸기 또는 벗기기"))
+        #expect(!labels.contains("밑줄"))
+    }
+
     @Test func moreMenuPaintsAnOpaqueSurfaceInLightAndDark() throws {
         let style = PanelStyle(theme: try Theme.bundled())
         let menu = NoteMenuBuilder(style: style).moreMenu(isPinned: false, selectedPaletteID: nil) { _ in }

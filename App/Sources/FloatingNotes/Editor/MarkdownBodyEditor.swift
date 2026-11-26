@@ -15,10 +15,13 @@ import Theme
 ///   버린다. 접힘이나 글이 바뀔 때마다 적는다. 떠 있는 동안 밖에서 본문이 바뀌면 줄 번호를 새 본문에 맞춰 옮긴다.
 /// - 덧붙이기: 이 편집기가 아닌 쪽이 끝에 붙인 글은 `appendFromOutside`로 받아 커서, 접힘, 되돌리기 기록,
 ///   조합 중인 글자를 그대로 둔다.
-final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, ScheduleLineDisplaying {
+final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, NoteInkFormatting, ScheduleLineDisplaying {
     func setScheduleMarkers(_ markers: [Int: ScheduleLineMarker]) {
         editor.setScheduleMarkers(markers)
     }
+
+    var lastInkToken: ColorToken { editor.lastInkToken }
+    func inkMenu() -> NSMenu { editor.inkMenu() }
 
     var isEditingBody: Bool { editor.isEditingBody }
     var activeFormats: Set<NoteFormat> {
@@ -27,7 +30,7 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, ScheduleLin
             switch $0 {
             case .bold: state.bold
             case .strike: state.strikethrough
-            case .highlight: state.highlight > 0
+            case .highlight: editor.hasSelectedInk
             case .code: state.inlineCode
             case .link: state.link
             case .checklist: state.checklist

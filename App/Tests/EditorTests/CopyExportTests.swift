@@ -17,7 +17,7 @@ import Testing
         - [ ] **PR #482** 리뷰
             - [ ] 포커스 전환 애니메이션 확인
             - 리뷰 코멘트 2건에 답글
-        - [ ] ==배포 체크리스트 확인==
+        - [ ] 배포 체크리스트 확인
         - 지난주에서 넘어온 것
             - [ ] **온보딩 문서** 초안 마무리
             - [ ] `feature/quick-capture` 브랜치 정리
@@ -27,7 +27,7 @@ import Testing
     }
 
     @Test func markdownDropsTheHighlightColorSuffix() {
-        #expect(export("가 ==회색=={2} 나 ==블루=={4} 다 ==노랑==").markdown == "가 ==회색== 나 ==블루== 다 ==노랑==")
+        #expect(export("가 ==회색=={2} 나 ==블루=={4} 다 ==노랑==").markdown == "가 회색 나 블루 다 노랑")
         // 코드 안의 같은 글자는 건드리지 않는다.
         #expect(export("`==코드=={2}`").markdown == "`==코드=={2}`")
     }

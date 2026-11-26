@@ -42,9 +42,9 @@ import Testing
         #expect(tokens.textStyle(.body).weight == 400)
         #expect(tokens.color(.warn, .light) == RGBA(red: 229 / 255, green: 52 / 255, blue: 43 / 255))
         #expect(tokens.color(.warn, .dark) == RGBA(red: 1, green: 121 / 255, blue: 110 / 255))
-        #expect(tokens.color(HighlightColor.yellow.background, .light)
-            == RGBA(red: 1, green: 235 / 255, blue: 133 / 255))
-        #expect(tokens.color(HighlightColor.blue.background, .dark)
+        #expect(tokens.color(.inkYellowBG, .light)
+            == RGBA(red: 251 / 255, green: 243 / 255, blue: 219 / 255))
+        #expect(tokens.color(.inkBlueBG, .dark)
             == RGBA(red: 110 / 255, green: 170 / 255, blue: 1, alpha: 0.28))
     }
 

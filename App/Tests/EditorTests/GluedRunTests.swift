@@ -15,6 +15,7 @@ import Testing
             switch span.kind {
             case .bold: name = "굵게"
             case .strike: name = "취소선"
+            case .underline: name = "밑줄"
             case .highlight: name = "형광펜"
             case .code: name = "코드"
             case .link: name = "링크"

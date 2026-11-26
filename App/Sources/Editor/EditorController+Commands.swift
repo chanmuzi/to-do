@@ -9,9 +9,10 @@ extension EditorController {
             textView.unmarkText()
             textView.inputContext?.discardMarkedText()
         }
-        if editSelectedBlocks(action) { return }
+        if action != .highlight, editSelectedBlocks(action) { return }
         let selection = clamped(textView.selectedRange())
         switch action {
+        case .pasteInside: break
         case .duplicate: duplicateBlocks()
         case .indent: apply(EditorCommands.indent(document, selection: selection, folded: folded))
         case .outdent: apply(EditorCommands.outdent(document, selection: selection, folded: folded))
@@ -31,14 +32,10 @@ extension EditorController {
             guard (1...3).contains(level) else { return }
             apply(EditorCommands.toggleHeading(document, selection: selection, level: level))
         case .bold: toggle(.bold, selection: selection)
+        case .underline: toggle(.underline, selection: selection)
         case .strikethrough: toggle(.strike, selection: selection)
         case .inlineCode: toggle(.code, selection: selection)
-        case .highlight:
-            if selection.length > 0 {
-                apply(EditorCommands.cycleHighlight(document, selection: selection))
-            } else {
-                perform(EditorCommands.cycleTypingHighlight(document, caret: selection.location, marks: marksForShortcut()))
-            }
+        case .highlight: setInk(Self.lastInk, toggle: true)
         case .codeBlock: apply(EditorCommands.toggleCodeBlock(document, selection: selection))
         case .link: beginLinkEditing()
         case .fold:
@@ -49,6 +46,43 @@ extension EditorController {
             guard let unfolded = FoldState.unfold(document, selection: selection, folded: folded) else { return }
             changeUserFolds(unfolded)
         }
+    }
+
+    static let inkChanged = Notification.Name("FloatingNotes.Editor.lastInkChanged")
+    static var lastInk = InkColor(.yellow) {
+        didSet {
+            if oldValue != lastInk { NotificationCenter.default.post(name: inkChanged, object: nil) }
+        }
+    }
+
+    func setInk(_ color: InkColor?, toggle: Bool = false) {
+        guard textView.isEditable, !textView.hasMarkedText() else { return }
+        if !toggle, let color { Self.lastInk = color }
+        defer { onFormattingChange?() }
+        if let blocks = blockSelection {
+            let hidden = FoldState.hiddenLines(document, folded: folded)
+            let owners = (blocks.pastedRoots ?? Array(blocks.rows)).filter { !hidden.contains($0) && document.lines[$0].continuationOf == nil && !document.lines[$0].kind.isCode }
+            if let edit = EditorCommands.setBlockInk(document, owners: owners, color: color, toggle: toggle) {
+                apply(edit)
+                showBlocks(blocks)
+            }
+        } else {
+            let selection = clamped(selectedRange)
+            if selection.length > 0 {
+                apply(EditorCommands.setInk(document, selection: selection, color: color, toggle: toggle))
+            } else {
+                perform(EditorCommands.typingInk(document, caret: selection.location, marks: marksForShortcut(), color: color, toggle: toggle))
+            }
+        }
+    }
+
+    var selectedInk: InkColor? {
+        if let blocks = blockSelection {
+            let hidden = FoldState.hiddenLines(document, folded: folded)
+            let colors = Set((blocks.pastedRoots ?? Array(blocks.rows)).filter { !hidden.contains($0) }.map { document.blockColor(at: $0) })
+            return colors.count == 1 ? colors.first ?? nil : nil
+        }
+        return InkColor.byID[formattingState.highlight]
     }
 
     /// 굵게, 취소선, 인라인 코드. 선택이 있으면 그 글자에, 없으면 다음에 칠 글자에 건다.
@@ -73,7 +107,7 @@ extension EditorController {
         let state = formattingState
         absorbRun = nil
         return TypingMarks(bold: state.bold ? true : nil, strike: state.strikethrough ? true : nil,
-                           code: state.inlineCode ? true : nil, highlight: state.highlight == 0 ? nil : state.highlight)
+                           underline: state.underline ? true : nil, code: state.inlineCode ? true : nil, highlight: state.highlight == 0 ? nil : state.highlight)
     }
 
     var formattingState: EditorFormattingState {
@@ -93,6 +127,7 @@ extension EditorController {
         }.first
         return EditorFormattingState(
             bold: marks?.bold ?? spans.contains { $0.kind == .bold },
+            underline: marks?.underline ?? spans.contains { $0.kind == .underline },
             strikethrough: marks?.strike ?? spans.contains { $0.kind == .strike },
             inlineCode: marks?.code ?? spans.contains { $0.kind == .code },
             highlight: marks?.highlight ?? highlight ?? 0,

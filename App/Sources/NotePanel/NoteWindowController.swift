@@ -228,6 +228,10 @@ final class NoteWindowController: NSObject {
         root.cornerButtons.isHidden = mode == .hidden
         let visible = formatting != nil && (mode == .always || (mode == .editing && formatting?.isEditingBody == true))
         let changed = visible != root.cornerButtons.showsFormats
+        if let ink = editor as? any NoteInkFormatting {
+            root.cornerButtons.inkToken = ink.lastInkToken
+            root.cornerButtons.inkMenu = { [weak ink] in ink?.inkMenu() }
+        }
         root.cornerButtons.apply(visible: visible, active: visible ? formatting?.activeFormats ?? [] : [])
         root.setHoverControlsAlpha(visible ? 1 : 0, animated: animated)
         if changed { root.layoutFormatBar(preservingScroll: focusChanged) }

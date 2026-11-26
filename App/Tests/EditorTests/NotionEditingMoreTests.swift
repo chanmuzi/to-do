@@ -111,7 +111,7 @@ private typealias Key = EditorShortcuts.Key
         h.caret(atEndOfLine: 0)
         h.key(Key.h, "ㅗ", [.command, .shift])
         h.mark("ㅎ")
-        #expect(h.editor.text == "가 ==ㅎ==")
+        #expect(h.editor.text == "가 ==ㅎ=={노랑}")
         // 조합하던 글자를 지우면(⌫) 조합이 글자 없이 끝난다. 넣어 둔 기호 쌍도 사라진다.
         h.mark("")
         #expect(!h.view.hasMarkedText())

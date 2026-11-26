@@ -88,7 +88,7 @@ nonisolated struct CopyExport: Sendable {
 
     // MARK: 표준 Markdown
 
-    /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 인용문은 `> `로, 형광펜은 색 번호 없이 `==글자==`로.
+    /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 인용문은 `> `로, 색과 밑줄은 보이는 글자로 내보낸다.
     var markdown: String {
         let base = baseLevel
         func usesInlineBreaks(_ row: Int) -> Bool {
@@ -145,23 +145,27 @@ nonisolated struct CopyExport: Sendable {
     }
 
     private func inlineMarkdown(_ line: MarkdownLine, keepingBreak: Bool = true) -> String {
-        var units = Array(doc.units[line.contentStart..<(keepingBreak ? line.end : line.contentEnd)])
-        // 형광펜의 색 번호 `{n}`을 뒤에서부터 지운다.
-        let suffixes = line.spans.compactMap { span -> Int? in
-            guard case .highlight = span.kind, span.closeMarker.length > 2 else { return nil }
-            return NSMaxRange(span.range) - 3 - line.contentStart
-        }
-        for offset in suffixes.sorted(by: >) {
-            units.removeSubrange(offset..<(offset + 3))
+        let end = keepingBreak ? line.inkComment?.location ?? line.end : line.contentEnd
+        var units = Array(doc.units[line.contentStart..<end])
+        let markers = line.spans.filter {
+            switch $0.kind { case .highlight, .underline: true; default: false }
+        }.flatMap { [$0.openMarker, $0.closeMarker] }
+        for marker in markers.sorted(by: { $0.location > $1.location }) {
+            units.removeSubrange((marker.location - line.contentStart)..<(NSMaxRange(marker) - line.contentStart))
         }
         return String(utf16CodeUnits: units, count: units.count)
     }
 
     // MARK: HTML
 
-    /// - Parameter highlightColors: 형광펜 번호(1...4)의 바탕색(CSS 표기).
+    /// - Parameter highlightColors: 글자색과 바탕색 식별자별 라이트 CSS 값.
     func html(highlightColors: [Int: String]) -> String {
         "<meta charset=\"utf-8\">" + blocks((doc.lines.count - lines.count)..<doc.lines.count, highlightColors)
+    }
+
+    private func inkStyle(_ ink: InkColor?, _ colors: [Int: String]) -> String {
+        guard let ink, let css = colors[ink.id] else { return "" }
+        return " style=\"" + (ink.foreground ? "color:" : "background-color:") + css + "\""
     }
 
     private func blocks(_ range: Range<Int>, _ colors: [Int: String]) -> String {
@@ -184,13 +188,16 @@ nonisolated struct CopyExport: Sendable {
                 while index < range.upperBound, doc.lines[index].kind.isListItem, doc.lines[index].level == line.level {
                     let item = doc.lines[index]
                     let end = min(item.subtreeEnd, range.upperBound)
-                    out += "<li>"
+                    let style = inkStyle(doc.blockColor(at: index), colors)
+                    let wrapContent = !style.isEmpty && doc.blockLines(at: index).upperBound + 1 < end
+                    out += wrapContent ? "<li><div\(style)>" : "<li\(style)>"
                     if case .todo(let done) = item.kind {
                         out += "<input type=\"checkbox\" disabled\(done ? " checked" : "")> "
                     }
                     let content = blockContent(at: index, colors)
                     if let level = item.kind.headingLevel { out += "<h\(level)>\(content)</h\(level)>" }
                     else { out += content }
+                    if wrapContent { out += "</div>" }
                     let children = doc.blockLines(at: index).upperBound + 1
                     if children < end { out += blocks(children..<end, colors) }
                     out += "</li>"
@@ -203,18 +210,18 @@ nonisolated struct CopyExport: Sendable {
                 while index < range.upperBound, doc.lines[index].kind == .quote, doc.lines[index].level == line.level {
                     let item = doc.lines[index]
                     let end = min(item.subtreeEnd, range.upperBound)
-                    out += "<p>" + blockContent(at: index, colors) + "</p>"
+                    out += "<p\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
                     let children = doc.blockLines(at: index).upperBound + 1
                     if children < end { out += blocks(children..<end, colors) }
                     index = end
                 }
                 out += "</blockquote>"
             case .heading(let level):
-                out += "<h\(level)>" + blockContent(at: index, colors) + "</h\(level)>"
+                out += "<h\(level)\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</h\(level)>"
                 index = doc.blockLines(at: index).upperBound + 1
             case .paragraph:
                 if line.contentRange.length > 0 || line.hasHardBreak {
-                    out += "<p>" + blockContent(at: index, colors) + "</p>"
+                    out += "<p\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
                 }
                 index = doc.blockLines(at: index).upperBound + 1
             }
@@ -245,8 +252,10 @@ nonisolated struct CopyExport: Sendable {
             case .strike: out += "<s>\(body)</s>"
             case .code: out += "<code>\(body)</code>"
             case .highlight(let number):
-                let color = colors[number].map { " style=\"background-color:\($0)\"" } ?? ""
-                out += "<mark\(color)>\(body)</mark>"
+                let ink = InkColor.byID[number]
+                let tag = ink?.foreground == true ? "span" : "mark"
+                out += "<\(tag)\(inkStyle(ink, colors))>\(body)</\(tag)>"
+            case .underline: out += "<u>\(body)</u>"
             case .link(let url):
                 // 웹 주소와 메일 주소만 링크로 내보낸다. 나머지는 글자만 남긴다.
                 if let target = LinkPolicy.openableURL(url) {

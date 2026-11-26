@@ -107,6 +107,26 @@ import Theme
         #expect(try h.fontSize(line: 0, at: span.contentRange).allSatisfy { $0 == h.theme.nsFont(.body).pointSize })
     }
 
+    @Test func linkInkWinsOverNestedColorsAndPreservesBackgroundOnHover() throws {
+        let h = try EditorHarness()
+        for source in ["==[문서](https://example.com)=={빨강 글자}", "[==문서=={빨강 글자}](https://example.com)",
+                       "==[문서](https://example.com)=={파랑}", "+ [문서](https://example.com) <!-- 초록 글자 -->"] {
+            h.editor.text = source
+            let span = try #require(h.document.lines[0].spans.first { if case .link = $0.kind { true } else { false } })
+            for hovered in [false, true] {
+                h.controller.hoveredLink = hovered ? (0, span.range.location) : nil
+                h.controller.refreshStyling()
+                let display = try h.display(line: 0)
+                let attributes = display.attributes(at: (source as NSString).range(of: "문서").location, effectiveRange: nil)
+                let style = h.controller.style
+                #expect(attributes[.foregroundColor] as? NSColor == (hovered ? style.text : style.text2))
+                #expect(attributes[.underlineColor] as? NSColor == (hovered ? style.text2 : style.text3))
+                #expect(attributes[.underlineStyle] as? Int == NSUnderlineStyle.single.rawValue)
+                #expect((attributes[.markdownHighlight] != nil) == source.hasSuffix("{파랑}"))
+            }
+        }
+    }
+
     @Test func inlineStyles() throws {
         let text = "**굵게** ~~취소~~ ==색=={3} `코드` [링크](https://a.example)"
         let h = try EditorHarness(text + "\n")
@@ -120,7 +140,7 @@ import Theme
         #expect(attributes(1)[.strikethroughStyle] as? Int == NSUnderlineStyle.single.rawValue)
         #expect(attributes(1)[.foregroundColor] as? NSColor == h.theme.rgba(.text2).nsColor)
         #expect((attributes(2)[.markdownHighlight] as? InlineBackground)?.kind == .highlight(3))
-        #expect(attributes(2)[.foregroundColor] as? NSColor == h.theme.rgba(HighlightColor.rose.foreground).nsColor)
+        #expect(attributes(2)[.foregroundColor] as? NSColor == h.theme.rgba(.text).nsColor)
         #expect((attributes(3)[.font] as? NSFont) == h.theme.nsFont(.code))
         let box = try #require(attributes(3)[.markdownCodeBox] as? InlineBackground)
         #expect(box.kind == .code)
@@ -147,7 +167,7 @@ import Theme
             var range = NSRange()
             let bg = try #require(shown.attribute(.markdownHighlight, at: (shown.string as NSString).range(of: "긴").location,
                                                   effectiveRange: &range) as? InlineBackground)
-            let normal = h.controller.style.highlightBackground(4).alphaComponent
+            let normal = h.controller.style.ink(InkColor(.blue)).alphaComponent
             #expect(abs(bg.color.alphaComponent - normal * (done ? h.theme.ratio(.doneFade) : 1)) < 0.001)
             let boxes = fragment.backgroundRects(for: range, background: bg)
             #expect(boxes.count > 1)
@@ -363,7 +383,7 @@ import Theme
         #expect(markdown.hasPrefix("- [x] 스탠드업 회의록 공유\n- [ ] **PR #482** 리뷰\n    - [ ] 포커스"))
         #expect(markdown.contains("- 지난주에서 넘어온 것\n    - [ ] **온보딩 문서**"))
         let html = try #require(board.string(forType: .html))
-        #expect(html.contains("<mark style=\"background-color:#FFEB85\">배포 체크리스트 확인</mark>"))
+        #expect(html.contains("<mark style=\"background-color:#FBF3DB\">배포 체크리스트 확인</mark>"))
         #expect(html.contains("<li>지난주에서 넘어온 것<ul><li>"))
         #expect(board.string(forType: .floatingNotesMarkdown) == DemoNote.text)
     }

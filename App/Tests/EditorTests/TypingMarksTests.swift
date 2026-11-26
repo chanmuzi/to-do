@@ -27,7 +27,7 @@ import Testing
         #expect(toggle("가|나", .bold, marks: TypingMarks(bold: true)) == .marks(TypingMarks()))
         // 여러 서식을 함께 켤 수 있다.
         #expect(type("가|", TypingMarks(bold: true, strike: true)) == "가**~~x|~~**")
-        #expect(type("가|", TypingMarks(bold: true, highlight: 2)) == "가==**x|**=={2}")
+        #expect(type("가|", TypingMarks(bold: true, highlight: 2)) == "가==**x|**=={회색}")
     }
 
     @Test func atTheEndOfARunTogglingOffStepsOutAndOnStepsBackIn() {
@@ -45,7 +45,7 @@ import Testing
     @Test func togglingOffInTheMiddleOfARunSplitsItWhenTyping() {
         #expect(toggle("**가|나**", .bold) == .marks(TypingMarks(bold: false)))
         #expect(type("**가|나**", TypingMarks(bold: false)) == "**가**x|**나**")
-        #expect(type("==가|나=={3}", TypingMarks(highlight: 0)) == "==가=={3}x|==나=={3}")
+        #expect(type("==가|나=={3}", TypingMarks(highlight: 0)) == "==가=={빨강}x|==나=={3}")
         // 바깥 구간만 끌 수는 없다(안쪽 구간이 겹쳐 있다).
         #expect(toggle("**가~~나|다~~라**", .bold) == .unavailable)
         #expect(type("**가~~나|다~~라**", TypingMarks(bold: false)) == nil)
@@ -59,28 +59,14 @@ import Testing
         #expect(type("`코|드`", TypingMarks(bold: true)) == nil)
     }
 
-    @Test func highlightCyclesFourColorsThenOff() {
-        func cycle(_ marked: String, _ marks: TypingMarks = TypingMarks()) -> TypingToggle {
-            let s = Scenario(marked)
-            return EditorCommands.cycleTypingHighlight(s.doc, caret: s.selection.location, marks: marks)
-        }
-        var marks = TypingMarks()
-        var seen: [Int?] = []
-        for _ in 0..<5 {
-            guard case .marks(let next) = cycle("가|", marks) else { break }
-            marks = next
-            seen.append(marks.highlight)
-        }
-        #expect(seen == [1, 2, 3, 4, nil])
-        #expect(type("가|", TypingMarks(highlight: 1)) == "가==x|==")
-        #expect(type("가|", TypingMarks(highlight: 4)) == "가==x|=={4}")
-        // 형광펜 구간 안에서는 그 색에서 이어 돈다. 구간 끝에서 다른 색이면 구간 뒤에 새 구간을 만들고,
-        // 형광펜 없음이면 구간 밖으로 나간다.
-        #expect(cycle("==가|==") == .marks(TypingMarks(highlight: 2)))
-        #expect(type("==가|==", TypingMarks(highlight: 2)) == "==가====x|=={2}")
-        #expect(cycle("==가|=={4}") == .marks(TypingMarks(highlight: 0)))
-        #expect(type("==가|=={4}", TypingMarks(highlight: 0)) == "==가=={4}x|")
-        #expect(type("==가|나==", TypingMarks(highlight: 3)) == "==가====x|=={3}==나==")
+    @Test func lastInkIsAppliedOrClearedForTyping() {
+        let base = Scenario("==가|=={4}")
+        let choice = InkColor(.blue)
+        #expect(EditorCommands.typingInk(base.doc, caret: base.selection.location, marks: TypingMarks(), color: choice,
+                                         toggle: true) == .marks(TypingMarks(highlight: 0)))
+        #expect(type("가|", TypingMarks(highlight: choice.id)) == "가==x|=={파랑}")
+        #expect(type("==가|나==", TypingMarks(highlight: 3)) == "==가=={노랑}==x|=={빨강}==나==")
+        #expect(type("가|", TypingMarks(underline: true)) == "가<u>x|</u>")
     }
 }
 

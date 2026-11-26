@@ -761,6 +761,13 @@ final class DebugControl {
         case ("input-window-resign", let id?, _) where isPassive:
             guard let window = notePanels.window(for: id) else { return }
             NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
+        case ("editor-ink-menu", let id?, let name?) where isPassive:
+            guard let editor = editor(of: id), let url = output(named: name) else { return }
+            snapshotLiveMenu(editor.inkMenu(), anchor: editor.documentView, to: url, selectFirst: false)
+        case ("editor-paste-blocks", let id?, let args?) where isPassive:
+            let parts = args.split(separator: " ", maxSplits: 1)
+            guard parts.count == 2, let donor = editor(of: NoteID(rawValue: String(parts[1]))) else { return }
+            editor(of: id)?.pasteBlocksForVerification(donor.text, inside: parts[0] == "inside")
         case ("editor-block-command", let id?, let action?) where isPassive:
             switch action {
             case "select": editor(of: id)?.selectBlocksForVerification()
@@ -896,7 +903,7 @@ final class DebugControl {
     }
 
     /// 자기 앱 메뉴에 방향키만 보내 호버와 같은 실제 선택 바탕을 확인한다.
-    private func snapshotLiveMenu(_ menu: NSMenu, anchor: NSView, to url: URL) {
+    private func snapshotLiveMenu(_ menu: NSMenu, anchor: NSView, to url: URL, selectFirst: Bool = true) {
         verificationMenu = menu
         let known = Set(NSApp.windows.map(\.windowNumber))
         let select = Timer(timeInterval: 0.2, repeats: false) { _ in
@@ -914,7 +921,7 @@ final class DebugControl {
                 self?.verificationMenu?.cancelTracking()
             }
         }
-        RunLoop.main.add(select, forMode: .common)
+        if selectFirst { RunLoop.main.add(select, forMode: .common) }
         RunLoop.main.add(capture, forMode: .common)
         menu.popUp(positioning: nil, at: .zero, in: anchor)
         select.invalidate()

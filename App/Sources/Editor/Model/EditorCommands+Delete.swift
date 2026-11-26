@@ -90,6 +90,7 @@ nonisolated extension EditorCommands {
                     selection: NSRange(location: target, length: 0)
                 ))
             }
+            if let join = joiningColoredBlocks(doc, before: index) { return .edit(join) }
             guard position > line.start else { return .passThrough }
             // 감춘 여는 기호 뒤에 커서가 있다. 기호가 아니라 줄바꿈을 지워 윗줄과 합친다.
             return .edit(TextEdit(
@@ -154,6 +155,7 @@ nonisolated extension EditorCommands {
                     } ?? line.start, length: 0)
                 ))
             }
+            if let join = joiningColoredBlocks(doc, before: index + 1) { return .edit(join) }
             if ListStructure.isBlank(line) {
                 return .edit(TextEdit(
                     range: line.fullRange,

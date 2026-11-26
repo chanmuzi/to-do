@@ -5,19 +5,22 @@ import Foundation
 
 nonisolated extension EditorCommands {
     enum Wrap: Sendable {
-        case bold, strike, code
+        case bold, strike, underline, code
+
+        var close: String { self == .underline ? "</u>" : marker }
 
         var marker: String {
             switch self {
             case .bold: "**"
             case .strike: "~~"
+            case .underline: "<u>"
             case .code: "`"
             }
         }
 
         func matches(_ kind: InlineSpan.Kind) -> Bool {
             switch (self, kind) {
-            case (.bold, .bold), (.strike, .strike), (.code, .code): true
+            case (.bold, .bold), (.strike, .strike), (.underline, .underline), (.code, .code): true
             default: false
             }
         }
@@ -30,27 +33,53 @@ nonisolated extension EditorCommands {
         if let span = line.markedSpans.last(where: { wrap.matches($0.kind) && contains($0.contentRange, selected) }) {
             return resplit(doc, line, span, selected, open: "", close: "")
         }
-        return wrapping(doc, line, selected, open: wrap.marker, close: wrap.marker) { kind in
+        return wrapping(doc, line, selected, open: wrap.marker, close: wrap.close) { kind in
             wrap == .code ? true : wrap.matches(kind)
         }
     }
 
-    /// 형광펜. 누를 때마다 노랑, 회색, 로즈, 블루로 넘어가고 그다음에는 지운다.
-    /// 형광펜 구간의 일부만 골랐으면 그 부분만 바꾼다.
-    static func cycleHighlight(_ doc: MarkdownDocument, selection: NSRange) -> TextEdit? {
-        guard let line = inlineLine(doc, selection), let selected = visibleSelection(selection, in: line) else { return nil }
+    /// 팔레트에서는 지정한 색을 걸고, 단축키에서는 같은 색을 한 번 더 걸면 벗긴다.
+    static func setInk(_ doc: MarkdownDocument, selection: NSRange, color: InkColor?, toggle: Bool = false) -> TextEdit? {
+        guard let line = inlineLine(doc, selection), let visible = visibleSelection(selection, in: line) else { return nil }
+        var lower = visible.location
+        var upper = NSMaxRange(visible)
+        while lower < upper, InlineParser.isWhitespace(doc.units[lower]) { lower += 1 }
+        while upper > lower, InlineParser.isWhitespace(doc.units[upper - 1]) { upper -= 1 }
+        guard lower < upper else { return nil }
+        let selected = NSRange(location: lower, length: upper - lower)
+        let open = color == nil ? "" : "=="
+        let close = color.map { "=={" + $0.suffix + "}" } ?? ""
         for span in line.markedSpans.reversed() where contains(span.contentRange, selected) {
-            guard case .highlight(let number) = span.kind else { continue }
-            if number >= 4 { return resplit(doc, line, span, selected, open: "", close: "") }
-            return resplit(doc, line, span, selected, open: "==", close: highlightClose(number + 1))
+            guard case .highlight(let id) = span.kind else { continue }
+            if color?.id == id {
+                guard toggle else { return nil }
+                return resplit(doc, line, span, selected, open: "", close: "")
+            }
+            return resplit(doc, line, span, selected, open: open, close: close)
         }
-        return wrapping(doc, line, selected, open: "==", close: "==") { kind in
+        // 색 구간의 한쪽 끝을 걸친 선택은 기존 색을 경계에서 나눈 뒤 감싼다.
+        // balanced가 원래 색의 나머지 글자까지 선택 범위를 넓히지 않게 한다.
+        for span in line.markedSpans {
+            guard case .highlight = span.kind else { continue }
+            let overlap = NSIntersectionRange(span.contentRange, selected)
+            guard overlap.length > 0, overlap != span.contentRange else { continue }
+            guard let split = resplit(doc, line, span, overlap, open: "", close: "") else { return nil }
+            let middle = MarkdownDocument(split.applied(to: doc.text))
+            let offset = split.replacement.utf16.count - split.range.length
+            let start = selected.location < span.range.location ? selected.location : split.selection.location
+            let end = NSMaxRange(selected) > NSMaxRange(span.range) ? NSMaxRange(selected) + offset : NSMaxRange(split.selection)
+            guard let recolored = setInk(middle, selection: NSRange(location: start, length: end - start), color: color) else {
+                return color == nil ? split : nil
+            }
+            return compose(split, then: recolored, middle: middle)
+        }
+        if color == nil, !line.markedSpans.contains(where: {
+            if case .highlight = $0.kind { return NSIntersectionRange($0.contentRange, selected).length > 0 }
+            return false
+        }) { return nil }
+        return wrapping(doc, line, selected, open: open, close: close) { kind in
             if case .highlight = kind { true } else { false }
         }
-    }
-
-    static func highlightClose(_ number: Int) -> String {
-        number <= 1 ? "==" : "=={\(number)}"
     }
 
     /// 선택이 한 줄 안에 있고 그 줄이 코드가 아닐 때만 그 줄.
@@ -68,7 +97,7 @@ nonisolated extension EditorCommands {
         var start = line.visualEnd(from: max(selection.location, line.contentStart))
         // 백슬래시로 막은 글자는 백슬래시째로 고른다.
         if let escape = line.escape(splitAt: start) { start = escape.range.location }
-        let end = line.visualStart(from: min(NSMaxRange(selection), line.end))
+        let end = line.visualStart(from: min(NSMaxRange(selection), line.contentEnd))
         return end > start ? NSRange(location: start, length: end - start) : nil
     }
 
@@ -143,7 +172,7 @@ nonisolated extension EditorCommands {
         }
         if !contains(content, middle) { middle = content }
         let spanOpen = doc.string(in: span.openMarker)
-        let spanClose = doc.string(in: span.closeMarker)
+        let spanClose = doc.closingSyntax(for: span)
         let wholeLeft = doc.string(in: NSRange(location: content.location, length: middle.location - content.location))
         let wholeRight = doc.string(in: NSRange(location: NSMaxRange(middle), length: NSMaxRange(content) - NSMaxRange(middle)))
         // 남는 조각의 가장자리 공백은 기호 밖에 둔다(여는 기호 뒤와 닫는 기호 앞은 공백일 수 없다).

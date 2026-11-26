@@ -161,15 +161,15 @@ import Testing
 
     private func highlight(_ marked: String) -> String? {
         let s = Scenario(marked)
-        return s.applying(EditorCommands.cycleHighlight(s.doc, selection: s.selection))
+        return s.applying(EditorCommands.setInk(s.doc, selection: s.selection, color: InkColor(.yellow), toggle: true))
     }
 
     @Test func wrappingTextThatContainsTheMarkerEscapesOrRefuses() {
         // 띄어 쓴 `==`는 닫는 기호로 읽히지 않으므로 그대로 감싼다.
-        #expect(highlight("|a == b|") == "==|a == b|==")
+        #expect(highlight("|a == b|") == "==|a == b|=={노랑}")
         #expect(MarkdownDocument("==a == b==").lines[0].spans.map(\.kind) == [.highlight(1)])
         // 닫는 기호로 읽힐 글자는 백슬래시로 막는다.
-        #expect(highlight("|a==b|") == "==|a\\=\\=b|==")
+        #expect(highlight("|a==b|") == "==|a\\=\\=b|=={노랑}")
         #expect(wrap("|2**3|", .bold) == "**|2\\*\\*3|**")
         #expect(wrap("|a~~b|", .strike) == "~~|a\\~\\~b|~~")
         // 인라인 코드 안에는 백슬래시를 쓸 수 없다. 백틱이 든 글은 코드로 감싸지 않는다.

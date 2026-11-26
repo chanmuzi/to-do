@@ -23,13 +23,13 @@ import Testing
     @Test func highlightColorsFollowD008() {
         let text = "==노랑== ==회색=={2} ==로즈=={3} ==블루=={4} ==없는색=={7}"
         let found = spans(text)
-        #expect(found.map(\.kind) == [.highlight(1), .highlight(2), .highlight(3), .highlight(4), .highlight(1)])
+        #expect(found.map(\.kind) == [.highlight(1), .highlight(2), .highlight(3), .highlight(4)])
         // 색 번호는 닫는 기호에 포함된다(화면에서 함께 감춘다).
         #expect(found[0].closeMarker.length == 2)
         #expect(found[1].closeMarker.length == 5)
         #expect((text as NSString).substring(with: found[1].closeMarker) == "=={2}")
         // 모르는 번호는 글자로 남는다.
-        #expect(found[4].closeMarker.length == 2)
+        #expect(spans("==없는색=={7}").isEmpty)
     }
 
     @Test func nestedSpansComeOuterFirst() {

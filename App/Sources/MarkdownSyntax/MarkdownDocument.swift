@@ -69,6 +69,10 @@ nonisolated package struct MarkdownDocument: Sendable {
         return NSRange(location: start, length: lines[rows.upperBound].end - start)
     }
 
+    package func blockColor(at index: Int) -> InkColor? {
+        lines[blockLines(at: index).upperBound].blockInk
+    }
+
     package func blockSource(at index: Int) -> String {
         string(in: sourceRange(for: blockLines(at: index)))
     }
@@ -105,7 +109,19 @@ nonisolated package struct MarkdownDocument: Sendable {
         var fence: (index: Int, indentLength: Int, level: Int)?
         for index in lines.indices {
             var line = lines[index]
-            let indent = LineClassifier.indent(units, from: line.start, to: line.end)
+            // 구문 분류 전에 주석을 떼어 빈 블록의 앞 공백도 들여쓰기로 소비되지 않게 한다.
+            if fence == nil, units[line.start..<line.end].suffix(4).elementsEqual(" -->".utf16),
+               let start = units[line.start..<line.end].lastIndex(of: 0x3C), start > line.start,
+               units[start - 1] == 0x20, units[start..<line.end].starts(with: "<!-- ".utf16),
+               start + 5 <= line.end - 4 {
+                let name = String(decoding: units[(start + 5)..<(line.end - 4)], as: UTF16.self)
+                if let color = InkColor.byLabel[name] {
+                    line.blockInk = color
+                    line.inkComment = NSRange(location: start - 1, length: line.end - start + 1)
+                }
+            }
+            let bodyEnd = line.contentEnd
+            let indent = LineClassifier.indent(units, from: line.start, to: bodyEnd)
             let bodyStart = line.start + indent.length
             if let open = fence {
                 if LineClassifier.isClosingFence(units, from: bodyStart, to: line.end) {
@@ -123,31 +139,34 @@ nonisolated package struct MarkdownDocument: Sendable {
             } else if index > 0, lines[index - 1].hasHardBreak {
                 let owner = lines[index - 1].continuationOf ?? (index - 1)
                 line.continuationOf = owner
-                line.indentLength = lines[owner].indentLength
+                line.indentLength = min(lines[owner].indentLength, bodyEnd - line.start)
                 line.level = lines[owner].level
             } else if LineClassifier.isFence(units, from: bodyStart, to: line.end) {
+                line.blockInk = nil
+                line.inkComment = nil
                 line.kind = .fenceOpen
                 line.indentLength = indent.length
                 line.level = min(indent.level, Self.maxLevel)
                 fence = (index, indent.length, line.level)
             } else {
-                let marker = LineClassifier.classify(units, from: bodyStart, to: line.end)
+                let marker = LineClassifier.classify(units, from: bodyStart, to: bodyEnd)
                 line.kind = marker.kind
                 line.markerLength = marker.markerLength
                 line.indentLength = indent.length
                 line.level = min(indent.level, Self.maxLevel)
             }
             if !line.kind.isCode {
-                if index + 1 < lines.count, line.end > line.contentStart, units[line.end - 1] == 0x5C {
-                    var start = line.end - 1
+                if index + 1 < lines.count, bodyEnd > line.contentStart, units[bodyEnd - 1] == 0x5C {
+                    var start = bodyEnd - 1
                     while start > line.contentStart, units[start - 1] == 0x5C { start -= 1 }
                     let next = lines[index + 1]
                     // 이어지는 줄에서 주인 줄의 들여쓰기만 소모한다. 나머지 공백은 본문이다.
                     let nextIndent = LineClassifier.indent(units, from: next.start, to: next.end)
-                    line.hasHardBreak = (line.end - start) % 2 == 1
+                    line.hasHardBreak = (bodyEnd - start) % 2 == 1
                         && !LineClassifier.isFence(units, from: next.start + nextIndent.length, to: next.end)
                         && units[next.start..<next.end].starts(with: units[line.start..<(line.start + line.indentLength)])
                 }
+                if line.inkComment != nil { line.hasHardBreak = false }
                 line.spans = InlineParser.parse(units, in: line.contentRange)
             }
             lines[index] = line

@@ -2,9 +2,10 @@ import AppKit
 import Theme
 import DateTime
 
-/// 입력할 글자 또는 선택 전체에 적용되는 인라인 서식. 형광펜 0은 꺼짐이다.
+/// 입력할 글자 또는 선택 전체에 적용되는 인라인 서식. highlight는 글자색 또는 바탕색 식별자이며 0은 색 없음이다.
 public struct EditorFormattingState: Equatable, Sendable {
     public let bold: Bool
+    public var underline = false
     public let strikethrough: Bool
     public let inlineCode: Bool
     public let highlight: Int
@@ -147,6 +148,10 @@ public final class MarkdownEditor {
         set { controller.onDateError = newValue }
     }
     #if DEBUG
+    package func pasteBlocksForVerification(_ text: String, inside: Bool) {
+        controller.pasteSource(text, inside: inside)
+    }
+
     package func selectBlocksForVerification() { controller.selectBlocks() }
     package func clearBlocksForVerification() { controller.clearBlocks() }
     package var selectedBlockRows: ClosedRange<Int>? { controller.blockSelection?.rows }
@@ -215,6 +220,12 @@ public final class MarkdownEditor {
 
     package static var editLinkAction: Selector { #selector(EditorTextView.editMarkdownLink(_:)) }
     package static var duplicateBlockAction: Selector { #selector(EditorTextView.duplicateMarkdownBlock(_:)) }
+    package var hasSelectedInk: Bool { controller.selectedInk != nil }
+    package var lastInkToken: ColorToken { EditorController.lastInk.token }
+    package func inkMenu() -> NSMenu { controller.inkMenu() }
+
+    package static var underlineAction: Selector { #selector(EditorTextView.toggleMarkdownUnderline(_:)) }
+    package static var pasteInsideAction: Selector { #selector(EditorTextView.pasteInsideBlock(_:)) }
     package static var toggleBoldAction: Selector { #selector(EditorTextView.toggleMarkdownBold(_:)) }
 
     /// 선택 범위(원문의 UTF-16 위치).

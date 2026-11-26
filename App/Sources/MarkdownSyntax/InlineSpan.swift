@@ -5,7 +5,8 @@ nonisolated package struct InlineSpan: Hashable, Sendable {
     package enum Kind: Hashable, Sendable {
         case bold
         case strike
-        /// 형광펜. 번호는 1...4 (D-008의 `{n}`, 1은 생략).
+        case underline
+        /// 글자색 또는 바탕색의 InkColor 식별자.
         case highlight(Int)
         case code
         /// 링크. 주소만 적은 링크는 기호 구간이 비어 있다.
