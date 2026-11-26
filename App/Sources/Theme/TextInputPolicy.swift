@@ -3,8 +3,8 @@ import AppKit
 /// 사람이 친 글을 그대로 받는 입력 칸의 공통 정책. 조합은 유지하고 시스템의 장식과 자동 변경만 끈다.
 @MainActor
 public enum TextInputPolicy {
-    public static func applyNoteStyle(to view: NSTextView, theme: Theme, underline: Bool) {
-        view.selectedTextAttributes = [.backgroundColor: theme.nsColor(.selected)]
+    public static func applyNoteStyle(to view: NSTextView, theme: Theme, underline: Bool, selection: ColorToken = .selected) {
+        view.selectedTextAttributes = [.backgroundColor: theme.nsColor(selection)]
         view.markedTextAttributes = underline
             ? [.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: theme.nsColor(.text3)]
             : [:]

@@ -155,8 +155,88 @@ import Theme
         #expect(try h.fontSize(line: 0, at: spans[2].closeMarker).allSatisfy { $0 == hidden })
     }
 
-    @Test func wrappedHighlightFadesAndRestoresWhenToggled() throws {
-        let h = try EditorHarness("- [ ] ==긴 체크박스에서 줄바꿈 뒤에도 색을 유지하는 글을 확인합니다=={4}", width: 155)
+    @Test func togglingHighlightPreservesGlyphPositions() throws {
+        for prefix in ["", "[x] "] {
+            let h = try EditorHarness(prefix + "가나다 노랑 바탕 라마바\n\n")
+            func positions() throws -> [CGFloat] {
+                h.window.layoutIfNeeded()
+                let manager = h.controller.layoutManager
+                manager.ensureLayout(for: manager.documentRange)
+                let fragment = try #require(manager.textLayoutFragment(for: manager.documentRange.location))
+                let line = try #require(fragment.textLineFragments.first)
+                let text = h.editor.text as NSString
+                return ["가", "노", "탕", "라", "바"].map {
+                    line.locationForCharacter(at: text.range(of: $0).location).x
+                }
+            }
+            let original = h.editor.text
+            let before = try positions()
+            h.editor.selectedRange = (original as NSString).range(of: "노랑 바탕")
+            for highlighted in [true, false] {
+                h.controller.setInk(InkColor(.yellow), toggle: true)
+                #expect(h.document.lines[0].spans.isEmpty == !highlighted)
+                for (x, y) in zip(try positions(), before) {
+                    #expect(abs(x - y) < 0.1)
+                }
+            }
+            #expect(h.editor.text == original)
+        }
+    }
+
+    @Test func adjacentHighlightsMeetWithoutDoublePaintingTheirPadding() throws {
+        let h = try EditorHarness("==노랑=={노랑}==파랑=={파랑}")
+        let manager = h.controller.layoutManager
+        manager.ensureLayout(for: manager.documentRange)
+        let fragment = try #require(manager.textLayoutFragment(for: manager.documentRange.location) as? MarkdownLayoutFragment)
+        let text = try #require((fragment.textElement as? NSTextParagraph)?.attributedString)
+        let boxes = fragment.inlineBoxes(for: .markdownHighlight, in: text)
+        try #require(boxes.count == 2)
+        #expect(abs(boxes[0].0.maxX - boxes[1].0.minX) < 0.001)
+    }
+
+    @Test func editorSelectionBlendsToSelectedOnTheDefaultNoteSurface() throws {
+        let h = try EditorHarness("본문")
+        let color = try #require(h.view.selectedTextAttributes[.backgroundColor] as? NSColor)
+        for mode in ThemeAppearance.allCases {
+            let appearance = try #require(NSAppearance(named: mode == .light ? .aqua : .darkAqua))
+            var resolved: NSColor?
+            appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) }
+            let selection = try #require(resolved)
+            let alpha = selection.alphaComponent
+            #expect(alpha > 0 && alpha < 1)
+            let base = h.theme.tokens.noteBackground(paletteID: nil, mode)
+            let target = h.theme.tokens.color(.selected, mode)
+            for (ink, surface, selected) in [(selection.redComponent, base.red, target.red),
+                                             (selection.greenComponent, base.green, target.green),
+                                             (selection.blueComponent, base.blue, target.blue)] {
+                #expect(abs(ink * alpha + surface * (1 - alpha) - selected) * 255 <= 3)
+            }
+        }
+    }
+
+    @Test(arguments: ThemeAppearance.allCases)
+    func blockSelectionPreservesCompletedBlockColor(appearance: ThemeAppearance) throws {
+        let h = try EditorHarness("[x] 완료 <!-- 노랑 바탕 -->\n[x] 완료", appearance: appearance)
+        h.window.appearance = appearance.nsAppearance
+        h.controller.blockSelection = BlockSelection(anchor: 0, focus: 1)
+        let boxes = h.controller.blockSelectionRects()
+        try #require(boxes.count == 2)
+        // 같은 선택 안에서 글자가 없는 두 블록의 중앙 픽셀을 비교한다.
+        let image = try #require(h.view.bitmapImageRepForCachingDisplay(in: h.view.bounds))
+        h.view.cacheDisplay(in: h.view.bounds, to: image)
+        func fill(_ rect: CGRect) throws -> NSColor {
+            let x = Int(rect.midX * CGFloat(image.pixelsWide) / h.view.bounds.width)
+            let y = Int(rect.midY * CGFloat(image.pixelsHigh) / h.view.bounds.height)
+            return try #require(image.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+        }
+        let colored = try fill(boxes[0]), plain = try fill(boxes[1])
+        #expect(plain.alphaComponent > 0 && plain.alphaComponent < 1)
+        #expect(colored.alphaComponent > plain.alphaComponent && colored != plain)
+    }
+
+    @Test(arguments: ThemeAppearance.allCases)
+    func wrappedHighlightFadesAndRestoresWhenToggled(appearance: ThemeAppearance) throws {
+        let h = try EditorHarness("- [ ] ==긴 체크박스에서 줄바꿈 뒤에도 색을 유지하는 글을 확인합니다=={4}", width: 155, appearance: appearance)
         h.caret(atEndOfLine: 0)
         for done in [false, true, false] {
             if case .todo(let value) = h.document.lines[0].kind, value != done { h.perform(.toggleDone) }

@@ -242,7 +242,7 @@ extension EditorController {
 
     func drawBlockSelection(in dirty: NSRect) {
         guard blockSelection != nil else { return }
-        theme.nsColor(.selected).setFill()
+        theme.nsColor(.editorSelection).setFill()
         let radius = theme.shape(.chipRadius)
         for rect in blockSelectionRects() where rect.intersects(dirty) {
             NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()

@@ -177,23 +177,34 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     private func drawInlineBackgrounds(_ decoration: FragmentDecoration, in context: CGContext) {
         guard let string = paragraphString else { return }
         let style = decoration.style
-        let full = NSRange(location: 0, length: string.length)
         for key in [NSAttributedString.Key.markdownHighlight, .markdownCodeBox] {
-            string.enumerateAttribute(key, in: full) { value, range, _ in
-                guard let background = value as? InlineBackground else { return }
-                for box in backgroundRects(for: range, background: background) {
-                    let radius: CGFloat
-                    switch background.kind {
-                    case .highlight: radius = style.highlightRadius
-                    case .code: radius = style.codeRadius
-                    }
-                    context.setFillColor(background.color.cgColor)
-                    let corner = min(radius, box.height / 2, box.width / 2)
-                    context.addPath(CGPath(roundedRect: box, cornerWidth: corner, cornerHeight: corner, transform: nil))
-                    context.fillPath()
-                }
+            for (box, background) in inlineBoxes(for: key, in: string) {
+                let radius = key == .markdownHighlight ? style.highlightRadius : style.codeRadius
+                context.setFillColor(background.color.cgColor)
+                let corner = min(radius, box.height / 2, box.width / 2)
+                context.addPath(CGPath(roundedRect: box, cornerWidth: corner, cornerHeight: corner, transform: nil))
+                context.fillPath()
             }
         }
+    }
+
+    func inlineBoxes(for key: NSAttributedString.Key, in string: NSAttributedString) -> [(CGRect, InlineBackground)] {
+        var boxes: [(rect: CGRect, background: InlineBackground)] = []
+        string.enumerateAttribute(key, in: NSRange(location: 0, length: string.length)) { value, range, _ in
+            guard let background = value as? InlineBackground else { return }
+            boxes += backgroundRects(for: range, background: background).map { ($0, background) }
+        }
+        guard key == .markdownHighlight, boxes.count > 1 else { return boxes }
+        // 같은 화면 줄에서 두 색의 여백이 겹치면 중간에서 나눠 반투명 잉크가 두 번 칠해지지 않게 한다.
+        boxes.sort { ($0.rect.midY, $0.rect.minX) < ($1.rect.midY, $1.rect.minX) }
+        for i in 1..<boxes.count {
+            let left = boxes[i - 1].rect, right = boxes[i].rect
+            guard left.midY == right.midY, left.maxX > right.minX else { continue }
+            let seam = (left.maxX + right.minX) / 2
+            boxes[i - 1].rect.size.width = seam - left.minX
+            boxes[i].rect = CGRect(x: seam, y: right.minY, width: right.maxX - seam, height: right.height)
+        }
+        return boxes
     }
 
     func backgroundRects(for range: NSRange, background: InlineBackground) -> [CGRect] {

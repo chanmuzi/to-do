@@ -289,7 +289,7 @@ final class EditorController: NSObject {
         textView.font = style.body.font
         textView.textColor = style.text
         setInputParagraph(style.bodyParagraph)
-        textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.selected)]
+        textView.selectedTextAttributes = [.backgroundColor: theme.nsColor(.editorSelection)]
         scheduleButtons.values.forEach { $0.needsDisplay = true }
         copyButton.apply(theme: theme, tint: style.text3)
         linkField.apply(theme: theme, style: style)

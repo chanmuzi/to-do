@@ -64,14 +64,9 @@ extension EditorController {
     ) -> (font: NSFont, rise: CGFloat, shift: CGFloat) {
         guard !line.kind.isCode else { return (lineFont.font, 0, 0) }
         for span in line.spans where NSLocationInRange(location, span.contentRange) || location == NSMaxRange(span.contentRange) {
-            let atStart = location == span.contentRange.location
-            switch span.kind {
-            case .code:
+            if case .code = span.kind {
+                let atStart = location == span.contentRange.location
                 return (style.inlineCode(in: lineFont), style.codeRise, atStart ? (style.codePadX + style.codeGap) / 2 : 0)
-            case .highlight(let id):
-                if atStart, InkColor.byID[id]?.foreground == false { return (lineFont.font, 0, style.metrics.highlightPadX / 2) }
-            default:
-                continue
             }
         }
         return (lineFont.font, 0, 0)
