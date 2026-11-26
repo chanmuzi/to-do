@@ -121,6 +121,8 @@ public enum ComponentToken: String, CaseIterable, Sendable {
     case editorChevronSize = "editor-chevron-size"
     case editorChevronStroke = "editor-chevron-stroke"
     case editorHeadingChevronScale = "editor-heading-chevron-scale"
+    case editorBlockGap = "editor-block-gap"
+    case editorBlockPadX = "editor-block-pad-x"
     case editorHighlightPadX = "editor-highlight-pad-x"
     case editorHighlightPadY = "editor-highlight-pad-y"
     case editorCaretScrollRoom = "editor-caret-scroll-room"

@@ -20,13 +20,14 @@ import Testing
         h.caret(atEndOfLine: 0)
         h.controller.selectBlocks()
         let parent = try #require(h.controller.blockSelectionRects().first)
-        let gap = h.theme.space(.sp1)
+        let gap = h.theme.component(.editorBlockGap)
         let first = try rowFrame(h, 0), last = try rowFrame(h, 2)
         #expect(parent.minY == first.minY + gap / 2)
         #expect(parent.maxY == last.maxY - gap / 2)
-        #expect(parent.minX == h.view.textContainerOrigin.x - gap)
-        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)), times: 2)
-        #expect(h.controller.blockSelectionRects() == [parent])
+        #expect(parent.minX == h.view.textContainerOrigin.x - 6)
+        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)))
+        let extended = h.controller.blockSelectionRects()
+        #expect(extended.first == parent && extended.count == 2)
         h.controller.blockSelection = BlockSelection(anchor: 2, focus: 1)
         let children = h.controller.blockSelectionRects()
         try #require(children.count == 2)
@@ -43,8 +44,9 @@ import Testing
         h.controller.blockSelection = BlockSelection(anchor: 1, focus: 3)
         let rects = h.controller.blockSelectionRects()
         try #require(rects.count == 3)
-        #expect(rects[1].minY - rects[0].maxY == h.theme.space(.sp1))
-        #expect(rects[2].minY - rects[1].maxY == h.theme.space(.sp1))
+        #expect(rects[1].minY - rects[0].maxY == 2)
+        #expect(rects[2].minY - rects[1].maxY == 2)
+        #expect(rects[1].height == 22)
         #expect(rects[0].maxX == rects[2].maxX)
         #expect(rects[0].maxX - rects[1].maxX == h.theme.component(.noteTopButtonSize))
     }
@@ -56,9 +58,90 @@ import Testing
         let rects = h.controller.blockSelectionRects()
         try #require(rects.count == 1)
         let frame = try rowFrame(h, 0)
-        let inset = h.theme.space(.sp1) / 2
+        let inset = h.theme.component(.editorBlockGap) / 2
         #expect(rects[0].minY == frame.minY + inset)
         #expect(rects[0].maxY == frame.maxY - inset)
+    }
+
+    private let week = "[ ] 주간 계획 세우기\n+ 월요일\n\t[ ] 회의록 정리\n\t- 자료 조사\n\t\t- 참고 링크 모으기\n+ 화요일\n\t[ ] 리뷰 답장\n다음 주에 할 것"
+
+    @Test func extendingFromMondayAddsTuesdayThenNextWeekAndShrinksOneBox() throws {
+        let h = try EditorHarness(week)
+        h.caret(atEndOfLine: 1)
+        h.controller.selectBlocks()
+        let down = #selector(NSResponder.moveDownAndModifySelection(_:))
+        let up = #selector(NSResponder.moveUpAndModifySelection(_:))
+        h.press(down)
+        #expect(h.controller.blockSelection == BlockSelection(anchor: 1, focus: 5))
+        let tuesday = h.controller.blockSelectionRects()
+        try #require(tuesday.count == 2)
+        let child = try rowFrame(h, 6)
+        #expect(tuesday[1].maxY == child.maxY - 1)
+        h.press(down)
+        #expect(h.controller.blockSelection?.focus == 7)
+        #expect(h.controller.blockSelectionRects().count == 3)
+        h.press(up)
+        #expect(h.controller.blockSelectionRects() == tuesday)
+        h.press(up)
+        #expect(h.controller.blockSelectionRects() == [tuesday[0]])
+    }
+
+    @Test func shiftStopsAtFirstChangedCoverageOrKeepsSelectionAtBoundary() throws {
+        let h = try EditorHarness(week)
+        // 시안의 각 시작 줄에서 마지막 자식까지의 물리적 줄 번호.
+        let ends = [0, 4, 2, 4, 4, 6, 6, 7]
+        func coverage(_ anchor: Int, _ focus: Int) -> ClosedRange<Int> {
+            let rows = min(anchor, focus)...max(anchor, focus)
+            return rows.lowerBound...ends[rows].max()!
+        }
+        for anchor in ends.indices {
+            for focus in ends.indices {
+                for direction in [-1, 1] {
+                    let start = BlockSelection(anchor: anchor, focus: focus)
+                    h.controller.showBlocks(start)
+                    let before = h.controller.blockSelectionRects()
+                    let rows = coverage(anchor, focus)
+                    var expected = focus + direction
+                    while ends.indices.contains(expected), coverage(anchor, expected) == rows {
+                        expected += direction
+                    }
+                    h.press(direction < 0 ? #selector(NSResponder.moveUpAndModifySelection(_:))
+                                          : #selector(NSResponder.moveDownAndModifySelection(_:)))
+                    if ends.indices.contains(expected) {
+                        #expect(h.controller.blockSelection == BlockSelection(anchor: anchor, focus: expected))
+                        #expect(h.controller.blockSelectionRects() != before)
+                    } else {
+                        #expect(h.controller.blockSelection == start && h.controller.blockSelectionRects() == before)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func plainArrowsEnterChildrenAndShiftTreatsFencedCodeAsOneBlock() throws {
+        let h = try EditorHarness("+ 월요일\n\t- 자식\n\t```\n\t내용\n\t```\n+ 접힘\n\t- 숨김\n끝")
+        h.editor.foldedLines = [5]
+        h.controller.selectBlocks()
+        let down = #selector(NSResponder.moveDown(_:))
+        h.press(down)
+        #expect(h.controller.blockSelection == BlockSelection(anchor: 1, focus: 1))
+        h.press(down)
+        #expect(h.controller.blockSelection == BlockSelection(anchor: 2, focus: 2))
+        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)))
+        #expect(h.controller.blockSelection == BlockSelection(anchor: 2, focus: 5))
+        h.press(down)
+        #expect(h.controller.blockSelection == BlockSelection(anchor: 7, focus: 7))
+    }
+
+    @Test func tabShiftsEveryPaintedSubtreeAtItsRelativeDepth() throws {
+        let h = try EditorHarness(week)
+        h.caret(atEndOfLine: 1)
+        h.controller.selectBlocks()
+        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)))
+        h.press(#selector(NSResponder.insertTab(_:)))
+        #expect(h.document.lines.map(\.level) == [0, 1, 2, 2, 3, 1, 2, 0])
+        h.press(#selector(NSResponder.insertBacktab(_:)))
+        #expect(h.editor.text == week)
     }
 
     @Test func navigationExtendsAndShrinksAcrossVisibleBlocks() throws {
@@ -140,7 +223,6 @@ import Testing
         let h = try EditorHarness("+ A\n\t- 첫째\n\t- 둘째\n+ B\n\t- 하나\n\t- 둘")
         h.caret(atEndOfLine: 0)
         h.press(#selector(NSResponder.cancelOperation(_:)))
-        h.press(#selector(NSResponder.moveDownAndModifySelection(_:)))
         h.perform(.moveLineDown)
         #expect(h.editor.text == "+ B\n\t- 하나\n\t- 둘\n+ A\n\t- 첫째\n\t- 둘째")
         h.perform(.moveLineUp)

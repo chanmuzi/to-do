@@ -92,6 +92,8 @@ import Testing
         #expect(tokens.shape(.chromeHeight) == TokenValueParser.length(try section("shape")["chrome-h"]!))
         #expect(tokens.component(.settingsNavSingleLineHoverHeight) == 30)
         #expect(tokens.component(.settingsNavTwoLineHoverInsetY) == 4)
+        #expect(tokens.component(.editorBlockGap) == 2)
+        #expect(tokens.component(.editorBlockPadX) == 6)
         #expect(tokens.component(.caretWidth) == 1.5)
         #expect(tokens.component(.browseWidth) == 300)
         #expect(tokens.docPadding == TokenValueParser.insets(try section("component")["doc-pad"]!))
