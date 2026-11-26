@@ -234,3 +234,10 @@
 | agent-model-inset-y | 3pt | 모델 단추 위아래 여백 |
 
 모델 단추의 간격과 좌우 여백은 `capture-val-gap` 6pt다. 체크박스 올림 바탕은 `check-size` 14pt에 `sp-1` 4pt를 사방으로 더하고 `r-control`을 쓴다.
+
+### 본문 블록 상자 (D-342)
+
+| component 토큰 | 값 | 쓰는 곳 |
+| --- | --- | --- |
+| `editor-block-gap` | 2pt | 블록 선택과 블록 색 상자 사이의 틈. 한 줄 칸의 위아래에서 절반씩 뺀다. |
+| `editor-block-pad-x` | 6pt | 블록 상자가 해당 들여쓰기 시작점에서 왼쪽으로 뻗는 거리 |
