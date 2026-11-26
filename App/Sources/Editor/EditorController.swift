@@ -5,7 +5,7 @@ import DateTime
 /// 줄별 모양을 정하는 상태. 이 값이 같으면 모양도 같다.
 struct KeyStamp: Equatable {
     var documentVersion: Int
-    var folded: Set<Int>
+    var foldState: FoldState
     var animating: Set<Int>
     var hoveredLine: Int?
     var hoveredOffset: Int?
@@ -72,7 +72,8 @@ final class EditorController: NSObject {
     }
     var blockSelection: BlockSelection?
     var document = MarkdownDocument("")
-    var folded: Set<Int> = []
+    var foldState = FoldState()
+    var folded: Set<Int> { foldState.closed }
     /// 화면에 입혀 둔 줄별 모양. 다음 모양과 견주어 달라진 줄만 다시 입힌다.
     var appliedKeys: [LineRenderKey] = []
     var isApplyingEdit = false
@@ -100,9 +101,9 @@ final class EditorController: NSObject {
     var documentVersion = 0
     var keysCache: (stamp: KeyStamp, keys: [LineRenderKey])?
     /// 바깥이 알고 있는 접힘(바깥에서 넣었거나 마지막으로 알린 값). 이것과 달라지면 `onFoldChange`를 부른다.
-    var reportedFolds: Set<Int> = []
+    var reportedFolds = FoldState()
     /// 원문이 바뀌기 직전의 접힘. 편집이 접힘을 바꿨으면 되돌리기에 함께 적는다.
-    var foldsBeforeEdit: Set<Int>?
+    var foldsBeforeEdit: FoldState?
     /// 마지막으로 알린 뒤에 원문에 가해진 편집들(바뀌기 전의 원문, 바뀐 범위, 길이 변화).
     var editsSinceFlush: [(old: MarkdownDocument, range: NSRange, delta: Int)] = []
     /// 접힌 줄 번호를 스스로 정한 편집(줄 옮기기, 줄 머리 바꾸기)이 있었다. 되돌릴 때 접힘을 그대로 되살려야 한다.
@@ -132,8 +133,8 @@ final class EditorController: NSObject {
     /// 되돌리기, 다시 하기가 진행 중이다.
     var isReplayingUndo = false
     /// 되돌리기, 다시 하기가 시작될 때의 접힘과, 끝난 뒤에 되살릴 접힘.
-    var foldsBeforeUndo: Set<Int>?
-    var pendingFoldRestore: Set<Int>?
+    var foldsBeforeUndo: FoldState?
+    var pendingFoldRestore: FoldState?
     /// 원문이 바뀌었는데 아직 바깥에 알리지 않았다(조합 중인 글자는 `textDidChange`가 오지 않는다).
     var hasPendingChange = false
     var isFlushScheduled = false
@@ -199,10 +200,11 @@ final class EditorController: NSObject {
     }
 
     /// 노트를 연다. 원문과 접힘을 한 번에 넣고 아무것도 알리지 않는다.
-    func load(text newText: String, foldedLines: Set<Int>) {
+    func load(text newText: String, foldedLines: Set<Int>, openedEmptyToggleLines: Set<Int>) {
         let normalized = LineEndings.normalized(newText)
         if normalized != text { replaceText(normalized) }
-        setFolded(foldedLines, notify: false)
+        applyFolds(FoldState(closed: foldedLines, openedEmpty: openedEmptyToggleLines))
+        reportedFolds = foldState
     }
 
     /// 접힌 토글의 줄 번호(0부터). 원문에는 적지 않는 보기 상태다. 지금 원문에서 토글이 아닌 줄 번호는 버린다.
@@ -400,18 +402,18 @@ final class EditorController: NSObject {
 
     /// - Parameter notify: 사용자가 접고 편 것이면 `true`. 바깥에서 넣은 값이면 `false`(알리지 않는다).
     func setFolded(_ newValue: Set<Int>, notify: Bool) {
-        applyFolds(newValue)
-        if notify { notifyFoldChangeIfNeeded() } else { reportedFolds = folded }
+        applyFolds(FoldState(closed: newValue, openedEmpty: foldState.openedEmpty))
+        if notify { notifyFoldChangeIfNeeded() } else { reportedFolds = foldState }
     }
 
     /// 접힘을 바꾸고 화면에 입힌다. 알리지는 않는다.
-    func applyFolds(_ newValue: Set<Int>) {
-        let sanitized = FoldState.sanitized(newValue, in: document)
-        guard sanitized != folded else { return }
-        if let hoveredGutterLine, folded.symmetricDifference(sanitized) != [hoveredGutterLine] {
+    func applyFolds(_ newValue: FoldState) {
+        let sanitized = newValue.sanitized(in: document)
+        guard sanitized != foldState else { return }
+        if let hoveredGutterLine, folded.symmetricDifference(sanitized.closed) != [hoveredGutterLine] {
             setHoveredGutter(nil)
         }
-        folded = sanitized
+        foldState = sanitized
         textView.window?.invalidateCursorRects(for: textView)
         refreshStyling()
         reportContentHeight()
@@ -419,8 +421,8 @@ final class EditorController: NSObject {
 
     /// 접힘이 바깥이 알고 있는 값과 달라졌으면 알린다. 되돌리는 중에는 끝난 뒤에 한 번만 알린다.
     func notifyFoldChangeIfNeeded() {
-        guard !isReplayingUndo, folded != reportedFolds else { return }
-        reportedFolds = folded
+        guard !isReplayingUndo, foldState != reportedFolds else { return }
+        reportedFolds = foldState
         onFoldChange?(folded)
     }
 }

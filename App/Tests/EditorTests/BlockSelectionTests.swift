@@ -331,3 +331,58 @@ import Testing
         #expect(h.editor.text == "[ ] 회의\\\n내일 자료")
     }
 }
+
+extension BlockSelectionTests {
+    @Test func shiftCommandArrowsMoveOnlySelectedBlocks() throws {
+        let h = try EditorHarness.at("머리\n+ |제목\n\t안\n끝")
+        h.editor.foldedLines = [1]
+        #expect(!h.view.canPerformFormat(.moveSelectedBlockUp))
+        #expect(!h.key(126, "\u{F700}", [.shift, .command, .numericPad, .function]))
+        h.controller.selectBlocks()
+        #expect(h.view.canPerformFormat(.moveSelectedBlockUp))
+        #expect(h.key(126, "\u{F700}", [.shift, .command, .numericPad, .function]))
+        #expect(h.editor.text == "+ 제목\n\t안\n머리\n끝")
+        #expect(h.editor.foldedLines == [0])
+        #expect(h.key(125, "\u{F701}", [.shift, .command, .numericPad, .function]))
+        #expect(h.editor.text == "머리\n+ 제목\n\t안\n끝")
+        #expect(h.editor.foldedLines == [1])
+    }
+
+    @Test func backspaceAfterBlockCopyAndUndoAfterMarkdownInsertion() throws {
+        let h = try EditorHarness.at("- 원본|")
+        h.controller.selectBlocks()
+        h.step { h.controller.pasteSource("- 사본") }
+        #expect(h.controller.blockSelection?.rows == 1...1)
+        h.press(NSResponder.backspace)
+        #expect(h.editor.text == "- 원본")
+        h.controller.selectBlocks()
+        h.perform(.duplicate)
+        #expect(h.controller.blockSelection?.rows == 1...1)
+        h.press(NSResponder.backspace)
+        #expect(h.editor.text == "- 원본")
+
+        let text = try EditorHarness()
+        text.step { text.controller.pasteSource("- **글**") }
+        #expect(text.document.lines[0].kind == .bullet)
+        text.undo()
+        #expect(text.editor.text.isEmpty)
+        text.type(">")
+        text.type(" ")
+        text.undo()
+        #expect(text.editor.text == ">")
+    }
+
+    @Test func backspaceRemovesFormattedTextThenMarkerThenRow() throws {
+        for content in ["**글|**", "==글|=={파랑}", "[글|](https://example.org)", "글| <!-- 노랑 바탕 -->"] {
+            let h = try EditorHarness.at("위\n[ ] " + content)
+            h.press(NSResponder.backspace)
+            #expect(h.document.lines.count == 2)
+            #expect(h.document.lines[1].kind == .todo(done: false))
+            #expect(h.document.lines[1].contentRange.length == 0)
+            h.press(NSResponder.backspace)
+            #expect(h.document.lines[1].kind == .paragraph)
+            h.press(NSResponder.backspace)
+            #expect(h.editor.text == "위")
+        }
+    }
+}

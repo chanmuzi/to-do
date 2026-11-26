@@ -174,6 +174,8 @@ nonisolated enum ParagraphStyler {
 
             if let comment = line.inkComment { hide(comment) }
             if line.hasHardBreak { hide(NSRange(location: line.contentEnd, length: 1)) }
+            decoration.showsEmptyToggleHint = key.showsEmptyToggleHint
+            decoration.showsTogglePlaceholder = key.kind.isToggle && !key.isContinuation && !line.hasHardBreak && line.contentRange.length == 0
             decoration.gutterX = left
             decoration.quoteBar = isQuote
             decoration.coversTrailingQuote = key.coversTrailingQuote

@@ -41,7 +41,7 @@ public final class MarkdownEditor {
     /// 넣을 때는 `onTextChange`를 부르지 않고, 같은 글이면 아무것도 하지 않는다.
     /// 다른 글을 넣으면 되돌리기 기록을 비우고, 커서는 가능한 한 제자리에 둔다.
     /// 접힘은 같은 줄 번호가 새 글에서도 토글일 때만 남고, 그래서 달라지면 `onFoldChange`로 알린다.
-    /// 노트를 처음 열 때는 `load(text:foldedLines:)`를 쓴다.
+    /// 노트를 처음 열 때는 `load(text:foldedLines:openedEmptyToggleLines:)`를 쓴다.
     public var text: String {
         get { controller.text }
         set { controller.text = newValue }
@@ -49,8 +49,8 @@ public final class MarkdownEditor {
 
     /// 노트를 연다. 원문과 접힌 줄을 한 번에 넣는다(순서를 신경 쓸 필요가 없다).
     /// `onTextChange`, `onFoldChange`를 부르지 않는다. 원문이 달라지면 되돌리기 기록을 비운다.
-    public func load(text: String, foldedLines: Set<Int> = []) {
-        controller.load(text: text, foldedLines: foldedLines)
+    public func load(text: String, foldedLines: Set<Int> = [], openedEmptyToggleLines: Set<Int> = []) {
+        controller.load(text: text, foldedLines: foldedLines, openedEmptyToggleLines: openedEmptyToggleLines)
     }
 
     /// 바깥(이 편집기가 아닌 쪽)이 원문 끝에 글을 덧붙였을 때 그 글만 넘긴다(빠른 캡처가 떠 있는 노트에
@@ -187,15 +187,18 @@ public final class MarkdownEditor {
     /// 지금의 내용 높이(안쪽 여백 포함). 뷰에 너비가 정해진 뒤에 맞는 값이 나온다.
     public var contentHeight: CGFloat { controller.contentHeight }
 
-    /// 접힌 토글의 줄 번호(0부터). 원문에 적지 않는 보기 상태다. 지금 원문에서 토글이 아닌 줄 번호는 버린다
-    /// (원문보다 먼저 넣으면 남지 않는다. 함께 넣을 때는 `load(text:foldedLines:)`).
+    /// 닫힘을 기록한 토글의 줄 번호(0부터). 기록 없이 기본값으로 닫힌 빈 토글은 제외한다. 지금 원문에서 토글이 아닌 줄 번호는 버린다
+    /// (원문보다 먼저 넣으면 남지 않는다. 함께 넣을 때는 `load(text:foldedLines:openedEmptyToggleLines:)`).
     /// 넣을 때는 `onFoldChange`를 부르지 않는다. 편집을 되돌리면 접힘도 그 편집 전으로 돌아간다.
     public var foldedLines: Set<Int> {
         get { controller.foldedLines }
         set { controller.foldedLines = newValue }
     }
 
-    /// 접힌 토글이 바뀌었을 때(사용자가 접고 폈거나, 원문이 바뀌어 줄 번호가 옮겨졌을 때).
+    /// 직접 열어 안내를 보이는 빈 토글의 줄 번호.
+    public var openedEmptyToggleLines: Set<Int> { controller.foldState.openedEmpty }
+
+    /// 닫힘이나 빈 토글의 열림 기록이 바뀌었을 때(사용자가 접고 폈거나, 원문이 바뀌어 줄 번호가 옮겨졌을 때).
     /// 값이 실제로 달라졌을 때만 한 번 부른다.
     public var onFoldChange: ((Set<Int>) -> Void)? {
         get { controller.onFoldChange }

@@ -62,6 +62,7 @@ enum MainMenu {
             .separator(), format("제목 1", .heading(1)), format("제목 2", .heading(2)), format("제목 3", .heading(3)),
             format("투두로 바꾸기", .toggleTodo), format("코드 블록", .codeBlock), .separator(),
             format("완료 표시, 접기와 펼치기", .toggleDone), format("줄 위로 옮기기", .moveLineUp), format("줄 아래로 옮기기", .moveLineDown),
+            format("고른 블록 위로 옮기기", .moveSelectedBlockUp), format("고른 블록 아래로 옮기기", .moveSelectedBlockDown),
         ])
         add("노트", [
             command("제목 고치기", .editTitle), command("항상 위에 고정", .togglePin),

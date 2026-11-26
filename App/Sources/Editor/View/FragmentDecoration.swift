@@ -29,6 +29,9 @@ nonisolated final class FragmentDecoration: NSObject {
     var coversTrailingQuote = false
     var startsQuote = false
     var endsQuote = false
+    static let emptyToggleHint = "빈 토글입니다. 누르거나 블록을 끌어 넣으세요"
+    var showsEmptyToggleHint = false
+    var showsTogglePlaceholder = false
     var divider = false
     var chevronSize: CGFloat
     var gutterWidth: CGFloat { style.gutter + chevronSize - style.metrics.chevronSize }

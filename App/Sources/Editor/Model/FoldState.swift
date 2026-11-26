@@ -1,7 +1,46 @@
 import Foundation
 
-/// 접힌 토글. 접힘은 원문에 적지 않고 줄 번호로 따로 들고 있다.
-nonisolated enum FoldState {
+/// 사용자가 정한 닫힘과 빈 토글의 열림. 원문에는 적지 않는다.
+nonisolated struct FoldState: Equatable, Sendable {
+    var closed: Set<Int> = []
+    var openedEmpty: Set<Int> = []
+
+    var isEmpty: Bool { closed.isEmpty && openedEmpty.isEmpty }
+
+    static func isEmptyToggle(_ row: Int, in doc: MarkdownDocument) -> Bool {
+        doc.lines.indices.contains(row) && doc.lines[row].kind.isToggle
+            && doc.lines[row].subtreeEnd == doc.blockLines(at: row).upperBound + 1
+    }
+
+    func isClosed(_ row: Int, in doc: MarkdownDocument) -> Bool {
+        closed.contains(row) || (!openedEmpty.contains(row) && Self.isEmptyToggle(row, in: doc))
+    }
+
+    func toggling(_ rows: Set<Int>, in doc: MarkdownDocument) -> Self {
+        var next = self
+        for row in rows {
+            if isClosed(row, in: doc) {
+                next.closed.remove(row)
+                if Self.isEmptyToggle(row, in: doc) { next.openedEmpty.insert(row) }
+            } else {
+                next.closed.insert(row)
+                next.openedEmpty.remove(row)
+            }
+        }
+        return next
+    }
+
+    func sanitized(in doc: MarkdownDocument) -> Self {
+        Self(closed: Self.sanitized(closed, in: doc),
+             openedEmpty: openedEmpty.filter { !closed.contains($0) && Self.isEmptyToggle($0, in: doc) })
+    }
+
+    func remapped(old: MarkdownDocument, new: MarkdownDocument, editedRange: NSRange, delta: Int) -> Self {
+        Self(closed: Self.remapped(closed, old: old, new: new, editedRange: editedRange, delta: delta),
+             openedEmpty: Self.remapped(openedEmpty, old: old, new: new, editedRange: editedRange, delta: delta)
+                .filter { Self.isEmptyToggle($0, in: new) })
+    }
+
     /// 토글이 아닌 줄 번호를 버린다.
     static func sanitized(_ folded: Set<Int>, in doc: MarkdownDocument) -> Set<Int> {
         folded.filter { $0 >= 0 && $0 < doc.lines.count && doc.lines[$0].kind.isToggle }
@@ -87,6 +126,11 @@ nonisolated enum FoldState {
         return sanitized(result, in: new)
     }
 
+    /// 옮겨 간 줄을 새로 품은 접힌 조상만 연다. 옮긴 토글 자체의 접힘은 보존한다.
+    static func revealing(_ row: Int, in doc: MarkdownDocument, folded: Set<Int>) -> Set<Int> {
+        folded.filter { root in !(doc.blockLines(at: root).upperBound < row && row < doc.lines[root].subtreeEnd) }
+    }
+
     /// 접기. 커서 줄이 토글이면 그 줄을, 아니면 그 줄을 품은 가장 가까운 토글을 접는다.
     static func fold(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> (folded: Set<Int>, selection: NSRange)? {
         let index = doc.blockLines(at: doc.lineIndex(at: selection.location)).lowerBound
@@ -99,8 +143,6 @@ nonisolated enum FoldState {
             }
         }
         guard let target else { return nil }
-        let title = doc.lines[target]
-        guard title.subtreeEnd > doc.blockLines(at: target).upperBound + 1 else { return nil }
         let end = doc.lines[doc.blockLines(at: target).upperBound].end
         return (folded.union([target]), NSMaxRange(selection) > end ? NSRange(location: end, length: 0) : selection)
     }

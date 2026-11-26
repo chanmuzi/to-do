@@ -6,6 +6,7 @@ nonisolated enum FoldPersistence {
     /// (상태 파일에 항목을 남기지 않는다).
     /// 줄 번호만 적어 두면 창이 닫힌 사이에 파일이 바뀌었을 때 엉뚱한 토글이 접힌다.
     static func stored(_ folded: Set<Int>, in text: String) -> (lines: [Int], texts: [String])? {
+        guard !folded.isEmpty else { return nil }
         let body = lines(of: text)
         let valid = folded.filter { $0 >= 0 && $0 < body.count }.sorted()
         return valid.isEmpty ? nil : (valid, valid.map { String(body[$0]) })

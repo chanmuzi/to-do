@@ -139,13 +139,13 @@ extension EditorController {
         }
         if redo {
             if let target = record.foldsAfter {
-                record.foldsBefore = foldsBeforeUndo ?? folded
+                record.foldsBefore = foldsBeforeUndo ?? foldState
                 pendingFoldRestore = target
             }
             history.pushUndo(record)
         } else {
             if let target = record.foldsBefore {
-                record.foldsAfter = foldsBeforeUndo ?? folded
+                record.foldsAfter = foldsBeforeUndo ?? foldState
                 pendingFoldRestore = target
             }
             history.redoStack.append(record)
@@ -171,12 +171,12 @@ extension EditorController {
         editSetFoldsExplicitly = false
         guard let before = foldsBeforeEdit else { return }
         foldsBeforeEdit = nil
-        guard !before.isEmpty || !folded.isEmpty, !isReplayingUndo, history.open != nil else { return }
+        guard !before.isEmpty || !foldState.isEmpty, !isReplayingUndo, history.open != nil else { return }
         if !explicit, edits.count == 1, let edit = edits.first {
             let oldRange = NSRange(location: edit.range.location, length: edit.range.length - edit.delta)
-            let redone = FoldState.remapped(before, old: edit.old, new: document, editedRange: edit.range, delta: edit.delta)
-            let undone = FoldState.remapped(folded, old: document, new: edit.old, editedRange: oldRange, delta: -edit.delta)
-            if redone == folded, undone == before { return }
+            let redone = before.remapped(old: edit.old, new: document, editedRange: edit.range, delta: edit.delta)
+            let undone = foldState.remapped(old: document, new: edit.old, editedRange: oldRange, delta: -edit.delta)
+            if redone == foldState, undone == before { return }
         }
         // 한 단계에 여럿이 있으면 가장 먼저 적힌 것이 남는다.
         if history.open?.foldsBefore == nil { history.open?.foldsBefore = before }
@@ -184,7 +184,7 @@ extension EditorController {
 
     private func undoWillReplay() {
         isReplayingUndo = true
-        foldsBeforeUndo = folded
+        foldsBeforeUndo = foldState
         pendingFoldRestore = nil
     }
 

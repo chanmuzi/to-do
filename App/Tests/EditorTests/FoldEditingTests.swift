@@ -50,11 +50,14 @@ import Testing
         #expect(h.editor.foldedLines == [1])
     }
 
-    @Test func returnOnAnEmptyNestedFoldedToggleOutdentsItWithItsChildren() throws {
+    @Test func returnOnEmptyNestedFoldedToggleRemovesMarkerAndAdoptsChildren() throws {
         let h = try loaded("- a\n\t+ \n\t\tc1\nz", folded: [1])
         h.caret(atEndOfLine: 1)
         h.press(NSResponder.newline)
-        #expect(h.editor.text == "- a\n+ \n\tc1\nz")
+        #expect(h.editor.text == "- a\n\t\n\tc1\nz")
+        #expect(h.editor.foldedLines.isEmpty)
+        h.undo()
+        #expect(h.editor.text == "- a\n\t+ \n\t\tc1\nz")
         #expect(h.editor.foldedLines == [1])
     }
 
@@ -247,5 +250,68 @@ import Testing
         // 감춘 줄이 문서 끝이면 문서 끝도 감춘 줄 안이다.
         let tail = MarkdownDocument("+ T\n\tc")
         #expect(FoldState.brokenRoots(by: NSRange(location: 6, length: 0), in: tail, folded: [0]) == [0])
+    }
+}
+
+extension FoldEditingTests {
+    @Test func newToggleFoldsAndIndentRevealsItsChild() throws {
+        let h = try EditorHarness.at(">|제목\n다음")
+        h.type(" ")
+        #expect(h.editor.foldedLines == [0])
+        h.caret(atEndOfLine: 1)
+        h.perform(.indent)
+        #expect(h.editor.foldedLines.isEmpty)
+        #expect(h.editor.text == "+ 제목\n\t다음")
+        h.undo()
+        #expect(h.editor.foldedLines == [0])
+        let parent = try EditorHarness.at("- >|제목\n\t자식")
+        parent.type(" ")
+        #expect(parent.editor.text == "+ 제목\n\t자식")
+        #expect(parent.editor.foldedLines.isEmpty)
+    }
+}
+
+extension FoldEditingTests {
+    @Test func movingAndInsertingInsideAClosedToggleRevealTheDestination() throws {
+        let h = try EditorHarness.at("부모\n\t|옮길 줄\n+ 토글")
+        h.editor.foldedLines = [2]
+        h.controller.selectBlocks()
+        h.perform(.moveSelectedBlockDown)
+        #expect(h.editor.text == "부모\n+ 토글\n\t옮길 줄")
+        #expect(h.editor.foldedLines.isEmpty)
+
+        h.controller.clearBlocks()
+        h.caret(atEndOfLine: 1)
+        h.perform(.toggleDone)
+        h.controller.selectBlocks()
+        h.step { h.controller.pasteSource("붙인 줄", inside: true) }
+        #expect(h.editor.text == "부모\n+ 토글\n\t붙인 줄\n\t옮길 줄")
+        #expect(h.editor.foldedLines.isEmpty)
+    }
+
+    @Test func emptyItemReturnTwiceLeavesToggle() throws {
+        for marker in ["[ ] ", "- ", "+ ", "> ", "+ ## "] {
+            let h = try EditorHarness.at("+ 부모\n\t" + marker + "|")
+            h.press(NSResponder.newline)
+            #expect(h.marked == "+ 부모\n\t|")
+            h.press(NSResponder.newline)
+            #expect(h.marked == "+ 부모\n|")
+            h.undo()
+            #expect(h.marked == "+ 부모\n\t|")
+        }
+    }
+}
+
+extension FoldEditingTests {
+    @Test func returnOnUnrecordedEmptyToggleCreatesClosedSibling() throws {
+        for marker in ["+ ", "+ ## "] {
+            let h = try EditorHarness.at(marker + "제목|")
+            h.press(NSResponder.newline)
+            #expect(h.marked == marker + "제목\n" + marker + "|")
+            #expect(h.controller.currentKeys().allSatisfy { $0.isFolded && !$0.showsEmptyToggleHint })
+            h.undo()
+            #expect(h.marked == marker + "제목|")
+            #expect(h.editor.openedEmptyToggleLines.isEmpty)
+        }
     }
 }

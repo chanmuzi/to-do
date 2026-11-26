@@ -44,6 +44,8 @@ nonisolated package enum EditorShortcuts {
     static let bindings: [Binding] = [
         Binding(modifiers: [.command, .shift], keyCode: Key.nine, action: .toggleTodo),
         Binding(modifiers: [.command], keyCode: Key.returnKey, action: .toggleDone),
+        Binding(modifiers: [.command, .shift], keyCode: Key.up, action: .moveSelectedBlockUp),
+        Binding(modifiers: [.command, .shift], keyCode: Key.down, action: .moveSelectedBlockDown),
         Binding(modifiers: [.command, .control], keyCode: Key.up, action: .moveLineUp),
         Binding(modifiers: [.command, .control], keyCode: Key.down, action: .moveLineDown),
         Binding(modifiers: [.command, .option], keyCode: Key.leftBracket, action: .fold),

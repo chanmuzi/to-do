@@ -242,7 +242,7 @@ import Theme
         #expect(abs(boxes[0].0.maxX - boxes[1].0.minX) < 0.001)
     }
 
-    @Test func editorSelectionBlendsToSelectedOnTheDefaultNoteSurface() throws {
+    @Test func editorSelectionUsesConfirmedBlueInEachAppearance() throws {
         let h = try EditorHarness("본문")
         let color = try #require(h.view.selectedTextAttributes[.backgroundColor] as? NSColor)
         for mode in ThemeAppearance.allCases {
@@ -250,15 +250,10 @@ import Theme
             var resolved: NSColor?
             appearance.performAsCurrentDrawingAppearance { resolved = color.usingColorSpace(.sRGB) }
             let selection = try #require(resolved)
-            let alpha = selection.alphaComponent
-            #expect(alpha > 0 && alpha < 1)
-            let base = h.theme.tokens.noteBackground(paletteID: nil, mode)
-            let target = h.theme.tokens.color(.selected, mode)
-            for (ink, surface, selected) in [(selection.redComponent, base.red, target.red),
-                                             (selection.greenComponent, base.green, target.green),
-                                             (selection.blueComponent, base.blue, target.blue)] {
-                #expect(abs(ink * alpha + surface * (1 - alpha) - selected) * 255 <= 3)
-            }
+            #expect(abs(selection.redComponent * 255 - 35) < 0.01)
+            #expect(abs(selection.greenComponent * 255 - 131) < 0.01)
+            #expect(abs(selection.blueComponent * 255 - 226) < 0.01)
+            #expect(abs(selection.alphaComponent - (mode == .light ? 0.14 : 0.26)) < 0.001)
         }
     }
 
@@ -463,14 +458,14 @@ import Theme
         h.press(NSResponder.newline)
         h.type("새 토글")
         #expect(h.editor.text == "+ 토글\n\t- 안\n+ 새 토글\n밖")
-        #expect(h.editor.foldedLines == [0])
+        #expect(h.editor.foldedLines == [0, 2])
         // 접힌 줄과 맞닿은 줄바꿈을 지우려 하면 먼저 편다(보이지 않는 줄과 합쳐지지 않게).
         h.caret(atEndOfLine: 3)
         h.editor.selectedRange = NSRange(location: h.document.lines[3].start, length: 0)
         h.perform(.moveLineUp)
         #expect(h.editor.text == "+ 토글\n\t- 안\n밖\n+ 새 토글")
         #expect(!h.controller.textView(h.view, doCommandBy: NSResponder.backspace))
-        #expect(h.editor.foldedLines == [])
+        #expect(h.editor.foldedLines == [3])
     }
 
     @Test func linkClickOpensTheAddress() throws {
@@ -560,5 +555,59 @@ import Theme
         h.controller.copyButton.onPress?()
         #expect(board.string(forType: .string) == "let a = 1\nlet b = 2")
         #expect(h.controller.copyButton.accessibilityLabel() == "복사")
+    }
+}
+
+extension MarkdownEditorDisplayTests {
+    @Test func emptyToggleHintRequiresOpeningAnUnrecordedToggle() throws {
+        let h = try EditorHarness("+ ## A\n+ B")
+        #expect(h.controller.currentKeys().allSatisfy { $0.isFolded && !$0.showsEmptyToggleHint })
+        let point = try #require(h.controller.gutterPoint(forLine: 0))
+        #expect(h.controller.handleMouseDown(at: point))
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        #expect(h.controller.currentKeys()[0].showsEmptyToggleHint)
+        h.caret(atEndOfLine: 0)
+        h.controller.selectBlocks()
+        h.perform(.toggleDone)
+        #expect(h.editor.openedEmptyToggleLines.isEmpty)
+        #expect(!h.controller.currentKeys()[0].showsEmptyToggleHint)
+        h.perform(.toggleDone)
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        h.perform(.moveSelectedBlockDown)
+        #expect(h.editor.openedEmptyToggleLines == [1])
+        h.undo()
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        h.redo()
+        #expect(h.editor.openedEmptyToggleLines == [1])
+    }
+
+    @Test func emptyToggleHintReservesOneRowAndCreatesAChild() throws {
+        for suffix in ["", "\n다음"] {
+            let h = try EditorHarness("+ " + suffix)
+            h.place(at: 2)
+            h.editor.foldedLines = [0]
+            let closed = h.controller.measureContentHeight()
+            h.perform(.toggleDone)
+            let open = h.controller.measureContentHeight()
+            #expect(abs(open - closed - h.controller.style.body.lineHeight) <= 1)
+            let layout = h.controller.layoutManager
+            let fragment = try #require(layout.textLayoutFragment(for: layout.documentRange.location) as? MarkdownLayoutFragment)
+            #expect(fragment.decoration?.showsTogglePlaceholder == true)
+            #expect(h.view.accessibilityHelp()?.contains(FragmentDecoration.emptyToggleHint) == true)
+            #expect(h.editor.text == "+ " + suffix)
+            let rect = try #require(fragment.emptyToggleHintRect)
+            h.controller.selectBlocks()
+            let box = try #require(h.controller.blockSelectionRects().first)
+            let origin = h.view.textContainerOrigin
+            #expect(box.maxY <= fragment.layoutFragmentFrame.minY + origin.y + rect.minY)
+            let point = CGPoint(x: rect.midX + fragment.layoutFragmentFrame.minX + origin.x,
+                                y: rect.midY + fragment.layoutFragmentFrame.minY + origin.y)
+            #expect(h.controller.handleMouseDown(at: point))
+            #expect(h.marked == "+ \n\t|" + suffix)
+            #expect(!h.controller.currentKeys()[0].showsEmptyToggleHint)
+            #expect(h.editor.openedEmptyToggleLines.isEmpty)
+            h.undo()
+            #expect(h.editor.openedEmptyToggleLines == [0])
+        }
     }
 }

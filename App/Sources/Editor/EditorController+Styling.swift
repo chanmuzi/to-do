@@ -79,14 +79,14 @@ extension EditorController: NSTextStorageDelegate {
         documentVersion += 1
         if isSettingText {
             // 통째로 바꿔 넣은 글: 같은 줄 번호가 여전히 토글인 접힘만 남긴다.
-            folded = FoldState.sanitized(folded, in: document)
+            foldState = foldState.sanitized(in: document)
             return
         }
         if isApplyingOutsideChange {
             // 바깥이 바꾼 글: 접힘은 줄 번호를 따라 옮기고, 바뀐 줄에 걸친 접힘은 편다. 사용자의 편집이
             // 아니므로 알리지 않는다.
-            folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
-            folded.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
+            foldState = foldState.remapped(old: old, new: document, editedRange: editedRange, delta: delta)
+            foldState.closed.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
             return
         }
         // 미뤄 둔 바깥의 변경이 가리키는 자리를 이 편집만큼 옮긴다.
@@ -95,12 +95,12 @@ extension EditorController: NSTextStorageDelegate {
            !(deferredEditPrecedesComposition && editedRange.location >= NSMaxRange(deferred.range) && NSMaxRange(editedRange) - delta >= NSMaxRange(deferred.range)) {
             deferredOutsideEdit?.shift(editedRange: editedRange, delta: delta)
         }
-        if foldsBeforeEdit == nil { foldsBeforeEdit = folded }
-        folded = FoldState.remapped(folded, old: old, new: document, editedRange: editedRange, delta: delta)
+        if foldsBeforeEdit == nil { foldsBeforeEdit = foldState }
+        foldState = foldState.remapped(old: old, new: document, editedRange: editedRange, delta: delta)
         if isReplayingUndo {
             // 되돌리기가 접혀서 감춘 줄을 고쳤으면 보이도록 편다(D-018). 접힘까지 적어 둔 편집이면
             // 다 돌아온 뒤에 그 접힘을 되살린다.
-            folded.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
+            foldState.closed.subtract(FoldState.brokenRoots(by: editedRange, in: document, folded: folded))
         } else {
             editsSinceFlush.append((old, editedRange, delta))
             recordForUndo(old: old, editedRange: editedRange, delta: delta)
@@ -121,13 +121,13 @@ extension EditorController {
         // 문단을 만들 때마다 불리므로 같은 상태에서는 다시 계산하지 않는다.
         let stamp = KeyStamp(
             documentVersion: documentVersion,
-            folded: folded,
+            foldState: foldState,
             animating: Set(foldTransitions.keys),
             hoveredLine: hoveredLink?.line,
             hoveredOffset: hoveredLink?.offset
         )
         if let cache = keysCache, cache.stamp == stamp { return cache.keys }
-        let keys = LinePresentation.keys(for: document, folded: folded, hoveredLink: hoveredLink,
+        let keys = LinePresentation.keys(for: document, folded: folded, openedEmpty: foldState.openedEmpty, hoveredLink: hoveredLink,
                                          animating: stamp.animating)
         keysCache = (stamp, keys)
         return keys

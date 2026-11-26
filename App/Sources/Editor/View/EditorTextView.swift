@@ -135,7 +135,8 @@ final class EditorTextView: PlainTextInputView {
         if editor?.isActive == true,
            let action = EditorShortcuts.action(keyCode: event.keyCode, modifiers: Self.modifiers(of: event)),
            action != .pasteInside || editor?.blockSelection != nil,
-           action == .bold || !hasMarkedText() {
+           editor?.blockSelection != nil || !action.requiresBlockSelection,
+           action.commitsComposition || !hasMarkedText() {
             editor?.perform(action)
             return true
         }
@@ -177,6 +178,14 @@ final class EditorTextView: PlainTextInputView {
     @objc func pasteInsideBlock(_ sender: Any?) {
         guard isEditable, editor?.blockSelection != nil else { return }
         editor?.paste(from: .general, inside: true)
+    }
+
+    override func accessibilityHelp() -> String? {
+        guard let editor else { return super.accessibilityHelp() }
+        let row = editor.document.lineIndex(at: selectedRange().location)
+        let end = editor.document.blockLines(at: row).upperBound
+        guard editor.currentKeys()[end].showsEmptyToggleHint else { return super.accessibilityHelp() }
+        return [super.accessibilityHelp(), FragmentDecoration.emptyToggleHint].compactMap { $0 }.joined(separator: "\n")
     }
 
     override func accessibilityValueDescription() -> String? {

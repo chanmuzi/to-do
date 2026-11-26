@@ -35,6 +35,8 @@ nonisolated public enum EditorAction: Sendable, Hashable {
     case toggleTodo
     case duplicate
     case toggleDone
+    case moveSelectedBlockUp
+    case moveSelectedBlockDown
     case moveLineUp
     case moveLineDown
     case fold
@@ -49,4 +51,17 @@ nonisolated public enum EditorAction: Sendable, Hashable {
     case inlineCode
     case codeBlock
     case link
+}
+
+extension EditorAction {
+    var requiresBlockSelection: Bool { self == .moveSelectedBlockUp || self == .moveSelectedBlockDown }
+    var commitsComposition: Bool { self == .bold || self == .toggleDone }
+
+    var editingAction: Self {
+        switch self {
+        case .moveSelectedBlockUp: .moveLineUp
+        case .moveSelectedBlockDown: .moveLineDown
+        default: self
+        }
+    }
 }

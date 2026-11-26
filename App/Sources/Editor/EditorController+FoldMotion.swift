@@ -27,10 +27,31 @@ struct FoldTransition {
 }
 
 extension EditorController {
-    func changeUserFolds(_ next: Set<Int>) {
-        guard next != folded else { return }
-        startFoldMotion(from: folded, to: next)
-        setFolded(next, notify: true)
+    /// 줄 명령에 넘길 접힘. 기본값으로 닫힌 빈 토글은 커서 줄에서만 판단하면 된다.
+    func foldsAtCaret(_ caret: NSRange) -> Set<Int> {
+        let row = document.blockLines(at: document.lineIndex(at: caret.location)).lowerBound
+        return foldState.isClosed(row, in: document) ? folded.union([row]) : folded
+    }
+
+    func performFoldCommand(_ action: EditorAction, at caret: NSRange, moveCaret: Bool) {
+        let current = foldsAtCaret(caret)
+        let next: Set<Int>
+        if action == .fold {
+            guard let change = FoldState.fold(document, selection: caret, folded: current) else { return }
+            if moveCaret { setSelection(change.selection) }
+            next = change.folded
+        } else {
+            guard let change = FoldState.unfold(document, selection: caret, folded: current) else { return }
+            next = change
+        }
+        changeUserFolds(foldState.toggling(current.symmetricDifference(next), in: document))
+    }
+
+    func changeUserFolds(_ next: FoldState) {
+        guard next != foldState else { return }
+        startFoldMotion(from: folded, to: next.closed)
+        applyFolds(next)
+        notifyFoldChangeIfNeeded()
     }
 
     func startFoldMotion(from previous: Set<Int>, to next: Set<Int>) {
