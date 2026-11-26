@@ -224,9 +224,7 @@ public final class MarkdownEditor {
     package var lastInkToken: ColorToken { EditorController.lastInk.token }
     package func inkMenu() -> NSMenu { controller.inkMenu() }
 
-    package static var underlineAction: Selector { #selector(EditorTextView.toggleMarkdownUnderline(_:)) }
     package static var pasteInsideAction: Selector { #selector(EditorTextView.pasteInsideBlock(_:)) }
-    package static var toggleBoldAction: Selector { #selector(EditorTextView.toggleMarkdownBold(_:)) }
 
     /// 선택 범위(원문의 UTF-16 위치).
     public var selectedRange: NSRange {

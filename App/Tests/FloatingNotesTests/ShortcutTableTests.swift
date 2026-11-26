@@ -143,14 +143,6 @@ import Theme
             "코드 블록": [.codeBlock],
             "링크": [.link],
         ]
-        func modifiers(_ chord: KeyChord) -> EditorShortcuts.Modifiers {
-            var result: EditorShortcuts.Modifiers = []
-            if chord.modifiers.contains(.command) { result.insert(.command) }
-            if chord.modifiers.contains(.shift) { result.insert(.shift) }
-            if chord.modifiers.contains(.option) { result.insert(.option) }
-            if chord.modifiers.contains(.control) { result.insert(.control) }
-            return result
-        }
         // Tab, ⇧Tab은 편집기가 글자 입력 경로에서 받는다(단축키 목록에 없다).
         let typed: Set<String> = ["들여쓰기 (여러 줄 선택 또는 날짜 제안이 없을 때)", "내어쓰기 / 본문 처음에서 제목으로", "현재 줄 날짜 제안 받기", "날짜 제안 닫기, 블록 고르기 또는 풀기", "같은 블록 안에서 줄바꿈"]
         let rows = ShortcutTable.standard.entries(in: .editing).filter { !typed.contains($0.action) }
@@ -163,11 +155,11 @@ import Theme
             #expect(row.chords.count == actions.count, "\(row.action)")
             for (chord, action) in zip(row.chords, actions) {
                 #expect(
-                    EditorShortcuts.action(keyCode: chord.key.keyCode, modifiers: modifiers(chord)) == action,
+                    EditorShortcuts.action(keyCode: chord.key.keyCode, modifiers: chord.modifiers.eventFlags) == action,
                     "\(row.action) \(chord.labels.joined())"
                 )
                 fromTable.insert(EditorShortcuts.Binding(
-                    modifiers: modifiers(chord), keyCode: chord.key.keyCode, action: action
+                    modifiers: chord.modifiers.eventFlags, keyCode: chord.key.keyCode, action: action
                 ))
             }
         }

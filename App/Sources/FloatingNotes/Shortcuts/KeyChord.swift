@@ -125,6 +125,16 @@ nonisolated struct ShortcutModifiers: OptionSet, Hashable, Sendable {
     }
 }
 
+extension ShortcutModifiers {
+    nonisolated init(eventFlags flags: NSEvent.ModifierFlags) {
+        self = []
+        if flags.contains(.control) { insert(.control) }
+        if flags.contains(.option) { insert(.option) }
+        if flags.contains(.shift) { insert(.shift) }
+        if flags.contains(.command) { insert(.command) }
+    }
+}
+
 /// 키 하나와 보조 키의 조합.
 nonisolated struct KeyChord: Hashable, Sendable {
     var key: ShortcutKey

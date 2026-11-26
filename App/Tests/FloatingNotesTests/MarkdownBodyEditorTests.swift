@@ -781,6 +781,7 @@ extension MarkdownBodyEditorTests {
         let (id, adapter) = try fixture.open(NoteDraft(title: "서식", body: "한글"))
         let window = try #require(fixture.notePanels.window(for: id))
         let editor = adapter.editor
+        fixture.notePanels.isKeyPanel = { $0 === window }
         editor.forcesActiveAppearance = true
         adapter.focus()
         let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
@@ -788,8 +789,12 @@ extension MarkdownBodyEditorTests {
             timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: "ㅠ",
             charactersIgnoringModifiers: "ㅠ", isARepeat: false, keyCode: 11))
         func pressBold() {
-            let handled = window.performKeyEquivalent(with: event) || menu.performKeyEquivalent(with: event)
-            #expect(handled)
+            let handledByEditor = window.performKeyEquivalent(with: event)
+            #expect(handledByEditor)
+            if !handledByEditor {
+                Issue.record("편집기가 받은 굵게 키가 앱 메뉴까지 전달되었습니다.")
+                _ = menu.performKeyEquivalent(with: event)
+            }
         }
         editor.selectedRange = NSRange(location: 0, length: 2)
         pressBold()
