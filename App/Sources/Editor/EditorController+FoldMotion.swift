@@ -17,7 +17,7 @@ nonisolated final class FoldDrawing {
 struct FoldTransition {
     let from: Double
     let to: Double
-    let start: TimeInterval
+    var start: TimeInterval
     let duration: TimeInterval
 
     func value(at now: TimeInterval, curve: BezierCurve) -> Double {
@@ -49,9 +49,15 @@ extension EditorController {
 
     func changeUserFolds(_ next: FoldState) {
         guard next != foldState else { return }
+        let changed = folded.symmetricDifference(next.closed)
         startFoldMotion(from: folded, to: next.closed)
         applyFolds(next)
         notifyFoldChangeIfNeeded()
+        // 동기 배치와 저장이 끝난 시각부터 시작한다. 반전의 출발 투명도는 누른 순간의 값이다.
+        if !foldTransitions.isEmpty {
+            let start = foldClock()
+            for row in changed { foldTransitions[row]?.start = start }
+        }
     }
 
     func startFoldMotion(from previous: Set<Int>, to next: Set<Int>) {
@@ -79,6 +85,8 @@ extension EditorController {
     }
 
     @discardableResult func advanceFoldMotion() -> Bool {
+        let interval = EditorTrace.begin("advanceFoldMotion")
+        defer { EditorTrace.end("advanceFoldMotion", interval) }
         let now = foldClock()
         let count = foldTransitions.count
         for (row, transition) in foldTransitions {
@@ -89,9 +97,12 @@ extension EditorController {
                 foldDrawing.frames[row]?.openness = transition.value(at: now, curve: theme.motion.curve)
             }
         }
-        refreshStyling()
-        textView.needsDisplay = true
-        if count != foldTransitions.count { reportContentHeight() }
+        // 중간 프레임은 기존 조각에서 투명도와 회전만 다시 그린다.
+        if count != foldTransitions.count {
+            refreshStyling()
+            reportContentHeight()
+        }
+        textView.setNeedsDisplay(textView.visibleRect)
         if foldTransitions.isEmpty {
             foldTask = nil
             return false

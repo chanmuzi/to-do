@@ -107,7 +107,7 @@ extension EditorController {
         guard let start = contentStorage.location(base, offsetBy: range.location),
               let end = contentStorage.location(base, offsetBy: NSMaxRange(range)),
               let textRange = NSTextRange(location: start, end: end) else { return [] }
-        layoutManager.ensureLayout(for: textRange)
+        ensureLayout(for: textRange)
         let origin = textView.textContainerOrigin
         var rects: [CGRect] = []
         layoutManager.enumerateTextSegments(in: textRange, type: .standard, options: []) { _, frame, _, _ in

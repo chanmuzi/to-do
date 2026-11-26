@@ -7,6 +7,8 @@ extension EditorController: NSTextContentStorageDelegate {
         _ textContentStorage: NSTextContentStorage,
         textParagraphWith range: NSRange
     ) -> NSTextParagraph? {
+        let interval = EditorTrace.begin("textParagraphWith")
+        defer { EditorTrace.end("textParagraphWith", interval) }
         guard let storage = textContentStorage.textStorage, NSMaxRange(range) <= storage.length else { return nil }
         let index = document.lineIndex(at: range.location)
         let line = document.lines[index]
@@ -68,13 +70,23 @@ extension EditorController: NSTextStorageDelegate {
         changeInLength delta: Int
     ) {
         // 글자가 바뀌면 문단을 다시 만들기 전에 곧바로 다시 푼다(문단을 만들 때 이 값을 쓴다).
+        if let pending = pendingHeightRange {
+            // 연속 편집이면 앞서 기록한 원문 좌표도 움직일 수 있다.
+            pendingHeightRange = editedMask.contains(.editedCharacters)
+                ? NSRange(location: 0, length: textStorage.length) : NSUnionRange(pending, editedRange)
+        } else {
+            pendingHeightRange = editedRange
+        }
         guard editedMask.contains(.editedCharacters) else { return }
         setHoveredGutter(nil)
         let old = document
         stopFoldMotion()
         // 저장소 편집 중에는 삽입점이나 커서 영역을 다시 배치하지 않는다.
         blockSelection = nil
-        document = MarkdownDocument(textStorage.string)
+        document = EditorTrace.measure("didProcessEditing.parse") {
+            if isSettingText { return MarkdownDocument(textStorage.string) }
+            return MarkdownDocument(updating: old, text: textStorage.string, editedRange: editedRange, delta: delta)
+        }
         lastBodyEdit = (old.text, NSRange(location: editedRange.location, length: editedRange.length - delta))
         documentVersion += 1
         if isSettingText {
@@ -127,8 +139,10 @@ extension EditorController {
             hoveredOffset: hoveredLink?.offset
         )
         if let cache = keysCache, cache.stamp == stamp { return cache.keys }
-        let keys = LinePresentation.keys(for: document, folded: folded, openedEmpty: foldState.openedEmpty, hoveredLink: hoveredLink,
-                                         animating: stamp.animating)
+        let keys = EditorTrace.measure("LinePresentation.keys") {
+            LinePresentation.keys(for: document, folded: folded, openedEmpty: foldState.openedEmpty,
+                                  hoveredLink: hoveredLink, animating: stamp.animating)
+        }
         keysCache = (stamp, keys)
         return keys
     }
@@ -138,14 +152,18 @@ extension EditorController {
         guard !isRestyling else { return }
         updateTrailingLineStyle()
         let keys = currentKeys()
-        defer { appliedKeys = keys }
-        guard let changed = LinePresentation.changedLines(old: appliedKeys, new: keys) else { return }
+        guard appliedStamp != keysCache?.stamp else { return }
+        let previous = appliedKeys
+        appliedKeys = keys
+        appliedStamp = keysCache?.stamp
+        guard let changed = LinePresentation.changedLines(old: previous, new: keys) else { return }
         invalidate(lines: changed)
     }
 
     func restyleAll() {
         updateTrailingLineStyle()
         appliedKeys = currentKeys()
+        appliedStamp = keysCache?.stamp
         invalidate(lines: 0..<document.lines.count)
     }
 
@@ -188,22 +206,66 @@ extension EditorController {
 
     // MARK: 높이
 
+    func ensureLayout(for range: NSTextRange) {
+        EditorTrace.measure("ensureLayout") { layoutManager.ensureLayout(for: range) }
+    }
+
     func measureContentHeight() -> CGFloat {
+        let interval = EditorTrace.begin("measureContentHeight")
+        defer { EditorTrace.end("measureContentHeight", interval) }
         let padding = theme.docPadding
         guard textContainer.size.width > 0 else { return padding.top + padding.bottom + style.body.lineHeight }
-        layoutManager.ensureLayout(for: layoutManager.documentRange)
-        // `usageBoundsForTextContainer`는 문단 높이가 줄어든 뒤에도 옛 값을 줄 때가 있어 마지막 조각의 아래 끝을 쓴다.
-        var used: CGFloat = 0
-        layoutManager.enumerateTextLayoutFragments(
-            from: layoutManager.documentRange.endLocation,
-            options: [.reverse, .ensuresLayout]
-        ) { fragment in
-            used = fragment.layoutFragmentFrame.maxY
-            return false
+        let dirty = pendingHeightRange
+        pendingHeightRange = nil
+        let count = document.lines.count
+        if heightLayoutWidth != textContainer.size.width || measuredParagraphHeights.count != count || dirty?.length == document.length {
+            measureAllParagraphs()
+        } else if let dirty {
+            let first = max(0, document.lineIndex(at: dirty.location) - 1)
+            let last = min(count - 1, document.lineIndex(at: NSMaxRange(dirty)) + 1)
+            updateParagraphHeights(first...last)
         }
-        let text = ceil(max(used, style.body.lineHeight)) + padding.top + padding.bottom
+        heightLayoutWidth = textContainer.size.width
+        let text = ceil(max(measuredTextHeight, style.body.lineHeight)) + padding.top + padding.bottom
         // 링크 주소 칸이 떠 있으면 그 아래 끝까지 보이게 한다.
         return linkSession == nil ? text : max(text, ceil(linkField.frame.maxY + style.metrics.linkFieldGap))
+    }
+
+    /// 전체를 처음 배치할 때 얻은 마지막 y 좌표와 각 문단의 높이를 보관한다.
+    private func measureAllParagraphs() {
+        let bounds = layoutManager.documentRange
+        ensureLayout(for: bounds)
+        measuredParagraphHeights = Array(repeating: 0, count: document.lines.count)
+        measuredTextHeight = 0
+        layoutManager.enumerateTextLayoutFragments(from: bounds.location, options: [.ensuresLayout]) { fragment in
+            let offset = self.contentStorage.offset(from: bounds.location, to: fragment.rangeInElement.location)
+            let row = self.document.lineIndex(at: offset)
+            self.measuredParagraphHeights[row] = fragment.layoutFragmentFrame.height
+            self.measuredTextHeight = fragment.layoutFragmentFrame.maxY
+            return true
+        }
+    }
+
+    /// 앞쪽 문단만 다시 배치하면 TextKit은 먼 끝 조각의 y를 추정한다. 확정한 전체 높이에
+    /// 바뀐 조각의 실제 높이 차이만 더한다. 문서 끝의 빈 줄은 앞 문단 조각에 포함된다.
+    private func updateParagraphHeights(_ rows: ClosedRange<Int>) {
+        let bounds = layoutManager.documentRange
+        guard let start = contentStorage.location(bounds.location, offsetBy: document.lines[rows.lowerBound].start),
+              let end = contentStorage.location(bounds.location, offsetBy: NSMaxRange(document.lines[rows.upperBound].fullRange)),
+              let range = NSTextRange(location: start, end: end) else { measureAllParagraphs(); return }
+        ensureLayout(for: range)
+        var heights = Array(repeating: CGFloat.zero, count: rows.count)
+        layoutManager.enumerateTextLayoutFragments(from: start, options: [.ensuresLayout]) { fragment in
+            let offset = self.contentStorage.offset(from: bounds.location, to: fragment.rangeInElement.location)
+            let row = self.document.lineIndex(at: offset)
+            guard row <= rows.upperBound else { return false }
+            if rows.contains(row) { heights[row - rows.lowerBound] = fragment.layoutFragmentFrame.height }
+            return row < rows.upperBound
+        }
+        for (row, height) in zip(rows, heights) {
+            measuredTextHeight += height - measuredParagraphHeights[row]
+            measuredParagraphHeights[row] = height
+        }
     }
 
     func reportContentHeight() {

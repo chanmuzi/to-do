@@ -47,6 +47,22 @@ import Testing
         #expect(s.applying(edit) == "가==|나다|=={파랑}==라=={빨강}")
     }
 
+    @Test func partialRecolorOnLaterLineReportsOnlyFinalFormatting() throws {
+        let h = try EditorHarness.at("📝 앞줄\n가|나==다|라=={3}\n뒤")
+        var reports: [Int] = []
+        h.editor.onFormattingChange = { [weak h] in
+            if let h { reports.append(h.controller.formattingState.highlight) }
+        }
+        let previous = EditorController.lastInk
+        defer { EditorController.lastInk = previous }
+        let blue = InkColor(.blue)
+        h.step { h.controller.setInk(blue) }
+        #expect(h.marked == "📝 앞줄\n가==|나다|=={파랑}==라=={빨강}\n뒤")
+        #expect(reports == [blue.id])
+        h.undo()
+        #expect(h.marked == "📝 앞줄\n가|나==다|라=={3}\n뒤")
+    }
+
     @Test func standardExportKeepsHierarchyAndHTMLStylesOnlyOwnBlock() {
         let red = InkColor(.red, foreground: true), blue = InkColor(.blue)
         let source = "+ 제목" + red.comment + "\n\t[x] <u>==글=={파랑}</u> **굵게** [링크](https://example.com)"

@@ -64,14 +64,14 @@ nonisolated extension EditorCommands {
             let overlap = NSIntersectionRange(span.contentRange, selected)
             guard overlap.length > 0, overlap != span.contentRange else { continue }
             guard let split = resplit(doc, line, span, overlap, open: "", close: "") else { return nil }
-            let middle = MarkdownDocument(split.applied(to: doc.text))
+            let (middle, origin) = inlineContext(after: split, in: doc)
             let offset = split.replacement.utf16.count - split.range.length
             let start = selected.location < span.range.location ? selected.location : split.selection.location
             let end = NSMaxRange(selected) > NSMaxRange(span.range) ? NSMaxRange(selected) + offset : NSMaxRange(split.selection)
-            guard let recolored = setInk(middle, selection: NSRange(location: start, length: end - start), color: color) else {
+            guard let recolored = setInk(middle, selection: NSRange(location: start - origin, length: end - start), color: color) else {
                 return color == nil ? split : nil
             }
-            return compose(split, then: recolored, middle: middle)
+            return compose(split.offsettingRanges(by: -origin), then: recolored, middle: middle).offsettingRanges(by: origin)
         }
         if color == nil, !line.markedSpans.contains(where: {
             if case .highlight = $0.kind { return NSIntersectionRange($0.contentRange, selected).length > 0 }

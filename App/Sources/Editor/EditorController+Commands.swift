@@ -3,7 +3,22 @@ import AppKit
 extension EditorController {
     /// 굵게와 완료 전환은 현재 조합을 먼저 확정한다.
     func run(_ action: EditorAction) {
-        defer { onFormattingChange?() }
+        withFormattingChange { runCommand(action) }
+    }
+
+    func reportFormattingChange() {
+        if !isBatchingFormattingChange { onFormattingChange?() }
+    }
+
+    private func withFormattingChange(_ action: () -> Void) {
+        let wasBatching = isBatchingFormattingChange
+        isBatchingFormattingChange = true
+        action()
+        isBatchingFormattingChange = wasBatching
+        reportFormattingChange()
+    }
+
+    private func runCommand(_ action: EditorAction) {
         if textView.hasMarkedText() {
             guard action.commitsComposition else { return }
             textView.unmarkText()
@@ -52,8 +67,11 @@ extension EditorController {
 
     func setInk(_ color: InkColor?, toggle: Bool = false) {
         guard textView.isEditable, !textView.hasMarkedText() else { return }
+        withFormattingChange { applyInk(color, toggle: toggle) }
+    }
+
+    private func applyInk(_ color: InkColor?, toggle: Bool) {
         if !toggle, let color { Self.lastInk = color }
-        defer { onFormattingChange?() }
         if let blocks = blockSelection {
             let hidden = FoldState.hiddenLines(document, folded: folded)
             let owners = (blocks.pastedRoots ?? Array(blocks.rows)).filter { !hidden.contains($0) && document.lines[$0].continuationOf == nil && !document.lines[$0].kind.isCode }
@@ -162,6 +180,8 @@ extension EditorController {
     /// - Parameter isIntermediate: 곧 이어지는 편집이나 조합이 마무리하는 중간 편집(두 단계로 넣는 서식의 둘째
     ///   단계, 조합할 자리를 만드는 편집). 그 사이에 잠깐 드러나는 기호는 가리지 않는다.
     func apply(_ edit: TextEdit?, isIntermediate: Bool = false) {
+        let interval = EditorTrace.begin("apply")
+        defer { EditorTrace.end("apply", interval) }
         guard var edit, let storage = textView.textStorage, textView.isEditable else { return }
         // 부모 항목을 없앤 편집은 부모를 잃는 하위 줄을 함께 내어 쓴다(D-043. `finalized`에서 이미 따진 편집은 다시 따지지 않는다).
         if !isIntermediate { edit = EditorCommands.adoptingOrphans(document, edit, folded: folded, openedEmpty: foldState.openedEmpty) }
@@ -255,6 +275,8 @@ extension EditorController {
     /// 원문이 바뀐 것을 바깥에 알린다. 글자 입력은 `textDidChange`에서, 조합 중인 글자는
     /// `setMarkedText` 바로 뒤에 부르고, 그 밖의 경로는 다음 메인 큐 차례에 부른다.
     func flushPendingChange() {
+        let interval = EditorTrace.begin("flushPendingChange")
+        defer { EditorTrace.end("flushPendingChange", interval) }
         // 쌓아 두는 중이거나 텍스트 뷰가 조합을 끝내는 중이면 끝난 뒤에 한 번만 알린다.
         guard !holdsChangeNotification, !isEndingComposition else { return }
         applyDeferredOutsideEditIfPossible()
@@ -269,7 +291,7 @@ extension EditorController {
         notifyFoldChangeIfNeeded()
         // 미뤄 둔 덧붙임(글 끝에서 조합 중)이 있으면 그것까지가 원문이다.
         onTextChange?(text)
-        onFormattingChange?()
+        reportFormattingChange()
         reportContentHeight()
         layoutCopyButton()
         updateDateSuggestion()
@@ -410,7 +432,7 @@ extension EditorController: NSTextViewDelegate {
         let line = document.line(at: location)
         guard let start = contentStorage.location(contentStorage.documentRange.location, offsetBy: line.start),
               let fragment = layoutManager.textLayoutFragment(for: start) else { return true }
-        layoutManager.ensureLayout(for: fragment.rangeInElement)
+        ensureLayout(for: fragment.rangeInElement)
         let lines = fragment.textLineFragments.filter { $0.characterRange.length > 0 }
         guard let edge = last ? lines.last : lines.first else { return true }
         let offset = location - line.start
@@ -595,7 +617,7 @@ extension EditorController: NSTextViewDelegate {
     }
 
     func textViewDidChangeSelection(_ notification: Notification) {
-        defer { onFormattingChange?() }
+        defer { reportFormattingChange() }
         guard !isSettingText else { return }
         if !isApplyingEdit {
             resolveDividerCaret()
@@ -607,6 +629,8 @@ extension EditorController: NSTextViewDelegate {
             if !isApplyingOutsideChange { pendingLineBreak = nil }
         }
         selectionVersion = documentVersion
+        // 명령이 곧 textDidChange에서 최종 선택과 문서를 함께 알린다.
+        guard !(isApplyingEdit && hasPendingChange) else { return }
         refreshStyling()
         updateDateSuggestion()
     }

@@ -242,7 +242,10 @@ extension EditorController {
         let previous = folded
         apply(edit)
         if documentVersion != version {
-            if action == .toggleDone, previous != folded { startFoldMotion(from: previous, to: folded) }
+            if action == .toggleDone, previous != folded {
+                startFoldMotion(from: previous, to: folded)
+                if !foldTransitions.isEmpty { refreshStyling() }
+            }
             showVisibleBlocks(selection.shifted(by: shifted))
         }
         return true
@@ -259,7 +262,7 @@ extension EditorController {
         if line.fullRange.length == 0 { return caretSpot(line.start, lineIndex: row)?.line }
         guard let location = contentStorage.location(contentStorage.documentRange.location, offsetBy: line.start),
               let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment else { return nil }
-        layoutManager.ensureLayout(for: fragment.rangeInElement)
+        ensureLayout(for: fragment.rangeInElement)
         var frame = fragment.layoutFragmentFrame
         frame.size.height = min(fragment.ownHeight, fragment.emptyToggleHintRect?.minY ?? fragment.ownHeight)
         return frame
