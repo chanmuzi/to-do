@@ -224,6 +224,10 @@ nonisolated struct DateTimeResolver {
             // 한 주는 월요일에 시작한다.
             let sinceMonday = (weekday + 6) % 7
             return adding(weeks * 7 + (index + 6) % 7 - sinceMonday).map { DayPlan(day: $0) }
+        case .shortYearDate(let year, let month, let day, let expectedWeekday):
+            guard let value = validDate(year: year, month: month, day: day) else { return nil }
+            if let expectedWeekday, calendar.component(.weekday, from: value) != expectedWeekday + 1 { return nil }
+            return DayPlan(day: value)
         case .monthDay(let month, let day, .exact(let year)?, _):
             return validDate(year: year, month: month, day: day).map { DayPlan(day: $0) }
         case .monthDay(let month, let day, .fromNow(let offset)?, _):

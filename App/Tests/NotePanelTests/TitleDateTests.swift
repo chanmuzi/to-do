@@ -23,6 +23,17 @@ import DateTime
         }
     }
 
+    @Test(arguments: ["- [ ] 내일", "26.11.27", "내일 3시", "내일 3시 회의"])
+    func titleNeedsRemainingText(_ source: String) throws {
+        try withField(source) { field, editor in
+            field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
+            field.updateDateSuggestion()
+            #expect((field.dateSuggestion != nil) == source.hasSuffix("회의"))
+            let style = editor.layoutManager?.temporaryAttribute(.underlineStyle, atCharacterIndex: 0, effectiveRange: nil) as? Int
+            #expect(style == (source.hasSuffix("회의") ? NSUnderlineStyle.single.union(.patternDot).rawValue : nil))
+        }
+    }
+
     @Test func disablingRecognitionClearsTitleUnderlineAndAcceptance() throws {
         try withField("내일 회의") { field, editor in
             field.onAcceptDate = { _ in InlineDateEffect(undo: {}, redo: {}) }
@@ -68,7 +79,7 @@ import DateTime
         }
     }
 
-    @Test(arguments: ["내일", "긴 회의 제목 내일 오후 3시~4시"])
+    @Test(arguments: ["내일 회의", "긴 회의 제목 내일 오후 3시~4시"])
     func underlineKeepsTitleAndBodyFrames(source: String) throws {
         let theme = try Theme.bundled()
         let body = NSTextView(frame: NSRect(x: 0, y: 0, width: 340, height: 100))

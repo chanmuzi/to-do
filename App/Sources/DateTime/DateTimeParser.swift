@@ -127,6 +127,7 @@ public nonisolated enum DateTimeParser {
         }
         /// 날 뒤의 요일 덧말을 표현에 넣는다: `(금)`, 요일이 아닌 날 뒤의 요일(`11/20 금요일`).
         func absorbWeekdayNotes(into located: inout Located, after spec: DateSpec) {
+            if case .shortYearDate = spec { return }
             while isNext(blank, after: located.range) {
                 switch pieces[index].kind {
                 case .weekdayNote: break

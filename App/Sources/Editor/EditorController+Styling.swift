@@ -26,7 +26,7 @@ extension EditorController: NSTextContentStorageDelegate {
                 let part = NSIntersectionRange(match, line.contentRange)
                 if part.length > 0 {
                     let marked = NSRange(location: part.location - range.location, length: part.length)
-                    display.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: style.text], range: marked)
+                    display.addAttributes([.underlineStyle: NSUnderlineStyle.single.union(.patternDot).rawValue, .underlineColor: style.text2], range: marked)
                 }
             }
         }

@@ -12,16 +12,18 @@ extension TitleField {
         if dismissedDate != text { dismissedDate = nil }
         if recognizesDates, isEditing, onAcceptDate != nil, !editor.hasMarkedText(), selection.length == 0,
            dismissedDate != text {
-            let excluded = Self.dateExclusions.matches(in: text, range: NSRange(location: 0, length: text.utf16.count)).map(\.range)
+            let wholeTitle = NSRange(location: 0, length: text.utf16.count)
+            let excluded = Self.dateExclusions.matches(in: text, range: wholeTitle).map(\.range)
             dateSuggestion = InlineDateProposal.find(in: text, caret: selection.location, now: Date(),
-                                                     calendar: .current, excluding: excluded)
+                                                     calendar: .current, excluding: excluded,
+                                                     hiddenMarkers: Self.listPrefix.matches(in: text, range: wholeTitle).map(\.range))
         }
         let whole = NSRange(location: 0, length: editor.string.utf16.count)
         editor.layoutManager?.removeTemporaryAttribute(.underlineStyle, forCharacterRange: whole)
         editor.layoutManager?.removeTemporaryAttribute(.underlineColor, forCharacterRange: whole)
         for range in dateSuggestion?.expression.ranges ?? [] {
-            editor.layoutManager?.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue,
-                                                         .underlineColor: style.color(.text)], forCharacterRange: range)
+            editor.layoutManager?.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.single.union(.patternDot).rawValue,
+                                                         .underlineColor: style.color(.text2)], forCharacterRange: range)
         }
         let message = dateSuggestion.map {
             let p = ReminderPresentation(item: $0.item, now: Date(), options: NoteDisplayOptions(), calendar: .current)
@@ -29,6 +31,7 @@ extension TitleField {
         }
         setAccessibilityHelp(message)
     }
+    private static let listPrefix = try! NSRegularExpression(pattern: #"^\s*(?:(?:[-+*]|\d+\.)\s+)?(?:\[[ xX]\]\s+)?"#)
     private static let dateExclusions = try! NSRegularExpression(pattern: #"`[^`]*`|\]\([^)]*\)|https?://\S+"#)
 
     func hideDateSuggestion() {

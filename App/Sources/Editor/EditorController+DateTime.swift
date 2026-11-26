@@ -38,7 +38,9 @@ extension EditorController {
                     let gap = NSRange(location: start - line.contentStart, length: document.lines[i].contentStart - start)
                     text.replaceCharacters(in: gap, with: String(repeating: " ", count: gap.length))
                 }
+                var hidden: [NSRange] = []
                 for span in document.lines[rows].flatMap(\.spans) {
+                    hidden += [span.openMarker, span.closeMarker].filter { $0.length > 0 }
                     switch span.kind {
                     case .code: excluded.append(span.range)
                     case .link where span.openMarker.length == 0: excluded.append(span.range)
@@ -47,7 +49,8 @@ extension EditorController {
                 }
                 let local = excluded.map { NSRange(location: $0.location - line.contentStart, length: $0.length) }
                 dateSuggestion = InlineDateProposal.find(in: text as String,
-                    caret: selection.location - line.contentStart, now: dateNow(), calendar: dateCalendar, excluding: local)
+                    caret: selection.location - line.contentStart, now: dateNow(), calendar: dateCalendar, excluding: local,
+                    hiddenMarkers: hidden.map { NSRange(location: $0.location - line.contentStart, length: $0.length) })
                 if dateSuggestion != nil { dateSuggestionLine = index }
             }
         }

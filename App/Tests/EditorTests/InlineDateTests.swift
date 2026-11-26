@@ -42,6 +42,30 @@ import Models
         #expect(effects.count == 0)
     }
 
+    @Test(arguments: ["- [ ] 내일", "\t[ ] 내일", "26.11.27", "내일 3시", "**내일 3시**",
+                      "[내일 3시](https://example.com)", "==내일 3시=={2}", "00.11.27 지난 회의"])
+    func emptyOrPastSuggestionIsHidden(_ text: String) throws {
+        let (h, effects) = try setup(text)
+        #expect(h.controller.dateSuggestion == nil)
+        #expect(!h.controller.acceptDateSuggestion())
+        #expect(effects.requests.isEmpty)
+    }
+
+    @Test func underlinesCoverOnlyVisibleLinkAndDateText() throws {
+        let text = "회의록 [ 루시 1on1 ](https://example.com) 정리 내일 3시에 회의"
+        let (h, _) = try setup(text)
+        let display = try h.display(line: 0)
+        for (label, style) in [("루시 1on1", NSUnderlineStyle.single), ("내일 3시", .single.union(.patternDot))] {
+            let range = (text as NSString).range(of: label)
+            var effective = NSRange()
+            #expect(display.attribute(.underlineStyle, at: range.location, effectiveRange: &effective) as? Int == style.rawValue)
+            #expect(effective == range)
+            if label == "내일 3시" {
+                #expect(display.attribute(.underlineColor, at: range.location, effectiveRange: nil) as? NSColor == h.controller.style.text2)
+            }
+        }
+    }
+
     @Test func distantSuggestionChangesInvalidateOnlyTheTwoLines() throws {
         let source = "회의 내일\n가운데 보존\n마지막 내일"
         let (h, _) = try setup(source)
@@ -116,7 +140,6 @@ import Models
         ("- 부모\n\t[ ] 회의 내일 3시", "- 부모\n\t[ ] 회의"),
         ("😀 내일 회의 3시", "😀 회의"),
         ("내일 회의 3시", "회의"),
-        ("내일", ""),
         ("# 회의 내일 3시", "# 회의"),
         ("회의 내일 ３시", "회의"),
         ("회의 내일 3시".decomposedStringWithCanonicalMapping, "회의".decomposedStringWithCanonicalMapping)
@@ -135,7 +158,7 @@ import Models
         #expect(h.editor.text == pair.1)
         #expect(effects.count == 1)
     }
-    @Test(arguments: ["**회의 내일 3시**", "**내일 3시**", "[내일 3시](https://example.com)", "==내일 3시=={2}"])
+    @Test(arguments: ["**회의 내일 3시**", "회의 **내일 3시**", "[내일 3시](https://example.com) 회의", "회의 ==내일 3시=={2}"])
     func hiddenMarkersSurviveAcceptanceAndUndo(source: String) throws {
         let (h, effects) = try setup(source)
         let end = (source as NSString).range(of: "3시").upperBound
