@@ -36,6 +36,7 @@ nonisolated package enum LineClassifier {
     package static func classify(_ u: [unichar], from start: Int, to end: Int) -> (kind: LineKind, markerLength: Int) {
         guard start < end else { return (.paragraph, 0) }
         let c = u[start]
+        if c == dash, end - start >= 3, u[start..<end].allSatisfy({ $0 == dash }) { return (.divider, end - start) }
         if let level = headingLevel(u, from: start, to: end) { return (.heading(level), level + 1) }
         if c == dash || c == star, start + 1 < end, u[start + 1] == space {
             if let todo = todo(u, from: start + 2, to: end) { return (.todo(done: todo.done), 2 + todo.length) }

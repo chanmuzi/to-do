@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Editor
 
@@ -53,6 +53,47 @@ import Testing
     private func newline(_ marked: String, folded: Set<Int> = []) -> String? {
         let s = Scenario(marked)
         return s.applying(EditorCommands.newline(s.doc, selection: s.selection, folded: folded))
+    }
+
+    @MainActor @Test(arguments: [
+        ("+ |회의 준비", "+ \n+ |회의 준비", false),
+        ("+ |프로젝트 A\n\t일정 정리\n다음 문단", "+ \n+ |프로젝트 A\n\t일정 정리\n다음 문단", true),
+        ("## |이번 주\n월요일까지 초안", "\n## |이번 주\n월요일까지 초안", false),
+        ("[x] |보고서 제출\n[ ] 회의록 공유", "[ ] \n[x] |보고서 제출\n[ ] 회의록 공유", false),
+        ("- |마감 이번 주 금요일 <!-- 노랑 바탕 -->\n- 자료 모으기", "- \n- |마감 이번 주 금요일 <!-- 노랑 바탕 -->\n- 자료 모으기", false),
+        ("+ 회의 준비|", "+ 회의 준비\n+ |", false),
+        ("+ 프로젝트 A|\n\t- 일정 정리\n다음 문단", "+ 프로젝트 A\n\t|\n\t- 일정 정리\n다음 문단", false),
+        ("+ 프로젝트 |회고\n\t일정 정리\n다음 문단", "+ 프로젝트\n\t일정 정리\n+ |회고\n다음 문단", true),
+        ("- 장보기|\n\t- 우유\n\t- 계란\n- 세탁소", "- 장보기\n- |\n\t- 우유\n\t- 계란\n- 세탁소", false),
+        ("> 작은 일부터 끝낸다.|", "> 작은 일부터 끝낸다.\n|", false),
+        ("\t+ ## 앞|뒤", "\t+ ## 앞\n\t+ ## |뒤", false),
+        ("\t> 앞|뒤", "\t> 앞\n\t|뒤", false),
+        ("- 위\\\n|계속", "- 위\\\n\n- |계속", false),
+    ])
+    func returnPolicy(_ before: String, _ after: String, _ folded: Bool) throws {
+        let h = try EditorHarness.at(before)
+        if folded { h.editor.foldedLines = [0] }
+        h.press(NSResponder.newline)
+        #expect(h.marked == after)
+        if folded { #expect(h.editor.foldedLines == (before.hasPrefix("+ |") ? [1] : [0])) }
+        h.undo()
+        #expect(h.marked == before)
+        if folded { #expect(h.editor.foldedLines == [0]) }
+    }
+
+    @MainActor @Test func foldedMultilineHeadingSplitsAfterItsLastContinuation() throws {
+        let h = try EditorHarness.at("+ # 앞\\\n중|간 <!-- 노랑 바탕 -->\n\t+ 하위\n\t\t안\n끝")
+        h.editor.foldedLines = [0, 2]
+        h.press(NSResponder.newline)
+        #expect(h.marked == "+ # 앞\\\n중 <!-- 노랑 바탕 -->\n\t+ 하위\n\t\t안\n+ # |간\n끝")
+        #expect(h.editor.foldedLines == [0, 2])
+        h.undo()
+        #expect(h.marked == "+ # 앞\\\n중|간 <!-- 노랑 바탕 -->\n\t+ 하위\n\t\t안\n끝")
+        #expect(h.editor.foldedLines == [0, 2])
+    }
+
+    @Test func firstEmptyPhysicalLineOfANonemptyBlockKeepsItsContinuation() {
+        #expect(newline("+ |\\\n회의") == "+ \n+ |\\\n회의")
     }
 
     @Test func continuesListsWithTheSameMarker() {

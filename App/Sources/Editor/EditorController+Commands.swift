@@ -255,6 +255,7 @@ extension EditorController {
         // 바깥의 변경을 넣는 중에는 알리지 않는다. 알리지 않은 사용자의 변경은 다음 차례에 나간다.
         guard hasPendingChange, !isSettingText, !isApplyingOutsideChange else { return }
         hasPendingChange = false
+        resolveDividerCaret()
         textView.window?.invalidateCursorRects(for: textView)
         refreshStyling()
         recordFoldChangeForUndo()
@@ -340,9 +341,11 @@ extension EditorController: NSTextViewDelegate {
             apply(EditorCommands.newline(document, selection: selection, folded: folded))
             return true
         case #selector(NSResponder.deleteBackward(_:)):
+            if selectAdjacentDivider(selection, backward: true) { return true }
             unfoldBeforeDeleting(selection, backward: true)
             return apply(finalized(EditorCommands.deleteBackward(document, selection: selection)))
         case #selector(NSResponder.deleteForward(_:)):
+            if selectAdjacentDivider(selection, backward: false) { return true }
             unfoldBeforeDeleting(selection, backward: false)
             return apply(finalized(EditorCommands.deleteForward(document, selection: selection)))
         case #selector(NSResponder.transpose(_:)):
@@ -588,6 +591,7 @@ extension EditorController: NSTextViewDelegate {
         defer { onFormattingChange?() }
         guard !isSettingText else { return }
         if !isApplyingEdit {
+            resolveDividerCaret()
             unfoldAroundSelection()
             swallowsCodeTriggerKey = false
             // 커서를 옮기면 정해 둔 "다음에 칠 글자의 서식"은 사라진다(제자리로 돌아와도).

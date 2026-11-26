@@ -1,6 +1,7 @@
 import Foundation
 
 nonisolated package enum LineKind: Hashable, Sendable {
+    case divider
     case paragraph
     case heading(Int)
     case todo(done: Bool)
@@ -94,7 +95,7 @@ nonisolated package struct MarkdownLine: Hashable, Sendable {
     package var caretStart: Int {
         switch kind {
         case .fenceOpen, .fenceClose, .code: start + indentLength
-        case .paragraph, .heading, .todo, .bullet, .toggle, .toggleHeading, .quote: contentStart
+        case .divider, .paragraph, .heading, .todo, .bullet, .toggle, .toggleHeading, .quote: contentStart
         }
     }
 }

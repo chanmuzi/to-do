@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated extension EditorCommands {
     static func setBlockInk(_ doc: MarkdownDocument, owners: [Int], color: InkColor?, toggle: Bool) -> TextEdit? {
-        let ends = Set(owners.filter { !doc.lines[$0].kind.isCode }.map { doc.blockLines(at: $0).upperBound }).sorted()
+        let ends = Set(owners.filter { !doc.lines[$0].kind.isCode && doc.lines[$0].kind != .divider }.map { doc.blockLines(at: $0).upperBound }).sorted()
         guard let first = ends.first, let last = ends.last else { return nil }
         let remove = toggle && ends.allSatisfy { doc.lines[$0].blockInk == color }
         let comment = remove ? "" : color?.comment ?? ""

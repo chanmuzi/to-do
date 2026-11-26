@@ -219,6 +219,7 @@ public final class MarkdownEditor {
     public var formattingState: EditorFormattingState { controller.formattingState }
 
     package static var editLinkAction: Selector { #selector(EditorTextView.editMarkdownLink(_:)) }
+    package static var insertDividerAction: Selector { #selector(EditorTextView.insertMarkdownDivider(_:)) }
     package static var duplicateBlockAction: Selector { #selector(EditorTextView.duplicateMarkdownBlock(_:)) }
     package var hasSelectedInk: Bool { controller.selectedInk != nil }
     package var lastInkToken: ColorToken { EditorController.lastInk.token }

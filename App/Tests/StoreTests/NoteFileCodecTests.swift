@@ -57,6 +57,13 @@ import Models
         #expect(text == "---\ntitle: \"\"\n---\nx")
     }
 
+    @Test(arguments: ["---", "---\n첫 문단", "---\n첫 문단\n---\n둘째 문단"])
+    func headerlessDividersStayInTheBody(_ source: String) {
+        let decoded = NoteFileCodec.decode(source)
+        #expect(decoded.body == source)
+        #expect(NoteFileCodec.decode(NoteFileCodec.encode(decoded, over: source)).body == source)
+    }
+
     @Test func readsFilesWithoutFrontmatterAsBody() {
         let text = "# 그냥 마크다운\n내용\n"
         #expect(NoteFileCodec.decode(text) == NoteFileContent(body: text))

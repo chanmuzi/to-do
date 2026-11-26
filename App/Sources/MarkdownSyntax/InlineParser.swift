@@ -28,8 +28,8 @@ nonisolated package enum InlineParser {
     private static let httpPrefixes: [[unichar]] = [Array("https://".utf16), Array("http://".utf16)]
     private static let trailingPunctuation = Set(".,;:!?)\"'".utf16)
     /// 백슬래시로 막을 수 있는 글자.
-    package static let escapable: Set<unichar> = [star, equals, tilde, backtick, leftBracket, rightBracket, backslash]
-    package static let escapableCharacters: Set<Character> = ["*", "=", "~", "`", "[", "]", "\\"]
+    package static let escapable: Set<unichar> = [star, equals, tilde, backtick, leftBracket, rightBracket, backslash, 0x2D]
+    package static let escapableCharacters: Set<Character> = ["*", "=", "~", "`", "[", "]", "\\", "-"]
 
     package static func parse(_ units: [unichar], in range: NSRange) -> [InlineSpan] {
         var spans: [InlineSpan] = []

@@ -45,6 +45,26 @@ extension EditorController {
         return true
     }
 
+    /// 문서가 구분선으로만 이루어져 있으면 삽입점을 둘 곳이 없어 블록 선택으로 남는다.
+    func resolveDividerCaret() {
+        let caret = clamped(selectedRange)
+        let row = document.lineIndex(at: caret.location)
+        guard blockSelection == nil, caret.length == 0, document.lines[row].kind == .divider,
+              !textView.hasMarkedText() else { return }
+        let next = CaretSnapping.snap(old: caret, new: caret, in: document, folded: folded)
+        if document.line(at: next.location).kind == .divider {
+            showBlocks(BlockSelection(anchor: row, focus: row))
+        } else {
+            setSelection(next)
+        }
+    }
+
+    func dismissBlocks() -> Bool {
+        guard clearBlocks() else { return false }
+        resolveDividerCaret()
+        return true
+    }
+
     private func navigateBlocks(by direction: Int, extending: Bool) {
         guard let selection = blockSelection else { return }
         let hidden = FoldState.hiddenLines(document, folded: folded)
@@ -79,6 +99,38 @@ extension EditorController {
     func selectedBlockRows(_ selection: BlockSelection, includingChildren: Bool) -> ClosedRange<Int> {
         let end = includingChildren ? lastSelectedGroup(selection) : block(at: selection.rows.upperBound)
         return selection.rows.lowerBound...end.upperBound
+    }
+
+    func insertDivider() {
+        let row = blockSelection?.rows.upperBound ?? document.lineIndex(at: selectedRange.location)
+        let rows = block(at: row)
+        let line = document.lines[rows.lowerBound]
+        let last = document.lines[max(rows.upperBound, line.subtreeEnd - 1)]
+        let indent = document.string(in: line.indentRange)
+        let close = line.codeBlock != nil && document.lines[rows.upperBound].kind != .fenceClose ? "\n" + indent + "```" : ""
+        clearBlocks()
+        var edit = TextEdit.insert(close + "\n" + indent + "---\n" + indent, replacing: NSRange(location: last.end, length: 0))
+        edit.includesHiddenLines = true
+        apply(edit)
+    }
+
+    func selectAdjacentDivider(_ selection: NSRange, backward: Bool) -> Bool {
+        guard selection.length == 0 else { return false }
+        let row = document.lineIndex(at: selection.location)
+        let line = document.lines[row]
+        let adjacent = row + (backward ? -1 : 1)
+        guard document.lines.indices.contains(adjacent), document.lines[adjacent].kind == .divider,
+              FoldState.foldRoot(of: adjacent, in: document, folded: folded) == nil,
+              backward ? line.isVisualStart(selection.location) : line.isVisualEnd(selection.location) else { return false }
+        var target = adjacent
+        if line.isBlankParagraph {
+            let start = backward ? document.lines[adjacent].end : line.start
+            let end = backward ? line.end : document.lines[adjacent].start
+            apply(.insert("", replacing: NSRange(location: start, length: end - start)))
+            if !backward { target -= 1 }
+        }
+        showBlocks(BlockSelection(anchor: target, focus: target))
+        return true
     }
 
     func duplicateBlocks() {
@@ -126,10 +178,16 @@ extension EditorController {
         case #selector(NSResponder.insertTab(_:)): run(.indent)
         case #selector(NSResponder.insertBacktab(_:)): run(.outdent)
         case #selector(NSResponder.deleteBackward(_:)), #selector(NSResponder.deleteForward(_:)): deleteBlocks()
-        case #selector(NSResponder.cancelOperation(_:)): clearBlocks()
+        case #selector(NSResponder.cancelOperation(_:)): _ = dismissBlocks()
         case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)),
              #selector(NSResponder.insertLineBreak(_:)), #selector(NSResponder.insertParagraphSeparator(_:)):
             let rows = block(at: selection.rows.lowerBound)
+            if document.lines[rows.lowerBound].kind == .divider {
+                let line = document.lines[rows.lowerBound]
+                clearBlocks()
+                apply(.insert("\n" + document.string(in: line.indentRange), replacing: NSRange(location: line.end, length: 0)))
+                return true
+            }
             let visible = rows.last { ![.fenceOpen, .fenceClose].contains(document.lines[$0].kind) } ?? rows.upperBound
             clearBlocks()
             setSelection(NSRange(location: document.lines[visible].contentEnd, length: 0))

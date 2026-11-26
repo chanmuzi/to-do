@@ -7,13 +7,14 @@ extension EditorController {
     /// 입력기가 기호와 마지막 Space를 한 번에 확정하면 delegate가 아직 marked text를 보고
     /// 변환을 건너뛴다. 줄 머리 변환이나 인라인 서식 끝에서 확정과 Space를 나눠 기존 입력 경로로 보낸다.
     func separatesCommittedTrigger(_ text: String, replacementRange: NSRange) -> Bool {
-        guard textView.hasMarkedText(), text.hasSuffix(" "), !isApplyingEdit, !isReplayingUndo else { return false }
+        guard textView.hasMarkedText(), (text.hasSuffix(" ") || text.hasSuffix("-")), !isApplyingEdit, !isReplayingUndo else { return false }
         let range = replacementRange.location == NSNotFound ? textView.markedRange() : replacementRange
         guard range.location != NSNotFound, range.location >= 0, NSMaxRange(range) <= document.length else { return false }
         let prefix = String(text.dropLast())
         let committed = (document.text as NSString).replacingCharacters(in: range, with: prefix)
         let candidate = MarkdownDocument(committed)
         let caret = range.location + prefix.utf16.count
+        if text.hasSuffix("-") { return EditorCommands.dividerConversion(candidate, at: caret) != nil }
         return candidate.line(at: caret).marker(startingAt: caret)?.isOpen == false
             || EditorCommands.spaceTrigger(candidate, selection: NSRange(location: caret, length: 0)) != nil
     }

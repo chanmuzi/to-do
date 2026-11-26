@@ -52,10 +52,16 @@ extension NoteFileCodec {
             return nil
         }
 
-        private init(
+        private init?(
             lines: [String], bodyStart: String.Index, hasByteOrderMark: Bool,
             newline: String, endsWithoutNewline: Bool
         ) {
+            // 구분선 사이에 일반 문단만 있으면 머리말 없는 Markdown 본문이다.
+            guard lines.isEmpty || lines.contains(where: { line in
+                guard let colon = line.firstIndex(of: ":"), colon > line.startIndex else { return false }
+                let key = line[..<colon]
+                return !key.contains(where: \.isWhitespace)
+            }) else { return nil }
             self.lines = lines
             self.bodyStart = bodyStart
             self.hasByteOrderMark = hasByteOrderMark

@@ -3,6 +3,9 @@ import Foundation
 /// 한 줄을 어떻게 그릴지 정하는 값. 글자가 그대로여도 이 값이 달라진 줄은 다시 입힌다.
 nonisolated struct LineRenderKey: Hashable, Sendable {
     var kind: LineKind
+    var coversTrailingQuote = false
+    var startsQuote = false
+    var endsQuote = false
     var isContinuation = false
     var hasHardBreak = false
     var ink: InkColor?
@@ -38,6 +41,16 @@ nonisolated enum LinePresentation {
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
             var key = LineRenderKey(kind: doc.lines[line.continuationOf ?? index].kind, isContinuation: line.continuationOf != nil, hasHardBreak: line.hasHardBreak, level: line.level)
+            if key.kind == .quote {
+                func joins(_ neighbor: Int) -> Bool {
+                    guard doc.lines.indices.contains(neighbor), !hidden.contains(neighbor) else { return false }
+                    let other = doc.lines[neighbor]
+                    return other.level == line.level && doc.lines[other.continuationOf ?? neighbor].kind == .quote
+                }
+                key.startsQuote = !joins(index - 1)
+                key.coversTrailingQuote = line.hasHardBreak && index == doc.lines.count - 2 && doc.lines[index + 1].range.length == 0
+                key.endsQuote = key.coversTrailingQuote || !joins(index + 1)
+            }
             key.ink = doc.blockColor(at: index)
             key.isCollapsed = hidden.contains(index)
             key.isFolded = folded.contains(index)

@@ -19,7 +19,7 @@ nonisolated struct CopyExport: Sendable {
         var start = selection.location
         var end = NSMaxRange(selection)
         let firstHead = Self.hiddenHeadEnd(of: first)
-        if start <= firstHead {
+        if start <= firstHead, first.kind != .divider {
             start = end > first.end ? first.start : min(firstHead, end)
         }
         let lastIndex = document.lineIndex(at: end)
@@ -123,6 +123,9 @@ nonisolated struct CopyExport: Sendable {
                 return nil
             case .fenceOpen, .fenceClose, .code:
                 return indent + doc.string(in: NSRange(location: line.start + line.indentLength, length: line.end - line.start - line.indentLength))
+            case .divider:
+                let needsBlank = row > doc.lines.count - lines.count && doc.lines[row - 1].contentRange.length > 0
+                return (needsBlank ? "\n" : "") + indent + "---"
             case .paragraph:
                 return content.isEmpty ? "" : indent + content
             case .heading(let level):
@@ -219,6 +222,9 @@ nonisolated struct CopyExport: Sendable {
             case .heading(let level):
                 out += "<h\(level)\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</h\(level)>"
                 index = doc.blockLines(at: index).upperBound + 1
+            case .divider:
+                out += "<hr>"
+                index += 1
             case .paragraph:
                 if line.contentRange.length > 0 || line.hasHardBreak {
                     out += "<p\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"

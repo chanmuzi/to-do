@@ -79,7 +79,7 @@ import Testing
             h.view.selectAll(nil)
             let rects = h.controller.selectionRects()
             #expect(!rects.isEmpty)
-            let padding = source.hasPrefix(">") ? h.controller.style.quotePadding : h.controller.style.gutter
+            let padding = h.controller.style.gutter
             #expect(rects.allSatisfy { $0.minX >= h.view.textContainerOrigin.x + padding })
         }
     }

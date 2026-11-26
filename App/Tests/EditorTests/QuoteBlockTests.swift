@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import Theme
 @testable import Editor
 
 /// 인용문(`> `)과, 그와 겹치지 않게 바꾼 토글의 원문 표기(`+ `). D-044.
@@ -39,14 +40,14 @@ import Testing
         #expect(h.document.lines[0].kind == .toggle)
     }
 
-    @Test func returnContinuesTheQuoteAndLeavesItOnAnEmptyLine() throws {
+    @Test func returnLeavesTheQuote() throws {
         let h = try EditorHarness.at("> 첫 줄|")
         h.press(NSResponder.newline)
-        #expect(h.marked == "> 첫 줄\n> |")
+        #expect(h.marked == "> 첫 줄\n|")
         h.type("둘째")
         h.press(NSResponder.newline)
         h.press(NSResponder.newline)
-        #expect(h.marked == "> 첫 줄\n> 둘째\n|")
+        #expect(h.marked == "> 첫 줄\n둘째\n\n|")
     }
 
     @Test func returnOnAnEmptyNestedQuoteOutdents() throws {
@@ -63,20 +64,45 @@ import Testing
         #expect(h.marked == "앞|인용")
     }
 
-    @Test func quoteLinesUseTheSecondaryTextColorAndABar() throws {
+    @Test func quoteLinesUseTheBodyTextColorAndABar() throws {
         let h = try EditorHarness("> 인용 **굵게**\n> 둘째\n본문")
         let decoration = try #require(try h.display(line: 0).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
         #expect(decoration.quoteBar)
         #expect(decoration.gutter == nil)
-        #expect(try h.color(line: 0, at: h.document.lines[0].contentStart) == h.controller.style.text2)
+        #expect(try h.color(line: 0, at: h.document.lines[0].contentStart) == h.controller.style.text)
         let style = try #require(try h.display(line: 0).attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
-        #expect(style.headIndent == h.theme.component(.quotePadding))
+        #expect(style.headIndent == h.controller.style.gutter)
         // 인라인 서식은 그대로 입힌다.
         let bold = h.document.lines[0].spans[0].contentRange
         let font = try h.display(line: 0).attribute(.font, at: bold.location, effectiveRange: nil) as? NSFont
         #expect(font == h.controller.style.strong)
         let plain = try #require(try h.display(line: 2).attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
         #expect(!plain.quoteBar)
+    }
+
+    @Test(arguments: [CheckboxStyle.box, .bracket])
+    func continuedQuoteUsesOneBarAndTheListGutter(_ checkbox: CheckboxStyle) throws {
+        let h = try EditorHarness("- 부모\n\t> 첫 줄\\\n\t둘째\n\t> 셋째\n\t- 목록", checkbox: checkbox)
+        for row in 1...3 {
+            let paragraph = try h.display(line: row)
+            let decoration = try #require(paragraph.attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
+            #expect(decoration.quoteBar)
+            #expect(decoration.startsQuote == (row == 1))
+            #expect(decoration.endsQuote == (row == 3))
+            #expect(decoration.gutterX == h.controller.style.indent)
+            let style = try #require(paragraph.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+            #expect(style.headIndent == h.controller.style.indent + h.controller.style.gutter)
+        }
+        #expect(h.controller.style.quoteBarWidth == 3)
+        #expect(h.controller.style.quoteBarInset == 4)
+    }
+
+    @Test func trailingEmptyContinuationFinishesTheBar() throws {
+        let h = try EditorHarness.at("> 인용|")
+        h.press(#selector(NSResponder.insertLineBreak(_:)))
+        let first = try h.display(line: 0)
+        let decoration = try #require(first.attribute(.markdownDecoration, at: 0, effectiveRange: nil) as? FragmentDecoration)
+        #expect(decoration.coversTrailingQuote && decoration.startsQuote && decoration.endsQuote)
     }
 
     @Test func copyExportsQuotesAsStandardMarkdownAndBlockquote() {

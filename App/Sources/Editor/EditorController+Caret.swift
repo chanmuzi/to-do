@@ -13,7 +13,7 @@ extension EditorController {
         let location = selection.location
         let index = document.lineIndex(at: location)
         let line = document.lines[index]
-        guard let spot = caretSpot(location, lineIndex: index) else { return nil }
+        guard line.kind != .divider, let spot = caretSpot(location, lineIndex: index) else { return nil }
         let lineFont = self.lineFont(for: line, at: index)
         let caret = caretFont(for: line, at: location, lineFont: lineFont)
         // 글자는 줄 높이의 세로 가운데에 그린다(`MarkdownLayoutFragment.textShift`). 그 기준선에 맞춘다.

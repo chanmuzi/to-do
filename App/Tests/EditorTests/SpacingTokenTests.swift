@@ -37,11 +37,11 @@ import Theme
         let before = h.editor.contentHeight
         let taller = Int(h.theme.lineHeight(.body)) + 2
         try h.theme.setOverrides(ThemeOverrides(values: [
-            "component.gutter": "26px", "component.indent": "30px", "type.lh-body": "\(taller)px", "component.quote-pad": "20px",
+            "component.gutter": "26px", "component.indent": "30px", "type.lh-body": "\(taller)px",
         ]))
         #expect(try paragraphStyle(h, line: 0).headIndent == 26)
         #expect(try paragraphStyle(h, line: 1).headIndent == 56)
-        #expect(try paragraphStyle(h, line: 2).headIndent == 20)
+        #expect(try paragraphStyle(h, line: 2).headIndent == 26)
         #expect(try paragraphStyle(h, line: 3).minimumLineHeight == CGFloat(taller))
         #expect(h.editor.contentHeight > before)
         // 왼쪽 칸 그림도 새 칸에 놓인다.

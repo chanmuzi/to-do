@@ -22,7 +22,7 @@ nonisolated extension EditorCommands {
         guard !text.isEmpty else { return nil }
         let block = doc.lines[target].codeBlock ?? doc.blockLines(at: target)
         let line = doc.lines[block.lowerBound]
-        let isDivider = ["---", "***", "___"].contains(doc.string(in: line.contentRange).trimmingCharacters(in: .whitespaces))
+        let isDivider = line.kind == .divider || ["---", "***", "___"].contains(doc.string(in: line.contentRange).trimmingCharacters(in: .whitespaces))
         let child = inside && !line.kind.isCode && !isDivider && line.level < MarkdownDocument.maxLevel
         let after = child ? block.upperBound : max(belowRow, block.upperBound)
         let fragment = MarkdownDocument(text)
