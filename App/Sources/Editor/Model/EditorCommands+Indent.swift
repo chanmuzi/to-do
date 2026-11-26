@@ -58,6 +58,10 @@ nonisolated extension EditorCommands {
         }
         var edit = LinePrefixEdit.make(doc, lines: lines, selection: selection) { changes[$0.start] }
         edit?.includesHiddenLines = FoldState.hidesAny(of: lines, in: doc, folded: folded)
+        if inward, !folded.isEmpty, let change = edit {
+            let after = MarkdownDocument(change.applied(to: doc.text))
+            edit?.foldedAfter = FoldState.revealing(lines.lowerBound, in: after, folded: folded)
+        }
         return edit
     }
 

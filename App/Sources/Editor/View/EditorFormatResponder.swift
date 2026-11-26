@@ -8,8 +8,9 @@ import AppKit
 
 extension EditorTextView: EditorFormatResponder {
     package func canPerformFormat(_ action: EditorAction) -> Bool {
-        guard isEditable, let editor, editor.isActive, action == .bold || !hasMarkedText() else { return false }
-        return editor.canApplyFormat(action)
+        guard isEditable, let editor, editor.isActive, editor.blockSelection != nil || !action.requiresBlockSelection,
+              action.commitsComposition || !hasMarkedText() else { return false }
+        return editor.canApplyFormat(action.editingAction)
     }
 
     package func performFormat(_ action: EditorAction) {
@@ -39,7 +40,7 @@ extension EditorController {
                     guard !hidden.contains(row) else { return false }
                     let line = document.lines[row]
                     if case .todo = line.kind { return true }
-                    return line.kind.isToggle && line.subtreeEnd > document.blockLines(at: row).upperBound + 1
+                    return line.kind.isToggle
                 }
             default: return false
             }
@@ -66,7 +67,7 @@ extension EditorController {
             let rows = document.lineRange(for: selection)
             let block = document.blockLines(at: rows.lowerBound)
             let line = document.lines[block.lowerBound]
-            if block.contains(rows.upperBound), line.kind.isToggle { return line.subtreeEnd > block.upperBound + 1 }
+            if block.contains(rows.upperBound), line.kind.isToggle { return true }
             return EditorCommands.toggleDone(document, selection: selection) != nil
         case .moveLineUp, .moveLineDown:
             return EditorCommands.moveLines(document, selection: selection, folded: folded, direction: action == .moveLineUp ? .up : .down) != nil

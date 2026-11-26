@@ -60,7 +60,7 @@ extension EditorController {
             return
         }
         let selection = clamped(textView.selectedRange())
-        if let plan = EditorCommands.pasteAtParentEnd(document, text: text, selection: selection, folded: folded) {
+        if let plan = EditorCommands.pasteAtParentEnd(document, text: text, selection: selection, folded: foldsAtCaret(selection)) {
             var edit = plan.edit
             edit.selection.location = edit.range.location + edit.replacement.utf16.count
             apply(edit)

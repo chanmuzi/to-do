@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 
 /// 둥근 바탕은 텍스트 뷰의 배경 그리기에 제공하고 글자와 왼쪽 칸 장식은 TextKit에서 그린다.
 nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
@@ -22,6 +23,18 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
     private var containerWidth: CGFloat {
         textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.maxX
+    }
+
+    override var bottomMargin: CGFloat {
+        guard let decoration, decoration.showsEmptyToggleHint else { return super.bottomMargin }
+        return super.bottomMargin + decoration.style.body.lineHeight
+    }
+
+    var emptyToggleHintRect: CGRect? {
+        guard let decoration, decoration.showsEmptyToggleHint, let last = contentLines.last else { return nil }
+        let left = decoration.gutterX + decoration.style.indent
+        return CGRect(x: left - layoutFragmentFrame.minX, y: last.typographicBounds.maxY,
+                      width: max(0, containerWidth - left), height: decoration.style.body.lineHeight)
     }
 
     // MARK: 위치
@@ -118,7 +131,29 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
         drawGutter(decoration, in: context)
+        if decoration.showsTogglePlaceholder, let gutter = gutterRect {
+            let rect = CGRect(x: gutter.maxX, y: gutter.minY, width: containerWidth - decoration.gutterX - gutter.width,
+                              height: gutter.height)
+            drawPlaceholder("토글", in: rect, font: decoration.lineFont ?? decoration.style.body.font, color: decoration.style.text3, context: context)
+        }
+        if let rect = emptyToggleHintRect {
+            drawPlaceholder(FragmentDecoration.emptyToggleHint, in: rect, font: decoration.style.body.font, color: decoration.style.text3, context: context)
+        }
         context.restoreGState()
+    }
+
+    private func drawPlaceholder(_ title: String, in rect: CGRect, font: NSFont, color: NSColor, context: CGContext) {
+        guard rect.width > 0 else { return }
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: title, attributes: attributes))
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.clip(to: rect)
+        context.translateBy(x: rect.minX, y: rect.midY + (font.ascender + font.descender) / 2)
+        context.scaleBy(x: 1, y: -1)
+        context.textMatrix = .identity
+        context.textPosition = .zero
+        CTLineDraw(line, context)
     }
 
     /// NSTextView가 선택을 그리기 전에 글자 뒤의 바탕만 칠한다.

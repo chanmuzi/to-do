@@ -96,15 +96,16 @@ import Testing
         #expect(h.editor.text == "+ 제목\n\t[ ] 회의 ==내일 3시==\n\t[ ] 다음")
     }
 
-    @Test func doneSkipsEmptyTogglesAndOnlyChecksTodosInMixedSelections() throws {
+    @Test func doneFoldsEmptyToggleAndOnlyChecksTodosInMixedSelections() throws {
         let h = try EditorHarness("+ 비어 있음\n[ ] 할 일\n+ 제목\n\t본문")
+        h.editor.load(text: h.editor.text, openedEmptyToggleLines: [0])
         h.caret(atEndOfLine: 0)
         h.perform(.toggleDone)
-        #expect(h.editor.foldedLines.isEmpty)
+        #expect(h.editor.foldedLines == [0])
         h.place(at: h.document.lines[0].contentStart, length: h.document.length - h.document.lines[0].contentStart)
         h.perform(.toggleDone)
         #expect(h.editor.text == "+ 비어 있음\n[x] 할 일\n+ 제목\n\t본문")
-        #expect(h.editor.foldedLines.isEmpty)
+        #expect(h.editor.foldedLines == [0])
     }
 
     @Test(arguments: [1, 2, 3])

@@ -9,7 +9,7 @@ nonisolated extension EditorCommands {
     static func moveLines(
         _ doc: MarkdownDocument,
         selection: NSRange,
-        folded: Set<Int>,
+        folded: Set<Int>, openedEmpty: Set<Int> = [],
         direction: MoveDirection, selectedRows: ClosedRange<Int>? = nil
     ) -> TextEdit? {
         let folded = FoldState.sanitized(folded, in: doc)
@@ -81,18 +81,25 @@ nonisolated extension EditorCommands {
 
         let lineShift = direction == .up ? -neighbor.count : neighbor.count
         let neighborShift = direction == .up ? block.count : -block.count
-        let foldedAfter = Set(folded.map { index in
+        func moved(_ index: Int) -> Int {
             if block.contains(index) { return index + lineShift }
             if neighbor.contains(index) { return index + neighborShift }
             return index
-        })
+        }
+        let foldedAfter = Set(folded.map(moved))
 
-        return TextEdit(
+        var edit = TextEdit(
             range: NSRange(location: regionStart, length: regionEnd - regionStart),
             replacement: ordered.joined(separator: "\n"),
             selection: NSRange(location: max(0, selection.location + shift), length: selection.length),
             foldedAfter: foldedAfter,
             includesHiddenLines: true
         )
+        edit.openedEmptyAfter = Set(openedEmpty.map(moved))
+        if !foldedAfter.isEmpty {
+            let after = MarkdownDocument(edit.applied(to: doc.text))
+            edit.foldedAfter = FoldState.revealing(first + lineShift, in: after, folded: foldedAfter)
+        }
+        return edit
     }
 }

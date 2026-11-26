@@ -16,7 +16,7 @@ nonisolated extension EditorCommands {
     ///   바꿨을 때뿐이다. 대상은 편집한 줄 바로 뒤의 하위 덩어리(그 부모보다 깊은 줄이 이어지는 동안)다.
     /// - 코드 블록의 줄은 블록째로 움직여야 해서 다루지 않는다(부모를 잃은 채 남는다).
     /// - 접혀서 감춘 줄은 제 토글과 함께 내어 쓸 때만 고친다. 아니면 편집기가 막고 토글을 편다(D-020).
-    static func adoptingOrphans(_ doc: MarkdownDocument, _ edit: TextEdit, folded: Set<Int> = []) -> TextEdit {
+    static func adoptingOrphans(_ doc: MarkdownDocument, _ edit: TextEdit, folded: Set<Int> = [], openedEmpty: Set<Int> = []) -> TextEdit {
         guard !edit.checkedForOrphans else { return edit }
         var checked = edit
         checked.checkedForOrphans = true
@@ -51,12 +51,16 @@ nonisolated extension EditorCommands {
         result.replacement = replacement
         let start = moved(edit.selection.location)
         result.selection = NSRange(location: start, length: max(0, moved(NSMaxRange(edit.selection)) - start))
-        if !edit.preservesLines, edit.foldedAfter == nil, !folded.isEmpty {
-            // 바꿔 쓰는 범위가 넓어져도 접힘은 원래 편집을 따라 옮긴다(내어 쓰기는 줄 수를 바꾸지 않는다).
-            result.foldedAfter = FoldState.remapped(
-                folded, old: doc, new: MarkdownDocument(edit.applied(to: doc.text)),
-                editedRange: NSRange(location: edit.range.location, length: edit.replacement.utf16.count), delta: delta
-            )
+        if !edit.preservesLines, !folded.isEmpty || !openedEmpty.isEmpty {
+            // 내어 쓰기는 줄 수를 바꾸지 않으므로 원래 편집을 기준으로 두 기록을 옮긴다.
+            let after = MarkdownDocument(edit.applied(to: doc.text))
+            let range = NSRange(location: edit.range.location, length: edit.replacement.utf16.count)
+            if edit.foldedAfter == nil, !folded.isEmpty {
+                result.foldedAfter = FoldState.remapped(folded, old: doc, new: after, editedRange: range, delta: delta)
+            }
+            if edit.openedEmptyAfter == nil, !openedEmpty.isEmpty {
+                result.openedEmptyAfter = FoldState.remapped(openedEmpty, old: doc, new: after, editedRange: range, delta: delta)
+            }
         }
         if !edit.includesHiddenLines, !folded.isEmpty {
             result.includesHiddenLines = movesFoldedBlocksWhole(doc, edit, moved: Set(removals.keys), folded: folded)

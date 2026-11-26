@@ -61,21 +61,25 @@ import Testing
         ("## |이번 주\n월요일까지 초안", "\n## |이번 주\n월요일까지 초안", false),
         ("[x] |보고서 제출\n[ ] 회의록 공유", "[ ] \n[x] |보고서 제출\n[ ] 회의록 공유", false),
         ("- |마감 이번 주 금요일 <!-- 노랑 바탕 -->\n- 자료 모으기", "- \n- |마감 이번 주 금요일 <!-- 노랑 바탕 -->\n- 자료 모으기", false),
-        ("+ 회의 준비|", "+ 회의 준비\n+ |", false),
+        ("+ 회의 준비|", "+ 회의 준비\n\t|", false),
+        ("+ 회의 준비|", "+ 회의 준비\n+ |", true),
         ("+ 프로젝트 A|\n\t- 일정 정리\n다음 문단", "+ 프로젝트 A\n\t|\n\t- 일정 정리\n다음 문단", false),
         ("+ 프로젝트 |회고\n\t일정 정리\n다음 문단", "+ 프로젝트\n\t일정 정리\n+ |회고\n다음 문단", true),
         ("- 장보기|\n\t- 우유\n\t- 계란\n- 세탁소", "- 장보기\n- |\n\t- 우유\n\t- 계란\n- 세탁소", false),
         ("> 작은 일부터 끝낸다.|", "> 작은 일부터 끝낸다.\n|", false),
-        ("\t+ ## 앞|뒤", "\t+ ## 앞\n\t+ ## |뒤", false),
+        ("\t+ ## 앞|뒤", "\t+ ## 앞\n\t\t|뒤", false),
         ("\t> 앞|뒤", "\t> 앞\n\t|뒤", false),
         ("- 위\\\n|계속", "- 위\\\n\n- |계속", false),
     ])
     func returnPolicy(_ before: String, _ after: String, _ folded: Bool) throws {
         let h = try EditorHarness.at(before)
-        if folded { h.editor.foldedLines = [0] }
+        h.editor.load(text: h.editor.text, foldedLines: folded ? [0] : [], openedEmptyToggleLines: folded ? [] : [0])
         h.press(NSResponder.newline)
         #expect(h.marked == after)
-        if folded { #expect(h.editor.foldedLines == (before.hasPrefix("+ |") ? [1] : [0])) }
+        if folded {
+            let sibling = before.hasPrefix("+ |") ? 0 : h.document.lineIndex(at: h.editor.selectedRange.location)
+            #expect(h.editor.foldedLines == [sibling, before.hasPrefix("+ |") ? 1 : 0])
+        }
         h.undo()
         #expect(h.marked == before)
         if folded { #expect(h.editor.foldedLines == [0]) }
@@ -86,7 +90,7 @@ import Testing
         h.editor.foldedLines = [0, 2]
         h.press(NSResponder.newline)
         #expect(h.marked == "+ # 앞\\\n중 <!-- 노랑 바탕 -->\n\t+ 하위\n\t\t안\n+ # |간\n끝")
-        #expect(h.editor.foldedLines == [0, 2])
+        #expect(h.editor.foldedLines == [0, 2, 4])
         h.undo()
         #expect(h.marked == "+ # 앞\\\n중|간 <!-- 노랑 바탕 -->\n\t+ 하위\n\t\t안\n끝")
         #expect(h.editor.foldedLines == [0, 2])
@@ -110,10 +114,10 @@ import Testing
         #expect(newline("- 앞|가운데|뒤") == "- 앞\n- |뒤")
     }
 
-    @Test func emptyItemEndsTheListOrOutdents() {
+    @Test func emptyItemKeepsItsDepth() {
         #expect(newline("- 하나\n- |") == "- 하나\n|")
         #expect(newline("[ ] |") == "|")
-        #expect(newline("\t- |") == "- |")
+        #expect(newline("\t- |") == "\t|")
         #expect(newline("\t|") == "|")
     }
 

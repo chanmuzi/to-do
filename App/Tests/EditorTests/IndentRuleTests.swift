@@ -103,7 +103,7 @@ import Testing
     @Test func returnOnAnEmptyParentOutdentsTheChildrenWithIt() throws {
         let h = try EditorHarness.at("- p\n\t- |\n\t\t- b")
         h.press(NSResponder.newline)
-        #expect(h.marked == "- p\n- |\n\t- b")
+        #expect(h.marked == "- p\n\t|\n\t- b")
     }
 
     @Test func childrenThatKeepAParentStay() throws {

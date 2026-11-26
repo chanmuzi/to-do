@@ -3,6 +3,7 @@ import AppKit
 extension EditorController {
     /// 마우스 아래에 있는 누를 수 있는 것.
     enum Hit: Equatable {
+        case emptyToggleHint(line: Int)
         case divider(line: Int)
         case checkbox(line: Int)
         case chevron(line: Int)
@@ -27,6 +28,7 @@ extension EditorController {
         guard let found = fragment(at: point) else { return nil }
         guard FoldState.foldRoot(of: found.line, in: document, folded: folded) == nil else { return nil }
         let line = document.lines[found.line]
+        if found.fragment.emptyToggleHintRect?.contains(found.local) == true { return .emptyToggleHint(line: found.line) }
         if line.kind == .divider, found.local.y < found.fragment.ownHeight { return .divider(line: found.line) }
         if let gutter = found.fragment.gutterRect, gutter.contains(found.local) {
             switch line.kind {
@@ -86,7 +88,7 @@ extension EditorController {
         if isOverScheduleButton(point) || isOverCopyButton(point) { return .arrow }
         switch hit(at: point) {
         case .link: return selectingText ? .iBeam : .pointingHand
-        case .divider, .checkbox, .chevron: return .arrow
+        case .emptyToggleHint, .divider, .checkbox, .chevron: return .arrow
         case nil: return .iBeam
         }
     }
@@ -130,6 +132,10 @@ extension EditorController {
         let wasSelecting = clearBlocks()
         guard let hit = target else { return false }
         switch hit {
+        case .emptyToggleHint(let row):
+            guard !textView.hasMarkedText() else { return true }
+            let line = document.lines[row]
+            apply(.insert("\n" + document.string(in: line.indentRange) + "\t", replacing: NSRange(location: line.end, length: 0)))
         case .divider(let row):
             showBlocks(BlockSelection(anchor: row, focus: row))
         case .checkbox where wasSelecting, .chevron where wasSelecting:
@@ -150,9 +156,7 @@ extension EditorController {
 
     func toggleFold(line: Int) {
         guard document.lines.indices.contains(line), document.lines[line].kind.isToggle else { return }
-        if folded.contains(line) {
-            changeUserFolds(folded.subtracting([line]))
-        } else {
+        if !foldState.isClosed(line, in: document) {
             // 커서가 접히는 줄 안에 있으면 토글 제목 끝으로 옮긴다.
             let selection = clamped(textView.selectedRange())
             let title = document.lines[line]
@@ -161,8 +165,8 @@ extension EditorController {
             if NSMaxRange(selection) > titleEnd, selection.location < subtreeEnd {
                 setSelection(NSRange(location: titleEnd, length: 0))
             }
-            changeUserFolds(folded.union([line]))
         }
+        changeUserFolds(foldState.toggling([line], in: document))
     }
 
     /// - Returns: 누를 수 있는 것(복사 버튼 포함) 위면 `true`(화살표 커서).

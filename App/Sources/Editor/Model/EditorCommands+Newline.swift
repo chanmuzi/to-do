@@ -13,9 +13,9 @@ nonisolated extension EditorCommands {
         return insert(doc, marker + "\n" + doc.string(in: line.indentRange), replacing: range)
     }
 
-    /// Return. 목록은 같은 기호로 이어 가고, 빈 항목에서는 기호를 지우거나 한 단계 내어 쓴다.
+    /// Return. 목록은 같은 기호로 이어 가고, 빈 항목에서는 같은 깊이에서 기호만 지운다.
     /// 서식 구간 한가운데에서 누르면 구간을 줄바꿈 앞에서 닫고 다음 줄에서 다시 연다.
-    static func newline(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int> = []) -> TextEdit {
+    static func newline(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int> = [], openedEmpty: Set<Int> = []) -> TextEdit {
         let row = doc.lineIndex(at: selection.location)
         let line = doc.lines[row]
         if selection.length == 0, line.continuationOf == nil, !line.kind.isCode,
@@ -23,9 +23,10 @@ nonisolated extension EditorCommands {
            doc.blockLines(at: row).contains(where: { doc.lines[$0].contentRange.length > 0 }) {
             let prefix = doc.string(in: line.indentRange) + nextMarker(doc, line)
             return TextEdit(range: NSRange(location: line.start, length: 0), replacement: prefix + "\n",
-                            selection: NSRange(location: selection.location + prefix.utf16.count + 1, length: 0))
+                            selection: NSRange(location: selection.location + prefix.utf16.count + 1, length: 0),
+                            foldedAfter: line.kind.isToggle ? Set(folded.map { $0 >= row ? $0 + 1 : $0 }).union([row]) : nil)
         }
-        let edit = splitLine(doc, selection: selection, folded: folded)
+        let edit = splitLine(doc, selection: selection, folded: folded, openedEmpty: openedEmpty)
         return keepingInkOnSplit(doc, selection: selection, edit: edit)
     }
 
@@ -35,7 +36,7 @@ nonisolated extension EditorCommands {
         return line.kind.isListItem ? marker : ""
     }
 
-    private static func splitLine(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>) -> TextEdit {
+    private static func splitLine(_ doc: MarkdownDocument, selection: NSRange, folded: Set<Int>, openedEmpty: Set<Int>) -> TextEdit {
         let index = doc.lineIndex(at: selection.location)
         let line = doc.lines[index]
         let indent = doc.string(in: line.indentRange)
@@ -51,10 +52,10 @@ nonisolated extension EditorCommands {
 
         if let owner = line.continuationOf {
             let first = doc.lines[owner]
-            if isCaret, folded.contains(owner), !line.isVisualStart(selection.location),
-               first.subtreeEnd > doc.blockLines(at: owner).upperBound + 1 {
-                return splitFoldedToggle(doc, index: index, selection: selection, folded: folded)
+            if isCaret, folded.contains(owner) {
+                return splitFoldedToggle(doc, index: index, selection: selection, folded: folded, openedEmpty: openedEmpty)
             }
+            if first.kind.isToggle { return insert(doc, "\n" + indent + "\t", replacing: selection) }
             let marker = first.kind.headingLevel != nil ? doc.string(in: first.markerRange) : nextMarker(doc, first)
             return insert(doc, "\n" + indent + marker, replacing: selection)
         }
@@ -84,16 +85,14 @@ nonisolated extension EditorCommands {
             return insert(doc, "\n" + indent, replacing: selection)
 
         case .todo, .bullet, .toggle, .toggleHeading, .quote:
-            // 빈 항목(빈 인용문 줄 포함)에서는 기호를 지우거나 한 단계 내어 쓴다. 글이 있는 인용문은 본문으로 나온다.
+            // 빈 항목(빈 인용문 줄 포함)에서는 같은 깊이에서 기호만 지운다. 글이 있는 인용문은 본문으로 나온다.
             if isCaret, !line.hasHardBreak, line.contentRange.length == 0 {
-                if line.indentLength > 0, let edit = outdent(doc, selection: selection, folded: folded) { return edit }
                 return TextEdit(range: line.markerRange, replacement: "", selection: NSRange(location: line.start + line.indentLength, length: 0))
             }
             let marker = nextMarker(doc, line)
-            let blockEnd = doc.blockLines(at: index).upperBound
-            if line.kind.isToggle, line.subtreeEnd > blockEnd + 1 {
+            if line.kind.isToggle {
                 if isCaret, folded.contains(index) {
-                    return splitFoldedToggle(doc, index: index, selection: selection, folded: folded)
+                    return splitFoldedToggle(doc, index: index, selection: selection, folded: folded, openedEmpty: openedEmpty)
                 }
                 return insert(doc, "\n" + indent + "\t", replacing: selection)
             }
@@ -102,7 +101,7 @@ nonisolated extension EditorCommands {
     }
 
     /// 먼저 제목을 서식 경계에서 나누고, 두 조각 사이에 감춰진 하위 원문을 그대로 끼운다.
-    private static func splitFoldedToggle(_ doc: MarkdownDocument, index: Int, selection: NSRange, folded: Set<Int>) -> TextEdit {
+    private static func splitFoldedToggle(_ doc: MarkdownDocument, index: Int, selection: NSRange, folded: Set<Int>, openedEmpty: Set<Int>) -> TextEdit {
         let line = doc.lines[index]
         let blockEnd = doc.blockLines(at: index).upperBound
         var range = selection
@@ -121,10 +120,13 @@ nonisolated extension EditorCommands {
         }
         edit.range.length = NSMaxRange(children) - edit.range.location
         edit.selection.location += children.length
-        edit.foldedAfter = Set(folded.map { row in
+        func shifted(_ row: Int) -> Int {
             if row >= owner.subtreeEnd { return row + 1 }
             return row > blockEnd ? row - (blockEnd - index) : row
-        })
+        }
+        edit.openedEmptyAfter = Set(openedEmpty.map(shifted))
+        edit.foldedAfter = Set(folded.map(shifted))
+        edit.foldedAfter?.insert(owner.subtreeEnd - (blockEnd - index))
         edit.includesHiddenLines = true
         return edit
     }

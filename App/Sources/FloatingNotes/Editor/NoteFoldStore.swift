@@ -15,16 +15,25 @@ struct NoteFoldStore {
         return FoldPersistence.restored(lines: state?.foldedLines, texts: state?.foldedLineTexts, in: text)
     }
 
+    func openedEmptyToggleLines(for id: NoteID, in text: String) -> Set<Int> {
+        let state = windowStates.state(for: id)
+        return FoldPersistence.restored(lines: state?.openedEmptyToggleLines, texts: state?.openedEmptyToggleLineTexts, in: text)
+    }
+
     func hasStoredFolds(for id: NoteID) -> Bool {
-        windowStates.state(for: id)?.foldedLines != nil
+        let state = windowStates.state(for: id)
+        return state?.foldedLines != nil || state?.openedEmptyToggleLines != nil
     }
 
     /// 접힌 줄 번호와 그 줄의 글(`text`에서 읽는다)을 적는다. 적힌 것과 같으면 파일을 쓰지 않는다.
-    func save(_ lines: Set<Int>, in text: String, for id: NoteID) {
+    func save(_ lines: Set<Int>, openedEmpty: Set<Int> = [], in text: String, for id: NoteID) {
         var state = windowStates.state(for: id) ?? NoteWindowState()
         let stored = FoldPersistence.stored(lines, in: text)
         state.foldedLines = stored?.lines
         state.foldedLineTexts = stored?.texts
+        let opened = FoldPersistence.stored(openedEmpty, in: text)
+        state.openedEmptyToggleLines = opened?.lines
+        state.openedEmptyToggleLineTexts = opened?.texts
         do {
             try windowStates.set(state, for: id)
         } catch {

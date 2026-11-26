@@ -206,13 +206,9 @@ extension EditorController {
         switch action {
         case .fold, .unfold:
             let caret = NSRange(location: document.lines[selection.focus].contentStart, length: 0)
-            if action == .fold, let change = FoldState.fold(document, selection: caret, folded: folded) {
-                changeUserFolds(change.folded)
-                if let root = FoldState.foldRoot(of: selection.focus, in: document, folded: folded) {
-                    showBlocks(BlockSelection(anchor: root, focus: root))
-                }
-            } else if action == .unfold, let next = FoldState.unfold(document, selection: caret, folded: folded) {
-                changeUserFolds(next)
+            performFoldCommand(action, at: caret, moveCaret: false)
+            if action == .fold, let root = FoldState.foldRoot(of: selection.focus, in: document, folded: folded) {
+                showBlocks(BlockSelection(anchor: root, focus: root))
             }
             return true
         case .pasteInside: paste(from: .general, inside: true); return true
@@ -223,19 +219,19 @@ extension EditorController {
             let hidden = FoldState.hiddenLines(document, folded: folded)
             let toggles = rows.filter { row in
                 !hidden.contains(row) && document.lines[row].kind.isToggle
-                    && document.lines[row].subtreeEnd > block(at: row).upperBound + 1
             }
-            let next = folded.symmetricDifference(toggles)
+            let next = foldState.toggling(Set(toggles), in: document)
             edit = EditorCommands.toggleDone(document, lines: rows, selection: range, excluding: hidden, invertEach: true)
             if edit == nil {
                 changeUserFolds(next)
                 showVisibleBlocks(selection)
                 return true
             }
-            edit?.foldedAfter = next
+            edit?.foldedAfter = next.closed
+            edit?.openedEmptyAfter = next.openedEmpty
             edit?.includesHiddenLines = true
         case .moveLineUp, .moveLineDown:
-            edit = EditorCommands.moveLines(document, selection: range, folded: folded,
+            edit = EditorCommands.moveLines(document, selection: range, folded: folded, openedEmpty: foldState.openedEmpty,
                                             direction: action == .moveLineUp ? .up : .down, selectedRows: rows)
         default: return true
         }
@@ -265,7 +261,7 @@ extension EditorController {
               let fragment = layoutManager.textLayoutFragment(for: location) as? MarkdownLayoutFragment else { return nil }
         layoutManager.ensureLayout(for: fragment.rangeInElement)
         var frame = fragment.layoutFragmentFrame
-        frame.size.height = fragment.ownHeight
+        frame.size.height = min(fragment.ownHeight, fragment.emptyToggleHintRect?.minY ?? fragment.ownHeight)
         return frame
     }
 

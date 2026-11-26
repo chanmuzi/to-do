@@ -52,6 +52,9 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
     /// 어긋났는지 다시 열 때 이것으로 알아보고, 같은 글의 줄을 찾아 옮기거나 버린다(D-023).
     /// 이것 없이 적힌 예전 상태에서는 `nil`이다.
     public var foldedLineTexts: [String]?
+    /// 사용자가 직접 연 빈 토글(D-352). 이전 파일에서 두 값은 nil이다.
+    public var openedEmptyToggleLines: [Int]?
+    public var openedEmptyToggleLineTexts: [String]?
     /// 이 노트가 마지막으로 키 창이 된 때. 기존에 기록된 시각은 이어 쓴다(D-130).
     /// 기록이 없으면 최근에서 제외하고 검색으로 찾는다.
     public var lastOpened: Date?
@@ -78,6 +81,8 @@ public struct NoteWindowState: Hashable, Codable, Sendable {
         stackOrder = try values.decodeIfPresent(Int.self, forKey: .stackOrder)
         foldedLines = try values.decodeIfPresent([Int].self, forKey: .foldedLines)
         foldedLineTexts = try values.decodeIfPresent([String].self, forKey: .foldedLineTexts)
+        openedEmptyToggleLines = try values.decodeIfPresent([Int].self, forKey: .openedEmptyToggleLines)
+        openedEmptyToggleLineTexts = try values.decodeIfPresent([String].self, forKey: .openedEmptyToggleLineTexts)
         lastOpened = try values.decodeIfPresent(Date.self, forKey: .lastOpened)
     }
 

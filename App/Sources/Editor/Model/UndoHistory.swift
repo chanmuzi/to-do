@@ -17,8 +17,8 @@ nonisolated struct UndoRecord: Equatable, Sendable {
     var selectionBefore: NSRange
     var selectionAfter: NSRange
     /// 되돌릴 때(다시 할 때) 되살릴 접힘. 줄 번호를 따라 옮기는 것으로 충분하면 `nil`.
-    var foldsBefore: Set<Int>?
-    var foldsAfter: Set<Int>?
+    var foldsBefore: FoldState?
+    var foldsAfter: FoldState?
     /// 글자를 그대로 친 편집 하나. 이어 친 글자는 한 단계로 묶는다.
     var isTyping = false
     var dateEffect: UUID?

@@ -93,13 +93,15 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, NoteInkForm
             guard hasLoaded else {
                 // 노트를 연다: 원문과 지난번의 접힘을 한 번에 넣는다. 접힘은 지금 본문에 맞춰 되살린 것이다.
                 hasLoaded = true
-                editor.load(text: newValue, foldedLines: folds.foldedLines(for: noteID, in: newValue))
+                editor.load(text: newValue, foldedLines: folds.foldedLines(for: noteID, in: newValue),
+                            openedEmptyToggleLines: folds.openedEmptyToggleLines(for: noteID, in: newValue))
                 saveFolds()
                 return
             }
             // 이 편집기가 아닌 쪽이 본문을 바꿨다. 같은 글이면 편집기가 아무것도 하지 않는다.
             let folded = FoldPersistence.remapped(editor.foldedLines, from: editor.text, to: newValue)
-            editor.load(text: newValue, foldedLines: folded)
+            let opened = FoldPersistence.remapped(editor.openedEmptyToggleLines, from: editor.text, to: newValue)
+            editor.load(text: newValue, foldedLines: folded, openedEmptyToggleLines: opened)
             saveFolds()
         }
     }
@@ -141,7 +143,8 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, NoteInkForm
     private func saveFolds() {
         let folded = editor.foldedLines
         // 접힌 것이 없고 적어 둔 것도 없으면 본문을 줄로 나눌 필요가 없다(글자를 칠 때마다 불린다).
-        guard !folded.isEmpty || folds.hasStoredFolds(for: noteID) else { return }
-        folds.save(folded, in: editor.text, for: noteID)
+        let opened = editor.openedEmptyToggleLines
+        guard !folded.isEmpty || !opened.isEmpty || folds.hasStoredFolds(for: noteID) else { return }
+        folds.save(folded, openedEmpty: opened, in: editor.text, for: noteID)
     }
 }

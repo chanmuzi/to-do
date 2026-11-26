@@ -50,10 +50,10 @@ import Theme
         #expect(h.marked == "> 첫 줄\n둘째\n\n|")
     }
 
-    @Test func returnOnAnEmptyNestedQuoteOutdents() throws {
+    @Test func returnOnAnEmptyNestedQuoteKeepsDepth() throws {
         let h = try EditorHarness.at("- 부모\n\t> |")
         h.press(NSResponder.newline)
-        #expect(h.marked == "- 부모\n> |")
+        #expect(h.marked == "- 부모\n\t|")
     }
 
     @Test func backspaceAtTheStartLeavesTheQuote() throws {

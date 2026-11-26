@@ -87,7 +87,7 @@ extension EditorController {
     /// 선택을 글자로 덮어쓰면 부모를 잃는 하위 줄을 함께 내어 써야 하는지.
     private func replacingMovesOrphans(_ selection: NSRange) -> Bool {
         let typed = TextEdit.insert("가", replacing: selection)
-        let adopted = EditorCommands.adoptingOrphans(document, typed, folded: folded)
+        let adopted = EditorCommands.adoptingOrphans(document, typed, folded: folded, openedEmpty: foldState.openedEmpty)
         return adopted.range != typed.range || adopted.replacement != typed.replacement
     }
 

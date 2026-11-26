@@ -337,3 +337,22 @@ import Theme
     var items: [NSMenuItem] = []
     @objc func record(_ item: NSMenuItem) { items.append(item) }
 }
+
+extension MenuTests {
+    @Test func commandReturnMenuRoutesToActiveToggle() throws {
+        defer { fixture.cleanUp() }
+        let (id, adapter) = try fixture.open(NoteDraft(title: "검증", body: "+ 제목\n\t자식"))
+        let window = try #require(fixture.notePanels.window(for: id))
+        fixture.notePanels.isKeyPanel = { $0 === window }
+        adapter.focus()
+        adapter.editor.forcesActiveAppearance = true
+        adapter.editor.selectedRange = NSRange(location: 3, length: 0)
+        let menu = MainMenu.make(appName: "Float", table: .standard, dispatcher: fixture.commands)
+        let item = try #require(menu.item(withTitle: "서식")?.submenu?.item(withTitle: "완료 표시, 접기와 펼치기"))
+        #expect(fixture.commands.validateMenuItem(item))
+        #expect(try press(KeyChord(.returnKey, .command), in: menu))
+        #expect(adapter.editor.foldedLines == [0])
+        #expect(try press(KeyChord(.returnKey, .command), in: menu))
+        #expect(adapter.editor.foldedLines.isEmpty)
+    }
+}

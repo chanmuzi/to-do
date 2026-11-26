@@ -1,18 +1,18 @@
 import AppKit
 
 extension EditorController {
-    /// 굵게는 조합한 글자를 먼저 확정하고 그 뒤의 입력 상태를 바꾼다.
+    /// 굵게와 완료 전환은 현재 조합을 먼저 확정한다.
     func run(_ action: EditorAction) {
         defer { onFormattingChange?() }
         if textView.hasMarkedText() {
-            guard action == .bold else { return }
+            guard action.commitsComposition else { return }
             textView.unmarkText()
             textView.inputContext?.discardMarkedText()
         }
-        if action != .highlight, editSelectedBlocks(action) { return }
+        if action != .highlight, editSelectedBlocks(action.editingAction) { return }
         let selection = clamped(textView.selectedRange())
         switch action {
-        case .pasteInside: break
+        case .pasteInside, .moveSelectedBlockUp, .moveSelectedBlockDown: break
         case .duplicate: duplicateBlocks()
         case .indent: apply(EditorCommands.indent(document, selection: selection, folded: folded))
         case .outdent: apply(EditorCommands.outdent(document, selection: selection, folded: folded))
@@ -22,12 +22,12 @@ extension EditorController {
             let lines = document.lineRange(for: selection)
             let first = document.blockLines(at: lines.lowerBound).lowerBound
             if document.blockLines(at: first).contains(lines.upperBound), document.lines[first].kind.isToggle {
-                if document.lines[first].subtreeEnd > document.blockLines(at: first).upperBound + 1 { toggleFold(line: first) }
+                toggleFold(line: first)
             } else {
                 apply(EditorCommands.toggleDone(document, selection: selection))
             }
-        case .moveLineUp: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, direction: .up))
-        case .moveLineDown: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, direction: .down))
+        case .moveLineUp: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, openedEmpty: foldState.openedEmpty, direction: .up))
+        case .moveLineDown: apply(EditorCommands.moveLines(document, selection: selection, folded: folded, openedEmpty: foldState.openedEmpty, direction: .down))
         case .heading(let level):
             guard (1...3).contains(level) else { return }
             apply(EditorCommands.toggleHeading(document, selection: selection, level: level))
@@ -38,13 +38,8 @@ extension EditorController {
         case .highlight: setInk(Self.lastInk, toggle: true)
         case .codeBlock: apply(EditorCommands.toggleCodeBlock(document, selection: selection))
         case .link: beginLinkEditing()
-        case .fold:
-            guard let result = FoldState.fold(document, selection: selection, folded: folded) else { return }
-            setSelection(result.selection)
-            changeUserFolds(result.folded)
-        case .unfold:
-            guard let unfolded = FoldState.unfold(document, selection: selection, folded: folded) else { return }
-            changeUserFolds(unfolded)
+        case .fold, .unfold:
+            performFoldCommand(action, at: selection, moveCaret: true)
         }
     }
 
@@ -169,7 +164,7 @@ extension EditorController {
     func apply(_ edit: TextEdit?, isIntermediate: Bool = false) {
         guard var edit, let storage = textView.textStorage, textView.isEditable else { return }
         // 부모 항목을 없앤 편집은 부모를 잃는 하위 줄을 함께 내어 쓴다(D-043. `finalized`에서 이미 따진 편집은 다시 따지지 않는다).
-        if !isIntermediate { edit = EditorCommands.adoptingOrphans(document, edit, folded: folded) }
+        if !isIntermediate { edit = EditorCommands.adoptingOrphans(document, edit, folded: folded, openedEmpty: foldState.openedEmpty) }
         // ``` 줄이 짝을 잃는 편집은 그대로 넣지 않는다(어느 길로 들어온 편집이든). 새로 생기는 ``` 를 글자로
         // 막아 넣을 수 있으면 그렇게 하고, 아니면 넣지 않고 알린다.
         if !EditorCommands.keepsFencesBalanced(document, edit) {
@@ -194,13 +189,25 @@ extension EditorController {
             isApplyingEdit = wasApplying
             allowsHiddenEdit = allowedHidden
         }
-        let foldsBefore = folded
+        let documentBefore = document
+        let foldsBefore = foldState
         guard textView.shouldChangeText(in: edit.range, replacementString: edit.replacement) else { return }
         storage.replaceCharacters(in: edit.range, with: NSAttributedString(string: edit.replacement, attributes: baseAttributes))
         // 줄을 옮기는 편집은 접힌 줄 번호를 스스로 정하고, 줄 머리만 바꾸는 편집은 줄 번호가 그대로다.
-        if let foldedAfter = edit.foldedAfter ?? (edit.preservesLines ? foldsBefore : nil) {
-            folded = FoldState.sanitized(foldedAfter, in: document)
+        if let foldedAfter = edit.foldedAfter ?? (edit.preservesLines ? foldsBefore.closed : nil) {
+            foldState.closed = FoldState.sanitized(foldedAfter, in: document)
+            if edit.preservesLines {
+                for row in document.lineRange(for: NSRange(location: edit.range.location, length: edit.replacement.utf16.count)) {
+                    let line = document.lines[row]
+                    if line.kind.isToggle, !documentBefore.lines[row].kind.isToggle,
+                       line.subtreeEnd == document.blockLines(at: row).upperBound + 1 { foldState.closed.insert(row) }
+                }
+            }
             editSetFoldsExplicitly = true
+        }
+        if let opened = edit.openedEmptyAfter ?? (edit.preservesLines ? foldsBefore.openedEmpty : nil) {
+            foldState.openedEmpty = opened
+            foldState = foldState.sanitized(in: document)
         }
         if edit.includesHiddenLines { editSetFoldsExplicitly = true }
         // 명령이 정한 커서가 감춘 곳(줄 머리, 기호 한가운데, ``` 줄)에 걸리면 보이는 자리로 옮긴다.
@@ -338,7 +345,7 @@ extension EditorController: NSTextViewDelegate {
                 return true
             }
             // ⌃Return(U+2028), 문단 구분(U+2029)도 원문에는 `\n` 하나로 넣는다.
-            apply(EditorCommands.newline(document, selection: selection, folded: folded))
+            apply(EditorCommands.newline(document, selection: selection, folded: foldsAtCaret(selection), openedEmpty: foldState.openedEmpty))
             return true
         case #selector(NSResponder.deleteBackward(_:)):
             if selectAdjacentDivider(selection, backward: true) { return true }
@@ -380,7 +387,7 @@ extension EditorController: NSTextViewDelegate {
             return nil
         }
         // 지우거나 덮어써 부모 항목이 없어지면 하위 줄을 함께 내어 쓴다(그대로 넣는 길로 가지 않게 여기서 붙인다).
-        return EditorCommands.adoptingOrphans(document, EditorCommands.finalized(document, edit), folded: folded)
+        return EditorCommands.adoptingOrphans(document, EditorCommands.finalized(document, edit), folded: folded, openedEmpty: foldState.openedEmpty)
     }
 
     /// 지우려는 줄바꿈 너머가 접힌 줄이면 먼저 편다. 보이지 않는 줄과 합쳐지지 않게 한다.

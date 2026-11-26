@@ -14,6 +14,7 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
     var isCollapsed = false
     /// 접힌 토글 자신.
     var isFolded = false
+    var showsEmptyToggleHint = false
     /// 문서의 첫 줄(위 여백을 두지 않는다).
     var isFirst = false
     /// 코드 블록의 첫 줄, 마지막 줄(상자의 둥근 모서리를 그린다).
@@ -32,10 +33,11 @@ nonisolated struct LineRenderKey: Hashable, Sendable {
 nonisolated enum LinePresentation {
     static func keys(
         for doc: MarkdownDocument,
-        folded: Set<Int>,
+        folded: Set<Int>, openedEmpty: Set<Int> = [],
         hoveredLink: (line: Int, offset: Int)? = nil, animating: Set<Int> = []
     ) -> [LineRenderKey] {
         let folded = FoldState.sanitized(folded, in: doc)
+        let state = FoldState(closed: folded, openedEmpty: openedEmpty)
         let hidden = FoldState.hiddenLines(doc, folded: folded.subtracting(animating))
         let trailingCode = trailingCodeLine(in: doc) != nil
         return doc.lines.indices.map { index in
@@ -53,7 +55,11 @@ nonisolated enum LinePresentation {
             }
             key.ink = doc.blockColor(at: index)
             key.isCollapsed = hidden.contains(index)
-            key.isFolded = folded.contains(index)
+            key.isFolded = state.isClosed(index, in: doc)
+            if key.kind.isToggle, !line.hasHardBreak, !key.isCollapsed {
+                let owner = line.continuationOf ?? index
+                key.showsEmptyToggleHint = openedEmpty.contains(owner) && !folded.contains(owner) && FoldState.isEmptyToggle(owner, in: doc)
+            }
             key.isFirst = index == 0
             if let block = line.codeBlock {
                 key.isCodeTop = index == block.lowerBound

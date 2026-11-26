@@ -131,6 +131,7 @@ import Theme
             "투두로 바꾸기": [.toggleTodo],
             "완료 표시, 토글 접기와 펼치기": [.toggleDone],
             "블록 복제": [.duplicate],
+            "고른 블록 위로, 아래로 옮기기": [.moveSelectedBlockUp, .moveSelectedBlockDown],
             "줄 위로, 아래로 옮기기": [.moveLineUp, .moveLineDown],
             "접기, 펼치기": [.fold, .unfold],
             "제목 1, 2, 3": [.heading(1), .heading(2), .heading(3)],

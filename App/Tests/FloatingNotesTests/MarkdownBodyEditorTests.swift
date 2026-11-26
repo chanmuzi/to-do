@@ -450,6 +450,36 @@ import Theme
 
     // MARK: - 접힘
 
+    @Test func openedEmptyToggleIsRestoredOnlyForItsMatchingLine() throws {
+        defer { fixture.cleanUp() }
+        let body = "+ 이전 토글\n+ 직접 연 토글\n+ 자식 있음\n\t본문"
+        let id = NoteID(rawValue: "empty-toggle")
+        let legacy = Data(#"{"isPinned":true,"isOpen":false,"foldedLines":[2]}"#.utf8)
+        try fixture.windowStates.set(JSONDecoder().decode(NoteWindowState.self, from: legacy), for: id)
+        func reopen(_ text: String) throws -> MarkdownBodyEditor {
+            let store = try WindowStateStore(location: fixture.location)
+            let adapter = MarkdownBodyEditor(editor: MarkdownEditor(theme: fixture.theme), noteID: id,
+                                             folds: NoteFoldStore(windowStates: store, log: { Issue.record("\($0)") }))
+            adapter.text = text
+            return adapter
+        }
+        let first = try reopen(body)
+        #expect(first.editor.foldedLines == [2])
+        #expect(first.editor.openedEmptyToggleLines.isEmpty)
+        first.editor.selectedRange = NSRange(location: (body as NSString).range(of: "직접").location, length: 0)
+        first.editor.perform(.toggleDone)
+        let written = try WindowStateStore(location: fixture.location).state(for: id)
+        #expect(written?.openedEmptyToggleLines == [1])
+        #expect(written?.openedEmptyToggleLineTexts == ["+ 직접 연 토글"])
+        let next = try reopen("머리\n" + body)
+        #expect(next.editor.foldedLines == [3])
+        #expect(next.editor.openedEmptyToggleLines == [2])
+        let withChild = try reopen(next.text.replacingOccurrences(of: "+ 직접 연 토글", with: "+ 직접 연 토글\n\t자식"))
+        #expect(withChild.editor.foldedLines == [4])
+        #expect(withChild.editor.openedEmptyToggleLines.isEmpty)
+        #expect(try WindowStateStore(location: fixture.location).state(for: id)?.openedEmptyToggleLines == nil)
+    }
+
     @Test func foldsArePersistedInWindowStateAndRestoredOnReopen() throws {
         defer { fixture.cleanUp() }
         let body = "+ 토글\n\t안쪽 하나\n\t안쪽 둘\n마지막 줄"
