@@ -59,6 +59,7 @@ public struct BezierCurve: Hashable, Sendable {
 public struct MotionTokens: Hashable, Sendable {
     /// 전환 시간(초).
     public let duration: TimeInterval
+    public let chevronRotation: TimeInterval
     public let curve: BezierCurve
     public let bell: BellMotion
     /// 입력 커서가 켜져 있는 시간이자 꺼져 있는 시간(초).

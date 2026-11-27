@@ -8,6 +8,7 @@ import AppKit
 final class SpyBodyEditor: NoteBodyEditing {
     let view: NSView = FlippedView()
     var onTextChange: ((String) -> Void)?
+    var isChangingUserFold = false
     var onContentHeightChange: ((CGFloat) -> Void)?
     /// 밖에서 `text`에 넣은 값(넣은 차례대로).
     private(set) var assignments: [String] = []

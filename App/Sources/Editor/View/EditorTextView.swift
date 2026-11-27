@@ -19,6 +19,7 @@ final class EditorTextView: PlainTextInputView {
     override func draw(_ dirtyRect: NSRect) {
         editor?.drawBlockColors(in: dirtyRect)
         if let manager = textLayoutManager, let context = NSGraphicsContext.current?.cgContext {
+            var chevrons: [(MarkdownLayoutFragment, CGPoint)] = []
             let origin = textContainerOrigin
             let start = manager.textViewportLayoutController.viewportRange?.location
             manager.enumerateTextLayoutFragments(from: start, options: [.ensuresLayout]) { fragment in
@@ -26,11 +27,15 @@ final class EditorTextView: PlainTextInputView {
                 guard frame.minY <= dirtyRect.maxY else { return false }
                 if frame.maxY >= dirtyRect.minY, let paragraph = fragment as? MarkdownLayoutFragment {
                     paragraph.drawBackground(at: frame.origin, in: context)
+                    if paragraph.hasChevron {
+                        chevrons.append((paragraph, frame.origin))
+                    }
                 }
                 return true
             }
+            editor?.drawBlockSelection(in: dirtyRect)
+            for (paragraph, point) in chevrons { paragraph.drawChevron(at: point, in: context) }
         }
-        editor?.drawBlockSelection(in: dirtyRect)
         super.draw(dirtyRect)
     }
 

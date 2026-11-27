@@ -6,7 +6,6 @@ import DateTime
 struct KeyStamp: Equatable {
     var documentVersion: Int
     var foldState: FoldState
-    var animating: Set<Int>
     var hoveredLine: Int?
     var hoveredOffset: Int?
 }
@@ -64,6 +63,7 @@ final class EditorController: NSObject {
     var dateEffects: [UUID: InlineDateEffect] = [:]
 
     var lastBodyEdit: (previous: String, range: NSRange)?
+    var isChangingUserFold = false
     let foldDrawing = FoldDrawing()
     var foldTransitions: [Int: FoldTransition] = [:]
     var foldTask: Task<Void, Never>?
@@ -418,6 +418,7 @@ final class EditorController: NSObject {
         defer { EditorTrace.end("applyFolds", interval) }
         let sanitized = newValue.sanitized(in: document)
         guard sanitized != foldState else { return }
+        if !isChangingUserFold { stopFoldMotion() }
         if let hoveredGutterLine, folded.symmetricDifference(sanitized.closed) != [hoveredGutterLine] {
             setHoveredGutter(nil)
         }

@@ -222,14 +222,13 @@ extension EditorController {
             }
             let next = foldState.toggling(Set(toggles), in: document)
             edit = EditorCommands.toggleDone(document, lines: rows, selection: range, excluding: hidden, invertEach: true)
-            if edit == nil {
-                changeUserFolds(next)
-                showVisibleBlocks(selection)
-                return true
-            }
+            edit?.selection.length = 0
             edit?.foldedAfter = next.closed
             edit?.openedEmptyAfter = next.openedEmpty
             edit?.includesHiddenLines = true
+            changeUserFolds(next, applying: edit)
+            showVisibleBlocks(selection)
+            return true
         case .moveLineUp, .moveLineDown:
             edit = EditorCommands.moveLines(document, selection: range, folded: folded, openedEmpty: foldState.openedEmpty,
                                             direction: action == .moveLineUp ? .up : .down, selectedRows: rows)
@@ -239,13 +238,8 @@ extension EditorController {
         let shifted = MarkdownDocument(edit.applied(to: document.text)).lineIndex(at: edit.selection.location) - rows.lowerBound
         edit.selection.length = 0
         let version = documentVersion
-        let previous = folded
         apply(edit)
         if documentVersion != version {
-            if action == .toggleDone, previous != folded {
-                startFoldMotion(from: previous, to: folded)
-                if !foldTransitions.isEmpty { refreshStyling() }
-            }
             showVisibleBlocks(selection.shifted(by: shifted))
         }
         return true

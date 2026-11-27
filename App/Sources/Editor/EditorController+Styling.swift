@@ -79,8 +79,10 @@ extension EditorController: NSTextStorageDelegate {
         }
         guard editedMask.contains(.editedCharacters) else { return }
         setHoveredGutter(nil)
+        // TextKit은 글자 조각만 갱신한다. 별도로 그리는 형광펜과 코드 바탕도 다음 프레임에 갱신한다.
+        textView.setNeedsDisplay(textView.visibleRect)
         let old = document
-        stopFoldMotion()
+        if !isChangingUserFold { stopFoldMotion() }
         // 저장소 편집 중에는 삽입점이나 커서 영역을 다시 배치하지 않는다.
         blockSelection = nil
         document = EditorTrace.measure("didProcessEditing.parse") {
@@ -134,14 +136,13 @@ extension EditorController {
         let stamp = KeyStamp(
             documentVersion: documentVersion,
             foldState: foldState,
-            animating: Set(foldTransitions.keys),
             hoveredLine: hoveredLink?.line,
             hoveredOffset: hoveredLink?.offset
         )
         if let cache = keysCache, cache.stamp == stamp { return cache.keys }
         let keys = EditorTrace.measure("LinePresentation.keys") {
             LinePresentation.keys(for: document, folded: folded, openedEmpty: foldState.openedEmpty,
-                                  hoveredLink: hoveredLink, animating: stamp.animating)
+                                  hoveredLink: hoveredLink)
         }
         keysCache = (stamp, keys)
         return keys

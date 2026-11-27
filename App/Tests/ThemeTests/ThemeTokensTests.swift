@@ -99,6 +99,7 @@ import Testing
         #expect(tokens.docPadding == TokenValueParser.insets(try section("component")["doc-pad"]!))
         #expect(tokens.material == MaterialTokens(opacity: 0.92, blur: 24, tintMix: 0.26, tintMixRow: 0.18))
         #expect(tokens.motion.duration == 0.18)
+        #expect(tokens.motion.chevronRotation == 0.12)
         #expect(tokens.motion.curve == BezierCurve(x1: 0.25, y1: 0.1, x2: 0.25, y2: 1))
     }
 
