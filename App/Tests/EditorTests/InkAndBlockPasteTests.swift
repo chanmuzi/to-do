@@ -68,10 +68,10 @@ import Testing
         let source = "+ 제목" + red.comment + "\n\t[x] <u>==글=={파랑}</u> **굵게** [링크](https://example.com)"
         let export = CopyExport(source: source)
         #expect(export.source == source)
-        #expect(export.markdown == "- 제목\n    - [x] 글 **굵게** [링크](https://example.com)")
+        #expect(export.markdown == "- 제목\n\t- [x] 글 **굵게** [링크](https://example.com)")
         let html = export.html(highlightColors: [red.id: "#D44C47", blue.id: "#E7F3F8"])
-        #expect(html.contains("<li><div style=\"color:#D44C47\">제목</div><ul>"))
-        #expect(html.contains("<u><mark style=\"background-color:#E7F3F8\">글</mark></u>"))
+        #expect(html.contains("<summary class=\"block-color-red\" style=\"color:#D44C47\">제목</summary><ul class=\"to-do-list\">"))
+        #expect(html.contains("<u><mark class=\"highlight-blue_background\" style=\"background-color:#E7F3F8\">글</mark></u>"))
     }
 
     @Test func colorMenuAndShortcutsUseTheSameSelection() throws {

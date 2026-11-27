@@ -315,7 +315,7 @@ import Testing
         let export = CopyExport(source: "[ ] 첫\\\n둘\n## 제목\\\n다음")
         #expect(export.markdown == "- [ ] 첫\\\n  둘\n## 제목<br>다음")
         let html = export.html(highlightColors: [:])
-        #expect(html.contains("첫<br>둘</li>"))
+        #expect(html.contains("첫<br>둘</span></li>"))
         #expect(html.contains("<h2>제목<br>다음</h2>"))
     }
 

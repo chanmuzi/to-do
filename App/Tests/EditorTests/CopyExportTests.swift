@@ -15,14 +15,14 @@ import Testing
         #expect(result == """
         - [x] 스탠드업 회의록 공유
         - [ ] **PR #482** 리뷰
-            - [ ] 포커스 전환 애니메이션 확인
-            - 리뷰 코멘트 2건에 답글
+        \t- [ ] 포커스 전환 애니메이션 확인
+        \t- 리뷰 코멘트 2건에 답글
         - [ ] 배포 체크리스트 확인
         - 지난주에서 넘어온 것
-            - [ ] **온보딩 문서** 초안 마무리
-            - [ ] `feature/quick-capture` 브랜치 정리
-                - 리베이스한 뒤 푸시
-            - [x] 주간 리포트 제출
+        \t- [ ] **온보딩 문서** 초안 마무리
+        \t- [ ] `feature/quick-capture` 브랜치 정리
+        \t\t- 리베이스한 뒤 푸시
+        \t- [x] 주간 리포트 제출
         """)
     }
 
@@ -58,7 +58,7 @@ import Testing
         #expect(CopyExport(doc, selection: range).markdown == """
         - [ ] **온보딩 문서** 초안 마무리
         - [ ] `feature/quick-capture` 브랜치 정리
-            - 리베이스한 뒤 푸시
+        \t- 리베이스한 뒤 푸시
         """)
     }
 
@@ -71,25 +71,32 @@ import Testing
     }
 
     @Test func htmlNestsToggleChildrenAndMarksTodos() {
-        let html = export(DemoNote.text).html(highlightColors: colors)
-        #expect(html == "<meta charset=\"utf-8\"><ul>"
-            + "<li><input type=\"checkbox\" disabled checked> 스탠드업 회의록 공유</li>"
-            + "<li><input type=\"checkbox\" disabled> <strong>PR #482</strong> 리뷰<ul>"
-            + "<li><input type=\"checkbox\" disabled> 포커스 전환 애니메이션 확인</li>"
-            + "<li>리뷰 코멘트 2건에 답글</li></ul></li>"
-            + "<li><input type=\"checkbox\" disabled> <mark style=\"background-color:#FFEB85\">배포 체크리스트 확인</mark></li>"
-            + "<li>지난주에서 넘어온 것<ul>"
-            + "<li><input type=\"checkbox\" disabled> <strong>온보딩 문서</strong> 초안 마무리</li>"
-            + "<li><input type=\"checkbox\" disabled> <code>feature/quick-capture</code> 브랜치 정리<ul>"
-            + "<li>리베이스한 뒤 푸시</li></ul></li>"
-            + "<li><input type=\"checkbox\" disabled checked> 주간 리포트 제출</li></ul></li>"
-            + "</ul>")
+        let copy = CopyExport(source: "+ 계획\n\t[x] 초안")
+        #expect(copy.markdown == "- 계획\n\t- [x] 초안")
+        #expect(copy.html(highlightColors: colors) == #"<meta charset="utf-8"><ul class="toggle"><li><details open=""><summary>계획</summary><ul class="to-do-list"><li><input type="checkbox" class="checkbox checkbox-on" disabled checked> <span class="to-do-children-checked">초안</span></li></ul></details></li></ul>"#)
+    }
+
+    @Test func headingTogglesMatchNotionSummarySizes() {
+        for (level, size) in [(1, "1.875em"), (2, "1.5em"), (3, "1.25em")] {
+            let copy = CopyExport(source: "+ " + String(repeating: "#", count: level) + " 제목\n\t[ ] 할 일\n- 다음")
+            let html = copy.html(highlightColors: colors)
+            #expect(html.contains("<details open=\"\"><summary style=\"font-weight:600;font-size:\(size);line-height:1.3;margin:0\">제목</summary><div class=\"indented\">"))
+            #expect(html.contains("checkbox-off\" disabled> <span class=\"to-do-children-unchecked\">할 일</span>"))
+            #expect(html.hasSuffix("</div></details><ul><li>다음</li></ul>"))
+        }
+    }
+
+    @Test func bulletSiblingsShareAListAndForegroundMarksHaveNoTint() {
+        let copy = CopyExport(source: "- ==빨강=={빨강 글자}\n- 둘\n+ 토글")
+        let ink = InkColor(.red, foreground: true)
+        let html = copy.html(highlightColors: [ink.id: "#AA0000"])
+        #expect(html.contains(#"<ul><li><mark class="highlight-red" style="background-color:transparent;color:#AA0000">빨강</mark></li><li>둘</li></ul><ul class="toggle">"#))
     }
 
     @Test func htmlInlineStylesAndEscaping() {
         let html = export("# a < b\n~~취소~~ ==색=={4} [링크](https://x.example/?a=1&b=2) `<tag>`").html(highlightColors: colors)
         #expect(html == "<meta charset=\"utf-8\"><h1>a &lt; b</h1>"
-            + "<p><s>취소</s> <mark style=\"background-color:#CFE5FF\">색</mark> "
+            + "<p><s>취소</s> <mark class=\"highlight-blue_background\" style=\"background-color:#CFE5FF\">색</mark> "
             + "<a href=\"https://x.example/?a=1&amp;b=2\">링크</a> <code>&lt;tag&gt;</code></p>")
     }
 
@@ -147,6 +154,6 @@ import Testing
 
     @Test func htmlCodeBlock() {
         let html = export("```swift\nlet a = 1 < 2\n```").html(highlightColors: colors)
-        #expect(html == "<meta charset=\"utf-8\"><pre><code>let a = 1 &lt; 2</code></pre>")
+        #expect(html == "<meta charset=\"utf-8\"><pre><code class=\"language-swift\">let a = 1 &lt; 2</code></pre>")
     }
 }

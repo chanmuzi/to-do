@@ -108,10 +108,10 @@ import Theme
     @Test func copyExportsQuotesAsStandardMarkdownAndBlockquote() {
         let doc = MarkdownDocument("> 첫 **줄**\n> 둘째\n본문\n+ 토글\n\t안")
         let export = CopyExport(doc, selection: NSRange(location: 0, length: doc.length))
-        #expect(export.markdown == "> 첫 **줄**\n> 둘째\n본문\n- 토글\n    안")
+        #expect(export.markdown == "> 첫 **줄**\n> 둘째\n본문\n- 토글\n\t안")
         #expect(export.html(highlightColors: [:]) == "<meta charset=\"utf-8\">"
             + "<blockquote><p>첫 <strong>줄</strong></p><p>둘째</p></blockquote><p>본문</p>"
-            + "<ul><li>토글<p>안</p></li></ul>")
+            + "<ul class=\"toggle\"><li><details open=\"\"><summary>토글</summary><p>안</p></details></li></ul>")
     }
 
     /// 접기는 토글(`+ `)에만 있다. 인용문은 하위 줄이 있어도 접지 않는다.
