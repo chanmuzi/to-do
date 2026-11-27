@@ -41,12 +41,15 @@ nonisolated extension EditorCommands {
                       targets.allSatisfy({ $0.level < MarkdownDocument.maxLevel }) else { return nil }
             } else if group && level == 0 { return nil }
         }
+        if inward {
+            var edit = indentLines(doc, lines: lines, targets: targets, selection: selection, folded: folded)
+            edit?.includesHiddenLines = FoldState.hidesAny(of: lines, in: doc, folded: folded)
+            return edit
+        }
         var changes: [Int: LinePrefixEdit.Change] = [:]
         for line in targets {
-            if inward {
-                changes[line.start] = .init(oldLength: 0, new: "\t")
-            } else if group, !codeOnly, line.indentLength >= 2,
-                      doc.units[line.start] == 0x20, doc.units[line.start + 1] == 0x09 {
+            if group, !codeOnly, line.indentLength >= 2,
+               doc.units[line.start] == 0x20, doc.units[line.start + 1] == 0x09 {
                 // 공백 하나 뒤의 탭이 한 단계다. 공백만 지우면 깊이가 그대로 남는다.
                 changes[line.start] = .init(oldLength: 2, new: " ")
             } else {
@@ -58,11 +61,35 @@ nonisolated extension EditorCommands {
         }
         var edit = LinePrefixEdit.make(doc, lines: lines, selection: selection) { changes[$0.start] }
         edit?.includesHiddenLines = FoldState.hidesAny(of: lines, in: doc, folded: folded)
-        if inward, !folded.isEmpty, let change = edit {
-            let after = MarkdownDocument(change.applied(to: doc.text))
-            edit?.foldedAfter = FoldState.revealing(lines.lowerBound, in: after, folded: folded)
-        }
         return edit
+    }
+
+    private static func indentLines(
+        _ doc: MarkdownDocument, lines: ClosedRange<Int>, targets: [MarkdownLine],
+        selection: NSRange, folded: Set<Int>
+    ) -> TextEdit? {
+        let starts = Set(targets.map(\.start))
+        // 한쪽 줄만 들여 쓰면 리터럴 역슬래시가 강제 줄바꿈으로 바뀔 수 있다.
+        // 둘 다 들여 쓰면 같은 접두사가 붙으므로 두 줄의 연결 관계는 그대로다.
+        let boundaries = (max(0, lines.lowerBound - 1)...lines.upperBound).filter { row in
+            let line = doc.lines[row]
+            guard row + 1 < doc.lines.count, !line.kind.isCode,
+                  line.end > line.contentStart, doc.units[line.end - 1] == 0x5C else { return false }
+            return starts.contains(line.start) != starts.contains(doc.lines[row + 1].start)
+        }
+        for unit in ["\t", "  "] {
+            guard var edit = LinePrefixEdit.make(doc, lines: lines, selection: selection, change: {
+                starts.contains($0.start) ? .init(oldLength: 0, new: unit) : nil
+            }) else { return nil }
+            if !boundaries.isEmpty || !folded.isEmpty {
+                let after = MarkdownDocument(edit.applied(to: doc.text))
+                // 탭이 이웃 블록을 합치면 같은 깊이를 나타내는 공백 두 칸을 쓴다.
+                guard boundaries.allSatisfy({ doc.lines[$0].hasHardBreak == after.lines[$0].hasHardBreak }) else { continue }
+                edit.foldedAfter = FoldState.revealing(lines.lowerBound, in: after, folded: folded)
+            }
+            return edit
+        }
+        return nil
     }
 
     /// 줄 맨 앞의 들여쓰기 한 단위(탭 하나 또는 공백 `spaces`개까지)의 길이.
