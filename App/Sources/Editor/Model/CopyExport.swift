@@ -111,7 +111,7 @@ nonisolated struct CopyExport: Sendable {
             if line.continuationOf == nil { inlineBreaks = usesInlineBreaks(row) }
             if inlineBreaks && line.continuationOf != nil { return nil }
             let content = inlineBreaks ? doc.blockLines(at: row).map { inlineMarkdown(doc.lines[$0], keepingBreak: false) }.joined(separator: "<br>") : inlineMarkdown(line)
-            let indent = String(repeating: "    ", count: max(0, line.level - base))
+            let indent = String(repeating: "\t", count: max(0, line.level - base))
             if let owner = line.continuationOf {
                 let kind = doc.lines[owner].kind
                 let prefix = kind == .quote ? "> " : kind.isListItem ? "  " : ""
@@ -166,9 +166,18 @@ nonisolated struct CopyExport: Sendable {
         "<meta charset=\"utf-8\">" + blocks((doc.lines.count - lines.count)..<doc.lines.count, highlightColors)
     }
 
-    private func inkStyle(_ ink: InkColor?, _ colors: [Int: String]) -> String {
-        guard let ink, let css = colors[ink.id] else { return "" }
-        return " style=\"" + (ink.foreground ? "color:" : "background-color:") + css + "\""
+    private func inkAttributes(_ ink: InkColor?, _ colors: [Int: String], inline: Bool = false,
+                               classes: [String] = [], styles: [String] = []) -> String {
+        var classes = classes
+        var styles = styles
+        if let ink {
+            classes.append((inline ? "highlight-" : "block-color-") + NotionHTMLFormat.colorName(ink))
+            if inline && ink.foreground { styles.append("background-color:transparent") }
+            if let css = colors[ink.id] { styles.append((ink.foreground ? "color:" : "background-color:") + css) }
+        }
+        let classAttr = classes.isEmpty ? "" : " class=\"\(classes.joined(separator: " "))\""
+        let styleAttr = styles.isEmpty ? "" : " style=\"\(styles.joined(separator: ";"))\""
+        return classAttr + styleAttr
     }
 
     private func blocks(_ range: Range<Int>, _ colors: [Int: String]) -> String {
@@ -184,50 +193,68 @@ nonisolated struct CopyExport: Sendable {
                     .filter { doc.lines[$0].kind == .code }
                     .map { doc.string(in: NSRange(location: doc.lines[$0].start + doc.lines[$0].indentLength, length: doc.lines[$0].end - doc.lines[$0].start - doc.lines[$0].indentLength)) }
                     .joined(separator: "\n")
-                out += "<pre><code>" + Self.escape(code) + "</code></pre>"
+                let language = line.kind == .fenceOpen
+                    ? doc.string(in: line.contentRange).dropFirst(3).split(whereSeparator: \.isWhitespace).first : nil
+                let attribute = language.map { " class=\"language-\(Self.escape(String($0)))\"" } ?? ""
+                out += "<pre><code\(attribute)>" + Self.escape(code) + "</code></pre>"
                 index = last + 1
-            case .todo, .bullet, .toggle, .toggleHeading:
+            case .bullet:
                 out += "<ul>"
-                while index < range.upperBound, doc.lines[index].kind.isListItem, doc.lines[index].level == line.level {
-                    let item = doc.lines[index]
-                    let end = min(item.subtreeEnd, range.upperBound)
-                    let style = inkStyle(doc.blockColor(at: index), colors)
-                    let wrapContent = !style.isEmpty && doc.blockLines(at: index).upperBound + 1 < end
-                    out += wrapContent ? "<li><div\(style)>" : "<li\(style)>"
-                    if case .todo(let done) = item.kind {
-                        out += "<input type=\"checkbox\" disabled\(done ? " checked" : "")> "
-                    }
-                    let content = blockContent(at: index, colors)
-                    if let level = item.kind.headingLevel { out += "<h\(level)>\(content)</h\(level)>" }
-                    else { out += content }
-                    if wrapContent { out += "</div>" }
+                while index < range.upperBound, doc.lines[index].kind == .bullet, doc.lines[index].level == line.level {
+                    let end = min(doc.lines[index].subtreeEnd, range.upperBound)
                     let children = doc.blockLines(at: index).upperBound + 1
-                    if children < end { out += blocks(children..<end, colors) }
-                    out += "</li>"
+                    let attrs = inkAttributes(doc.blockColor(at: index), colors)
+                    let content = blockContent(at: index, colors)
+                    let title = attrs.isEmpty ? content : "<span\(attrs)>\(content)</span>"
+                    out += "<li>" + title + blocks(children..<end, colors) + "</li>"
                     index = end
                 }
                 out += "</ul>"
+            case .todo, .toggle, .toggleHeading:
+                let end = min(line.subtreeEnd, range.upperBound)
+                let childrenStart = doc.blockLines(at: index).upperBound + 1
+                let children = blocks(childrenStart..<end, colors)
+                let content = blockContent(at: index, colors)
+                let ink = doc.blockColor(at: index)
+                if line.kind == .toggle {
+                    out += "<ul class=\"toggle\"><li><details open=\"\"><summary\(inkAttributes(ink, colors))>\(content)</summary>"
+                        + children + "</details></li></ul>"
+                } else if case .toggleHeading(let level) = line.kind {
+                    let size = NotionHTMLFormat.headingSizes[level] ?? "1em"
+                    let summary = inkAttributes(ink, colors, styles: ["font-weight:600", "font-size:\(size)", "line-height:1.3", "margin:0"])
+                    out += "<details open=\"\"><summary\(summary)>" + content
+                        + "</summary><div class=\"indented\">" + children + "</div></details>"
+                } else if case .todo(let done) = line.kind {
+                    let checkbox = done ? "checkbox-on" : "checkbox-off"
+                    let state = done ? "checked" : "unchecked"
+                    let label = inkAttributes(ink, colors, classes: ["to-do-children-\(state)"])
+                    out += "<ul class=\"to-do-list\"><li><input type=\"checkbox\" class=\"checkbox \(checkbox)\" disabled"
+                        + (done ? " checked" : "") + "> <span\(label)>"
+                        + content + "</span>"
+                        + children + "</li></ul>"
+                }
+                index = end
             case .quote:
                 // 같은 단계에 이어지는 인용문 줄은 하나의 인용문이다. 줄마다 문단이고, 하위 줄은 그 안에 든다.
                 out += "<blockquote>"
                 while index < range.upperBound, doc.lines[index].kind == .quote, doc.lines[index].level == line.level {
                     let item = doc.lines[index]
                     let end = min(item.subtreeEnd, range.upperBound)
-                    out += "<p\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
+                    out += "<p\(inkAttributes(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
                     let children = doc.blockLines(at: index).upperBound + 1
                     if children < end { out += blocks(children..<end, colors) }
                     index = end
                 }
                 out += "</blockquote>"
             case .heading(let level):
-                out += "<h\(level)\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</h\(level)>"
+                out += "<h\(level)\(inkAttributes(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</h\(level)>"
                 index = doc.blockLines(at: index).upperBound + 1
             case .divider:
                 out += "<hr>"
                 index += 1
             case .paragraph:
                 if line.contentRange.length > 0 || line.hasHardBreak {
-                    out += "<p\(inkStyle(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
+                    out += "<p\(inkAttributes(doc.blockColor(at: index), colors))>" + blockContent(at: index, colors) + "</p>"
                 }
                 index = doc.blockLines(at: index).upperBound + 1
             }
@@ -258,9 +285,7 @@ nonisolated struct CopyExport: Sendable {
             case .strike: out += "<s>\(body)</s>"
             case .code: out += "<code>\(body)</code>"
             case .highlight(let number):
-                let ink = InkColor.byID[number]
-                let tag = ink?.foreground == true ? "span" : "mark"
-                out += "<\(tag)\(inkStyle(ink, colors))>\(body)</\(tag)>"
+                out += "<mark\(inkAttributes(InkColor.byID[number], colors, inline: true))>\(body)</mark>"
             case .underline: out += "<u>\(body)</u>"
             case .link(let url):
                 // 웹 주소와 메일 주소만 링크로 내보낸다. 나머지는 글자만 남긴다.

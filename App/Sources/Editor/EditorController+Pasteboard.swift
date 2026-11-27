@@ -30,13 +30,18 @@ extension EditorController {
         return true
     }
 
-    /// 붙여 넣는다. 이 앱에서 복사한 것이면 원문 조각을, 아니면 글자를 그대로 넣는다.
+    /// 붙여 넣는다. Float 원문, 인식한 Notion HTML, 일반 글자, URL 순으로 읽는다.
     /// 줄바꿈은 `\n`으로 맞춘다.
     func paste(from pasteboard: NSPasteboard, inside: Bool = false) {
-        guard let text = pasteboard.string(forType: .floatingNotesMarkdown) ?? pasteboard.string(forType: .string)
-                ?? pasteboard.string(forType: .URL),
-              !text.isEmpty else { return }
+        guard let text = Self.source(from: pasteboard), !text.isEmpty else { return }
         pasteSource(LineEndings.normalized(text), inside: inside)
+    }
+
+    static func source(from pasteboard: NSPasteboard) -> String? {
+        pasteboard.string(forType: .floatingNotesMarkdown)
+            ?? pasteboard.string(forType: .html).flatMap(NotionHTMLImport.source)
+            ?? pasteboard.string(forType: .string)
+            ?? pasteboard.string(forType: .URL)
     }
 
     func pasteSource(_ text: String, inside: Bool = false) {

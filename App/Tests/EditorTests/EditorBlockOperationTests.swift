@@ -145,7 +145,7 @@ import Testing
         #expect(h.editor.text == body)
         let export = CopyExport(source: body)
         #expect(export.markdown.hasPrefix("- " + hashes + " 제목"))
-        #expect(export.html(highlightColors: [:]).contains("<h\(level)>제목</h\(level)>"))
+        #expect(NotionHTMLImport.source(export.html(highlightColors: [:]))?.hasPrefix(heading + "\n") == true)
         h.caret(at: h.document.lines[0].contentStart)
         h.press(NSResponder.backspace)
         #expect(h.editor.text == "제목\n\n- 자식\n\n끝")

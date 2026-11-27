@@ -12,7 +12,7 @@ import Testing
         #expect(FoldState.hiddenLines(doc, folded: [4]).contains(5))
         let export = CopyExport(source: source)
         #expect(export.source == source)
-        #expect(export.markdown == "본문\n\n---\n\n---\n- 토글\n\n    ---\n        안\n```\n---\n```")
+        #expect(export.markdown == "본문\n\n---\n\n---\n- 토글\n\n\t---\n\t\t안\n```\n---\n```")
         #expect(export.html(highlightColors: [:]).components(separatedBy: "<hr>").count == 4)
     }
 

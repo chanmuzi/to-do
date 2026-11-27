@@ -558,11 +558,11 @@ import Theme
         h.editor.selectedRange = NSRange(location: 0, length: h.document.length)
         #expect(h.controller.copySelection(to: board))
         let markdown = try #require(board.string(forType: .string))
-        #expect(markdown.hasPrefix("- [x] 스탠드업 회의록 공유\n- [ ] **PR #482** 리뷰\n    - [ ] 포커스"))
-        #expect(markdown.contains("- 지난주에서 넘어온 것\n    - [ ] **온보딩 문서**"))
+        #expect(markdown.hasPrefix("- [x] 스탠드업 회의록 공유\n- [ ] **PR #482** 리뷰\n\t- [ ] 포커스"))
+        #expect(markdown.contains("- 지난주에서 넘어온 것\n\t- [ ] **온보딩 문서**"))
         let html = try #require(board.string(forType: .html))
-        #expect(html.contains("<mark style=\"background-color:#FBF3DB\">배포 체크리스트 확인</mark>"))
-        #expect(html.contains("<li>지난주에서 넘어온 것<ul><li>"))
+        #expect(html.contains("<mark class=\"highlight-yellow_background\" style=\"background-color:#FBF3DB\">배포 체크리스트 확인</mark>"))
+        #expect(html.contains("<summary>지난주에서 넘어온 것</summary><ul class=\"to-do-list\"><li>"))
         #expect(board.string(forType: .floatingNotesMarkdown) == DemoNote.text)
     }
 
