@@ -159,6 +159,14 @@ nonisolated struct CopyExport: Sendable {
         return String(utf16CodeUnits: units, count: units.count)
     }
 
+    var notionBlocksJSON: String? {
+        NotionBlocksExport(document: doc).json(startingAt: doc.lines.count - lines.count)
+    }
+
+    var chromiumData: Data? {
+        notionBlocksJSON.flatMap { ChromiumCustomData.encode([ChromiumCustomData.notionBlocks: $0]) }
+    }
+
     // MARK: HTML
 
     /// - Parameter highlightColors: 글자색과 바탕색 식별자별 라이트 CSS 값.

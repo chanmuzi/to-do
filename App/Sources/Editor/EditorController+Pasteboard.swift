@@ -2,12 +2,14 @@ import AppKit
 import Theme
 
 extension NSPasteboard.PasteboardType {
+    static let chromiumWebCustomData = NSPasteboard.PasteboardType("org.chromium.web-custom-data")
+
     /// 앱 안에서 붙여 넣을 때 쓰는 원문 그대로의 조각(형광펜 색 번호, 토글 기호를 잃지 않는다).
     static let floatingNotesMarkdown = NSPasteboard.PasteboardType("local.floating-notes.markdown-source")
 }
 
 extension EditorController {
-    /// 선택을 복사한다(D-009). 표준 Markdown 글자, HTML, 그리고 앱 안에서 쓰는 원문 조각을 함께 올린다.
+    /// 선택을 복사한다(D-009). 표준 Markdown 글자, HTML, Notion 블록과 Float 원문을 함께 올린다.
     /// - Returns: 복사할 것이 없으면 `false`.
     @discardableResult
     func copySelection(to pasteboard: NSPasteboard) -> Bool {
@@ -22,7 +24,11 @@ extension EditorController {
         }
         pasteboard.clearContents()
         let markdown = NSPasteboard.PasteboardType("net.daringfireball.markdown")
-        pasteboard.declareTypes([.string, .html, markdown, .floatingNotesMarkdown], owner: nil)
+        let customData = export.chromiumData
+        var types: [NSPasteboard.PasteboardType] = [.string, .html, markdown, .floatingNotesMarkdown]
+        if customData != nil { types.append(.chromiumWebCustomData) }
+        pasteboard.declareTypes(types, owner: nil)
+        if let customData { pasteboard.setData(customData, forType: .chromiumWebCustomData) }
         pasteboard.setString(export.markdown, forType: .string)
         pasteboard.setString(export.markdown, forType: markdown)
         pasteboard.setString(export.html(highlightColors: highlightCSSColors), forType: .html)
@@ -30,7 +36,7 @@ extension EditorController {
         return true
     }
 
-    /// 붙여 넣는다. Float 원문, 인식한 Notion HTML, 일반 글자, URL 순으로 읽는다.
+    /// 붙여 넣는다. Float 원문, Notion 블록, 인식한 HTML, 일반 글자, URL 순으로 읽는다.
     /// 줄바꿈은 `\n`으로 맞춘다.
     func paste(from pasteboard: NSPasteboard, inside: Bool = false) {
         guard let text = Self.source(from: pasteboard), !text.isEmpty else { return }
@@ -39,6 +45,7 @@ extension EditorController {
 
     static func source(from pasteboard: NSPasteboard) -> String? {
         pasteboard.string(forType: .floatingNotesMarkdown)
+            ?? pasteboard.data(forType: .chromiumWebCustomData).flatMap(NotionBlocksImport.source(from:))
             ?? pasteboard.string(forType: .html).flatMap(NotionHTMLImport.source)
             ?? pasteboard.string(forType: .string)
             ?? pasteboard.string(forType: .URL)
