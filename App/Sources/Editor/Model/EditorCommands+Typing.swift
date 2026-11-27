@@ -164,16 +164,20 @@ nonisolated extension EditorCommands {
     /// - 코드 블록 안에 붙이면 ``` 줄은 빼고 그 안의 글만 넣는다.
     /// - Parameter runEnd: 구간 끝에서 친 공백 뒤에 붙이는 것이면(이어 넣는 글이 그 구간에 붙는다) 그 구간의
     ///   닫는 기호가 시작하는 자리.
-    static func preparedForPaste(_ doc: MarkdownDocument, _ text: String, replacing selection: NSRange, runEnd: Int? = nil) -> String {
+    static func preparedForPaste(_ doc: MarkdownDocument, _ source: PasteSource, replacing selection: NSRange, runEnd: Int? = nil) -> PasteSource {
         let line = doc.line(at: selection.location)
+        var prepared = source
+        let text = source.text
         let fragment = MarkdownDocument(text)
         let hasFence = fragment.lines.contains { $0.kind == .fenceOpen }
         if line.kind.isCode {
-            guard hasFence else { return text }
-            return fragment.lines.filter { $0.kind != .fenceOpen && $0.kind != .fenceClose }
-                .map { fragment.string(in: $0.range) }.joined(separator: "\n")
+            guard hasFence else { return source }
+            let rows = fragment.lines.indices.filter { ![.fenceOpen, .fenceClose].contains(fragment.lines[$0].kind) }
+            prepared.text = rows.map { fragment.string(in: fragment.lines[$0].range) }.joined(separator: "\n")
+            prepared.closedByRow = [:]
+            for (offset, row) in rows.enumerated() { prepared.closedByRow[offset] = source.closedByRow[row] }
+            return prepared
         }
-        var result = text
         let containing = selection.location >= line.contentStart ? line.spansContaining(runEnd ?? selection.location) : []
         if !containing.isEmpty, !hasFence {
             let insideCode = containing.contains { $0.kind == .code }
@@ -181,7 +185,7 @@ nonisolated extension EditorCommands {
                 if insideCode { return kind == .code }
                 return containing.contains { sameFormat($0.kind, kind) }
             }
-            result = fragment.lines.map { fragmentLine -> String in
+            prepared.text = fragment.lines.map { fragmentLine -> String in
                 var units = Array(fragment.units[fragmentLine.start..<fragmentLine.end])
                 let markers = fragmentLine.markedSpans.filter { strips($0.kind) }
                     .flatMap { [$0.openMarker, $0.closeMarker] }
@@ -193,21 +197,22 @@ nonisolated extension EditorCommands {
                 return String(utf16CodeUnits: units, count: units.count)
             }.joined(separator: "\n")
         }
-        if result.contains("\n"), selection.length == 0 {
-            result = rebasedLines(MarkdownDocument(result), depth: line.level, atCaret: true).joined(separator: "\n")
+        if prepared.text.contains("\n"), selection.length == 0 {
+            prepared.text = rebasedLines(MarkdownDocument(prepared.text), depth: line.level, atCaret: true).joined(separator: "\n")
         }
-        guard hasFence else { return result }
+        guard hasFence else { return prepared }
         if hasUnterminatedFence(fragment) {
-            result += result.hasSuffix("\n") ? "```" : "\n```"
+            prepared.text += prepared.text.hasSuffix("\n") ? "```" : "\n```"
         }
         if fragment.lines.first?.kind == .fenceOpen, selection.location != line.start {
-            result = "\n" + result
+            prepared.text = "\n" + prepared.text
+            prepared.closedByRow = Dictionary(uniqueKeysWithValues: prepared.closedByRow.map { ($0.key + 1, $0.value) })
         }
         let endLine = doc.line(at: NSMaxRange(selection))
-        let reparsed = MarkdownDocument(result)
+        let reparsed = MarkdownDocument(prepared.text)
         if reparsed.lines.last?.kind == .fenceClose, NSMaxRange(selection) != endLine.end {
-            result += "\n"
+            prepared.text += "\n"
         }
-        return result
+        return prepared
     }
 }

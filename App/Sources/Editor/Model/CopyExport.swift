@@ -86,6 +86,21 @@ nonisolated struct CopyExport: Sendable {
         }
     }
 
+    func copiedFolds(in original: MarkdownDocument, from firstRow: Int, state: FoldState) -> FoldState {
+        var result = FoldState()
+        for (offset, line) in lines.enumerated() where line.kind.isToggle {
+            let row = firstRow + offset
+            guard original.lines.indices.contains(row), original.lines[row].kind.isToggle else { continue }
+            if state.isClosed(row, in: original) {
+                result.closed.insert(offset)
+            } else if FoldState.isEmptyToggle(doc.lineIndex(at: line.start), in: doc) {
+                // 글 선택이 자식 앞에서 끝나면 복사한 조각에서는 열린 빈 토글이다.
+                result.openedEmpty.insert(offset)
+            }
+        }
+        return result
+    }
+
     // MARK: 표준 Markdown
 
     /// 토글은 하위 항목을 가진 글머리표로, 투두는 `- [ ]`로, 인용문은 `> `로, 색과 밑줄은 보이는 글자로 내보낸다.

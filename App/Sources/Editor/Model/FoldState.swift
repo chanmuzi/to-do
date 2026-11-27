@@ -1,7 +1,7 @@
 import Foundation
 
 /// 사용자가 정한 닫힘과 빈 토글의 열림. 원문에는 적지 않는다.
-nonisolated struct FoldState: Equatable, Sendable {
+nonisolated struct FoldState: Codable, Equatable, Sendable {
     var closed: Set<Int> = []
     var openedEmpty: Set<Int> = []
 

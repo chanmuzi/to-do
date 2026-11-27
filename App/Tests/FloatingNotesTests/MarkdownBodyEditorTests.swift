@@ -1,5 +1,5 @@
 import AppKit
-@_spi(Verification) import Editor
+@_spi(Verification) @testable import Editor
 import Models
 @testable import NotePanel
 import Store
@@ -449,6 +449,39 @@ import Theme
     }
 
     // MARK: - 접힘
+
+    @Test func copiedToggleStatesPersistOnPasteUndoAndRedo() throws {
+        defer { fixture.cleanUp() }
+        let id = NoteID(rawValue: "copied-toggles")
+        func reopen(_ body: String) throws -> MarkdownBodyEditor {
+            let store = try WindowStateStore(location: fixture.location)
+            let adapter = MarkdownBodyEditor(editor: MarkdownEditor(theme: fixture.theme), noteID: id,
+                                             folds: NoteFoldStore(windowStates: store, log: { Issue.record("\($0)") }))
+            adapter.text = body
+            return adapter
+        }
+        let source = MarkdownEditor(theme: fixture.theme)
+        source.load(text: "+ 닫힘\n\t자식\n+ 빈 열림", foldedLines: [0], openedEmptyToggleLines: [2])
+        source.selectedRange = NSRange(location: 0, length: source.text.utf16.count)
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        #expect(source.controller.copySelection(to: board))
+
+        let adapter = try reopen("")
+        adapter.editor.controller.paste(from: board)
+        let pasted = try reopen(adapter.text)
+        #expect(pasted.editor.foldedLines == [0])
+        #expect(pasted.editor.openedEmptyToggleLines == [2])
+        adapter.editor.undoManager.undo()
+        #expect(adapter.text.isEmpty)
+        let undone = try WindowStateStore(location: fixture.location).state(for: id)
+        #expect(undone?.foldedLines == nil)
+        #expect(undone?.openedEmptyToggleLines == nil)
+        adapter.editor.undoManager.redo()
+        let redone = try reopen(adapter.text)
+        #expect(redone.editor.foldedLines == [0])
+        #expect(redone.editor.openedEmptyToggleLines == [2])
+    }
 
     @Test func openedEmptyToggleIsRestoredOnlyForItsMatchingLine() throws {
         defer { fixture.cleanUp() }
