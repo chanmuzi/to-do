@@ -224,7 +224,7 @@ extension EditorController {
             edit = EditorCommands.toggleDone(document, lines: rows, selection: range, excluding: hidden, invertEach: true)
             edit?.selection.length = 0
             edit?.foldedAfter = next.closed
-            edit?.openedEmptyAfter = next.openedEmpty
+            edit?.openTogglesAfter = next.openedEmpty
             edit?.includesHiddenLines = true
             changeUserFolds(next, applying: edit)
             showVisibleBlocks(selection)

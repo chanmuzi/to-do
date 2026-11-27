@@ -110,7 +110,8 @@ extension EditorController: NSTextStorageDelegate {
             deferredOutsideEdit?.shift(editedRange: editedRange, delta: delta)
         }
         if foldsBeforeEdit == nil { foldsBeforeEdit = foldState }
-        foldState = foldState.remapped(old: old, new: document, editedRange: editedRange, delta: delta)
+        foldState = foldState.remapped(old: old, new: document, editedRange: editedRange, delta: delta,
+                                       isReplayingUndo: isReplayingUndo)
         if isReplayingUndo {
             // 되돌리기가 접혀서 감춘 줄을 고쳤으면 보이도록 편다(D-018). 접힘까지 적어 둔 편집이면
             // 다 돌아온 뒤에 그 접힘을 되살린다.

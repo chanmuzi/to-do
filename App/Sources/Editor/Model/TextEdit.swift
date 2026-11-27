@@ -9,7 +9,8 @@ nonisolated struct TextEdit: Equatable, Sendable {
     var selection: NSRange
     /// 줄 순서가 바뀌는 편집이면 접힌 토글의 새 줄 번호.
     var foldedAfter: Set<Int>?
-    var openedEmptyAfter: Set<Int>?
+    /// 편집이 지정한 열린 토글의 새 줄 번호. 적용 뒤 비어 있는 것만 창 상태에 남긴다.
+    var openTogglesAfter: Set<Int>?
     /// 줄 수와 줄 순서를 그대로 두는 편집(줄 머리만 바꾼다). 접힌 토글의 줄 번호가 그대로 남는다.
     var preservesLines = false
     /// 접혀서 보이지 않는 줄까지 일부러 고치는 편집(접힌 덩어리를 통째로 옮기거나 들여 쓴다).

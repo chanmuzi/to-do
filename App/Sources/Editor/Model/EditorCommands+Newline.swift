@@ -124,7 +124,8 @@ nonisolated extension EditorCommands {
             if row >= owner.subtreeEnd { return row + 1 }
             return row > blockEnd ? row - (blockEnd - index) : row
         }
-        edit.openedEmptyAfter = Set(openedEmpty.map(shifted))
+        let state = FoldState(closed: folded, openedEmpty: openedEmpty)
+        edit.openTogglesAfter = Set(state.openToggleLines(in: doc).map(shifted))
         edit.foldedAfter = Set(folded.map(shifted))
         edit.foldedAfter?.insert(owner.subtreeEnd - (blockEnd - index))
         edit.includesHiddenLines = true

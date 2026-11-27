@@ -198,7 +198,7 @@ public final class MarkdownEditor {
         set { controller.foldedLines = newValue }
     }
 
-    /// 직접 열어 안내를 보이는 빈 토글의 줄 번호.
+    /// 열린 상태로 안내를 보이는 빈 토글의 줄 번호.
     public var openedEmptyToggleLines: Set<Int> { controller.foldState.openedEmpty }
 
     /// 닫힘이나 빈 토글의 열림 기록이 바뀌었을 때(사용자가 접고 폈거나, 원문이 바뀌어 줄 번호가 옮겨졌을 때).

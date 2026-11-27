@@ -174,8 +174,10 @@ extension EditorController {
         guard !before.isEmpty || !foldState.isEmpty, !isReplayingUndo, history.open != nil else { return }
         if !explicit, edits.count == 1, let edit = edits.first {
             let oldRange = NSRange(location: edit.range.location, length: edit.range.length - edit.delta)
-            let redone = before.remapped(old: edit.old, new: document, editedRange: edit.range, delta: edit.delta)
-            let undone = foldState.remapped(old: document, new: edit.old, editedRange: oldRange, delta: -edit.delta)
+            let redone = before.remapped(old: edit.old, new: document, editedRange: edit.range,
+                                        delta: edit.delta, isReplayingUndo: true)
+            let undone = foldState.remapped(old: document, new: edit.old, editedRange: oldRange,
+                                             delta: -edit.delta, isReplayingUndo: true)
             if redone == foldState, undone == before { return }
         }
         // 한 단계에 여럿이 있으면 가장 먼저 적힌 것이 남는다.

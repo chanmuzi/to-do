@@ -478,6 +478,13 @@ import Theme
         #expect(withChild.editor.foldedLines == [4])
         #expect(withChild.editor.openedEmptyToggleLines.isEmpty)
         #expect(try WindowStateStore(location: fixture.location).state(for: id)?.openedEmptyToggleLines == nil)
+
+        withChild.editor.selectedRange = NSRange(location: (withChild.text as NSString).range(of: "자식").location, length: 0)
+        withChild.editor.perform(.outdent)
+        let emptied = try WindowStateStore(location: fixture.location).state(for: id)
+        #expect(emptied?.openedEmptyToggleLines == [2])
+        #expect(emptied?.openedEmptyToggleLineTexts == ["+ 직접 연 토글"])
+        #expect(try reopen(withChild.text).editor.openedEmptyToggleLines == [2])
     }
 
     @Test func foldsArePersistedInWindowStateAndRestoredOnReopen() throws {

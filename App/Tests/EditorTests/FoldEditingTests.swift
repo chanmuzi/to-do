@@ -315,3 +315,86 @@ extension FoldEditingTests {
         }
     }
 }
+
+extension FoldEditingTests {
+    @Test func backspaceOnOnlyEmptyChildKeepsToggleOpenAndRestoresChildOnUndo() throws {
+        for title in ["+ ㄷㄷㄷ", "+ ## 첫 줄\\\n둘째 줄"] {
+            let h = try EditorHarness.at(title + "\n\t|\n+ 닫힘")
+            h.type(" ")
+            h.press(NSResponder.backspace)
+            #expect(h.marked == title + "\n\t|\n+ 닫힘")
+            h.press(NSResponder.backspace)
+            #expect(h.marked == title + "|\n+ 닫힘")
+            let titleEnd = h.document.blockLines(at: 0).upperBound
+            #expect(h.controller.currentKeys()[titleEnd].showsEmptyToggleHint)
+            #expect(h.editor.openedEmptyToggleLines == [0])
+            #expect(h.controller.currentKeys().last?.isFolded == true)
+            h.undo()
+            #expect(h.marked == title + "\n\t|\n+ 닫힘")
+            #expect(!h.controller.currentKeys()[titleEnd + 1].isCollapsed)
+            #expect(h.editor.openedEmptyToggleLines.isEmpty)
+            h.redo()
+            #expect(h.marked == title + "|\n+ 닫힘")
+            #expect(h.editor.openedEmptyToggleLines == [0])
+        }
+    }
+
+    @Test func undoOfIndentIntoUnrecordedEmptyToggleRestoresDefaultClosedState() throws {
+        let h = try EditorHarness.at("+ 부모\n자식|")
+        h.perform(.indent)
+        #expect(h.marked == "+ 부모\n\t자식|")
+        #expect(!h.controller.currentKeys()[0].isFolded)
+        h.undo()
+        #expect(h.marked == "+ 부모\n자식|")
+        #expect(h.controller.currentKeys()[0].isFolded)
+        #expect(h.editor.openedEmptyToggleLines.isEmpty)
+    }
+
+    @Test func deletingOnlyChildBlockDoesNotOpenItsClosedNeighbor() throws {
+        let h = try EditorHarness.at("+ 부모\n\t+ 자식|\n\t\t본문\n+ 닫힘")
+        h.controller.selectBlocks()
+        h.press(NSResponder.backspace)
+        #expect(h.editor.text == "+ 부모\n+ 닫힘")
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        #expect(h.controller.currentKeys()[1].isFolded)
+    }
+
+    @Test func removingSelectedChildTextUsesTheSameOpenStateOnRedo() throws {
+        let h = try EditorHarness.at("+ 부모|\n\t본문|\n+ 닫힘")
+        // 글 선택을 잘라낼 때와 같은 편집. 시스템 클립보드는 사용하지 않는다.
+        h.step { h.view.insertText("", replacementRange: h.editor.selectedRange) }
+        #expect(h.marked == "+ 부모|\n+ 닫힘")
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        h.undo()
+        #expect(h.editor.text == "+ 부모\n\t본문\n+ 닫힘")
+        #expect(!h.controller.currentKeys()[1].isCollapsed)
+        h.redo()
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        #expect(h.controller.currentKeys()[0].showsEmptyToggleHint)
+    }
+
+    @Test func outdentingOrMovingOnlyChildKeepsItsFormerParentOpen() throws {
+        let source = "+ 부모\n\t자식|\n+ 다음"
+        let h = try EditorHarness.at(source)
+        h.perform(.outdent)
+        #expect(h.marked == "+ 부모\n자식|\n+ 다음")
+        #expect(h.editor.openedEmptyToggleLines == [0])
+        h.undo()
+        #expect(h.marked == source)
+        h.perform(.moveLineUp)
+        #expect(h.marked == "\t자식|\n+ 부모\n+ 다음")
+        #expect(h.editor.openedEmptyToggleLines == [1])
+        #expect(h.controller.currentKeys()[2].isFolded)
+    }
+}
+
+extension FoldRemapTests {
+    @Test func losingChildrenKeepsAnExplicitlyClosedToggleClosed() {
+        let old = MarkdownDocument("+ 부모\n\t자식")
+        let new = MarkdownDocument("+ 부모")
+        let state = FoldState(closed: [0]).remapped(old: old, new: new,
+            editedRange: NSRange(location: new.length, length: 0), delta: new.length - old.length)
+        #expect(state.closed == [0] && state.openedEmpty.isEmpty)
+        #expect(state.isClosed(0, in: new))
+    }
+}

@@ -51,15 +51,16 @@ nonisolated extension EditorCommands {
         result.replacement = replacement
         let start = moved(edit.selection.location)
         result.selection = NSRange(location: start, length: max(0, moved(NSMaxRange(edit.selection)) - start))
-        if !edit.preservesLines, !folded.isEmpty || !openedEmpty.isEmpty {
+        if !edit.preservesLines {
             // 내어 쓰기는 줄 수를 바꾸지 않으므로 원래 편집을 기준으로 두 기록을 옮긴다.
             let after = MarkdownDocument(edit.applied(to: doc.text))
             let range = NSRange(location: edit.range.location, length: edit.replacement.utf16.count)
             if edit.foldedAfter == nil, !folded.isEmpty {
                 result.foldedAfter = FoldState.remapped(folded, old: doc, new: after, editedRange: range, delta: delta)
             }
-            if edit.openedEmptyAfter == nil, !openedEmpty.isEmpty {
-                result.openedEmptyAfter = FoldState.remapped(openedEmpty, old: doc, new: after, editedRange: range, delta: delta)
+            if edit.openTogglesAfter == nil {
+                let state = FoldState(closed: folded, openedEmpty: openedEmpty)
+                result.openTogglesAfter = FoldState.remapped(state.openToggleLines(in: doc), old: doc, new: after, editedRange: range, delta: delta)
             }
         }
         if !edit.includesHiddenLines, !folded.isEmpty {

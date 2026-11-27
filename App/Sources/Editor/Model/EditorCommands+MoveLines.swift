@@ -95,7 +95,8 @@ nonisolated extension EditorCommands {
             foldedAfter: foldedAfter,
             includesHiddenLines: true
         )
-        edit.openedEmptyAfter = Set(openedEmpty.map(moved))
+        let state = FoldState(closed: folded, openedEmpty: openedEmpty)
+        edit.openTogglesAfter = Set(state.openToggleLines(in: doc).map(moved))
         if !foldedAfter.isEmpty {
             let after = MarkdownDocument(edit.applied(to: doc.text))
             edit.foldedAfter = FoldState.revealing(first + lineShift, in: after, folded: foldedAfter)
