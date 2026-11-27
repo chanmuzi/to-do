@@ -51,6 +51,8 @@ public protocol NoteBodyEditing: AnyObject {
     func editedRange(from previous: String) -> NSRange?
     var onTextChange: ((String) -> Void)? { get set }
     var onContentHeightChange: ((CGFloat) -> Void)? { get set }
+    /// 토글이 높이를 바꾸는 동안에는 창도 즉시 맞춘다.
+    var isChangingUserFold: Bool { get }
     func setNotePalette(_ id: String?)
     func setTitleFocusAction(_ action: @escaping () -> Void)
     func scheduleRemoved(fromBodyLine line: Int)
@@ -73,6 +75,7 @@ public protocol NoteBodyEditing: AnyObject {
 }
 
 extension NoteBodyEditing {
+    public var isChangingUserFold: Bool { false }
     public func editedRange(from previous: String) -> NSRange? { nil }
     public func setNotePalette(_ id: String?) {}
     public func setTitleFocusAction(_ action: @escaping () -> Void) {}

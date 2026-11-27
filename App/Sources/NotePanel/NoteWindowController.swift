@@ -46,7 +46,7 @@ final class NoteWindowController: NSObject {
     var heightStartedAt = ContinuousClock.now
     var heightTarget: CGFloat? { heightTransition?.to }
     var heightAnimation: Task<Void, Never>?
-    private var heightChangedDuringLayout = false
+    private var animateHeightAfterLayout: Bool?
 
     private var reminderRefresh: Task<Void, Never>?
 
@@ -288,16 +288,17 @@ final class NoteWindowController: NSObject {
         editor.onContentHeightChange = { [unowned self] height in
             contentHeight = height
             // 너비가 바뀌어 온 알림은 배치 도중이다. 그때는 배치가 끝난 뒤(onLayout)에 맞춘다.
+            let animated = !editor.isChangingUserFold
             if root.isLayingOut {
-                heightChangedDuringLayout = true
+                animateHeightAfterLayout = animated && (animateHeightAfterLayout ?? true)
             } else {
-                applyContentHeight(animated: true)
+                applyContentHeight(animated: animated)
             }
         }
         root.onLayout = { [unowned self] in
-            if heightChangedDuringLayout {
-                heightChangedDuringLayout = false
-                applyContentHeight(animated: true)
+            if let animated = animateHeightAfterLayout {
+                animateHeightAfterLayout = nil
+                applyContentHeight(animated: animated)
             }
             updateBodyScroller()
         }

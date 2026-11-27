@@ -208,6 +208,7 @@ public struct ThemeTokens: Hashable, Sendable {
         facePeriods = try table("motion", TokenValueParser.seconds)
         self.motion = MotionTokens(
             duration: try motion(.duration, TokenValueParser.seconds),
+            chevronRotation: try motion(.chevronRotation, TokenValueParser.seconds),
             curve: try motion(.ease, TokenValueParser.bezier),
             bell: BellMotion(
                 period: try motion(.bellPeriod, TokenValueParser.seconds),

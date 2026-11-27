@@ -7,6 +7,34 @@ import Theme
 @Suite struct MarkdownEditorDisplayTests {
     private let hidden = EditorMetrics.hiddenFontSize
 
+    @Test func togglingInkInvalidatesTheLayerThatDrawsItsBackground() throws {
+        let previousInk = EditorController.lastInk
+        defer { EditorController.lastInk = previousInk }
+        EditorController.lastInk = InkColor(.yellow)
+        let h = try EditorHarness.at("첫 |문단| 끝")
+        let root = try #require(h.window.contentView)
+        root.wantsLayer = true
+        h.window.setFrameOrigin(NSPoint(x: -10000, y: -10000))
+        h.window.orderBack(nil)
+        defer { h.window.orderOut(nil) }
+        root.layoutSubtreeIfNeeded()
+        h.window.displayIfNeeded()
+        CATransaction.flush()
+        let layer = try #require(h.view.layer)
+        for highlighted in [true, false] {
+            h.window.displayIfNeeded()
+            layer.displayIfNeeded()
+            #expect(!layer.needsDisplay())
+            h.perform(.highlight)
+            #expect(layer.needsDisplay() || h.view.needsDisplay)
+            let manager = h.controller.layoutManager
+            let fragment = try #require(manager.textLayoutFragment(for: manager.documentRange.location))
+            let paragraph = try #require(fragment.textElement as? NSTextParagraph).attributedString
+            let selected = (paragraph.string as NSString).range(of: "문단")
+            #expect((paragraph.attribute(.markdownHighlight, at: selected.location, effectiveRange: nil) != nil) == highlighted)
+        }
+    }
+
     @Test func displayedParagraphHasTheSameCharactersAsTheSource() throws {
         let h = try EditorHarness(DemoNote.text)
         for index in h.document.lines.indices {

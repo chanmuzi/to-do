@@ -184,6 +184,9 @@ public final class MarkdownEditor {
         set { controller.onContentHeightChange = newValue }
     }
 
+    /// 사용자 토글이 일으킨 동기 높이 알림인지 호스트가 확인한다.
+    package var isChangingUserFold: Bool { controller.isChangingUserFold }
+
     /// 지금의 내용 높이(안쪽 여백 포함). 뷰에 너비가 정해진 뒤에 맞는 값이 나온다.
     public var contentHeight: CGFloat { controller.contentHeight }
 

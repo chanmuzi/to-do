@@ -217,6 +217,33 @@ import Theme
         #expect(controller.editor.view.frame.origin == .zero)
     }
 
+    @Test func foldHeightImmediatelyReplacesAnOngoingContentResize() throws {
+        let body = SpyBodyEditor()
+        let coordinator = try fixture.makeCoordinator(makeBodyEditor: { _ in body })
+        coordinator.displayOptions.heightMode = .fitContent
+        defer { fixture.cleanUp(coordinator) }
+        let note = try fixture.notes.create(NoteDraft())
+        try coordinator.open(note.id, focus: false)
+        let controller = try #require(coordinator.controllers[note.id])
+        let padding = fixture.theme.docPadding
+        let line = fixture.theme.lineHeight(.body)
+        let closed = padding.top + padding.bottom + line * 5
+        let opened = closed + line * 2
+        let top = controller.panel.frame.maxY
+        body.onContentHeightChange?(opened + line)
+        #expect((controller.heightTarget != nil) == fixture.animates)
+        body.isChangingUserFold = true
+        for height in [closed, opened] {
+            body.onContentHeightChange?(height)
+            #expect(controller.heightTarget == nil)
+            #expect(controller.panel.frame.height == height + fixture.theme.shape(.chromeHeight) + fixture.theme.shape(.borderWidth))
+            #expect(controller.panel.frame.maxY == top)
+        }
+        body.isChangingUserFold = false
+        body.onContentHeightChange?(closed)
+        #expect((controller.heightTarget != nil) == fixture.animates)
+    }
+
     @Test func animatedHeightChangeReachesItsTarget() async throws {
         let coordinator = try fixture.makeCoordinator()
         coordinator.displayOptions.heightMode = .fitContent

@@ -110,10 +110,6 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         }
         if decoration.isCollapsed { return }
         context.saveGState()
-        defer { context.restoreGState() }
-        context.setAlpha(foldDrawing?.opacity(at: row) ?? 1)
-
-        context.saveGState()
         context.translateBy(x: point.x, y: point.y)
         drawQuoteBar(decoration, in: context)
         if decoration.divider {
@@ -130,7 +126,9 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
 
         context.saveGState()
         context.translateBy(x: point.x, y: point.y)
-        drawGutter(decoration, in: context)
+        if !hasChevron, let glyph = decoration.gutter, let rect = gutterRect {
+            GutterGlyph.draw(glyph, in: rect, decoration: decoration, context: context)
+        }
         if decoration.showsTogglePlaceholder, let gutter = gutterRect {
             let rect = CGRect(x: gutter.maxX, y: gutter.minY, width: containerWidth - decoration.gutterX - gutter.width,
                               height: gutter.height)
@@ -160,7 +158,6 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
     func drawBackground(at origin: CGPoint, in context: CGContext) {
         guard let decoration, !decoration.isCollapsed else { return }
         context.saveGState()
-        context.setAlpha(foldDrawing?.opacity(at: row) ?? 1)
         context.translateBy(x: origin.x, y: origin.y)
         drawCodeBox(decoration, in: context)
         drawInlineBackgrounds(decoration, in: context)
@@ -265,9 +262,16 @@ nonisolated final class MarkdownLayoutFragment: NSTextLayoutFragment {
         }
     }
 
-    private func drawGutter(_ decoration: FragmentDecoration, in context: CGContext) {
-        guard let gutter = decoration.gutter, let rect = gutterRect else { return }
-        GutterGlyph.draw(gutter, in: rect, decoration: decoration, context: context,
-                         openness: foldDrawing?.frames[row]?.openness)
+    // 꺾쇠는 TextKit의 문단 캐시와 독립적으로 회전한다. 본문 뷰가 블록 선택 바탕 위에 그린다.
+    var hasChevron: Bool {
+        if case .chevron = decoration?.gutter { return true }
+        return false
+    }
+
+    func drawChevron(at origin: CGPoint, in context: CGContext) {
+        guard let decoration, !decoration.isCollapsed, let glyph = decoration.gutter,
+              case .chevron = glyph, let gutter = gutterRect else { return }
+        GutterGlyph.draw(glyph, in: gutter.offsetBy(dx: origin.x, dy: origin.y), decoration: decoration,
+                         context: context, openness: foldDrawing?.openness[row])
     }
 }

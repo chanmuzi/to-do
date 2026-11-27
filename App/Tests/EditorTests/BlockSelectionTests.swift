@@ -236,8 +236,16 @@ import Testing
         h.caret(atEndOfLine: 0)
         h.press(#selector(NSResponder.cancelOperation(_:)))
         h.press(#selector(NSResponder.moveDownAndModifySelection(_:)), times: 2)
+        h.controller.foldAnimationsEnabled = { true }
+        var foldHeights: [CGFloat] = []
+        h.editor.onContentHeightChange = { [weak h] height in
+            if h?.editor.isChangingUserFold == true { foldHeights.append(height) }
+        }
         h.perform(.toggleDone)
         #expect(h.editor.foldedLines == [2] && h.editor.text.hasPrefix("[x] A\n[ ] B"))
+        #expect(h.controller.currentKeys()[3].isCollapsed)
+        #expect(h.controller.foldDrawing.openness[2] == 1)
+        #expect(foldHeights == [h.editor.contentHeight])
         h.undo()
         #expect(h.editor.foldedLines.isEmpty && h.editor.text.hasPrefix("[ ] A\n[x] B"))
     }

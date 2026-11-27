@@ -389,6 +389,7 @@ public enum CountToken: String, CaseIterable, Sendable {
 /// `motion` 구역의 키. 값은 `MotionTokens`로 묶여 나온다.
 public enum MotionToken: String, CaseIterable, Sendable {
     case duration = "dur"
+    case chevronRotation = "chevron-rot"
     case ease
     /// 임박한 리마인더의 종(spec 15): 주기, 가만히 있는 앞부분의 몫, 차례로 기우는 각도 셋,
     /// 돌리는 축(위에서부터의 몫), 곡선.

@@ -1,17 +1,9 @@
 import AppKit
 import Theme
 
-/// TextKit 조각은 줄의 논리 상태와 별개로 현재 프레임의 불투명도와 꺾쇠 각도만 읽는다.
+/// 꺾쇠가 도는 동안에만 그 행의 열림 정도를 보관한다(0은 닫힘, 1은 열림).
 nonisolated final class FoldDrawing {
-    struct Frame {
-        var children: Range<Int>
-        var openness: Double
-    }
-    var frames: [Int: Frame] = [:]
-
-    func opacity(at row: Int) -> Double {
-        frames.values.reduce(1) { $1.children.contains(row) ? $0 * $1.openness : $0 }
-    }
+    var openness: [Int: Double] = [:]
 }
 
 struct FoldTransition {
@@ -47,33 +39,41 @@ extension EditorController {
         changeUserFolds(foldState.toggling(current.symmetricDifference(next), in: document))
     }
 
-    func changeUserFolds(_ next: FoldState) {
-        guard next != foldState else { return }
-        let changed = folded.symmetricDifference(next.closed)
-        startFoldMotion(from: folded, to: next.closed)
-        applyFolds(next)
-        notifyFoldChangeIfNeeded()
-        // 동기 배치와 저장이 끝난 시각부터 시작한다. 반전의 출발 투명도는 누른 순간의 값이다.
-        if !foldTransitions.isEmpty {
-            let start = foldClock()
-            for row in changed { foldTransitions[row]?.start = start }
+    func changeUserFolds(_ next: FoldState, applying edit: TextEdit? = nil) {
+        guard next != foldState else {
+            if let edit { apply(edit) }
+            return
         }
+        let changed = folded.symmetricDifference(next.closed)
+            .union(foldState.openedEmpty.symmetricDifference(next.openedEmpty))
+        isChangingUserFold = true
+        defer { isChangingUserFold = false }
+        startFoldMotion(rows: changed, to: next)
+        if let edit {
+            // 선택한 투두의 완료와 토글의 접힘을 같은 편집으로 되돌릴 수 있게 한다.
+            apply(edit)
+        } else {
+            applyFolds(next)
+            notifyFoldChangeIfNeeded()
+        }
+        guard foldState == next else { stopFoldMotion(); return }
+        // 동기 배치와 저장이 끝난 뒤부터 꺾쇠의 시간을 센다.
+        let start = foldClock()
+        for row in changed { foldTransitions[row]?.start = start }
     }
 
-    func startFoldMotion(from previous: Set<Int>, to next: Set<Int>) {
-        guard foldAnimationsEnabled(), theme.motion.duration > 0 else {
+    private func startFoldMotion(rows: Set<Int>, to next: FoldState) {
+        guard foldAnimationsEnabled(), theme.motion.chevronRotation > 0 else {
             stopFoldMotion()
             return
         }
         let now = foldClock()
-        for root in previous.symmetricDifference(next) {
-            let children = (document.blockLines(at: root).upperBound + 1)..<document.lines[root].subtreeEnd
-            guard !children.isEmpty else { continue }
-            let target: Double = next.contains(root) ? 0 : 1
-            let from = foldTransitions[root]?.value(at: now, curve: theme.motion.curve) ?? (1 - target)
-            foldTransitions[root] = FoldTransition(from: from, to: target, start: now,
-                                                   duration: theme.motion.duration * abs(target - from))
-            foldDrawing.frames[root] = FoldDrawing.Frame(children: children, openness: from)
+        for row in rows {
+            let target: Double = next.isClosed(row, in: document) ? 0 : 1
+            let from = foldDrawing.openness[row] ?? (1 - target)
+            foldTransitions[row] = FoldTransition(from: from, to: target, start: now,
+                                                  duration: theme.motion.chevronRotation * abs(target - from))
+            foldDrawing.openness[row] = from
         }
         guard foldTask == nil, !foldTransitions.isEmpty else { return }
         let fps = max(1, textView.window?.screen?.maximumFramesPerSecond ?? 60)
@@ -88,19 +88,13 @@ extension EditorController {
         let interval = EditorTrace.begin("advanceFoldMotion")
         defer { EditorTrace.end("advanceFoldMotion", interval) }
         let now = foldClock()
-        let count = foldTransitions.count
         for (row, transition) in foldTransitions {
             if !foldAnimationsEnabled() || now >= transition.start + transition.duration {
                 foldTransitions.removeValue(forKey: row)
-                foldDrawing.frames.removeValue(forKey: row)
+                foldDrawing.openness.removeValue(forKey: row)
             } else {
-                foldDrawing.frames[row]?.openness = transition.value(at: now, curve: theme.motion.curve)
+                foldDrawing.openness[row] = transition.value(at: now, curve: theme.motion.curve)
             }
-        }
-        // 중간 프레임은 기존 조각에서 투명도와 회전만 다시 그린다.
-        if count != foldTransitions.count {
-            refreshStyling()
-            reportContentHeight()
         }
         textView.setNeedsDisplay(textView.visibleRect)
         if foldTransitions.isEmpty {
@@ -113,7 +107,7 @@ extension EditorController {
     func stopFoldMotion() {
         foldTask?.cancel()
         foldTask = nil
-        foldDrawing.frames.removeAll()
+        foldDrawing.openness.removeAll()
         foldTransitions.removeAll()
     }
 }

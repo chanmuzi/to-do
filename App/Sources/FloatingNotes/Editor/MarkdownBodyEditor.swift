@@ -64,6 +64,7 @@ final class MarkdownBodyEditor: NoteBodyEditing, NoteBodyFormatting, NoteInkForm
 
     let editor: MarkdownEditor
     var onTextChange: ((String) -> Void)?
+    var isChangingUserFold: Bool { editor.isChangingUserFold }
     var onContentHeightChange: ((CGFloat) -> Void)?
 
     private let noteID: NoteID

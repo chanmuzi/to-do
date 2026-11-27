@@ -34,11 +34,11 @@ nonisolated enum LinePresentation {
     static func keys(
         for doc: MarkdownDocument,
         folded: Set<Int>, openedEmpty: Set<Int> = [],
-        hoveredLink: (line: Int, offset: Int)? = nil, animating: Set<Int> = []
+        hoveredLink: (line: Int, offset: Int)? = nil
     ) -> [LineRenderKey] {
         let folded = FoldState.sanitized(folded, in: doc)
         let state = FoldState(closed: folded, openedEmpty: openedEmpty)
-        let hidden = FoldState.hiddenLines(doc, folded: folded.subtracting(animating))
+        let hidden = FoldState.hiddenLines(doc, folded: folded)
         let trailingCode = trailingCodeLine(in: doc) != nil
         return doc.lines.indices.map { index in
             let line = doc.lines[index]
