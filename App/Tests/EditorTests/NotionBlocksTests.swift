@@ -156,12 +156,12 @@ import Testing
         let empty = try #require(ChromiumCustomData.encode([ChromiumCustomData.notionBlocks: "{}"]))
         for invalid in [Data([1]), other, empty] {
             board.setData(invalid, forType: .chromiumWebCustomData)
-            #expect(EditorController.source(from: board) == "+ HTML")
+            #expect(EditorController.source(from: board)?.text == "+ HTML")
         }
         let valid = try #require(CopyExport(source: "+ Notion").chromiumData)
         board.setData(valid, forType: .chromiumWebCustomData)
-        #expect(EditorController.source(from: board) == "+ Notion")
+        #expect(EditorController.source(from: board)?.text == "+ Notion")
         board.setString("Float", forType: .floatingNotesMarkdown)
-        #expect(EditorController.source(from: board) == "Float")
+        #expect(EditorController.source(from: board)?.text == "Float")
     }
 }

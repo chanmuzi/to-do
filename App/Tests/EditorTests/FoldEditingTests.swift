@@ -470,3 +470,163 @@ extension FoldEditingTests {
         #expect(h.marked == title + body + suffix)
     }
 }
+
+extension FoldEditingTests {
+    @Test(arguments: [false, true])
+    func notionClosesNestedTogglesAndPlacesCaretOnVisibleTitle(html: Bool) throws {
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        let source = "+ 부모\n\t+ ## 자식\n\t\t내용"
+        let export = CopyExport(source: source)
+        if html { board.setString(export.html(highlightColors: [:]), forType: .html) }
+        else {
+            let data: Data = try #require(export.chromiumData)
+            board.setData(data, forType: .chromiumWebCustomData)
+        }
+
+        let h = try EditorHarness.at("위\n|")
+        h.controller.paste(from: board)
+        #expect(h.editor.text == "위\n" + source)
+        #expect(h.editor.foldedLines == [1, 2])
+        #expect(h.editor.selectedRange.location == h.document.lines[1].end)
+        #expect(h.changes == [h.editor.text])
+        h.undo()
+        #expect(h.marked == "위\n|")
+        #expect(h.editor.foldedLines.isEmpty)
+        h.redo()
+        #expect(h.editor.foldedLines == [1, 2])
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func floatCopiesTextAndBlocksWithTheirToggleStates(copyBlocks: Bool, inside: Bool) throws {
+        let clip = "+ 열림\n\t보임\n+ 닫힘\n\t숨김\n+ 빈 열림"
+        let from = try EditorHarness()
+        from.editor.load(text: "머리\n" + clip + "\n꼬리", foldedLines: [3], openedEmptyToggleLines: [5])
+        if copyBlocks {
+            from.controller.showBlocks(BlockSelection(anchor: 1, focus: 5))
+        } else {
+            let start = from.document.lines[1].caretStart
+            from.place(at: start, length: from.document.lines[5].end - start)
+        }
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        #expect(from.controller.copySelection(to: board))
+        #expect(board.string(forType: .floatingNotesMarkdown) == clip)
+
+        let body = "+ 대상\n\t기존\n+ 뒤\n\t유지"
+        let h = try EditorHarness()
+        h.editor.load(text: body, foldedLines: [0, 2])
+        h.controller.showBlocks(BlockSelection(anchor: 0, focus: 0))
+        h.controller.paste(from: board, inside: inside)
+        let first = inside ? 1 : 2
+        let roots = [first, first + 2, first + 4]
+        #expect(h.controller.blockSelection?.pastedRoots == roots)
+        #expect(h.document.lines[first].level == (inside ? 1 : 0))
+        #expect(h.editor.foldedLines == (inside ? [3, 7] : [0, 4, 7]))
+        #expect(h.editor.openedEmptyToggleLines == [first + 4])
+        let hidden = FoldState.hiddenLines(h.document, folded: h.editor.foldedLines)
+        #expect(hidden.contains(first + 3))
+        #expect(hidden.isDisjoint(with: roots))
+        h.undo()
+        #expect(h.editor.text == body)
+        #expect(h.controller.foldState == FoldState(closed: [0, 2]))
+        h.redo()
+        #expect(h.editor.openedEmptyToggleLines == [first + 4])
+
+        let text = try EditorHarness.at("위\n|\n아래")
+        text.controller.paste(from: board)
+        #expect(text.editor.text == "위\n" + clip + "\n아래")
+        #expect(text.controller.foldState == FoldState(closed: [3], openedEmpty: [5]))
+        text.undo()
+        #expect(text.marked == "위\n|\n아래")
+        #expect(text.controller.foldState.isEmpty)
+    }
+
+    @Test func textAtParentEndRebasesRowsAndKeepsExistingTitleState() throws {
+        let h = try EditorHarness.at("+ 대상|\n\t이전")
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        board.setString("<p>첫째</p><details><summary>둘째</summary><p>내용</p></details>", forType: .html)
+        h.controller.paste(from: board)
+        #expect(h.marked == "+ 대상\n\t첫째\n\t+ 둘째|\n\t\t내용\n\t이전")
+        #expect(h.editor.foldedLines == [2])
+        h.undo()
+        h.caret(at: h.document.lines[0].contentStart + 1)
+        board.setString("<details><summary>글</summary></details>", forType: .html)
+        h.controller.paste(from: board)
+        #expect(h.editor.text == "+ 대+ 글상\n\t이전")
+        #expect(h.editor.foldedLines.isEmpty)
+    }
+
+    @Test func textReplacementAdoptsOrphansWithoutFoldingUnrelatedRows() throws {
+        let h = try EditorHarness.at("|머리\n- 부모|\n\t+ 기존\n\t\t유지")
+        h.editor.foldedLines = [2]
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        board.setString("<details><summary>붙임</summary><p>자식</p></details><p>끝</p>", forType: .html)
+        h.controller.paste(from: board)
+        #expect(h.editor.text == "+ 붙임\n\t자식\n끝\n+ 기존\n\t유지")
+        #expect(h.editor.foldedLines == [0, 3])
+        h.undo()
+        #expect(h.editor.foldedLines == [2])
+        #expect(h.editor.text == "머리\n- 부모\n\t+ 기존\n\t\t유지")
+    }
+
+    @Test func replacingIdenticalTextCanUndoTheImportedFolds() throws {
+        let h = try EditorHarness.at("|+ 열림\n\t자식|")
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        board.setString("<details><summary>열림</summary><p>자식</p></details>", forType: .html)
+        h.controller.paste(from: board)
+        #expect(h.editor.foldedLines == [0])
+        h.undo()
+        #expect(h.editor.foldedLines.isEmpty)
+        #expect(h.marked == "|+ 열림\n\t자식|")
+        h.redo()
+        #expect(h.editor.foldedLines == [0])
+    }
+
+    @Test func textCopyEndingBeforeChildrenKeepsTheToggleOpen() throws {
+        let from = try EditorHarness.at("|첫 줄\n+ 부모|\n\t자식")
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        #expect(from.controller.copySelection(to: board))
+        let h = try EditorHarness()
+        h.controller.paste(from: board)
+        #expect(h.editor.text == "첫 줄\n+ 부모")
+        #expect(h.controller.foldState == FoldState(openedEmpty: [1]))
+    }
+
+    @Test func leadingFencePaddingAndCodeLiteralsKeepTheirOwnRows() throws {
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        board.setString("<pre><code>+ 코드</code></pre><details><summary>토글</summary><p>자식</p></details>", forType: .html)
+        let h = try EditorHarness.at("앞|뒤")
+        h.controller.paste(from: board)
+        #expect(h.editor.text == "앞\n```\n+ 코드\n```\n+ 토글\n\t자식뒤")
+        #expect(h.editor.foldedLines == [4])
+        #expect(h.editor.selectedRange.location == h.document.lines[4].end)
+
+        let code = try EditorHarness.at("```\n앞|뒤\n```")
+        code.controller.paste(from: board)
+        #expect(code.editor.text == "```\n앞+ 코드\n+ 토글\n\t자식뒤\n```")
+        #expect(code.controller.foldState.isEmpty)
+    }
+
+    @Test func plainAndLegacyFloatFragmentsUseDefaultToggleStates() throws {
+        let clip = "+ 부모\n\t자식\n+ 비었음"
+        let board = NSPasteboard(name: .init(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        for type in [NSPasteboard.PasteboardType.string, .floatingNotesMarkdown] {
+            board.clearContents()
+            board.setString(clip, forType: type)
+            board.setData(Data("invalid".utf8), forType: .floatingNotesFoldState)
+            let h = try EditorHarness()
+            h.controller.paste(from: board)
+            #expect(h.editor.text == clip)
+            #expect(h.controller.foldState.isEmpty)
+            #expect(!h.controller.foldState.isClosed(0, in: h.document))
+            #expect(h.controller.foldState.isClosed(2, in: h.document))
+        }
+    }
+}

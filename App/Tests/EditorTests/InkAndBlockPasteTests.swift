@@ -132,7 +132,7 @@ import Testing
         #expect(plan.edit.applied(to: s.text) == "+ 부모\n\t- 하나\n\t\t- 둘\n\t기존")
         #expect(EditorCommands.pasteAtParentEnd(s.doc, text: "한 줄", selection: s.selection, folded: []) == nil)
         let nonParent = Scenario("\t- 본|문")
-        #expect(EditorCommands.preparedForPaste(nonParent.doc, "\t첫\n\t\t둘", replacing: nonParent.selection) == "첫\n\t\t둘")
+        #expect(EditorCommands.preparedForPaste(nonParent.doc, PasteSource("\t첫\n\t\t둘"), replacing: nonParent.selection).text == "첫\n\t\t둘")
         for source in ["---", "```\n코드\n```"] {
             let doc = MarkdownDocument(source)
             let plan = try #require(EditorCommands.blockPaste(doc, text: "- 다음", target: 0, belowRow: doc.lines.count - 1,

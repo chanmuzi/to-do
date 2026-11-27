@@ -60,14 +60,14 @@ import Testing
         let board = NSPasteboard(name: .init(UUID().uuidString))
         defer { board.releaseGlobally() }
         board.setString("https://example.com", forType: .URL)
-        #expect(EditorController.source(from: board) == "https://example.com")
+        #expect(EditorController.source(from: board)?.text == "https://example.com")
         board.setString("일반 글자", forType: .string)
         board.setData(Data("<p>웹 글자</p>".utf8), forType: .html)
-        #expect(EditorController.source(from: board) == "일반 글자")
+        #expect(EditorController.source(from: board)?.text == "일반 글자")
         board.setData(Data("<details><summary>제목</summary>자식</details>".utf8), forType: .html)
-        #expect(EditorController.source(from: board) == "+ 제목\n\t자식")
+        #expect(EditorController.source(from: board)?.text == "+ 제목\n\t자식")
         board.setString("+ Float 원문", forType: .floatingNotesMarkdown)
-        #expect(EditorController.source(from: board) == "+ Float 원문")
+        #expect(EditorController.source(from: board)?.text == "+ Float 원문")
     }
 
     @Test func fallsBackForUnrecognizedOrUnsupportedContent() {
