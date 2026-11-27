@@ -398,3 +398,75 @@ extension FoldRemapTests {
         #expect(state.isClosed(0, in: new))
     }
 }
+
+extension FoldEditingTests {
+    @Test(arguments: ["|", "본|문"])
+    func indentBelowClosedDateTogglePreservesItsNeighbors(body: String) throws {
+        let title = "+ ## 26.11.27(금)  \\\n이어진 제목  "
+        let prefix = title + "\n\t기존 자식\n"
+        let suffix = "\n+ 26.11.27(금)\n\t숨김\n+ 26.11.27(금)\n+ 26.11.27(금)\n\t보임"
+        let h = try EditorHarness.at(prefix + body + suffix)
+        h.editor.load(text: h.editor.text, foldedLines: [0, 4], openedEmptyToggleLines: [6])
+        let before = h.controller.foldState
+
+        h.perform(.indent)
+        #expect(h.marked == prefix + "\t" + body + suffix)
+        #expect(h.document.lines[0].subtreeEnd == 4)
+        #expect(h.document.lines[3].level == 1)
+        #expect(h.controller.foldState == FoldState(closed: [4], openedEmpty: [6]))
+        #expect(h.controller.currentKeys().enumerated().filter { $0.element.isCollapsed }.map(\.offset) == [5])
+
+        h.undo()
+        #expect(h.marked == prefix + body + suffix)
+        #expect(h.controller.foldState == before)
+        h.redo()
+        h.perform(.outdent)
+        #expect(h.marked == prefix + body + suffix)
+    }
+
+    @Test(arguments: ["|", "본|문"])
+    func indentAfterHiddenToggleEndingInBackslashKeepsBodyIndependent(body: String) throws {
+        let prefix = "+ 26.11.27(금)\n\t+ 안쪽 토글\\\n"
+        let suffix = "\n+ 26.11.28(토)\n\t아래 자식\n+ 26.11.29(일)"
+        let h = try EditorHarness.at(prefix + body + suffix)
+        h.editor.load(text: h.editor.text, foldedLines: [0, 1, 3], openedEmptyToggleLines: [5])
+        let before = h.controller.foldState
+
+        h.perform(.indent)
+        #expect(h.marked == prefix + "  " + body + suffix)
+        #expect(h.document.lines[2].continuationOf == nil)
+        #expect(h.document.lines[2].level == 1)
+        #expect(h.document.lines[0].subtreeEnd == 3)
+        #expect(h.controller.currentKeys()[2].kind == .paragraph)
+        #expect(!h.controller.currentKeys()[2].isCollapsed)
+        #expect(h.controller.foldState == FoldState(closed: [1, 3], openedEmpty: [5]))
+
+        h.undo()
+        #expect(h.marked == prefix + body + suffix)
+        #expect(h.controller.foldState == before)
+        h.redo()
+        h.perform(.outdent)
+        #expect(h.marked == prefix + body + suffix)
+    }
+
+    @Test func indentDoesNotTurnTheFollowingToggleIntoAContinuation() throws {
+        let title = "+ 26.11.27(금)\n"
+        let body = " 본|문\\"
+        let suffix = "\n\t + 26.11.28(토)\n\t\t자식"
+        let h = try EditorHarness.at(title + body + suffix)
+        h.editor.foldedLines = [2]
+
+        h.perform(.indent)
+        #expect(h.marked == title + "  " + body + suffix)
+        #expect(h.document.lines[2].kind.isToggle)
+        #expect(h.editor.foldedLines == [2])
+        #expect(h.controller.currentKeys()[3].isCollapsed)
+        h.undo()
+        #expect(h.marked == title + body + suffix)
+        #expect(h.controller.currentKeys()[0].isFolded)
+        #expect(h.editor.foldedLines == [2])
+        h.redo()
+        h.perform(.outdent)
+        #expect(h.marked == title + body + suffix)
+    }
+}
