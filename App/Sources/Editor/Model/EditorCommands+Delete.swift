@@ -64,6 +64,9 @@ nonisolated extension EditorCommands {
                     selection: NSRange(location: position - line.markerLength, length: 0)
                 ))
             case .paragraph where line.indentLength > 0:
+                if line.isBlankParagraph, let edit = backspaceInOnlyEmptyToggleChild(doc, at: index) {
+                    return .edit(edit)
+                }
                 return .edit(removingLastIndentUnit(doc, line: line, caret: position))
             default:
                 break
@@ -108,6 +111,25 @@ nonisolated extension EditorCommands {
         }
         guard visible != position else { return .passThrough }
         return .edit(TextEdit(range: character, replacement: "", selection: NSRange(location: character.location, length: 0)))
+    }
+
+    private static func backspaceInOnlyEmptyToggleChild(_ doc: MarkdownDocument, at row: Int) -> TextEdit? {
+        guard let titleEnd = (0..<row).last(where: { !doc.lines[$0].isBlankParagraph }) else { return nil }
+        let owner = doc.blockLines(at: titleEnd).lowerBound
+        let toggle = doc.lines[owner]
+        guard toggle.kind.isToggle, toggle.subtreeEnd == row + 1,
+              doc.lines[(titleEnd + 1)..<row].allSatisfy({ $0.level <= toggle.level }) else { return nil }
+        let child = doc.lines[row]
+        let lastIndent = child.contentStart - 1
+        // 단계에 포함되지 않은 끝 공백은 먼저 한 글자만 지운다.
+        if doc.units[lastIndent] == 0x20,
+           LineClassifier.indent(doc.units, from: child.start, to: lastIndent).level == child.level {
+            return .insert("", replacing: NSRange(location: lastIndent, length: 1))
+        }
+        guard child.level == toggle.level + 1 else { return nil }
+        let start = doc.lines[row - 1].end
+        return TextEdit(range: NSRange(location: start, length: doc.lines[row].end - start), replacement: "",
+                        selection: NSRange(location: doc.lines[titleEnd].contentEnd, length: 0))
     }
 
     /// ⌦ (선택이 없을 때).

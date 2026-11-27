@@ -225,7 +225,7 @@ extension EditorController {
             }
             editSetFoldsExplicitly = true
         }
-        if let opened = edit.openedEmptyAfter ?? (edit.preservesLines ? foldsBefore.openedEmpty : nil) {
+        if let opened = edit.openTogglesAfter ?? (edit.preservesLines ? foldsBefore.openToggleLines(in: documentBefore) : nil) {
             foldState.openedEmpty = opened
             foldState = foldState.sanitized(in: document)
         }

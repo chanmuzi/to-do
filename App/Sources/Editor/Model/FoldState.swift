@@ -16,6 +16,11 @@ nonisolated struct FoldState: Equatable, Sendable {
         closed.contains(row) || (!openedEmpty.contains(row) && Self.isEmptyToggle(row, in: doc))
     }
 
+    /// 편집 뒤 자식이 없어져도 열림을 이어갈 수 있도록 자식이 있는 토글도 포함한다.
+    func openToggleLines(in doc: MarkdownDocument) -> Set<Int> {
+        Set(doc.lines.indices.filter { doc.lines[$0].kind.isToggle && !isClosed($0, in: doc) })
+    }
+
     func toggling(_ rows: Set<Int>, in doc: MarkdownDocument) -> Self {
         var next = self
         for row in rows {
@@ -35,10 +40,13 @@ nonisolated struct FoldState: Equatable, Sendable {
              openedEmpty: openedEmpty.filter { !closed.contains($0) && Self.isEmptyToggle($0, in: doc) })
     }
 
-    func remapped(old: MarkdownDocument, new: MarkdownDocument, editedRange: NSRange, delta: Int) -> Self {
-        Self(closed: Self.remapped(closed, old: old, new: new, editedRange: editedRange, delta: delta),
-             openedEmpty: Self.remapped(openedEmpty, old: old, new: new, editedRange: editedRange, delta: delta)
-                .filter { Self.isEmptyToggle($0, in: new) })
+    func remapped(old: MarkdownDocument, new: MarkdownDocument, editedRange: NSRange, delta: Int,
+                  isReplayingUndo: Bool = false) -> Self {
+        // 되돌리기와 다시 실행은 편집 때의 기록을 복원한다. 자식이 다시 사라져도 새로 연 것으로 기록하지 않는다.
+        let open = isReplayingUndo ? openedEmpty : openToggleLines(in: old)
+        let nextClosed = Self.remapped(closed, old: old, new: new, editedRange: editedRange, delta: delta)
+        let nextOpen = Self.remapped(open, old: old, new: new, editedRange: editedRange, delta: delta)
+        return Self(closed: nextClosed, openedEmpty: nextOpen.filter { !nextClosed.contains($0) && Self.isEmptyToggle($0, in: new) })
     }
 
     /// 토글이 아닌 줄 번호를 버린다.
@@ -98,7 +106,7 @@ nonisolated struct FoldState: Equatable, Sendable {
     ///
     /// - 줄이 바뀐 범위의 끝이나 그 뒤에서 시작하면, 그 첫 글자가 옮겨 간 줄이 된다
     ///   (위의 줄을 지우거나 더해도, 줄 맨 앞에 글자를 끼워도 따라간다).
-    /// - 줄이 바뀐 범위의 시작이나 그 앞에서 시작하면 줄 번호가 그대로다.
+    /// - 편집 시작보다 앞에서 시작하거나, 시작이 같고 일부가 남은 줄은 줄 번호가 그대로다.
     /// - 줄의 첫 글자가 바뀐 범위 한가운데에 있었으면 어디로 갔는지 알 수 없으므로 버린다.
     ///
     /// - Parameters:
@@ -119,7 +127,7 @@ nonisolated struct FoldState: Equatable, Sendable {
             let start = old.lines[index].start
             if start >= oldEnd {
                 result.insert(new.lineIndex(at: start + delta))
-            } else if start <= editStart {
+            } else if start < editStart || (start == editStart && oldEnd < NSMaxRange(old.lines[index].fullRange)) {
                 result.insert(index)
             }
         }
