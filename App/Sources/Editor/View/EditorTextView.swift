@@ -148,6 +148,18 @@ final class EditorTextView: PlainTextInputView {
         return super.performKeyEquivalent(with: event)
     }
 
+    /// AppKit이 커서를 보정하기 전의 범위로 스크롤을 요청할 때 이동 방향을 복원한다.
+    private(set) var selectionBeforeCaretMove: NSRange?
+
+    override func doCommand(by selector: Selector) {
+        let previous = selectionBeforeCaretMove
+        defer { selectionBeforeCaretMove = previous }
+        let name = NSStringFromSelector(selector)
+        selectionBeforeCaretMove = name.hasPrefix("move") && !name.hasSuffix("AndModifySelection:") && !hasMarkedText()
+            ? selectedRange() : nil
+        super.doCommand(by: selector)
+    }
+
     override func keyDown(with event: NSEvent) {
         let modifiers = Self.modifiers(of: event)
         if event.keyCode == EditorShortcuts.Key.returnKey, !hasMarkedText(),
