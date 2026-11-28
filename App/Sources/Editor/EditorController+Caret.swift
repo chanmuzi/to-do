@@ -26,11 +26,17 @@ extension EditorController {
 
     /// 커서의 화면 줄과 위아래 여백만 드러낸다. 감긴 마지막 문단도 실제 마지막 화면 줄에서만 끝을 보인다.
     func caretScrollTarget(for range: NSRange) -> CGRect? {
+        let selection = textView.selectedRange()
         guard !isSettingText, !isApplyingOutsideChange, linkSession == nil, range.length == 0,
-              range == textView.selectedRange(), range.location <= document.length,
+              selection.length == 0, selection.location <= document.length, range.location <= document.length,
               textView.textStorage?.length == document.length else { return nil }
-        let index = document.lineIndex(at: range.location)
-        guard let spot = caretSpot(range.location, lineIndex: index) else { return nil }
+        if range != selection {
+            // 접힌 자식을 지날 때는 요청과 실제 커서가 서로 다른 문단에 있을 수도 있다.
+            guard let old = textView.selectionBeforeCaretMove,
+                  CaretSnapping.snap(old: old, new: range, in: document, folded: folded) == selection else { return nil }
+        }
+        let index = document.lineIndex(at: selection.location)
+        guard let spot = caretSpot(selection.location, lineIndex: index) else { return nil }
         let origin = textView.textContainerOrigin
         let line = spot.line.offsetBy(dx: origin.x, dy: origin.y)
         let room = theme.component(.editorCaretScrollRoom)
@@ -45,7 +51,11 @@ extension EditorController {
             bottom = textView.bounds.maxY
         }
         let top = max(textView.bounds.minY, line.minY - room)
-        return CGRect(x: origin.x + spot.x, y: top, width: theme.component(.caretWidth), height: max(0, bottom - top))
+        let target = CGRect(x: origin.x + spot.x, y: top, width: theme.component(.caretWidth), height: max(0, bottom - top))
+        // 접힌 줄 조각이 남긴 소수점 좌표를 스크롤 뷰가 반올림해도 커서 여백을 확보한다.
+        guard textView.selectionBeforeCaretMove != nil else { return target }
+        let aligned = textView.convertFromBacking(textView.convertToBacking(target).integral)
+        return CGRect(x: target.minX, y: aligned.minY, width: target.width, height: aligned.height)
     }
 
     /// 그 줄의 기본 글꼴.
